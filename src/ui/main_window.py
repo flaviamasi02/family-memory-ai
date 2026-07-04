@@ -1,8 +1,6 @@
-import hashlib
 from pathlib import Path
 
-from PySide6.QtCore import QObject, Qt, QThread, Signal
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import Qt, QThread
 from PySide6.QtWidgets import (
     QFileDialog,
     QLabel,
@@ -14,54 +12,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from workers.thumbnail_worker import ThumbnailWorker
+
 
 SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-
-
-def get_thumbnail_cache_path(photo_path: str) -> Path:
-    cache_dir = Path("cache") / "thumbnails"
-    cache_dir.mkdir(parents=True, exist_ok=True)
-
-    file = Path(photo_path)
-    cache_key = f"{file.resolve()}_{file.stat().st_mtime}"
-    filename = hashlib.md5(cache_key.encode("utf-8")).hexdigest() + ".jpg"
-
-    return cache_dir / filename
-
-
-class ThumbnailWorker(QObject):
-    thumbnail_ready = Signal(str, QPixmap)
-    finished = Signal()
-
-    def __init__(self, photos, thumbnail_size=160):
-        super().__init__()
-        self.photos = photos
-        self.thumbnail_size = thumbnail_size
-
-    def run(self):
-        for photo_path in self.photos:
-            cache_path = get_thumbnail_cache_path(str(photo_path))
-
-            if cache_path.exists():
-                pixmap = QPixmap(str(cache_path))
-            else:
-                pixmap = QPixmap(str(photo_path))
-
-                if pixmap.isNull():
-                    continue
-
-                pixmap = pixmap.scaled(
-                    self.thumbnail_size,
-                    self.thumbnail_size,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                )
-
-                pixmap.save(str(cache_path), "JPG", quality=85)
-
-            self.thumbnail_ready.emit(str(photo_path), pixmap)
-
-        self.finished.emit()
 
 
 class MainWindow(QMainWindow):
