@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Qt, QThread, Signal
@@ -5,16 +6,27 @@ from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QFileDialog,
     QLabel,
+    QGridLayout,
     QMainWindow,
     QPushButton,
     QScrollArea,
     QVBoxLayout,
-    QGridLayout,
     QWidget,
 )
 
 
 SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+
+
+def get_thumbnail_cache_path(photo_path: str) -> Path:
+    cache_dir = Path("cache") / "thumbnails"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    file = Path(photo_path)
+    cache_key = f"{file.resolve()}_{file.stat().st_mtime}"
+    filename = hashlib.md5(cache_key.encode("utf-8")).hexdigest() + ".jpg"
+
+    return cache_dir / filename
 
 
 class ThumbnailWorker(QObject):
@@ -28,15 +40,26 @@ class ThumbnailWorker(QObject):
 
     def run(self):
         for photo_path in self.photos:
-            pixmap = QPixmap(str(photo_path))
-            if not pixmap.isNull():
+            cache_path = get_thumbnail_cache_path(str(photo_path))
+
+            if cache_path.exists():
+                pixmap = QPixmap(str(cache_path))
+            else:
+                pixmap = QPixmap(str(photo_path))
+
+                if pixmap.isNull():
+                    continue
+
                 pixmap = pixmap.scaled(
                     self.thumbnail_size,
                     self.thumbnail_size,
                     Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.SmoothTransformation,
                 )
-                self.thumbnail_ready.emit(str(photo_path), pixmap)
+
+                pixmap.save(str(cache_path), "JPG", quality=85)
+
+            self.thumbnail_ready.emit(str(photo_path), pixmap)
 
         self.finished.emit()
 
@@ -48,7 +71,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Family Memory AI")
         self.setMinimumSize(1000, 700)
 
-        self.thumbnail_labels = []
+        self.thumbnail_labels = {}
         self.thumbnail_thread = None
         self.thumbnail_worker = None
 
@@ -119,7 +142,7 @@ class MainWindow(QMainWindow):
 
         columns = 5
         thumbnail_size = 160
-        self.thumbnail_labels = []
+        self.thumbnail_labels = {}
 
         for index, photo_path in enumerate(photos):
             row = index // columns
@@ -130,7 +153,7 @@ class MainWindow(QMainWindow):
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             label.setStyleSheet("border: 1px solid #cccccc; color: #777777;")
 
-            self.thumbnail_labels.append(label)
+            self.thumbnail_labels[str(photo_path)] = label
             self.grid_layout.addWidget(label, row, column)
 
     def start_thumbnail_loading(self, photos):
@@ -148,19 +171,11 @@ class MainWindow(QMainWindow):
         self.thumbnail_thread.start()
 
     def update_thumbnail(self, photo_path, pixmap):
-        index = None
+        label = self.thumbnail_labels.get(photo_path)
 
-        for i, label in enumerate(self.thumbnail_labels):
-            if i < len(self.thumbnail_labels):
-                index = i
-                break
-
-        # Find the first label still showing "Loading..."
-        for label in self.thumbnail_labels:
-            if label.text() == "Loading...":
-                label.setPixmap(pixmap)
-                label.setText("")
-                break
+        if label:
+            label.setPixmap(pixmap)
+            label.setText("")
 
     def clear_grid(self):
         while self.grid_layout.count():
