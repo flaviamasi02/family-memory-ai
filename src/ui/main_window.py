@@ -1,21 +1,17 @@
-from pathlib import Path
-
 from PySide6.QtCore import Qt, QThread
 from PySide6.QtWidgets import (
     QFileDialog,
     QLabel,
-    QGridLayout,
     QMainWindow,
     QPushButton,
-    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
 
+from core.photo_scanner import find_photos
+from models.photo_model import PhotoModel
+from ui.photo_grid_view import PhotoGridView
 from workers.thumbnail_worker import ThumbnailWorker
-
-
-SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
 class MainWindow(QMainWindow):
@@ -25,7 +21,6 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Family Memory AI")
         self.setMinimumSize(1000, 700)
 
-        self.thumbnail_labels = {}
         self.thumbnail_thread = None
         self.thumbnail_worker = None
 
@@ -42,20 +37,15 @@ class MainWindow(QMainWindow):
         self.status_label.setStyleSheet("font-size: 15px;")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.grid_widget = QWidget()
-        self.grid_layout = QGridLayout()
-        self.grid_layout.setSpacing(12)
-        self.grid_widget.setLayout(self.grid_layout)
-
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setWidget(self.grid_widget)
+        self.photo_model = PhotoModel()
+        self.photo_view = PhotoGridView()
+        self.photo_view.setModel(self.photo_model)
 
         layout = QVBoxLayout()
         layout.addWidget(title)
         layout.addWidget(import_button)
         layout.addWidget(self.status_label)
-        layout.addWidget(scroll_area)
+        layout.addWidget(self.photo_view)
 
         container = QWidget()
         container.setLayout(layout)
@@ -72,47 +62,21 @@ class MainWindow(QMainWindow):
             self.status_label.setText("No folder selected.")
             return
 
-        photos = self.find_photos(folder_path)
-        photos_to_show = photos[:300]
+        photos = find_photos(folder_path)
 
         self.status_label.setText(
-            f"Found {len(photos)} photos. Loading first {len(photos_to_show)} thumbnails..."
+            f"Found {len(photos)} photos. Loading thumbnails progressively in background..."
         )
 
-        self.show_loading_grid(photos_to_show)
-        self.start_thumbnail_loading(photos_to_show)
+        self.load_photos(photos)
+        self.start_thumbnail_loading(photos)
 
-    def find_photos(self, folder_path):
-        folder = Path(folder_path)
-
-        return [
-            file
-            for file in folder.rglob("*")
-            if file.suffix.lower() in SUPPORTED_EXTENSIONS
-        ]
-
-    def show_loading_grid(self, photos):
-        self.clear_grid()
-
-        columns = 5
-        thumbnail_size = 160
-        self.thumbnail_labels = {}
-
-        for index, photo_path in enumerate(photos):
-            row = index // columns
-            column = index % columns
-
-            label = QLabel("Loading...")
-            label.setFixedSize(thumbnail_size, thumbnail_size)
-            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            label.setStyleSheet("border: 1px solid #cccccc; color: #777777;")
-
-            self.thumbnail_labels[str(photo_path)] = label
-            self.grid_layout.addWidget(label, row, column)
+    def load_photos(self, photos):
+        self.photo_model.set_photos(photos)
 
     def start_thumbnail_loading(self, photos):
         self.thumbnail_thread = QThread()
-        self.thumbnail_worker = ThumbnailWorker(photos)
+        self.thumbnail_worker = ThumbnailWorker(photos, batch_size=12, delay_ms=10)
 
         self.thumbnail_worker.moveToThread(self.thumbnail_thread)
 
@@ -124,16 +88,5 @@ class MainWindow(QMainWindow):
 
         self.thumbnail_thread.start()
 
-    def update_thumbnail(self, photo_path, pixmap):
-        label = self.thumbnail_labels.get(photo_path)
-
-        if label:
-            label.setPixmap(pixmap)
-            label.setText("")
-
-    def clear_grid(self):
-        while self.grid_layout.count():
-            item = self.grid_layout.takeAt(0)
-            widget = item.widget()
-            if widget:
-                widget.deleteLater()
+    def update_thumbnail(self, photo, pixmap):
+        self.photo_model.update_thumbnail(photo, pixmap)
