@@ -2,11 +2,11 @@
 
 ## Current Version
 
-- Version: v0.0.5
+- Version: v0.1.0
 
 ## Current Sprint
 
-- Sprint 10
+- Sprint 13
 
 ## Project Status
 
@@ -18,7 +18,7 @@
 
 ## Overall Completion
 
-- Estimate: Early-stage prototype
+- Estimate: Early prototype with a growing architecture foundation
 
 ---
 
@@ -40,11 +40,15 @@ Sprint 9.1 removed the temporary 300-photo display limit from the import flow. T
 
 Sprint 10 introduced a lightweight foundation for progressive thumbnail loading. The photo model remains the single source of truth for photo data, the view remains a simple list-based grid, and thumbnail work now runs in batches through the background worker so the UI stays responsive while thumbnails are loaded progressively. This is a preparation step for future lazy loading and virtual grid work rather than the final implementation.
 
+## Sprint 12 Update
+
+Sprint 12 added a simple metadata details panel to the main window and fixed the startup crash caused by connecting selection signals before the photo grid view had a valid selection model. The view now connects its selection handling safely inside the model-binding path, allowing photo selection to update the details panel without destabilizing startup or thumbnail loading. A follow-up bug fix also corrected an incorrect PySide6 import in the details panel, replacing the dynamic import path with the standard Qt import so the application can launch cleanly. Additional hardening was added to thumbnail loading for very large images by switching to QImageReader with scaled decoding, which avoids the full-resolution allocation failure and keeps the app responsive while continuing to use the existing thumbnail cache. The selection flow was then tightened so clicking a photo now routes through the photo model into the details panel, and the details view shows filename, size, dimensions, date, camera information, and status when available. A further fix now handles invalid or corrupted JPEG files safely by catching decode failures in both thumbnail loading and metadata extraction, logging concise warnings, and allowing the import process to continue without crashing. A targeted click-selection bug fix also resolved the earlier crash caused by mixing selectionChanged and clicked flows. The list view now relies on clicked as the reliable selection trigger, so clicking a photo updates the panel without crashing. A fallback interaction change then simplified the flow further by using double-click as the reliable trigger for showing photo details, which avoids the unstable single-click behavior seen after thumbnail updates in QListView. This sprint also introduced a reusable PhotoCardWidget component as the first building block for a future custom photo grid. The component displays a thumbnail and filename, emits a click signal, and can be reused in later Sprint work without introducing AI or database features. The unstable QListView-based photo grid was finally replaced with a lightweight custom PhotoGridWidget built from PhotoCardWidget instances so clicking a photo card reliably updates the details panel. This is an intermediate step toward a fuller custom photo browser and does not yet add virtual scrolling or advanced layout behavior.quiring a redesign of the current grid. The current PhotoGridView implementation was then rewritten from scratch as a minimal clicked-based wrapper because the earlier patchwork selection logic had become brittle when thumbnails and list-item rendering changed. The new view keeps only the essential responsibilities: configure the icon view, receive a click, resolve the selected Photo from the model, and emit the selection signal. This keeps the app functional while preserving a clear path toward a future custom grid implementation.placing the current QListView-based view. Invalid files may still lack thumbnails or metadata, but the app remains responsive and continues processing the rest of the library.
+
 ---
 
 # Current Architecture
 
-The current implementation is a lightweight Qt desktop application with a small modular structure.
+The current implementation is a lightweight Qt desktop application with a modular structure centered on the Photo model and a custom photo card experience.
 
 ## Current Folders
 
@@ -61,9 +65,11 @@ The current implementation is a lightweight Qt desktop application with a small 
 
 - Main application entry point
 - Main window UI
+- Photo card and photo grid widgets
 - Thumbnail worker
 - Thumbnail cache
 - Photo scanning flow
+- Metadata extraction flow
 
 ---
 
@@ -79,6 +85,13 @@ The current implementation is a lightweight Qt desktop application with a small 
 | Sprint 6 | Completed | Background Thumbnail Loading |
 | Sprint 7 | Completed | Persistent Thumbnail Cache |
 | Sprint 7.5 | Completed | Architecture Refactoring |
+| Sprint 8 | Completed | Model/View Architecture Foundation |
+| Sprint 9 | Completed | Photo Domain Model Foundation |
+| Sprint 9.1 | Completed | Removed the 300-photo display limit |
+| Sprint 10 | Completed | Progressive / Lazy Loading Foundation |
+| Sprint 11 | Completed | EXIF Metadata Foundation |
+| Sprint 12 | Completed | Custom Photo Grid and Details Panel |
+| Sprint 13 | Completed | Batch Photo Grid Loading |
 
 ---
 
@@ -89,27 +102,29 @@ The current implementation is a lightweight Qt desktop application with a small 
 - [x] Recursive scan
 - [x] Thumbnail generation
 - [x] Persistent thumbnail cache
-- [x] Responsive UI
+- [x] Responsive UI during import and thumbnail loading
 - [x] Background worker
 - [x] GitHub workflow
 - [x] Photo domain model foundation
 - [x] Thumbnail worker compatibility preserved
+- [x] EXIF metadata extraction foundation
+- [x] Custom photo card grid foundation
+- [x] Progressive batch creation of photo cards
+- [x] Details panel updates from card selection
 
 ---
 
 # Current Limitations
 
 - Temporary UI
-- Maximum thumbnails currently displayed is limited
-- No database
-- No EXIF extraction yet
-- No AI processing
-- No face recognition
-- No duplicate detection
-- No virtual grid
-- No lazy loading
-- No HEIC support
-- No cloud integration
+- No true virtual scrolling yet
+- Large folders still load progressively rather than instantly
+- No database yet
+- No AI scoring yet
+- No face recognition yet
+- No duplicate detection yet
+- No HEIC support yet
+- No cloud integration yet
 
 ---
 
@@ -117,15 +132,15 @@ The current implementation is a lightweight Qt desktop application with a small 
 
 ## High
 
-- Architecture is still early and should be formalized around model/view separation.
-- UI and processing concerns should be further decoupled.
-- The current structure will need stronger abstractions as the feature set grows.
+- The custom card grid still needs a more scalable layout and rendering strategy for very large libraries.
+- UI and processing concerns should be further decoupled as the feature set grows.
+- The architecture should continue to formalize the separation between domain models, UI widgets, and background workers.
 
 ## Medium
 
 - Thumbnail handling should be expanded into a more general media pipeline.
-- The app needs better state management as the number of features increases.
-- Performance expectations for large libraries require clearer infrastructure planning.
+- The app needs better state management as more metadata and interactions are added.
+- Performance expectations for very large libraries now require more explicit virtualization planning.
 
 ## Low
 
@@ -138,20 +153,19 @@ The current implementation is a lightweight Qt desktop application with a small 
 
 ## Title
 
-Virtual Grid / Lazy Loading Foundation
+Photo Grid Performance and Virtualization Foundation
 
 ## Objective
 
-Introduce a stronger structural foundation for photo data, UI presentation, and future AI integration.
+Improve the custom photo grid for large libraries by introducing a more scalable rendering strategy and reducing the cost of creating many card widgets.
 
 ## Expected Result
 
-A clearer separation between data models, UI views, and background processes.
+A smoother photo browser experience for large folders with better memory behavior and more explicit performance boundaries.
 
 ## Files likely to change
 
 - src/ui/
-- src/main.py
 - src/workers/
 - src/cache/
 
@@ -162,9 +176,9 @@ High
 ## Acceptance criteria
 
 - The application remains functional.
-- Photo data is handled through a more structured model layer.
-- The UI remains responsive.
-- The architecture is easier to extend for future features.
+- The custom card grid remains responsive for large folders.
+- Thumbnail loading continues to work with the existing cache.
+- The architecture remains easy to extend for metadata and AI features.
 
 ---
 
@@ -216,8 +230,8 @@ High
 | Classes | TBD |
 | Modules | TBD |
 | Implemented features | TBD |
-| Completed Sprints | 8 |
-| Architecture maturity | Early |
+| Completed Sprints | 13 |
+| Architecture maturity | Emerging |
 
 ---
 

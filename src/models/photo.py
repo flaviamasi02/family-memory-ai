@@ -50,6 +50,9 @@ class Photo:
     def display_name(self) -> str:
         return self.filename or str(self.path)
 
+    def set_status(self, status: str) -> None:
+        self.status = status
+
     def has_thumbnail(self) -> bool:
         return self.thumbnail is not None
 

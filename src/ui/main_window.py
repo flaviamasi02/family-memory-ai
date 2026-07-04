@@ -1,6 +1,7 @@
 from PySide6.QtCore import Qt, QThread
 from PySide6.QtWidgets import (
     QFileDialog,
+    QHBoxLayout,
     QLabel,
     QMainWindow,
     QPushButton,
@@ -10,7 +11,8 @@ from PySide6.QtWidgets import (
 
 from core.photo_scanner import find_photos
 from models.photo_model import PhotoModel
-from ui.photo_grid_view import PhotoGridView
+from ui.photo_details_panel import PhotoDetailsPanel
+from ui.photo_grid_widget import PhotoGridWidget
 from workers.thumbnail_worker import ThumbnailWorker
 
 
@@ -38,14 +40,20 @@ class MainWindow(QMainWindow):
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.photo_model = PhotoModel()
-        self.photo_view = PhotoGridView()
-        self.photo_view.setModel(self.photo_model)
+        self.photo_view = PhotoGridWidget()
+        self.photo_view.photo_selected.connect(self._handle_photo_selection)
+
+        self.details_panel = PhotoDetailsPanel()
+
+        content_layout = QHBoxLayout()
+        content_layout.addWidget(self.photo_view, 1)
+        content_layout.addWidget(self.details_panel, 0)
 
         layout = QVBoxLayout()
         layout.addWidget(title)
         layout.addWidget(import_button)
         layout.addWidget(self.status_label)
-        layout.addWidget(self.photo_view)
+        layout.addLayout(content_layout)
 
         container = QWidget()
         container.setLayout(layout)
@@ -73,6 +81,7 @@ class MainWindow(QMainWindow):
 
     def load_photos(self, photos):
         self.photo_model.set_photos(photos)
+        self.photo_view.set_photos(photos)
 
     def start_thumbnail_loading(self, photos):
         self.thumbnail_thread = QThread()
@@ -90,3 +99,12 @@ class MainWindow(QMainWindow):
 
     def update_thumbnail(self, photo, pixmap):
         self.photo_model.update_thumbnail(photo, pixmap)
+        self.photo_view.update_thumbnail(photo, pixmap)
+        self.details_panel.set_photo(photo)
+
+    def _handle_photo_selection(self, photo):
+        if photo is not None:
+            print(f"MainWindow received selected photo: {photo.display_name()}")
+        else:
+            print("MainWindow received selected photo: None")
+        self.details_panel.set_photo(photo)

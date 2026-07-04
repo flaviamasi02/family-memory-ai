@@ -1,10 +1,18 @@
+import os
 import tempfile
 import unittest
 from pathlib import Path
 
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import QApplication
+
 from core.metadata_extractor import extract_basic_metadata
 from core.photo_scanner import find_photos
 from models.photo import Photo
+from ui.photo_grid_widget import PhotoGridWidget
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
 class PhotoMetadataTests(unittest.TestCase):
@@ -63,3 +71,24 @@ class PhotoMetadataTests(unittest.TestCase):
             self.assertEqual(metadata["camera_model"], "EOS 80D")
             self.assertEqual(metadata["orientation"], 6)
             self.assertFalse(metadata["has_gps"])
+
+    def test_photo_grid_applies_pending_thumbnail_using_path_key(self):
+        app = QApplication.instance() or QApplication([])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "card.jpg"
+            path.write_bytes(b"fake jpg")
+
+            photo = Photo.from_path(path)
+            grid = PhotoGridWidget()
+            pixmap = QPixmap(20, 20)
+            pixmap.fill(Qt.GlobalColor.red)
+
+            grid.update_thumbnail(photo, pixmap)
+            self.assertIn(grid._photo_key(photo), grid._pending_thumbnail_updates)
+
+            grid.set_photos([photo])
+            app.processEvents()
+
+            self.assertEqual(len(grid._cards), 1)
+            self.assertFalse(grid._cards[0].thumbnail_label.pixmap().isNull())
