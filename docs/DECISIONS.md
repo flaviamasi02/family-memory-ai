@@ -94,3 +94,56 @@ Approved.
 Single Source of Truth
 
 Approved.
+
+### DEC-0022
+Story Timeline Architecture
+
+**Value:** Product  
+**Impact:** Medium
+
+Version 1 is **NOT** focused on Story Timeline. Story Timeline is an approved future capability. The application architecture must remain extensible so future album types can be added without major redesign.
+
+**Impacted documents:**
+- PROJECT_CONTEXT.md
+- PROJECT_STATE.md
+- ROADMAP.md
+- HANDOVER.md
+
+### DEC-0023
+Decision Impact Matrix
+
+**Value:** Method  
+**Impact:** Low
+
+Every approved decision must include:
+- Decision ID
+- Value (Product / Method / Both)
+- Impact
+- Documents to update
+- Impacted sprints
+
+### DEC-0024
+Product North Star
+
+**Value:** Product  
+**Impact:** Low
+
+Version 1 of Family Memory AI has one primary objective:
+
+> "Automatically create the best possible annual family photo album."
+
+Future album types including:
+- Vacation Albums
+- Gift Albums
+- Event Albums
+- Story Timeline
+
+are approved future directions but are **NOT** part of Version 1.
+
+The architecture should remain extensible.
+
+**Impacted documents:**
+- PROJECT_CONTEXT.md
+- PROJECT_STATE.md
+- ROADMAP.md
+- HANDOVER.md
