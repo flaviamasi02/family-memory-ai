@@ -165,35 +165,95 @@ MEME_FILENAME_INDICATORS = {
     "lol",
     "joke",
     "quote",
+    "citazione",
     "imgflip",
     "tenor",
     "giphy",
+    "reaction",
+    "buongiorno",
+    "buonanotte",
+    "auguri",
     "whatsapp image",
+    "whatsapp",
     "forwarded",
     "shared",
     "download",
     "facebook",
     "instagram",
     "tiktok",
+    "pinterest",
 }
 DOCUMENT_FILENAME_INDICATORS = {
     "document",
     "scan",
+    "scanned",
+    "doc",
     "pdf",
     "contract",
     "contratto",
-    "statement",
-    "bill",
+    "receipt",
+    "invoice",
+    "fattura",
+    "scontrino",
+    "ricevuta",
+    "bolletta",
+    "pagamento",
+    "tessera",
+    "carta_identita",
+    "passport",
+    "passaporto",
 }
 ADVERTISEMENT_FILENAME_INDICATORS = {
     "promo",
+    "promotion",
+    "advert",
+    "advertisement",
+    "pubblicita",
     "banner",
+    "flyer",
+    "volantino",
+    "marketing",
     "offerta",
     "sale",
-    "advert",
+    "discount",
     "coupon",
-    "sponsor",
-    "ad_",
+}
+SCREENSHOT_FILENAME_INDICATORS = {
+    "screenshot",
+    "screen_shot",
+    "screen-shot",
+    "schermata",
+    "capture",
+    "screenrec",
+}
+
+WEAK_SHARE_INDICATORS = {
+    "whatsapp",
+    "forwarded",
+    "shared",
+    "download",
+    "facebook",
+    "instagram",
+    "tiktok",
+    "pinterest",
+}
+
+STRONG_MEME_INDICATORS = {
+    "meme",
+    "sticker",
+    "gif",
+    "funny",
+    "lol",
+    "joke",
+    "quote",
+    "citazione",
+    "imgflip",
+    "tenor",
+    "giphy",
+    "reaction",
+    "buongiorno",
+    "buonanotte",
+    "auguri",
 }
 
 
@@ -207,12 +267,27 @@ class MediaClassifier:
         width, height = self._read_dimensions(metadata_dict)
         area = width * height if isinstance(width, int) and isinstance(height, int) else None
         ratio = (width / height) if isinstance(width, int) and isinstance(height, int) and height > 0 else None
+        tall_ratio = (height / width) if isinstance(width, int) and isinstance(height, int) and width > 0 else None
         has_camera_metadata = self._has_camera_metadata(metadata_dict)
         has_exif_date = self._has_exif_date(metadata_dict)
         has_gps = bool(metadata_dict.get("has_gps", False))
         looks_downloaded = self._looks_downloaded_or_shared(filename_lower)
         meme_indicators = self._matched_meme_indicators(filename_lower)
+        strong_meme_hit = any(indicator in STRONG_MEME_INDICATORS for indicator in meme_indicators)
+        whatsapp_like = self._is_whatsapp_filename(filename_lower)
+        camera_pattern = self._matches_camera_filename_pattern(path.name)
+        photo_like_geometry = self._is_photo_like_geometry(width, height)
+        weak_metadata_profile = not has_camera_metadata and not has_exif_date and not has_gps
 
+        # 1. unsupported file
+        if extension and extension not in IMAGE_EXTENSIONS and extension not in VIDEO_EXTENSIONS:
+            return MediaClassification(
+                media_category=MediaCategory.Unknown,
+                classification_reason=f"Unsupported extension {extension} classified as unknown media.",
+                classification_confidence=0.95,
+            )
+
+        # 2. video
         if extension in VIDEO_EXTENSIONS:
             return MediaClassification(
                 media_category=MediaCategory.Video,
@@ -220,15 +295,9 @@ class MediaClassifier:
                 classification_confidence=1.0,
             )
 
-        if extension and extension not in IMAGE_EXTENSIONS:
-            return MediaClassification(
-                media_category=MediaCategory.Unknown,
-                classification_reason=f"Unsupported non-video extension {extension} classified as unknown media.",
-                classification_confidence=0.70,
-            )
-
+        # 3. screenshot
         screenshot_by_filename = self._is_screenshot(filename_lower, metadata_dict)
-        screenshot_by_dimensions = self._is_tall_phone_screenshot(width, height, ratio)
+        screenshot_by_dimensions = self._is_tall_phone_screenshot(width, height, ratio, tall_ratio)
         if screenshot_by_filename or screenshot_by_dimensions:
             reason_parts = []
             if screenshot_by_filename:
@@ -238,14 +307,21 @@ class MediaClassifier:
             return MediaClassification(
                 MediaCategory.Screenshot,
                 f"Classified as screenshot because {' and '.join(reason_parts)}.",
-                0.98,
+                0.90 if screenshot_by_dimensions and not screenshot_by_filename else 0.97,
             )
 
+        # 4. document / scan / receipt / invoice
         if "invoice" in filename_lower:
-            return MediaClassification(MediaCategory.Invoice, "Filename indicates invoice content.", 0.99)
+            return MediaClassification(MediaCategory.Invoice, "Classified as invoice because filename indicates invoice/fattura content.", 0.98)
 
         if "receipt" in filename_lower:
-            return MediaClassification(MediaCategory.Receipt, "Filename indicates receipt content.", 0.99)
+            return MediaClassification(MediaCategory.Receipt, "Classified as receipt because filename indicates receipt/scontrino content.", 0.98)
+
+        if any(keyword in filename_lower for keyword in ("fattura",)):
+            return MediaClassification(MediaCategory.Invoice, "Classified as invoice because filename contains fattura.", 0.98)
+
+        if any(keyword in filename_lower for keyword in ("scontrino", "ricevuta")):
+            return MediaClassification(MediaCategory.Receipt, "Classified as receipt because filename contains scontrino/ricevuta.", 0.98)
 
         if self._is_document(filename_lower):
             return MediaClassification(
@@ -254,6 +330,7 @@ class MediaClassifier:
                 0.97,
             )
 
+        # 5. advertisement / promotional graphic
         if self._is_advertisement(filename_lower) or self._is_banner_like(ratio, width, height):
             reason_parts = []
             if self._is_advertisement(filename_lower):
@@ -266,12 +343,17 @@ class MediaClassifier:
                 0.95,
             )
 
-        if self._is_duplicate_candidate(filename_lower, metadata_dict):
-            return MediaClassification(MediaCategory.DuplicateCandidate, "Filename or metadata indicates duplicate candidate.", 0.95)
-
+        # 6. meme / sticker / graphic
         if self._is_meme(filename_lower):
             detail = ", ".join(meme_indicators[:3]) if meme_indicators else "meme indicators"
-            if area is not None and area <= 512 * 512:
+            if whatsapp_like and not strong_meme_hit and photo_like_geometry and not weak_metadata_profile:
+                return MediaClassification(
+                    MediaCategory.FamilyPhoto,
+                    f"Classified as family photo with conservative confidence because WhatsApp filename is ambiguous but geometry and photo evidence are present ({width}x{height}).",
+                    0.64,
+                )
+
+            if area is not None and area <= 600 * 600:
                 return MediaClassification(
                     MediaCategory.Graphic,
                     f"Classified as graphic because filename contains {detail} and image has low resolution ({width}x{height}).",
@@ -280,7 +362,7 @@ class MediaClassifier:
             return MediaClassification(
                 MediaCategory.Meme,
                 f"Classified as meme because filename contains {detail}.",
-                0.94,
+                0.92 if not whatsapp_like else 0.85,
             )
 
         if self._is_small_square_without_camera_metadata(width, height, has_camera_metadata, has_exif_date):
@@ -290,6 +372,11 @@ class MediaClassifier:
                 0.90,
             )
 
+        # 7. duplicate candidate if already known
+        if self._is_duplicate_candidate(filename_lower, metadata_dict):
+            return MediaClassification(MediaCategory.DuplicateCandidate, "Classified as duplicate candidate because metadata or filename indicates an existing duplicate marker.", 0.95)
+
+        # 8. low quality
         if self._is_low_quality(width, height):
             return MediaClassification(
                 MediaCategory.LowQuality,
@@ -304,21 +391,35 @@ class MediaClassifier:
                 0.90,
             )
 
+        # 9. family photo
         if extension in IMAGE_EXTENSIONS:
-            confidence = 0.70
+            confidence = 0.30
             reason_notes = ["supported image extension"]
+            strong_positive_signals = 0
 
             if has_camera_metadata:
-                confidence += 0.14
+                confidence += 0.24
                 reason_notes.append("camera metadata present")
+                strong_positive_signals += 1
             if has_exif_date:
-                confidence += 0.12
+                confidence += 0.20
                 reason_notes.append("EXIF date present")
+                strong_positive_signals += 1
             if has_gps:
                 confidence += 0.04
                 reason_notes.append("GPS metadata present")
+            if camera_pattern:
+                confidence += 0.16
+                reason_notes.append("filename matches camera/photo pattern")
+                strong_positive_signals += 1
+            if photo_like_geometry:
+                confidence += 0.10
+                reason_notes.append("photo-like resolution/aspect ratio")
 
-            weak_metadata_profile = not has_camera_metadata and not has_exif_date and not has_gps
+            if whatsapp_like:
+                confidence -= 0.08
+                reason_notes.append("WhatsApp filename requires conservative confidence")
+
             if looks_downloaded and weak_metadata_profile:
                 confidence -= 0.32
                 reason_notes.append("filename looks downloaded/shared/WhatsApp with no camera metadata")
@@ -329,7 +430,14 @@ class MediaClassifier:
 
             confidence = max(0.20, min(0.96, confidence))
 
-            if confidence < 0.58:
+            if strong_positive_signals == 0:
+                return MediaClassification(
+                    MediaCategory.Unknown,
+                    f"Classified as unknown because no strong photo signal is present ({'; '.join(reason_notes)}).",
+                    max(0.35, min(confidence, 0.62)),
+                )
+
+            if confidence < 0.62:
                 return MediaClassification(
                     MediaCategory.Unknown,
                     f"Classified as unknown because family-photo evidence is weak ({'; '.join(reason_notes)}).",
@@ -342,6 +450,7 @@ class MediaClassifier:
                 confidence,
             )
 
+        # 10. unknown
         return MediaClassification(
             media_category=MediaCategory.Unknown,
             classification_reason=f"No deterministic rule matched for extension {extension or 'none'}.",
@@ -388,10 +497,10 @@ class MediaClassifier:
         photo.sync_intelligence_from_metadata()
 
     def _is_screenshot(self, filename_lower: str, metadata: Mapping[str, Any]) -> bool:
-        if filename_lower.startswith("screenshot") or "screenshot" in filename_lower:
+        if any(indicator in filename_lower for indicator in SCREENSHOT_FILENAME_INDICATORS):
             return True
         software = str(metadata.get("software", "") or "").lower()
-        return "screenshot" in software
+        return "screenshot" in software or "screenrec" in software
 
     def _is_document(self, filename_lower: str) -> bool:
         if any(keyword in filename_lower for keyword in DOCUMENT_FILENAME_INDICATORS):
@@ -438,10 +547,15 @@ class MediaClassifier:
         width: Optional[int],
         height: Optional[int],
         ratio: Optional[float],
+        tall_ratio: Optional[float],
     ) -> bool:
-        if not isinstance(width, int) or not isinstance(height, int) or not isinstance(ratio, float):
+        if not isinstance(width, int) or not isinstance(height, int):
             return False
-        return height >= 1300 and ratio <= 0.58
+        if isinstance(tall_ratio, float) and tall_ratio > 2.4 and height >= 900:
+            return True
+        if isinstance(ratio, float):
+            return height >= 1300 and ratio <= 0.58
+        return False
 
     def _is_banner_like(
         self,
@@ -478,19 +592,37 @@ class MediaClassifier:
         return bool(str(date_value).strip()) if date_value is not None else False
 
     def _looks_downloaded_or_shared(self, filename_lower: str) -> bool:
-        indicators = {
-            "whatsapp",
-            "forwarded",
-            "shared",
-            "download",
-            "facebook",
-            "instagram",
-            "tiktok",
-            "imgflip",
-            "giphy",
-            "tenor",
-        }
-        return any(indicator in filename_lower for indicator in indicators)
+        return any(indicator in filename_lower for indicator in WEAK_SHARE_INDICATORS)
+
+    def _is_whatsapp_filename(self, filename_lower: str) -> bool:
+        return "wa" in filename_lower or "whatsapp" in filename_lower
+
+    def _matches_camera_filename_pattern(self, filename: str) -> bool:
+        upper_name = filename.upper()
+        if upper_name.startswith(("IMG_", "DSC_", "PXL_")):
+            return True
+
+        stem = Path(filename).stem
+        digits = "".join(char for char in stem if char.isdigit())
+        if len(digits) >= 14:
+            return True
+
+        if "_" in stem:
+            left, right = stem.split("_", 1)
+            left_digits = "".join(char for char in left if char.isdigit())
+            right_digits = "".join(char for char in right if char.isdigit())
+            if len(left_digits) == 8 and len(right_digits) >= 6:
+                return True
+
+        return False
+
+    def _is_photo_like_geometry(self, width: Optional[int], height: Optional[int]) -> bool:
+        if not isinstance(width, int) or not isinstance(height, int):
+            return False
+        if width < 900 or height < 700:
+            return False
+        ratio = width / height if height > 0 else 0
+        return 0.58 <= ratio <= 1.9
 
     def _read_dimensions(self, metadata: Mapping[str, Any]) -> tuple[Optional[int], Optional[int]]:
         width = metadata.get("width")

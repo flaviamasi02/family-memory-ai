@@ -231,11 +231,32 @@ MASTER_DEVELOPMENT_PLAN.md defines the high-level product-planning rule set that
 
 # Memory Review
 
-Album Review becomes Memory Review in the long-term product direction.
-
 Memory Review is the main interaction point between the user and the application.
 
 It is where users teach the application what matters.
+
+Current Memory Review behavior is deterministic, explainable, and correction-oriented:
+
+- multi-selection and bulk editing
+- Media Category review with Automatic Category, User Corrected Category, and Effective Category
+- confidence and reasoning visibility as first-class decision context
+
+Cleanup Review now follows the same UX philosophy as Memory Review:
+
+- top filters and grouping controls
+- compact thumbnail-first grid
+- right-side details panel with explainability and actions
+
+## Terminology Alignment
+
+Use the following terms consistently in review and learning documentation:
+
+- Media Category
+- Automatic Category
+- User Corrected Category
+- Effective Category
+- Decision Engine
+- Cleanup Engine
 
 ---
 
@@ -261,15 +282,7 @@ Metadata Extraction
 
 ↓
 
-Classification
-
-↓
-
-Technical Analysis
-
-↓
-
-Scoring
+Media Classification
 
 ↓
 
@@ -277,7 +290,11 @@ Memory Review
 
 ↓
 
-User Decision Engine
+Cleanup Review
+
+↓
+
+Decision Engine
 
 ↓
 
@@ -285,19 +302,15 @@ Preference Learning
 
 ↓
 
-Cleanup
+Duplicate Management
+
+↓
+
+Memory Intelligence
 
 ↓
 
 Album Builder
-
-↓
-
-Album Refinement
-
-↓
-
-Export
 
 Every user decision contributes to future scoring, recommendations, cleanup suggestions, and ranking explainability.
 
@@ -519,12 +532,12 @@ Each score component should be implemented independently and combined by the Fam
 ## Decision FM-008
 
 Title:
-Album Review becomes the central decision engine.
+Memory Review and Cleanup Review are the central decision interfaces.
 
 Decision:
-Album Review is no longer limited to Approve / Reject.
+Memory Review and Cleanup Review are no longer limited to generic approve/reject-style actions.
 
-It becomes the primary interface where the user teaches Family Memory AI what is important.
+They are the primary interfaces where the user teaches Family Memory AI what is important.
 
 Future scoring should continuously learn from these decisions.
 

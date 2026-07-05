@@ -52,6 +52,11 @@ class ThumbnailWorker(QObject):
                     except Exception as exc:
                         print(f"Failed to cache thumbnail for {photo.path}: {exc}")
 
+                photo.thumbnail_path = str(cache_path)
+                metadata = dict(getattr(photo, "metadata", {}) or {})
+                metadata["thumbnail_path"] = str(cache_path)
+                photo.metadata = metadata
+
                 photo.set_status("thumbnail_ready")
                 self.thumbnail_status_updated.emit(photo)
                 self.thumbnail_ready.emit(photo, pixmap)

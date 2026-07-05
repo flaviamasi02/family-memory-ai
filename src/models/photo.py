@@ -17,6 +17,7 @@ class Photo:
     created_at: Optional[datetime]
     modified_at: Optional[datetime]
     thumbnail: Optional[QPixmap] = None
+    thumbnail_path: str = ""
     status: str = "pending"
     id: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -113,6 +114,7 @@ class Photo:
         user_decision = metadata.get("user_decision")
         classification_reason = metadata.get("classification_reason")
         classification_confidence = metadata.get("classification_confidence")
+        thumbnail_path = metadata.get("thumbnail_path")
 
         if isinstance(year, int):
             self.intelligence.year = year
@@ -177,6 +179,9 @@ class Photo:
         if isinstance(classification_confidence, (int, float)):
             self.classification_confidence = float(classification_confidence)
             self.intelligence.classification_confidence = float(classification_confidence)
+
+        if isinstance(thumbnail_path, str):
+            self.thumbnail_path = thumbnail_path.strip()
 
         if (
             self.intelligence.year is None

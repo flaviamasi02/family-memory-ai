@@ -100,6 +100,19 @@ class AlbumReviewPageTests(unittest.TestCase):
                 return page._row_key(row)
         raise AssertionError(f"Filename not visible: {filename}")
 
+    def _card_for_filename(self, page: AlbumReviewPage, filename: str):
+        key = self._key_for_filename(page, filename)
+        card = page._cards_by_key.get(key)
+        if card is None:
+            raise AssertionError(f"Card not rendered for {filename}")
+        return card
+
+    def _write_image(self, path: Path, size: int = 320, color: Qt.GlobalColor = Qt.GlobalColor.red) -> None:
+        pixmap = QPixmap(size, size)
+        pixmap.fill(color)
+        saved = pixmap.save(str(path), "JPG")
+        self.assertTrue(saved)
+
     def test_sorting_modes(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -423,6 +436,127 @@ class AlbumReviewPageTests(unittest.TestCase):
             self.assertIsNotNone(first)
             self.assertIs(first, second)
 
+    def test_compact_card_dimensions(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            breakdown = self._make_breakdown(root, "compact.jpg", 80, 80, 80, 80, "2024:01:01 10:00:00")
+            page = AlbumReviewPage()
+            page.set_scored_photos([breakdown])
+            self._flush_ui(wait_ms=60)
+
+            card = self._card_for_filename(page, "compact.jpg")
+            self.assertLessEqual(card.width(), 180)
+            self.assertLessEqual(card.height(), 240)
+            self.assertGreaterEqual(card.height(), 210)
+            self.assertEqual(card.thumbnail_label.width(), 140)
+            self.assertEqual(card.thumbnail_label.height(), 140)
+
+    def test_grid_uses_multiple_columns_when_width_allows(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            items = [
+                self._make_breakdown(root, f"grid_{index}.jpg", 100 - index, 80, 80, 80, "2024:01:01 00:00:00")
+                for index in range(12)
+            ]
+
+            page = AlbumReviewPage()
+            page.resize(1800, 980)
+            page.show()
+            page.set_scored_photos(items)
+            self._flush_ui(wait_ms=120)
+
+            self.assertGreaterEqual(page.grid_column_count(), 3)
+
+    def test_card_text_is_concise_and_long_lines_hidden(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            breakdown = self._make_breakdown(
+                root,
+                "very_long_filename_that_should_be_ellipsized_in_compact_memory_review_card.jpg",
+                80,
+                80,
+                80,
+                80,
+                "2024:01:01 00:00:00",
+            )
+
+            page = AlbumReviewPage()
+            page.set_scored_photos([breakdown])
+            self._flush_ui(wait_ms=80)
+
+            card = self._card_for_filename(page, breakdown.photo.display_name())
+            self.assertFalse(card.category_label.isVisible())
+            self.assertFalse(card.confidence_label.isVisible())
+            self.assertFalse(card.pipeline_label.isVisible())
+            self.assertTrue(card.score_badge.text())
+            self.assertTrue(card.category_badge.text())
+            self.assertTrue(card.decision_badge.text())
+            self.assertLessEqual(len(card.filename_label.text()), len(breakdown.photo.display_name()))
+
+    def test_visible_cards_load_thumbnail_from_thumbnail_path_immediately(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            image_path = root / "source.jpg"
+            thumb_path = root / "thumb.jpg"
+            self._write_image(image_path, size=380, color=Qt.GlobalColor.green)
+            self._write_image(thumb_path, size=120, color=Qt.GlobalColor.blue)
+
+            breakdown = self._make_breakdown(root, "source.jpg", 80, 80, 80, 80, "2024:01:01 10:00:00")
+            breakdown.photo.thumbnail = None
+            breakdown.photo.thumbnail_path = str(thumb_path)
+            breakdown.photo.metadata["thumbnail_path"] = str(thumb_path)
+
+            page = AlbumReviewPage()
+            page.set_scored_photos([breakdown])
+            self._flush_ui(wait_ms=80)
+
+            card = self._card_for_filename(page, "source.jpg")
+            self.assertIsNotNone(card.thumbnail_label.pixmap())
+            self.assertEqual(page.thumbnail_source_for_filename("source.jpg"), "thumbnail_path")
+
+    def test_visible_cards_fallback_to_scaled_original_when_thumbnail_path_missing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            breakdown = self._make_breakdown(root, "original_only.jpg", 80, 80, 80, 80, "2024:01:01 10:00:00")
+            image_path = root / "original_only.jpg"
+            self._write_image(image_path, size=420, color=Qt.GlobalColor.yellow)
+            breakdown.photo.thumbnail = None
+            breakdown.photo.thumbnail_path = ""
+            breakdown.photo.metadata["thumbnail_path"] = ""
+
+            page = AlbumReviewPage()
+            page.set_scored_photos([breakdown])
+            self._flush_ui(wait_ms=80)
+
+            card = self._card_for_filename(page, "original_only.jpg")
+            self.assertIsNotNone(card.thumbnail_label.pixmap())
+            self.assertEqual(page.thumbnail_source_for_filename("original_only.jpg"), "original_scaled")
+
+    def test_category_change_is_not_required_to_show_thumbnail(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            breakdown = self._make_breakdown(root, "no_action_needed.jpg", 80, 80, 80, 80, "2024:01:01 10:00:00")
+            image_path = root / "no_action_needed.jpg"
+            self._write_image(image_path, size=360, color=Qt.GlobalColor.cyan)
+            breakdown.photo.thumbnail = None
+            breakdown.photo.thumbnail_path = ""
+
+            page = AlbumReviewPage()
+            page.set_scored_photos([breakdown])
+            self._flush_ui(wait_ms=80)
+
+            card = self._card_for_filename(page, "no_action_needed.jpg")
+            before = card.thumbnail_label.pixmap()
+            self.assertIsNotNone(before)
+
+            page.category_selector.setCurrentText("Advertisement")
+            page._apply_selector_category()
+            self._flush_ui(wait_ms=60)
+
+            card = self._card_for_filename(page, "no_action_needed.jpg")
+            after = card.thumbnail_label.pixmap()
+            self.assertIsNotNone(after)
+
     def test_multi_select_ctrl_click_adds_and_removes_selection(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -546,6 +680,25 @@ class AlbumReviewPageTests(unittest.TestCase):
             # Cancel keeps previous effective category.
             for item in items:
                 self.assertEqual(item.photo.effective_media_category, MediaCategory.FamilyPhoto.value)
+
+    def test_double_click_opens_preview_dialog_from_memory_review(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            first = self._make_breakdown(root, "first.jpg", 80, 80, 80, 80, "2024:01:01 00:00:00")
+            second = self._make_breakdown(root, "second.jpg", 79, 79, 79, 79, "2024:01:02 00:00:00")
+
+            page = AlbumReviewPage()
+            page.set_scored_photos([first, second])
+            self._flush_ui(wait_ms=80)
+
+            first_key = self._key_for_filename(page, "first.jpg")
+            page._on_card_double_clicked(first_key)
+            self._flush_ui(wait_ms=60)
+
+            self.assertIsNotNone(page._preview_dialog)
+            self.assertTrue(page._preview_dialog.isVisible())
+            self.assertEqual(page._preview_dialog.current_filename(), "first.jpg")
+            self.assertEqual(page._preview_dialog.position_label.text(), "1 of 2")
 
 
 if __name__ == "__main__":

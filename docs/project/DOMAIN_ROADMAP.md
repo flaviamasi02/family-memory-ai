@@ -87,9 +87,10 @@ Teach the system what memories matter.
 
 Example milestones:
 
-- MEM-001 Memory Review UI
-- MEM-002 Decision Actions
-- MEM-003 Review Improvements
+- MEM-003 Multi-Select Bulk Category Editing (completed)
+- MEM-004 Compact Memory Review thumbnail grid (completed)
+- MEM-005 True multi-column Memory Review grid (completed)
+- MEM-006 Memory Review UX polishing and keyboard workflow improvements
 
 ---
 
@@ -103,13 +104,14 @@ Detect irrelevant media.
 
 Mission:
 Safely identify clutter and cleanup-oriented media without permanent deletion.
+Cleanup Review should follow the same UX philosophy as Memory Review: toolbar filters, compact thumbnail grid, and right-side explainable details.
 
 Example milestones:
 
-- CLEAN-001 Media Classification
-- CLEAN-002 Safe Cleanup
-- CLEAN-003 Bulk Cleanup
-- CLEAN-004 Advanced Cleanup
+- CLEAN-001 Media Classification & Decision Engine Foundation (completed)
+- CLEAN-002 Improved deterministic initial media classification (completed)
+- CLEAN-003 Cleanup Review UX & Explainability (completed)
+- CLEAN-004 Advanced cleanup and duplicate workflows
 
 ---
 
@@ -235,16 +237,17 @@ Scope examples:
 
 ## Current Active Domain
 
-- MEM
+- CLEAN
 
 ## Current Milestone
 
-- MEM-001 Memory Review UI foundations evolving toward User Decision Engine behavior
+- CLEAN-003 Cleanup Review UX & Explainability (completed)
 
 ## Recently Completed Domains
 
 - FOUNDATION
-- CLEAN (initial deterministic foundation established)
+- MEM (review UX and decision ergonomics foundation)
+- CLEAN (deterministic classification and cleanup-review UX foundation)
 
 ## Future Planned Domains
 

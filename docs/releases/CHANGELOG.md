@@ -1,6 +1,50 @@
 # Changelog
 
 ## Unreleased
+### MEM-006 - Image Preview on Double Click
+- Added reusable `ImagePreviewDialog` for large visual inspection from compact review grids.
+- Added double-click preview opening from Memory Review cards.
+- Added double-click preview opening from Cleanup Review cards.
+- Added Previous/Next controls and keyboard shortcuts (Left/Right arrows, Esc close).
+- Added preview metadata context: filename, media category, user decision, score (when available), and position (N of total visible list).
+- Implemented original-image-first loading with thumbnail fallback and a clear `Preview unavailable` state.
+- Kept preview loading focused on current image only, with scaled pixmap caching to keep navigation responsive.
+- Added deterministic tests for dialog navigation, fallback behavior, Esc close, and double-click integration in both review pages.
+- No persistence, no AI behavior, no scoring/classification rule changes, and no AlbumBuilder logic changes.
+
+### CLEAN-003 - Cleanup Review UX & Explainability
+- Replaced Cleanup Review's table-centric UI with a visual review workspace aligned to Memory Review: toolbar filters, compact thumbnail grid, and right-side details panel.
+- Added compact cleanup cards that display only thumbnail, filename, automatic category badge, confidence badge, and recommended action badge.
+- Added structured explainability in details: "Why was this classified?" checklist signals and confidence display.
+- Added "Possible alternatives" visibility for low-confidence classifications (<80%) using deterministic category probability hints.
+- Added in-memory category correction flow with automatic -> user corrected -> effective category mapping.
+- Added explicit cleanup decision/action controls: Keep, Move to Cleanup Folder, and direct category-marking actions.
+- Added category grouping view with counts and category-by-category filtering workflow.
+- Added cleanup statistics summary: imported, cleanup candidates, category counts, and average confidence.
+- Reused Memory Review interaction patterns: compact cards, multi-selection model, right-side preview/details panel, lazy batch rendering, and thumbnail updates.
+- Added deterministic Qt tests for cleanup card rendering, details updates, grouping/statistics, category correction, alternatives visibility, selection/bulk actions, and safe move action.
+- No AI added, no persistence added, and no permanent delete workflow added.
+
+### MEM-005 - True Multi-Column Thumbnail Grid for Memory Review
+- Refactored Memory Review to use a true multi-column compact thumbnail grid with automatic column recalculation on resize.
+- Simplified cards to compact visual content: thumbnail, shortened filename, score badge, category badge, and decision badge.
+- Moved long contextual text to the right details panel only to keep the grid scan-friendly.
+- Preserved lazy/batched rendering and infinite-scroll style batch expansion for large libraries.
+- Preserved multi-select behavior, selected-count state, and bulk category/decision editing flows.
+- Kept right-side details panel with full selected-photo context (preview, score, category, reason, confidence, decision, date, date source, explanations).
+- Added/updated deterministic tests for multi-column behavior, compact card sizing/content, and preserved selection/bulk behavior.
+- No persistence, no AI training, no scoring-rule changes, and no AlbumDraftBuilder changes in this milestone.
+
+### MEM-004 - Fast Compact Thumbnail Grid for Memory Review
+- Replaced oversized Memory Review cards with a compact thumbnail-first grid layout optimized for dense visual scanning.
+- Reduced card and thumbnail dimensions and added compact score/category/decision badges for each card.
+- Added immediate thumbnail resolution for visible cards using thumbnail_path when available, with scaled-original fallback when thumbnail_path is missing.
+- Added per-path scaled pixmap caching for visible-card thumbnail loading to avoid loading full-size images for entire libraries.
+- Fixed stale "No thumbnail" behavior by wiring thumbnail worker updates directly into Memory Review card refreshes.
+- Preserved lazy/batched rendering for large libraries and maintained multi-select and bulk edit behavior.
+- Added deterministic tests for compact sizing, immediate visible thumbnail loading paths, fallback loading, and thumbnail visibility without requiring category changes.
+- No persistence, no AI training, no scoring-rule changes, and no album-builder changes in this milestone.
+
 ### MEM-003 - Multi-Select Bulk Category Editing
 - Added multi-select behavior in Memory Review grid with intuitive single click, Ctrl+click toggle selection, and Shift+click visible range selection.
 - Added in-memory selection state by file path with selected-count display, clear selection, and select-all-visible actions.
@@ -11,7 +55,7 @@
 - Added deterministic tests for multi-select, selection actions, bulk apply behavior, effective-category override behavior, learning events, and large-bulk confirmation flow.
 - No persistence and no AI training added in this milestone.
 
-### CLEAN-002 - Deterministic Meme & Irrelevant Media Classification Refinement
+### CLEAN-002 - Improved Deterministic Initial Media Classification
 - Strengthened deterministic MediaClassifier rules for meme, graphic, advertisement, screenshot, document, and unknown/non-family media.
 - Added richer filename indicators for meme-like/shared/downloaded media patterns.
 - Added dimension-aware classification heuristics for very small images, banner-like images, and tall phone screenshot shapes.

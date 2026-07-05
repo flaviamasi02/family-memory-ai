@@ -173,7 +173,11 @@ class MainWindow(QMainWindow):
 
     def _load_irrelevant_media_data(self, photos):
         irrelevant = [photo for photo in photos or [] if not self._is_album_relevant(photo)]
-        self.irrelevant_media_page.set_photos(irrelevant, self._imported_folder)
+        self.irrelevant_media_page.set_photos(
+            irrelevant,
+            self._imported_folder,
+            total_imported_count=len(photos or []),
+        )
 
     def _is_album_relevant(self, photo) -> bool:
         intelligence = getattr(photo, "intelligence", None)
@@ -367,6 +371,7 @@ class MainWindow(QMainWindow):
     def update_thumbnail(self, photo, pixmap):
         self.photo_model.update_thumbnail(photo, pixmap)
         self.photo_view.update_thumbnail(photo, pixmap)
+        self.review_page.update_thumbnail(photo, pixmap)
         self.irrelevant_media_page.update_thumbnail(photo, pixmap)
         self.draft_page.update_thumbnail(photo, pixmap)
 

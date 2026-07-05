@@ -96,9 +96,10 @@ Make Memory Review the central place where meaningful user decisions are capture
 
 Future milestones:
 
-- MEM-001 Decision Model
-- MEM-002 Review UX
-- MEM-003 Memory Review Improvements
+- MEM-003 Multi-Select Bulk Category Editing (completed)
+- MEM-004 Compact Thumbnail-First Memory Review Grid (completed)
+- MEM-005 True Multi-Column Memory Review Grid (completed)
+- MEM-006 Memory Review UX polishing and keyboard workflow improvements
 
 ### CLEAN
 
@@ -113,10 +114,10 @@ Reduce clutter while preserving safety, explainability, and user control.
 
 Future milestones:
 
-- CLEAN-001 Media Classification
-- CLEAN-002 Safe Cleanup
-- CLEAN-003 Duplicate Cleanup
-- CLEAN-004 Bulk Cleanup
+- CLEAN-001 Media Classification & Decision Engine Foundation (completed)
+- CLEAN-002 Improved deterministic initial media classification (completed)
+- CLEAN-003 Cleanup Review UX & Explainability (completed)
+- CLEAN-004 Advanced cleanup and duplicate cleanup workflows
 
 ### DUP
 
@@ -247,6 +248,19 @@ Permanent principles:
 - The application assists the user.
 - The user always has the final decision.
 
+Current deterministic workflow reference:
+
+Import
+-> Metadata Extraction
+-> Media Classification
+-> Memory Review
+-> Cleanup Review
+-> Decision Engine
+-> Preference Learning (future)
+-> Duplicate Management (future)
+-> Memory Intelligence (future)
+-> Album Builder
+
 ---
 
 ## Decision Engine
@@ -266,6 +280,18 @@ Future decision model:
 - Unknown
 
 These decisions become long-term learning examples.
+
+Category terminology for review interfaces:
+
+- Media Category
+- Automatic Category
+- User Corrected Category
+- Effective Category
+
+Classification principles:
+
+- initial classification remains deterministic and explainable
+- classification confidence is a first-class signal for review prioritization
 
 ---
 

@@ -6,7 +6,7 @@
 
 ## Current Sprint
 
-- Sprint MEM-003 (Multi-Select Bulk Category Editing in Memory Review) - Completed
+- Sprint MEM-006 (Image Preview on Double Click) - Completed
 
 ## Project Status
 
@@ -146,7 +146,7 @@ Current limitations after DEV-007:
 - cleanup classification is deterministic only (no AI)
 - duplicate detection is exact-hash only; no visual similarity yet
 - cleanup move uses quarantine move only; no permanent deletion workflow
-- cleanup review still needs richer batch-review ergonomics
+- cleanup review ergonomics were later improved by CLEAN-003 (visual workspace, grouping, explainability, category correction)
 - no print/export pipeline yet
 
 Future work now follows domain-based planning rather than a single global next sprint.
@@ -199,7 +199,7 @@ Album Builder becomes one consumer of the Memory Intelligence system rather than
 
 ## Current Milestone
 
-- MEM-003 Multi-Select Bulk Category Editing
+- MEM-006 Image Preview on Double Click
 
 ## Recently Completed Milestones
 
@@ -207,13 +207,16 @@ Album Builder becomes one consumer of the Memory Intelligence system rather than
 - DEV-007 Photo Cleanup & Relevance Engine
 - CLEAN-001 Media Classification & Decision Engine Foundation
 - MEM-002 Visible & Correctable Media Category in Memory Review
-- CLEAN-002 Deterministic meme and irrelevant media classification refinement
+- CLEAN-002 Improved deterministic initial media classification
 - MEM-003 Multi-select Memory Review with bulk category and decision editing
+- MEM-004 Compact thumbnail-first Memory Review grid with immediate visible thumbnail loading
+- MEM-005 True multi-column Memory Review grid with compact cards and right-panel details
+- CLEAN-003 Cleanup Review redesigned with visual thumbnail workspace, explainable classification, grouping, and category correction
+- MEM-006 Reusable image preview dialog with double-click navigation from Memory Review and Cleanup Review
 
 ## Upcoming Milestones
 
 - LEARN-001 Decision History foundations
-- CLEAN-003 Bulk cleanup ergonomics and review quality improvements
 - DUP-001 Exact Duplicate Detection refinement
 - MEMORY-001 Memory Value
 
@@ -247,22 +250,17 @@ The current implementation is a lightweight Qt desktop application with a modula
 Current deterministic curation pipeline:
 
 Import
--> Date Extraction
--> Cleanup Classification
--> Classification
--> Technical Analysis
--> Candidate Selection
--> Album Scoring
+-> Metadata Extraction
+-> Media Classification
 -> Memory Review
--> User Decision Engine (future)
+-> Cleanup Review
+-> Decision Engine
 -> Preference Learning (future)
--> Cleanup (future decision-informed)
 -> Duplicate Management (future)
 -> Memory Intelligence (future)
--> Album Draft Builder
--> Album Draft UI
+-> Album Builder
 
-Cleanup review now happens before album refinement work.
+Memory Review and Cleanup Review now share the same visual UX philosophy and both expose confidence-driven explainable decisions.
 
 ## Current Folders
 
@@ -385,8 +383,26 @@ Long-term output framing:
 - [x] Deterministic photo cleanup and relevance classification during import
 - [x] Photo Browser cleanup/relevance filter
 - [x] Cleanup Review tab with grouped category review and bulk selection
+- [x] Memory Review multi-selection (single, Ctrl toggle, Shift range)
+- [x] Memory Review bulk category editing with Automatic Category -> User Corrected Category -> Effective Category behavior
+- [x] Memory Review bulk decision editing with in-memory decision-history events
+- [x] Memory Review compact thumbnail-first cards for fast visual review
+- [x] Memory Review responsive multi-column layout with lazy rendering and thumbnail caching
+- [x] Cleanup Review redesigned with the same UX philosophy as Memory Review (toolbar, compact grid, right details panel)
+- [x] Cleanup Review explainable classification view with structured reason checklist and confidence display
+- [x] Cleanup Review category grouping and category-by-category review workflow
+- [x] Cleanup Review possible alternatives for low-confidence classifications (<80%)
+- [x] Cleanup category correction with Automatic Category -> User Corrected Category -> Effective Category propagation
+- [x] Reusable Image Preview dialog with larger visual inspection
+- [x] Double-click on Memory Review cards opens large image preview
+- [x] Double-click on Cleanup Review cards opens the same preview dialog
+- [x] Preview dialog supports next/previous navigation within the current visible filtered list
+- [x] Preview dialog keyboard shortcuts: Esc (close), Left/Right (previous/next)
+- [x] Preview dialog uses original image when available and falls back to thumbnail when original is unavailable
+- [x] Preview dialog shows filename, media category, user decision, score (when available), and position (N of total)
 - [x] Safe move to cleanup review folder with confirmation and result summary
 - [x] Exact duplicate placeholder handling using file hashes and deterministic keeper selection
+- [x] Improved deterministic initial media classification with richer multilingual indicators and conservative family-photo assignment
 - [x] Deterministic end-to-end curation pipeline from import through draft assembly
 - [x] Visible selected-photo highlight in the photo grid
 - [x] Documentation architecture refactored into modular folders
@@ -417,6 +433,8 @@ Future product priority after PRODUCT-DOC-002:
 - No duplicate detection yet
 - No AI cleanup classification yet
 - No visual-similarity duplicate detection yet
+- Cleanup and Memory review corrections are in-memory only (no persistence yet)
+- Preference Learning engine is not active yet (decision signals are foundation only)
 - No print-ready export pipeline yet
 - No HEIC support yet
 - No cloud integration yet
@@ -505,7 +523,7 @@ It provides the current project status and operational context. The other projec
 - [CODING_STANDARDS.md](../development/CODING_STANDARDS.md)
 - [ARCHITECTURAL_DECISIONS.md](../architecture/ARCHITECTURAL_DECISIONS.md)
 
-PROJECT_STATE.md is the single source of truth for current version, active sprint, completed sprint count, and operational implementation status.
+PROJECT_STATE.md is the single source of truth for current version, active domain/milestone, completed sprint count, and operational implementation status.
 
 docs/project/DOMAIN_ROADMAP.md is the single source of truth for future planned domains and milestones.
 

@@ -79,6 +79,7 @@ The initial product should focus on a set of high-value capabilities.
 - Photo Import
 - Memory Organization
 - Memory Review
+- Cleanup Review
 - Cleanup and Clutter Removal
 - Duplicate Detection
 - Preference Learning
@@ -90,6 +91,16 @@ The initial product should focus on a set of high-value capabilities.
 - Search
 
 These features should work together to make memories easier to understand, preserve, rediscover, and curate.
+
+## Current Product Direction
+
+Current implemented direction emphasizes human-in-the-loop deterministic curation:
+
+- Memory Review is the central decision interface.
+- Cleanup Review shares the same UX philosophy (top toolbar, compact thumbnail grid, right details panel).
+- Initial media classification is deterministic and explainable.
+- Classification confidence and classification explanations are first-class review concepts.
+- User corrections (Automatic Category -> User Corrected Category -> Effective Category) create the foundation for future Preference Learning.
 
 ---
 

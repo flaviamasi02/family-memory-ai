@@ -51,7 +51,15 @@ Current completed foundation work includes:
 
 Current next milestone:
 
-- MEM-001 Memory Review UI foundations evolving toward User Decision Engine behavior (Next)
+- LEARN-001 Decision History foundations (Next)
+
+Recently completed domain milestones relevant to Learning readiness:
+
+- MEM-003 Multi-Select Bulk Category Editing
+- MEM-004 Compact Memory Review thumbnail grid
+- MEM-005 True multi-column Memory Review grid
+- CLEAN-002 Improved deterministic initial media classification
+- CLEAN-003 Cleanup Review UX & Explainability
 
 ### Phase 3 - Memory Intelligence
 

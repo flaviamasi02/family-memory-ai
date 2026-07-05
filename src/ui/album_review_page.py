@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, List, Optional
 
-from PySide6.QtCore import QTimer, Qt, Signal
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import QTimer, Qt, QSize, Signal
+from PySide6.QtGui import QFontMetrics, QImageReader, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
@@ -32,6 +33,7 @@ from core.media_classifier import (
     media_category_label,
     ordered_media_category_values,
 )
+from ui.image_preview_dialog import ImagePreviewDialog
 
 
 @dataclass
@@ -45,6 +47,7 @@ class AlbumReviewRow:
 
 class AlbumReviewCardWidget(QFrame):
     clicked = Signal(str, int)
+    double_clicked = Signal(str)
 
     def __init__(self, row: AlbumReviewRow, key: str, thumbnail: Optional[QPixmap] = None, parent=None):
         super().__init__(parent)
@@ -54,37 +57,50 @@ class AlbumReviewCardWidget(QFrame):
 
         self.setObjectName("albumReviewCard")
         self.setFrameShape(QFrame.Shape.StyledPanel)
-        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        self.setMinimumWidth(220)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.setFixedWidth(164)
+        self.setFixedHeight(228)
 
         self.thumbnail_label = QLabel("No thumbnail")
         self.thumbnail_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.thumbnail_label.setFixedHeight(130)
+        self.thumbnail_label.setFixedSize(140, 140)
         self.thumbnail_label.setStyleSheet("border: 1px solid #bbb; background: #f6f6f6;")
 
         self.filename_label = QLabel("")
-        self.filename_label.setWordWrap(True)
+        self.filename_label.setWordWrap(False)
         self.filename_label.setStyleSheet("font-weight: 600;")
+        self.filename_label.setFixedWidth(148)
+        self.filename_label.setMaximumHeight(20)
 
-        self.scores_label = QLabel("")
-        self.scores_label.setWordWrap(True)
+        self.score_badge = QLabel("")
+        self.category_badge = QLabel("")
+        self.decision_badge = QLabel("")
+        for badge in (self.score_badge, self.category_badge, self.decision_badge):
+            badge.setStyleSheet("background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 6px; padding: 2px 6px;")
+            badge.setMaximumHeight(22)
 
         self.category_label = QLabel("")
         self.confidence_label = QLabel("")
         self.decision_label = QLabel("")
         self.pipeline_label = QLabel("")
         self.pipeline_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.category_label.setVisible(False)
+        self.confidence_label.setVisible(False)
+        self.decision_label.setVisible(False)
+        self.pipeline_label.setVisible(False)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(6)
-        layout.addWidget(self.thumbnail_label)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(4)
+        layout.addWidget(self.thumbnail_label, 0, Qt.AlignmentFlag.AlignHCenter)
         layout.addWidget(self.filename_label)
-        layout.addWidget(self.scores_label)
-        layout.addWidget(self.category_label)
-        layout.addWidget(self.confidence_label)
-        layout.addWidget(self.decision_label)
-        layout.addWidget(self.pipeline_label)
+        badge_layout = QHBoxLayout()
+        badge_layout.setContentsMargins(0, 0, 0, 0)
+        badge_layout.setSpacing(4)
+        badge_layout.addWidget(self.score_badge)
+        badge_layout.addWidget(self.category_badge)
+        badge_layout.addWidget(self.decision_badge)
+        layout.addLayout(badge_layout)
 
         self.refresh_from_row(thumbnail=thumbnail)
         self.set_selected(False)
@@ -101,20 +117,20 @@ class AlbumReviewCardWidget(QFrame):
             self.thumbnail_label.setPixmap(QPixmap())
             self.thumbnail_label.setText("No thumbnail")
 
-        self.filename_label.setText(photo.display_name())
-        self.scores_label.setText(
-            (
-                f"Total: {breakdown.total_score:.2f}\n"
-                f"Technical: {breakdown.technical_score:.2f}  "
-                f"Memory: {breakdown.memory_score:.2f}  "
-                f"Date: {breakdown.date_score:.2f}"
-            )
-        )
+        full_name = photo.display_name()
+        self.filename_label.setToolTip(full_name)
+        metrics = QFontMetrics(self.filename_label.font())
+        self.filename_label.setText(metrics.elidedText(full_name, Qt.TextElideMode.ElideRight, self.filename_label.width()))
 
         confidence = float(getattr(photo, "classification_confidence", 0.0) or 0.0)
         category_value = str(getattr(photo, "effective_media_category", "") or getattr(photo, "media_category", "unknown") or "unknown")
         category_text = media_category_label(category_value)
         decision_text = self.row.user_decision.replace("_", " ").title()
+        self.score_badge.setText(f"S {breakdown.total_score:.0f}")
+        short_category = category_text if len(category_text) <= 10 else category_text[:9] + ".."
+        short_decision = decision_text if len(decision_text) <= 10 else decision_text[:9] + ".."
+        self.category_badge.setText(short_category)
+        self.decision_badge.setText(short_decision)
         self.category_label.setText(f"Category: {category_text}")
         self.confidence_label.setText(f"Confidence: {max(0, min(100, int(round(confidence * 100))))}%")
         self.decision_label.setText(f"Decision: {decision_text}")
@@ -142,6 +158,10 @@ class AlbumReviewCardWidget(QFrame):
     def mousePressEvent(self, event):
         self.clicked.emit(self.key, int(event.modifiers().value))
         super().mousePressEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        self.double_clicked.emit(self.key)
+        super().mouseDoubleClickEvent(event)
 
 
 class AlbumReviewPage(QWidget):
@@ -182,6 +202,8 @@ class AlbumReviewPage(QWidget):
         self._candidate_count = 0
         self._rejection_reasons_summary: Dict[str, int] = {}
         self._thumbnail_cache: Dict[str, tuple[int, QPixmap]] = {}
+        self._thumbnail_source_by_key: Dict[str, str] = {}
+        self._scaled_thumbnail_path_cache: Dict[str, tuple[str, QPixmap]] = {}
         self._preview_cache: Dict[str, tuple[int, QPixmap]] = {}
         self._last_view_signature: Optional[tuple[str, str, str]] = None
         self._last_visible_key_order: List[str] = []
@@ -189,6 +211,7 @@ class AlbumReviewPage(QWidget):
         self._decision_history = DecisionHistory()
         self._decision_selector_syncing = False
         self._category_selector_syncing = False
+        self._preview_dialog: Optional[ImagePreviewDialog] = None
 
         self.memory_review_label = QLabel("Memory Review")
         self.memory_review_label.setStyleSheet("font-size: 18px; font-weight: 600;")
@@ -249,7 +272,7 @@ class AlbumReviewPage(QWidget):
         self.grid_content.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.grid_layout = QGridLayout(self.grid_content)
         self.grid_layout.setContentsMargins(10, 10, 10, 10)
-        self.grid_layout.setSpacing(10)
+        self.grid_layout.setSpacing(8)
         self.grid_scroll.setWidget(self.grid_content)
         self.grid_scroll.verticalScrollBar().valueChanged.connect(self._on_scroll_value_changed)
 
@@ -322,7 +345,7 @@ class AlbumReviewPage(QWidget):
 
         details_panel = QWidget()
         details_panel.setLayout(details_layout)
-        details_panel.setMinimumWidth(520)
+        details_panel.setMinimumWidth(420)
 
         splitter = QSplitter()
         grid_panel = QWidget()
@@ -333,8 +356,9 @@ class AlbumReviewPage(QWidget):
 
         splitter.addWidget(grid_panel)
         splitter.addWidget(details_panel)
-        splitter.setStretchFactor(0, 5)
+        splitter.setStretchFactor(0, 8)
         splitter.setStretchFactor(1, 3)
+        splitter.setSizes([1000, 420])
 
         root_layout = QVBoxLayout(self)
         root_layout.addWidget(self.memory_review_label)
@@ -728,6 +752,7 @@ class AlbumReviewPage(QWidget):
                 thumbnail=self._get_cached_card_thumbnail(row),
             )
             card.clicked.connect(self._on_card_clicked)
+            card.double_clicked.connect(self._on_card_double_clicked)
             self._cards_by_key[key] = card
             self._rendered_keys.append(key)
 
@@ -743,6 +768,28 @@ class AlbumReviewPage(QWidget):
             selected = self._selected_row()
             if selected is not None:
                 self._show_details(selected)
+
+    def update_thumbnail(self, photo, pixmap) -> None:
+        if photo is None:
+            return
+
+        key = str(getattr(photo, "path", ""))
+        if not key:
+            return
+
+        if isinstance(pixmap, QPixmap) and not pixmap.isNull():
+            self._scaled_thumbnail_path_cache.pop(key, None)
+
+        for row in self._all_rows:
+            if self._row_key(row) != key:
+                continue
+
+            card = self._cards_by_key.get(key)
+            if card is not None:
+                card.refresh_from_row(thumbnail=self._get_cached_card_thumbnail(row))
+            if self._selected_key == key:
+                self._show_details(row, force=True)
+            break
 
     def _on_card_clicked(self, key: str, modifiers: int = 0) -> None:
         ctrl_pressed = bool(modifiers & int(Qt.KeyboardModifier.ControlModifier.value))
@@ -774,6 +821,32 @@ class AlbumReviewPage(QWidget):
             return
 
         self._show_details(selected)
+
+    def _on_card_double_clicked(self, key: str) -> None:
+        if key not in {self._row_key(row) for row in self._visible_rows}:
+            return
+
+        self._selected_key = key
+        if key not in self._selected_keys:
+            self._selected_keys = {key}
+        self._refresh_card_selection()
+        self._refresh_selection_count_label()
+
+        self.open_preview_for_key(key)
+
+    def open_preview_for_key(self, key: str) -> None:
+        visible_keys = [self._row_key(row) for row in self._visible_rows]
+        if key not in visible_keys:
+            return
+
+        photos = [row.breakdown.photo for row in self._visible_rows]
+        start_index = visible_keys.index(key)
+        if self._preview_dialog is None:
+            self._preview_dialog = ImagePreviewDialog(self)
+        self._preview_dialog.set_items(photos, start_index=start_index)
+        self._preview_dialog.show()
+        self._preview_dialog.raise_()
+        self._preview_dialog.activateWindow()
 
     def _refresh_card_selection(self) -> None:
         for key, card in self._cards_by_key.items():
@@ -834,8 +907,9 @@ class AlbumReviewPage(QWidget):
         return str(getattr(photo, "path", photo.display_name()))
 
     def _calculate_grid_columns(self) -> int:
-        width = max(240, self.grid_scroll.viewport().width())
-        return max(1, width // 240)
+        width = max(176, self.grid_scroll.viewport().width())
+        card_footprint = 172
+        return max(1, width // card_footprint)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -1151,24 +1225,85 @@ class AlbumReviewPage(QWidget):
 
     def _get_cached_card_thumbnail(self, row: AlbumReviewRow) -> Optional[QPixmap]:
         key = self._row_key(row)
-        photo = row.breakdown.photo
-        pixmap = getattr(photo, "thumbnail", None)
+        signature, pixmap, source_name = self._resolve_card_thumbnail_source(row.breakdown.photo)
         if not isinstance(pixmap, QPixmap):
             return None
 
-        source_key = int(pixmap.cacheKey())
         cached = self._thumbnail_cache.get(key)
-        if cached is not None and cached[0] == source_key:
+        if cached is not None and cached[0] == signature:
             return cached[1]
 
         scaled = pixmap.scaled(
-            200,
-            120,
+            140,
+            140,
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation,
         )
-        self._thumbnail_cache[key] = (source_key, scaled)
+        self._thumbnail_cache[key] = (signature, scaled)
+        self._thumbnail_source_by_key[key] = source_name
         return scaled
+
+    def _resolve_card_thumbnail_source(self, photo) -> tuple[int, Optional[QPixmap], str]:
+        memory_thumbnail = getattr(photo, "thumbnail", None)
+        if isinstance(memory_thumbnail, QPixmap) and not memory_thumbnail.isNull():
+            return int(memory_thumbnail.cacheKey()), memory_thumbnail, "thumbnail"
+
+        thumbnail_path_value = str(
+            getattr(photo, "thumbnail_path", "")
+            or (getattr(photo, "metadata", {}) or {}).get("thumbnail_path", "")
+            or ""
+        ).strip()
+        if thumbnail_path_value:
+            thumbnail_file = Path(thumbnail_path_value)
+            if thumbnail_file.exists() and thumbnail_file.is_file():
+                signature = f"tp:{thumbnail_file}:{thumbnail_file.stat().st_mtime}"
+                cached = self._scaled_thumbnail_path_cache.get(str(thumbnail_file))
+                if cached is not None and cached[0] == signature:
+                    return hash(signature), cached[1], "thumbnail_path"
+
+                pixmap = QPixmap(str(thumbnail_file))
+                if not pixmap.isNull():
+                    self._scaled_thumbnail_path_cache[str(thumbnail_file)] = (signature, pixmap)
+                    return hash(signature), pixmap, "thumbnail_path"
+
+        original_path = Path(getattr(photo, "path", ""))
+        if original_path.exists() and original_path.is_file():
+            signature = f"op:{original_path}:{original_path.stat().st_mtime}"
+            cached = self._scaled_thumbnail_path_cache.get(str(original_path))
+            if cached is not None and cached[0] == signature:
+                return hash(signature), cached[1], "original_scaled"
+
+            reader = QImageReader(str(original_path))
+            reader.setAutoTransform(True)
+            reader.setScaledSize(QSize(160, 160))
+            image = reader.read()
+            if not image.isNull():
+                pixmap = QPixmap.fromImage(image)
+                if not pixmap.isNull():
+                    self._scaled_thumbnail_path_cache[str(original_path)] = (signature, pixmap)
+                    return hash(signature), pixmap, "original_scaled"
+
+        return 0, None, "none"
+
+    def thumbnail_source_for_filename(self, filename: str) -> Optional[str]:
+        target = (filename or "").strip()
+        if not target:
+            return None
+        for row in self._visible_rows:
+            if row.breakdown.photo.display_name() != target:
+                continue
+            return self._thumbnail_source_by_key.get(self._row_key(row))
+        return None
+
+    def grid_column_count(self) -> int:
+        return self._grid_columns
+
+    def compact_card_size(self) -> tuple[int, int]:
+        if not self._cards_by_key:
+            return 0, 0
+        first_key = next(iter(self._cards_by_key.keys()))
+        card = self._cards_by_key[first_key]
+        return card.width(), card.height()
 
     def _get_cached_preview(self, row_key: str, pixmap: Optional[QPixmap]) -> Optional[QPixmap]:
         if not isinstance(pixmap, QPixmap):
