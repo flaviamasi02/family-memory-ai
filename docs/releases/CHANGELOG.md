@@ -1,6 +1,27 @@
 # Changelog
 
 ## Unreleased
+### PRODUCT-DOC-006 - DOCSYNC PC FULL canonical alignment
+- Synchronized project state, domain roadmap, and historical roadmap on active domain/milestone and strategic priority order.
+- Standardized priority order across planning/product docs: classification reliability, correction learning, cleanup quality, people intelligence, outputs.
+- Clarified category semantics: Effective Category remains authoritative; grouping is visualization-only.
+- Clarified People roadmap direction: PEOPLE-001 remains local face-evidence only, without identity recognition.
+- Updated workflow references to canonical bootstrap paths.
+
+### PEOPLE-001 - Face Detection and Family Photo Classification
+- Added `FaceDetectionService` with `FaceDetectionResult` for local face detection foundations.
+- Uses OpenCV Haar cascade when available; unavailable detector path returns safe fallback without crashing.
+- Added `ENABLE_FACE_DETECTION = False` feature flag default for conservative rollout.
+- Added `FaceDetectionWorker` for non-blocking background analysis.
+- Added Cleanup Review action `Analyze Faces for Visible` to analyze selected/visible photos only.
+- Persisted face metadata: `face_count`, `has_faces`, `face_detection_confidence`, `face_detection_detector`.
+- Media classifier now treats strong face evidence as Family Photo evidence and includes `face detected` in classification reason.
+- Unknown photos with strong face evidence can be reclassified to Family Photo.
+- Automatic Meme/Graphic classification is only overridden by face evidence when there is no user-corrected category.
+- User-corrected category remains authoritative.
+- Added details-panel visibility for faces detected, face count, and detection confidence.
+- No cloud AI, no person identity recognition, and no original file modifications.
+
 ### Runtime Stability Hardening
 - Switched background thumbnail generation to emit `QImage` and moved `QPixmap` conversion into the UI thread.
 - Normalized Photo Browser thumbnail keys so late thumbnail updates resolve against stable absolute paths.

@@ -107,7 +107,7 @@ Version 1 is **NOT** focused on Story Timeline. Story Timeline is an approved fu
 - docs/project/PROJECT_CONTEXT.md
 - docs/project/PROJECT_STATE.md
 - docs/project/ROADMAP.md
-- HANDOVER.md
+- docs/bootstrap/HANDOVER.md
 
 ### DEC-0023
 Decision Impact Matrix
@@ -152,7 +152,7 @@ The architecture should remain extensible.
 - docs/project/PROJECT_CONTEXT.md
 - docs/project/PROJECT_STATE.md
 - docs/project/ROADMAP.md
-- HANDOVER.md
+- docs/bootstrap/HANDOVER.md
 
 ### DEC-0025
 Print Ready Export

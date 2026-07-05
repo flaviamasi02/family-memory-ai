@@ -87,6 +87,20 @@ class PhotoModel(QAbstractListModel):
 
         return False
 
+    def refresh_photo_metadata(self, photo):
+        target_path = photo.path if hasattr(photo, "path") else Path(photo)
+
+        for index, existing_photo in enumerate(self._photos):
+            if existing_photo.path == target_path or str(existing_photo.path) == str(target_path):
+                self.dataChanged.emit(
+                    self.createIndex(index, 0),
+                    self.createIndex(index, 0),
+                    [Qt.DisplayRole, Qt.DecorationRole],
+                )
+                return True
+
+        return False
+
     def get_photo_path(self, index):
         if not index.isValid():
             return None

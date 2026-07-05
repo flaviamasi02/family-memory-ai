@@ -26,9 +26,15 @@
 
 Family Memory AI is currently in an early-stage desktop prototype phase. The application launches and supports a basic workflow around importing photos, scanning folders, generating thumbnails, and displaying a photo browser experience.
 
-The immediate goals are to refine the photo library before deeper album work by improving deterministic cleanup, relevance categorization, and safe library triage, while keeping the app stable and without adding export features yet.
+Current strategic priority order:
 
-The immediate next goal is to shift product architecture toward Family Memory Intelligence, where Memory Review becomes the central interface for teaching future scoring, preference learning, cleanup, duplicate management, and memory-building improvements while keeping behavior deterministic, explainable, and local-only for now.
+1. Reliable AI-assisted media classification (deterministic and explainable first)
+2. Learning from user corrections (deterministic learning profile and sidecar-backed persistence)
+3. Media cleanup quality and safe triage workflows
+4. People Intelligence roadmap progression
+5. Memory output generation (albums as one downstream consumer)
+
+Immediate execution remains local-first, deterministic-first, and explainable-first. Memory Review is the central interface for teaching future scoring, preference learning, cleanup, duplicate management, and memory-building improvements.
 
 Future development is now organized by functional domains rather than by a single sequential DEV-XXX chain.
 
@@ -139,7 +145,7 @@ Current active domain and milestone are defined through the domain-based workflo
 
 ## Sprint DEV-007 Update
 
-DEV-007 introduced a deterministic Photo Cleanup & Relevance Engine that runs during import and prepares the library for safe review before later album refinement. The new cleanup layer classifies media into family_photo_candidate, document_or_scan, advertisement, screenshot, meme_or_graphic, video, duplicate_candidate, low_quality_photo, and unknown. Cleanup Review now provides category-based review, reason visibility, recommended actions, checkbox selection, select-all within the active category, and safe bulk move into `_family_memory_cleanup_review` under the imported folder. Exact duplicate handling is implemented as a placeholder using file hashes only: the technically best version is kept when deterministically available, otherwise the largest file is kept and the remaining exact duplicates become duplicate_candidate items. This sprint intentionally does not add AI behavior, permanent deletion, export behavior, or modifications to AlbumDraftBuilder logic.
+DEV-007 introduced a deterministic Photo Cleanup & Relevance Engine that runs during import and prepares the library for safe review before later album refinement. Cleanup Review now provides category-based review, reason visibility, recommended actions, checkbox selection, select-all within the active category, and safe bulk move into `_family_memory_cleanup_review` under the imported folder. Exact duplicate handling is implemented as a placeholder using file hashes only: the technically best version is kept when deterministically available, otherwise the largest file is kept and the remaining exact duplicates become duplicate_candidate items. Historical category labels from this milestone were superseded by the stable system-category model introduced later. This sprint intentionally does not add AI behavior, permanent deletion, export behavior, or modifications to AlbumDraftBuilder logic.
 
 Current limitations after DEV-007:
 
@@ -183,13 +189,11 @@ This creates a strategic shift in development priority.
 
 Future development priority becomes:
 
-1. Decision Engine
-2. Preference Learning
-3. Cleanup
-4. Duplicate Management
-5. Memory Intelligence
-6. Album Builder
-7. Album Refinement
+1. Reliable AI-assisted Media Classification
+2. Learning from User Corrections
+3. Cleanup Quality and Safety
+4. People Intelligence
+5. Output Generation (Albums, Timeline, Search)
 
 Album Builder becomes one consumer of the Memory Intelligence system rather than the sole center of the product mission.
 
@@ -199,10 +203,11 @@ Album Builder becomes one consumer of the Memory Intelligence system rather than
 
 ## Current Milestone
 
-- LEARN-001 Category Learning from User Corrections
+- LEARN-002 Preference Learning and Aggregation Foundations (next)
 
 ## Recently Completed Milestones
 
+- PEOPLE-001 Face Detection and Family Photo Classification
 - FOUNDATION historical milestones completed
 - DEV-007 Photo Cleanup & Relevance Engine
 - CLEAN-001 Media Classification & Decision Engine Foundation
@@ -267,6 +272,18 @@ CLEAN-005-FIX implementation summary:
 - Classifier now safely falls back to filename/metadata/user-learning rules when visual analysis is disabled, unavailable, or errors.
 - Added regression tests for disabled mode, no-image-open behavior, exception safety, and quick classification return.
 - Future work: run visual analysis only in background worker batches, never on UI thread.
+
+PEOPLE-001 implementation summary:
+
+- Added local face detection foundation in `src/core/face_detection_service.py` with `FaceDetectionResult`.
+- Uses OpenCV Haar cascade when available; returns deterministic safe fallback when unavailable.
+- Face detection analyzes resized images only (max 800px) and does not modify original files.
+- Added explicit background worker flow (`FaceDetectionWorker`) for user-triggered face analysis.
+- Added `Analyze Faces for Visible` action in Cleanup Review with non-blocking progress and result summary.
+- Face metadata is persisted per photo (`face_count`, `has_faces`, `face_detection_confidence`, `face_detection_detector`).
+- Media classification now treats strong face evidence as Family Photo evidence and includes `face detected` in reasoning.
+- User-corrected categories remain authoritative and are never auto-overridden by face detection.
+- No cloud AI; no identity recognition; no person-name matching in this milestone.
 
 Runtime stability update:
 
@@ -514,6 +531,14 @@ Future product priority after PRODUCT-DOC-002:
 - Cleanup and duplicate management as learning-aware infrastructure
 - Memory Intelligence before deeper output refinement
 
+Operational priority order for active planning:
+
+1. Reliable AI-assisted media classification
+2. Learning from user corrections
+3. Cleanup quality and safety
+4. People Intelligence
+5. Output generation (albums as one downstream consumer)
+
 ---
 
 # Current Limitations
@@ -532,6 +557,8 @@ Future product priority after PRODUCT-DOC-002:
 - No print-ready export pipeline yet
 - No HEIC support yet
 - No cloud integration yet
+- No people identity recognition yet (PEOPLE-001 includes face evidence only)
+- Background visual-analysis batching is still pending before re-enabling synchronous visual-analysis paths
 
 ---
 
@@ -548,6 +575,7 @@ Future product priority after PRODUCT-DOC-002:
 - Thumbnail handling should be expanded into a more general media pipeline.
 - The app needs better state management as more metadata and interactions are added.
 - Performance expectations for very large libraries now require more explicit virtualization planning.
+- Face-analysis and visual-analysis workloads require consolidated background scheduling policy to protect UI responsiveness.
 
 ## Low
 
@@ -579,6 +607,8 @@ See docs/project/ROADMAP.md for the authoritative milestone plan.
 - [ ] Add issue tracker entries as bugs and limitations are discovered.
 - [ ] Record major regressions after each Sprint.
 - [ ] Capture performance problems for large photo collections.
+- [ ] Formalize a shared background processing queue for thumbnail generation, visual analysis, and face analysis.
+- [ ] Define and track performance target validation for very large libraries (no UI-thread blocking during import/review).
 
 ---
 

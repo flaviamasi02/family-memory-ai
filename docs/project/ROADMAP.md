@@ -20,6 +20,14 @@ Family Memory AI is evolving into a Family Memory Intelligence system.
 
 Albums are one possible output, not the sole product objective.
 
+Strategic priority order for current planning:
+
+1. Reliable AI-assisted media classification
+2. Learning from user corrections
+3. Cleanup quality and safety
+4. People Intelligence
+5. Output generation (albums as one downstream consumer)
+
 ### Phase 1 - Foundation
 
 - Import
@@ -52,6 +60,7 @@ Current completed foundation work includes:
 Current status:
 
 - LEARN-001 is complete.
+- LEARN-002 is the next milestone focus.
 - This file is historical and transitional only; use docs/project/DOMAIN_ROADMAP.md for future milestones.
 
 Recently completed domain milestones relevant to Learning readiness:

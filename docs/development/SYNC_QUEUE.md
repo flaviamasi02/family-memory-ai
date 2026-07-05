@@ -51,3 +51,9 @@ Completed.
 Sprint D001 documentation review and consistency synchronization.
 
 Completed.
+
+### SQ-006
+
+DOCSYNC PC FULL canonical consistency pass (priority order, active domain alignment, category semantics, People roadmap wording, and workflow reference cleanup).
+
+Completed.

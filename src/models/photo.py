@@ -114,6 +114,11 @@ class Photo:
         user_decision = metadata.get("user_decision")
         classification_reason = metadata.get("classification_reason")
         classification_confidence = metadata.get("classification_confidence")
+        face_count = metadata.get("face_count")
+        faces_count = metadata.get("faces_count")
+        has_faces = metadata.get("has_faces")
+        face_detection_confidence = metadata.get("face_detection_confidence")
+        face_detection_detector = metadata.get("face_detection_detector")
         thumbnail_path = metadata.get("thumbnail_path")
 
         if isinstance(year, int):
@@ -180,6 +185,23 @@ class Photo:
             self.classification_confidence = float(classification_confidence)
             self.intelligence.classification_confidence = float(classification_confidence)
 
+        if isinstance(face_count, int):
+            self.intelligence.face_count = face_count
+            self.intelligence.faces_count = face_count
+
+        if isinstance(faces_count, int):
+            self.intelligence.face_count = faces_count
+            self.intelligence.faces_count = faces_count
+
+        if isinstance(has_faces, bool):
+            self.intelligence.has_faces = has_faces
+
+        if isinstance(face_detection_confidence, (int, float)):
+            self.intelligence.face_detection_confidence = float(face_detection_confidence)
+
+        if isinstance(face_detection_detector, str) and face_detection_detector.strip():
+            self.intelligence.face_detection_detector = face_detection_detector.strip()
+
         if isinstance(thumbnail_path, str):
             self.thumbnail_path = thumbnail_path.strip()
 
@@ -218,6 +240,16 @@ class Photo:
             self.intelligence.classification_reason = self.classification_reason
         if not isinstance(getattr(self.intelligence, "classification_confidence", None), (int, float)):
             self.intelligence.classification_confidence = self.classification_confidence
+        if not isinstance(getattr(self.intelligence, "face_count", None), int):
+            self.intelligence.face_count = self.intelligence.faces_count or 0
+        if not isinstance(getattr(self.intelligence, "faces_count", None), int):
+            self.intelligence.faces_count = self.intelligence.face_count or 0
+        if not isinstance(getattr(self.intelligence, "has_faces", None), bool):
+            self.intelligence.has_faces = bool(self.intelligence.face_count)
+        if not isinstance(getattr(self.intelligence, "face_detection_confidence", None), (int, float)):
+            self.intelligence.face_detection_confidence = float(metadata.get("face_detection_confidence", 0.0) or 0.0)
+        if not getattr(self.intelligence, "face_detection_detector", None):
+            self.intelligence.face_detection_detector = str(metadata.get("face_detection_detector", "unknown") or "unknown")
         self.intelligence.is_album_relevant_candidate = self.is_album_relevant_candidate
 
     def _derive_year_month_day_from_date(

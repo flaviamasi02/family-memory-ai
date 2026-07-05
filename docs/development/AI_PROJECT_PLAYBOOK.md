@@ -31,7 +31,7 @@ Reference the official documentation files:
 - docs/development/DECISIONS.md
 - docs/development/SYNC_QUEUE.md
 - docs/project/PROJECT_STATE.md
-- HANDOVER.md
+- docs/bootstrap/HANDOVER.md
 - docs/project/ROADMAP.md
 - docs/development/PROMPT_TEMPLATE.md
 
@@ -89,7 +89,7 @@ Before considering a Sprint complete:
 - documentation completeness verified for all impacted ownership documents;
 - docs/project/PROJECT_STATE.md updated;
 - docs/releases/CHANGELOG.md updated;
-- HANDOVER.md updated if navigation or operating context changed;
+- docs/bootstrap/HANDOVER.md updated if navigation or operating context changed;
 - docs/development/SYNC_QUEUE.md reviewed and synchronized.
 
 ---

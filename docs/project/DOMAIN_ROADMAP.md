@@ -178,6 +178,15 @@ Scope examples:
 - family relationships
 - importance learning
 
+Milestones:
+
+- PEOPLE-001 Face Detection and Family Photo Classification (completed)
+Goal:
+Use local face detection as explainable Family Photo evidence without identity recognition.
+
+- PEOPLE-002 Relationship Modeling
+- PEOPLE-003 Importance Learning
+
 ---
 
 ## EVENT
@@ -246,17 +255,25 @@ Scope examples:
 
 ## Current Active Domain
 
-- CLEAN
+- LEARN
 
 ## Current Milestone
 
-- CLEAN-003 Cleanup Review UX & Explainability (completed)
+- LEARN-002 Preference Learning and Aggregation Foundations (next)
 
 ## Recently Completed Domains
 
 - FOUNDATION
 - MEM (review UX and decision ergonomics foundation)
 - CLEAN (deterministic classification and cleanup-review UX foundation)
+
+## Strategic Priority Order
+
+1. Reliable AI-assisted media classification
+2. Learning from user corrections
+3. Cleanup quality and safety
+4. People Intelligence
+5. Output generation (albums as one downstream consumer)
 
 ## Future Planned Domains
 

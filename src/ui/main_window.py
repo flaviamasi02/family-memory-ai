@@ -97,6 +97,7 @@ class MainWindow(QMainWindow):
         self.irrelevant_media_page = IrrelevantMediaPage()
         self.irrelevant_media_page.categories_changed.connect(self._sync_cleanup_category_options)
         self.irrelevant_media_page.moved_photos.connect(self._handle_irrelevant_media_moved)
+        self.irrelevant_media_page.faces_analyzed.connect(self._handle_faces_analyzed)
 
         browser_page = QWidget()
         browser_layout = QVBoxLayout(browser_page)
@@ -333,6 +334,21 @@ class MainWindow(QMainWindow):
         self.status_label.setText(
             f"Cleanup files moved to {Path(self._imported_folder) / CLEANUP_REVIEW_FOLDER_NAME}. Library updated in memory."
         )
+
+    def _handle_faces_analyzed(self, analyzed_photos):
+        updated_photos = list(analyzed_photos or [])
+        if not updated_photos:
+            return
+
+        for photo in updated_photos:
+            self.photo_model.refresh_photo_metadata(photo)
+
+        if self.selected_photo is not None:
+            selected_path = str(getattr(self.selected_photo, "path", ""))
+            for photo in updated_photos:
+                if str(getattr(photo, "path", "")) == selected_path:
+                    self.details_panel.set_photo(self.selected_photo)
+                    break
 
     def _refresh_album_draft(self):
         if self._current_review_year is None or not self._current_scored_photos:

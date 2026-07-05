@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import Qt, QTimer, QThread, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
@@ -29,6 +29,7 @@ from learning.category_learning_engine import get_category_learning_engine
 from ui.category_management_dialog import CategoryManagementDialog
 from ui.image_preview_dialog import ImagePreviewDialog
 from ui.shared_thumbnail_grid import SharedGridItem, SharedThumbnailGrid
+from workers.face_detection_worker import FaceDetectionWorker
 
 RECOMMENDED_ACTION_LABELS = {
     "keep": "Keep",
@@ -54,6 +55,7 @@ class CleanupReviewRow:
 class IrrelevantMediaPage(QWidget):
     moved_photos = Signal(object)
     categories_changed = Signal()
+    faces_analyzed = Signal(object)
 
     CATEGORY_FILTER_ALL = "All categories"
     CONFIDENCE_FILTER_ALL = "All"
@@ -72,6 +74,8 @@ class IrrelevantMediaPage(QWidget):
         self._category_registry = get_category_registry()
         self._category_learning_engine = get_category_learning_engine()
         self._media_classifier = MediaClassifier()
+        self._face_detection_thread: Optional[QThread] = None
+        self._face_detection_worker: Optional[FaceDetectionWorker] = None
 
         self.title_label = QLabel("Cleanup Review")
         self.title_label.setStyleSheet("font-size: 18px; font-weight: 600;")
@@ -120,6 +124,11 @@ class IrrelevantMediaPage(QWidget):
         self.manage_categories_button.clicked.connect(self._on_manage_categories)
         self.reclassify_unknowns_button = QPushButton("Reclassify Unknowns")
         self.reclassify_unknowns_button.clicked.connect(self.reclassify_unknowns_from_learning)
+        self.analyze_faces_button = QPushButton("Analyze Faces for Visible")
+        self.analyze_faces_button.clicked.connect(self.analyze_faces_for_visible)
+
+        self.face_detection_status_label = QLabel("Face analysis idle")
+        self.face_detection_status_label.setStyleSheet("font-size: 12px; color: #666;")
 
         toolbar = QHBoxLayout()
         toolbar.addWidget(QLabel("Category:"))
@@ -136,6 +145,8 @@ class IrrelevantMediaPage(QWidget):
         toolbar.addWidget(self.user_saved_label)
         toolbar.addWidget(self.manage_categories_button)
         toolbar.addWidget(self.reclassify_unknowns_button)
+        toolbar.addWidget(self.analyze_faces_button)
+        toolbar.addWidget(self.face_detection_status_label)
         toolbar.addWidget(self.select_all_button)
         toolbar.addWidget(self.clear_selection_button)
 
@@ -310,6 +321,36 @@ class IrrelevantMediaPage(QWidget):
 
     def select_all_visible(self) -> None:
         self.thumbnail_grid.select_all_visible()
+
+    def analyze_faces_for_visible(self) -> None:
+        if self._face_detection_worker is not None or self._face_detection_thread is not None:
+            return
+
+        selected_rows = self._selected_rows()
+        target_rows = selected_rows if selected_rows else list(self._visible_rows)
+        if not target_rows:
+            self.face_detection_status_label.setText("No visible photos to analyze")
+            return
+
+        target_photos = [row.photo for row in target_rows]
+        self.face_detection_status_label.setText(f"Analyzing faces for {len(target_photos)} photo(s)...")
+        self.analyze_faces_button.setEnabled(False)
+
+        thread = QThread(self)
+        worker = FaceDetectionWorker(target_photos, enabled=True)
+        worker.moveToThread(thread)
+
+        thread.started.connect(worker.run)
+        worker.progress.connect(self._on_face_detection_progress)
+        worker.finished.connect(self._on_face_detection_finished)
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        thread.finished.connect(self._on_face_detection_thread_finished)
+
+        self._face_detection_thread = thread
+        self._face_detection_worker = worker
+        thread.start()
 
     def clear_selection(self) -> None:
         self.thumbnail_grid.clear_selection()
@@ -701,10 +742,14 @@ class IrrelevantMediaPage(QWidget):
         height = metadata.get("height")
         date_source = metadata.get("date_source") or metadata.get("source_of_date") or "Unknown"
         visual = metadata.get("visual_evidence") or metadata.get("visual_signals_summary") or ""
+        has_faces = bool(metadata.get("has_faces", False))
+        face_count = int(metadata.get("face_count", metadata.get("faces_count", 0)) or 0)
+        face_confidence = float(metadata.get("face_detection_confidence", 0.0) or 0.0)
 
         parts = [
             f"Resolution: {width or 'Unknown'} x {height or 'Unknown'}",
             f"Date source: {date_source}",
+            f"Faces: {'yes' if has_faces else 'no'} ({face_count}, {max(0, min(100, int(round(face_confidence * 100))))}%)",
         ]
         if visual:
             parts.append(f"Visual: {visual}")
@@ -798,6 +843,31 @@ class IrrelevantMediaPage(QWidget):
             self._user_metadata_service.save_photo_metadata(photo)
         except Exception:
             pass
+
+    def _on_face_detection_progress(self, index: int, total: int, filename: str) -> None:
+        self.face_detection_status_label.setText(f"Analyzing faces {index}/{total}: {filename}")
+
+    def _on_face_detection_finished(self, summary) -> None:
+        analyzed_photos = list(getattr(summary, "photos", []) or [])
+        analyzed_count = int(getattr(summary, "analyzed_count", len(analyzed_photos)) or 0)
+        faces_detected_count = int(getattr(summary, "faces_detected_count", 0) or 0)
+        reclassified_count = int(getattr(summary, "reclassified_count", 0) or 0)
+
+        if analyzed_photos:
+            self._rows = [self._build_row(row.photo) for row in self._rows]
+            self._refresh_group_options()
+            self._trigger_refresh(force=True)
+
+        self.face_detection_status_label.setText(
+            f"Face analysis complete: {analyzed_count} analyzed, {faces_detected_count} with faces, {reclassified_count} reclassified"
+        )
+        self.faces_analyzed.emit(analyzed_photos)
+        self.categories_changed.emit()
+
+    def _on_face_detection_thread_finished(self) -> None:
+        self._face_detection_thread = None
+        self._face_detection_worker = None
+        self.analyze_faces_button.setEnabled(True)
 
     def _selected_rows(self) -> list[CleanupReviewRow]:
         selected_keys = self.thumbnail_grid.selected_keys()

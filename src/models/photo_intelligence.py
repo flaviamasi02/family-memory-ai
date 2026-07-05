@@ -23,6 +23,11 @@ class PhotoIntelligence:
     user_decision: str = "pending"
     classification_reason: str = ""
     classification_confidence: float = 0.0
+    face_count: int = 0
+    faces_count: int = 0
+    has_faces: bool = False
+    face_detection_confidence: float = 0.0
+    face_detection_detector: str = "unknown"
 
     # Quality placeholders
     quality_score: Optional[float] = None
@@ -31,7 +36,6 @@ class PhotoIntelligence:
     is_blurry: bool = False
 
     # People placeholders
-    faces_count: int = 0
     people_names: List[str] = field(default_factory=list)
 
     # Duplicate placeholders

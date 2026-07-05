@@ -37,6 +37,9 @@ class UserMetadataService:
         sidecar_path.write_text(json.dumps(payload, indent=2, ensure_ascii=True), encoding="utf-8")
         return sidecar_path
 
+    def save_photo_metadata(self, photo, app_version: Optional[str] = None) -> Optional[Path]:
+        return self.save_for_photo(photo, app_version=app_version)
+
     def apply_for_photo(self, photo) -> UserMetadataLoadResult:
         photo_path = Path(getattr(photo, "path", ""))
         if not photo_path:
@@ -65,6 +68,11 @@ class UserMetadataService:
         effective_from_sidecar = str(data.get("effective_media_category", "") or "").strip()
         user_decision = str(data.get("user_decision", "") or "").strip()
         classification_reason = str(data.get("classification_reason", "") or "").strip()
+        face_count = data.get("face_count", data.get("faces_count", 0))
+        has_faces = data.get("has_faces", False)
+        face_detection_confidence = data.get("face_detection_confidence", 0.0)
+        face_detection_detector = str(data.get("face_detection_detector", "") or "").strip()
+        face_detection_explanation = data.get("face_detection_explanation", [])
 
         if automatic:
             metadata["automatic_media_category"] = automatic
@@ -83,6 +91,15 @@ class UserMetadataService:
 
         if classification_reason:
             metadata["classification_reason"] = classification_reason
+
+        metadata["face_count"] = int(face_count or 0)
+        metadata["faces_count"] = int(face_count or 0)
+        metadata["has_faces"] = bool(has_faces)
+        metadata["face_detection_confidence"] = float(face_detection_confidence or 0.0)
+        if face_detection_detector:
+            metadata["face_detection_detector"] = face_detection_detector
+        if isinstance(face_detection_explanation, list):
+            metadata["face_detection_explanation"] = [str(item) for item in face_detection_explanation]
 
         if not identity_match:
             metadata["user_metadata_warning"] = "identity_mismatch"
@@ -148,6 +165,11 @@ class UserMetadataService:
             "effective_media_category": effective,
             "user_decision": user_decision,
             "classification_reason": classification_reason,
+            "face_count": int(metadata.get("face_count", metadata.get("faces_count", 0)) or 0),
+            "has_faces": bool(metadata.get("has_faces", False)),
+            "face_detection_confidence": float(metadata.get("face_detection_confidence", 0.0) or 0.0),
+            "face_detection_detector": str(metadata.get("face_detection_detector", "") or "").strip(),
+            "face_detection_explanation": list(metadata.get("face_detection_explanation", []) or []),
             "updated_at": datetime.now(timezone.utc).isoformat(),
             "app_version": app_version or self._app_version,
         }

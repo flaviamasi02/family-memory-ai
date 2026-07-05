@@ -24,6 +24,14 @@ The application does not optimize for beautiful photographs.
 
 It optimizes for meaningful memories.
 
+Current strategic priority order:
+
+1. Reliable AI-assisted media classification
+2. Learning from user corrections
+3. Cleanup quality and safety
+4. People Intelligence
+5. Output generation (albums as one downstream consumer)
+
 ---
 
 # Explainable Intelligence
@@ -53,8 +61,21 @@ Decision source examples:
 Explainability requirement for classification:
 
 - Visual-content-based decisions must expose human-readable evidence (for example white page-like background, text-like regions, tall screenshot layout, banner layout, or graphic-like low-resolution square structure).
+- Face-based decisions must expose detector source, face count, and confidence as explicit evidence.
 - Metadata-less images should use local visual evidence before falling back to Unknown.
 - Unknown remains valid when evidence is weak or conflicting.
+
+People-001 classification rule:
+
+- Local face detection is allowed as Family Photo evidence.
+- Strong face evidence may elevate Unknown to Family Photo.
+- User-corrected category remains authoritative and must not be overridden automatically.
+- No person identity recognition and no cloud AI are allowed in People-001.
+
+People roadmap direction:
+
+- PEOPLE-002 and later milestones may introduce relationship-level intelligence, but only with explicit explainability and user-control safeguards.
+- Identity-level recognition is out of scope for PEOPLE-001 and remains gated by future product decisions.
 
 ---
 
@@ -298,6 +319,11 @@ Cleanup Review now follows the same UX philosophy as Memory Review:
 - top filters and grouping controls
 - compact thumbnail-first grid
 - right-side details panel with explainability and actions
+
+Grouping rule:
+
+- Grouping is a visualization mechanism for review speed only.
+- Grouping must not be treated as media classification.
 
 ## Terminology Alignment
 

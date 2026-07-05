@@ -41,6 +41,14 @@ The long-term mission is:
 
 "Help families preserve, organize, understand and rediscover the memories that matter most while continuously learning what is important for each family."
 
+Current strategic priority order:
+
+1. Reliable AI-assisted media classification
+2. Learning from user corrections
+3. Cleanup quality and safety
+4. People Intelligence
+5. Output generation (albums as one downstream consumer)
+
 ---
 
 ## Permanent Product Principles
@@ -203,9 +211,16 @@ Understand who matters to the family and how people shape memory value.
 
 Future milestones:
 
-- PEOPLE-001 People Identity Foundations
+- PEOPLE-001 Face Detection and Family Photo Classification (completed)
 - PEOPLE-002 Relationship Modeling
 - PEOPLE-003 Importance Learning
+
+PEOPLE-001 completed outcome:
+
+- Added local-only face detection foundation as explainable Family Photo evidence.
+- Added explicit background/manual face analysis workflow to avoid UI blocking import paths.
+- No identity recognition, no person-name matching, and no cloud AI in this milestone.
+- User corrections remain authoritative over automatic face-based categorization.
 
 ### EVENT
 
@@ -324,6 +339,9 @@ Classification principles:
 
 - initial classification remains deterministic and explainable
 - classification confidence is a first-class signal for review prioritization
+- default system categories are stable, user-correctable, and taxonomy-driven
+- Effective Category (Automatic Category -> User Corrected Category -> Effective Category) is authoritative for review behavior
+- grouping remains a review visualization aid and must not change underlying classification semantics
 
 ---
 

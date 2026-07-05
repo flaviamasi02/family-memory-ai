@@ -73,6 +73,16 @@ class PhotoDetailsPanel(QWidget):
             if metadata.get("has_gps"):
                 lines.append("GPS: present")
 
+        has_faces = metadata.get("has_faces")
+        face_count = metadata.get("face_count", metadata.get("faces_count", 0))
+        face_confidence = metadata.get("face_detection_confidence")
+        lines.append(f"Faces detected: {'yes' if bool(has_faces) else 'no'}")
+        lines.append(f"Face count: {int(face_count or 0)}")
+        if isinstance(face_confidence, (int, float)):
+            lines.append(f"Face detection confidence: {max(0, min(100, int(round(float(face_confidence) * 100))))}%")
+        else:
+            lines.append("Face detection confidence: 0%")
+
         lines.append(f"Date: {date_taken_value or '-'}")
         lines.append(f"Date source: {date_source_value or 'Unknown'}")
         lines.append(f"Relevance: {getattr(intelligence, 'relevance_category', 'unknown') if intelligence is not None else 'unknown'}")
