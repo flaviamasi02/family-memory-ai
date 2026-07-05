@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+### Sprint D001 - Documentation Review
+- Reviewed required repository documentation for consistency and single-source-of-truth alignment.
+- Fixed cross-document responsibility boundaries (state vs roadmap vs changelog).
+- Updated README, ROADMAP, PROJECT_STATE, HANDOVER, AI project docs, and sync queue to remove stale or conflicting documentation.
+
 ### Sprint 14 - UI polish and status synchronization
 - Polished the custom photo card UI so cards show only the thumbnail and filename.
 - Synced card and details-panel status updates from the current Photo object.

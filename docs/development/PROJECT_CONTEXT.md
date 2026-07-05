@@ -4,6 +4,13 @@ This document provides permanent context for AI assistants joining the project.
 
 Its purpose is to ensure that every AI understands how the project is developed before writing code.
 
+Single source role:
+
+- This file defines long-term collaboration and development context.
+- docs/PROJECT_STATE.md defines current operational status.
+- ROADMAP.md defines planned milestones.
+- CHANGELOG.md defines historical implementation changes.
+
 ---
 
 # Project Goal

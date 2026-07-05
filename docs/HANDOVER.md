@@ -31,13 +31,16 @@ Refer to:
 Read the following documents in this order:
 
 1. HANDOVER.md
-2. PROJECT_CONTEXT.md
+2. development/PROJECT_CONTEXT.md
 3. PROJECT_STATE.md
 4. DECISIONS.md
 5. IDEAS.md
 6. ROADMAP.md
 7. AI_PROJECT_PLAYBOOK.md
 8. ARCHITECTURE.md
+9. AI_DEVELOPER_GUIDE.md
+10. CODING_STANDARDS.md
+11. UI_GUIDELINES.md
 
 ---
 
@@ -72,3 +75,12 @@ PC is used for:
 ## Next Step
 
 Read PROJECT_STATE.md and continue with the next planned Sprint.
+
+---
+
+## Single Source of Truth
+
+- PROJECT_STATE.md: Current operational state
+- ROADMAP.md: Planned milestones
+- CHANGELOG.md: Historical sprint changes
+- development/PROJECT_CONTEXT.md: Long-term collaboration and development context

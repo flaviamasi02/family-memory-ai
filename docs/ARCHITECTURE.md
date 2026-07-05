@@ -99,8 +99,18 @@ The architecture should allow this without forcing a rewrite of the desktop appl
 ```text
 src/
   main.py
+  core/
+    photo_scanner.py
+    metadata_extractor.py
+  models/
+    photo.py
+    photo_model.py
   ui/
     main_window.py
+    photo_card_widget.py
+    photo_grid_widget.py
+    photo_details_panel.py
+    photo_grid_view.py
   workers/
     thumbnail_worker.py
   cache/
@@ -112,6 +122,8 @@ src/
 | Folder | Purpose |
 | --- | --- |
 | src/ | Main application source code |
+| src/core/ | Scanning and metadata extraction helpers |
+| src/models/ | Photo domain object and photo list model |
 | src/ui/ | User interface components and windows |
 | src/workers/ | Background processing tasks |
 | src/cache/ | Caching logic and local temporary data |
@@ -160,18 +172,22 @@ It is responsible for:
 
 It should not contain heavy image processing logic itself.
 
-## PhotoGridView
+## PhotoGridWidget
 
-PhotoGridView displays a grid of photos to the user.
+PhotoGridWidget is the current custom card grid used to display photos.
 
 It is responsible for:
 
-- rendering thumbnails
-- supporting scrolling and selection
-- showing current photo state
-- responding to user interaction
+- rendering card widgets in batches
+- handling photo card selection events
+- applying deferred thumbnail updates safely
+- supporting progressive loading in a scrollable container
 
 It should depend on models and data providers rather than performing processing directly.
+
+## PhotoGridView (Legacy Foundation)
+
+PhotoGridView remains as an earlier model/view foundation artifact and is not the primary runtime grid in the current UI flow.
 
 ## Photo
 

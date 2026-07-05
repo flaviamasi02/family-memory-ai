@@ -6,7 +6,7 @@
 
 ## Current Sprint
 
-- Sprint 13
+- Sprint 14
 
 ## Project Status
 
@@ -26,7 +26,7 @@
 
 Family Memory AI is currently in an early-stage desktop prototype phase. The application launches and supports a basic workflow around importing photos, scanning folders, generating thumbnails, and displaying a photo browser experience.
 
-The immediate goals are to strengthen the architecture, improve scalability, and move toward a more structured model/view-based foundation for future AI features.
+The immediate goals are to strengthen grid scalability, improve selection/detail synchronization reliability, and keep the architecture ready for future AI features.
 
 ## Sprint 9 Update
 
@@ -43,6 +43,12 @@ Sprint 10 introduced a lightweight foundation for progressive thumbnail loading.
 ## Sprint 12 Update
 
 Sprint 12 added a simple metadata details panel to the main window and fixed the startup crash caused by connecting selection signals before the photo grid view had a valid selection model. The view now connects its selection handling safely inside the model-binding path, allowing photo selection to update the details panel without destabilizing startup or thumbnail loading. A follow-up bug fix also corrected an incorrect PySide6 import in the details panel, replacing the dynamic import path with the standard Qt import so the application can launch cleanly. Additional hardening was added to thumbnail loading for very large images by switching to QImageReader with scaled decoding, which avoids the full-resolution allocation failure and keeps the app responsive while continuing to use the existing thumbnail cache. The selection flow was then tightened so clicking a photo now routes through the photo model into the details panel, and the details view shows filename, size, dimensions, date, camera information, and status when available. A further fix now handles invalid or corrupted JPEG files safely by catching decode failures in both thumbnail loading and metadata extraction, logging concise warnings, and allowing the import process to continue without crashing. A targeted click-selection bug fix also resolved the earlier crash caused by mixing selectionChanged and clicked flows. The list view now relies on clicked as the reliable selection trigger, so clicking a photo updates the panel without crashing. A fallback interaction change then simplified the flow further by using double-click as the reliable trigger for showing photo details, which avoids the unstable single-click behavior seen after thumbnail updates in QListView. This sprint also introduced a reusable PhotoCardWidget component as the first building block for a future custom photo grid. The component displays a thumbnail and filename, emits a click signal, and can be reused in later Sprint work without introducing AI or database features. The unstable QListView-based photo grid was finally replaced with a lightweight custom PhotoGridWidget built from PhotoCardWidget instances so clicking a photo card reliably updates the details panel. This is an intermediate step toward a fuller custom photo browser and does not yet add virtual scrolling or advanced layout behavior.quiring a redesign of the current grid. The current PhotoGridView implementation was then rewritten from scratch as a minimal clicked-based wrapper because the earlier patchwork selection logic had become brittle when thumbnails and list-item rendering changed. The new view keeps only the essential responsibilities: configure the icon view, receive a click, resolve the selected Photo from the model, and emit the selection signal. This keeps the app functional while preserving a clear path toward a future custom grid implementation.placing the current QListView-based view. Invalid files may still lack thumbnails or metadata, but the app remains responsive and continues processing the rest of the library.
+
+---
+
+## Sprint 14 Update
+
+Sprint 14 polished the custom card UX and status presentation. Photo cards remain focused on thumbnail and filename, and details-panel status values were normalized to user-friendly labels. Status refresh behavior between model updates and details rendering was improved for clearer runtime feedback.
 
 ---
 
@@ -92,6 +98,7 @@ The current implementation is a lightweight Qt desktop application with a modula
 | Sprint 11 | Completed | EXIF Metadata Foundation |
 | Sprint 12 | Completed | Custom Photo Grid and Details Panel |
 | Sprint 13 | Completed | Batch Photo Grid Loading |
+| Sprint 14 | Completed | UI polish and status synchronization |
 
 ---
 
@@ -184,23 +191,7 @@ High
 
 # Upcoming Roadmap
 
-| Milestone | Status | Priority |
-| --- | --- | --- |
-| Photo model | Planned | High |
-| Photo grid view | Planned | High |
-| Virtual scrolling | Planned | High |
-| Metadata extraction | Planned | High |
-| Blur detection | Planned | Medium |
-| Smile detection | Planned | Medium |
-| Face recognition | Planned | Medium |
-| Duplicate detection | Planned | Medium |
-| Memory scoring | Planned | Medium |
-| Preference learning | Planned | Low |
-| Storytelling | Planned | Low |
-| Album generation | Planned | Low |
-| Natural language search | Planned | Low |
-| Android | Planned | Low |
-| Commercial version | Planned | Low |
+See ROADMAP.md for the authoritative milestone plan.
 
 ---
 
@@ -230,7 +221,7 @@ High
 | Classes | TBD |
 | Modules | TBD |
 | Implemented features | TBD |
-| Completed Sprints | 13 |
+| Completed Sprints | 14 |
 | Architecture maturity | Emerging |
 
 ---
@@ -247,7 +238,11 @@ It provides the current project status and operational context. The other projec
 - [CODING_STANDARDS.md](CODING_STANDARDS.md)
 - [ARCHITECTURAL_DECISIONS.md](ARCHITECTURAL_DECISIONS.md)
 
-PROJECT_STATE.md represents the current implementation, while the other documents describe long-term direction and principles.
+PROJECT_STATE.md is the single source of truth for current version, active sprint, completed sprint count, and operational implementation status.
+
+ROADMAP.md is the single source of truth for planned milestones.
+
+CHANGELOG.md is the single source of truth for historical sprint changes.
 
 ---
 

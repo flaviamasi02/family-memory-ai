@@ -78,25 +78,21 @@ These badges must be small and unobtrusive.
 
 # Selection
 
-Only one photo can be selected.
+Current baseline:
 
-Selected photo must always have a visible highlight.
+- one photo interaction at a time through card click
+- details panel updates from the interacted card
 
-Preferred style:
+Planned enhancement:
 
-- blue border
-
-Alternative:
-
-- light blue background
-
-Selection must always remain visible while scrolling.
+- persistent visible selected-card highlight (blue border preferred)
+- highlight remains visible while scrolling
 
 ---
 
 # Details Panel
 
-The Details Panel must contain:
+Current fields:
 
 - Selected Photo
 - Filename
@@ -104,10 +100,13 @@ The Details Panel must contain:
 - Dimensions
 - Date Taken
 - Camera
-- Lens
 - Orientation
 - GPS
 - Status
+
+Future fields:
+
+- Lens
 - AI Score (future)
 - Faces (future)
 - People (future)
@@ -124,10 +123,13 @@ Display:
 
 - 🟡 Pending
 - 🔵 Loading Thumbnail...
-- 🟣 Reading Metadata...
 - 🟢 Thumbnail Ready
-- ✅ Ready
 - 🔴 Error
+
+Reserved for future metadata/analysis flows:
+
+- 🟣 Reading Metadata...
+- ✅ Ready
 
 ---
 

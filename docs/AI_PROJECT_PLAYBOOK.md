@@ -66,13 +66,10 @@ Review Session
 
 Before considering a Sprint complete:
 
-- code implemented;
-- tests completed;
-- documentation updated;
-- PROJECT_STATE updated;
-- HANDOVER updated if required;
-- SYNC_QUEUE reviewed.
-
-Commit message:
-
-Add AI project playbook
+- objective completed and verified;
+- tests/manual validation completed when applicable;
+- documentation updated where affected;
+- PROJECT_STATE.md updated;
+- CHANGELOG.md updated;
+- HANDOVER.md updated if navigation or operating context changed;
+- SYNC_QUEUE.md reviewed and synchronized.
