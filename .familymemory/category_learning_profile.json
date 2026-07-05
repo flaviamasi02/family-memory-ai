@@ -1,5 +1,5 @@
 {
-  "total_events": 807,
+  "total_events": 808,
   "category_event_counts": {
     "advertisement": 60,
     "important_object": 30,
@@ -12,11 +12,11 @@
     "da_buttare": 72,
     "document": 5,
     "unknown": 425,
-    "personal_photo": 1
+    "personal_photo": 2
   },
   "rules": [
     {
-      "id": "rule_unknown_441024711049",
+      "id": "rule_unknown_302451429760",
       "target_category": "unknown",
       "conditions": {
         "extension": ".jpg",
@@ -28,7 +28,7 @@
       "explanation": "User often marks media with without camera metadata; extension .jpg; tiny file size as Unknown."
     },
     {
-      "id": "rule_unknown_482206197058",
+      "id": "rule_unknown_289991307903",
       "target_category": "unknown",
       "conditions": {
         "date_source": "filename",
@@ -39,7 +39,7 @@
       "explanation": "User often marks media with date source filename; extension .jpg as Unknown."
     },
     {
-      "id": "rule_unknown_666250617440",
+      "id": "rule_unknown_274613222332",
       "target_category": "unknown",
       "conditions": {
         "contains_whatsapp": true,
@@ -50,7 +50,7 @@
       "explanation": "User often marks media with WhatsApp-like filename; without camera metadata as Unknown."
     },
     {
-      "id": "rule_unknown_850089640184",
+      "id": "rule_unknown_194496894508",
       "target_category": "unknown",
       "conditions": {
         "contains_whatsapp": true,
@@ -61,7 +61,7 @@
       "explanation": "User often marks media with WhatsApp-like filename; extension .jpg as Unknown."
     },
     {
-      "id": "rule_unknown_846625406969",
+      "id": "rule_unknown_807593126750",
       "target_category": "unknown",
       "conditions": {
         "contains_whatsapp": true,
@@ -72,7 +72,7 @@
       "explanation": "User often marks media with WhatsApp-like filename; tiny file size as Unknown."
     },
     {
-      "id": "rule_unknown_276072100914",
+      "id": "rule_unknown_182007710827",
       "target_category": "unknown",
       "conditions": {
         "contains_whatsapp": true,
@@ -88,7 +88,7 @@
       "explanation": "User often marks media with WhatsApp-like filename; without camera metadata; with EXIF date; date source filename; extension .jpg; tiny file size as Unknown."
     },
     {
-      "id": "rule_family_photo_293948183850",
+      "id": "rule_family_photo_891290178244",
       "target_category": "family_photo",
       "conditions": {
         "date_source": "filename",
@@ -99,7 +99,7 @@
       "explanation": "User often marks media with date source filename; extension .jpg as Family Photo."
     },
     {
-      "id": "rule_advertisement_310142934657",
+      "id": "rule_advertisement_877713345571",
       "target_category": "advertisement",
       "conditions": {
         "date_source": "unknown",
@@ -114,7 +114,7 @@
       "explanation": "User often marks media with without camera metadata; with EXIF date; date source unknown; extension .jpg; tiny file size as Advertisement."
     },
     {
-      "id": "rule_advertisement_287886035682",
+      "id": "rule_advertisement_490792875519",
       "target_category": "advertisement",
       "conditions": {
         "extension": ".jpg",
@@ -126,7 +126,7 @@
       "explanation": "User often marks media with without camera metadata; extension .jpg; tiny file size as Advertisement."
     },
     {
-      "id": "rule_advertisement_253098128182",
+      "id": "rule_advertisement_632041122416",
       "target_category": "advertisement",
       "conditions": {
         "date_source": "unknown",
@@ -137,7 +137,7 @@
       "explanation": "User often marks media with date source unknown; extension .jpg as Advertisement."
     },
     {
-      "id": "rule_da_buttare_438035928543",
+      "id": "rule_da_buttare_623316048857",
       "target_category": "da_buttare",
       "conditions": {
         "contains_whatsapp": true,
@@ -148,7 +148,7 @@
       "explanation": "User often marks media with WhatsApp-like filename; without camera metadata as da buttare."
     },
     {
-      "id": "rule_da_buttare_182244610627",
+      "id": "rule_da_buttare_573215882673",
       "target_category": "da_buttare",
       "conditions": {
         "date_source": "filename",
@@ -159,7 +159,7 @@
       "explanation": "User often marks media with date source filename; extension .jpg as da buttare."
     },
     {
-      "id": "rule_family_photo_470228157123",
+      "id": "rule_family_photo_647189620913",
       "target_category": "family_photo",
       "conditions": {
         "date_source": "filename",
@@ -174,7 +174,7 @@
       "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; large file size as Family Photo."
     },
     {
-      "id": "rule_family_photo_413173741871",
+      "id": "rule_family_photo_480404921862",
       "target_category": "family_photo",
       "conditions": {
         "extension": ".jpg",
@@ -186,7 +186,7 @@
       "explanation": "User often marks media with without camera metadata; extension .jpg; large file size as Family Photo."
     },
     {
-      "id": "rule_family_photo_811200112421",
+      "id": "rule_family_photo_509030921213",
       "target_category": "family_photo",
       "conditions": {
         "date_source": "filename",
@@ -201,7 +201,7 @@
       "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; medium file size as Family Photo."
     },
     {
-      "id": "rule_family_photo_661177242954",
+      "id": "rule_family_photo_231930477043",
       "target_category": "family_photo",
       "conditions": {
         "extension": ".jpg",
@@ -213,7 +213,7 @@
       "explanation": "User often marks media with without camera metadata; extension .jpg; medium file size as Family Photo."
     },
     {
-      "id": "rule_da_buttare_663261834934",
+      "id": "rule_da_buttare_293403296864",
       "target_category": "da_buttare",
       "conditions": {
         "extension": ".jpg",
@@ -225,7 +225,7 @@
       "explanation": "User often marks media with without camera metadata; extension .jpg; tiny file size as da buttare."
     },
     {
-      "id": "rule_da_buttare_464315760472",
+      "id": "rule_da_buttare_726224462710",
       "target_category": "da_buttare",
       "conditions": {
         "contains_whatsapp": true,
@@ -241,7 +241,7 @@
       "explanation": "User often marks media with WhatsApp-like filename; without camera metadata; with EXIF date; date source filename; extension .jpg; tiny file size as da buttare."
     },
     {
-      "id": "rule_da_buttare_492240314953",
+      "id": "rule_da_buttare_790351621132",
       "target_category": "da_buttare",
       "conditions": {
         "contains_whatsapp": true,
@@ -252,7 +252,7 @@
       "explanation": "User often marks media with WhatsApp-like filename; extension .jpg as da buttare."
     },
     {
-      "id": "rule_da_buttare_257661139014",
+      "id": "rule_da_buttare_441226553995",
       "target_category": "da_buttare",
       "conditions": {
         "contains_whatsapp": true,
@@ -263,7 +263,7 @@
       "explanation": "User often marks media with WhatsApp-like filename; tiny file size as da buttare."
     },
     {
-      "id": "rule_to_print_187276700335",
+      "id": "rule_to_print_396653549256",
       "target_category": "to_print",
       "conditions": {
         "extension": ".jpg",
@@ -275,7 +275,7 @@
       "explanation": "User often marks media with without camera metadata; extension .jpg; tiny file size as To Print."
     },
     {
-      "id": "rule_to_print_152488792835",
+      "id": "rule_to_print_726180448680",
       "target_category": "to_print",
       "conditions": {
         "date_source": "unknown",
@@ -286,7 +286,7 @@
       "explanation": "User often marks media with date source unknown; extension .jpg as To Print."
     },
     {
-      "id": "rule_important_object_464763285543",
+      "id": "rule_important_object_163071954555",
       "target_category": "important_object",
       "conditions": {
         "date_source": "unknown",
@@ -301,7 +301,7 @@
       "explanation": "User often marks media with without camera metadata; with EXIF date; date source unknown; extension .jpg; tiny file size as Important Object."
     },
     {
-      "id": "rule_meme_or_graphic_347197043415",
+      "id": "rule_meme_or_graphic_325700358434",
       "target_category": "meme_or_graphic",
       "conditions": {
         "date_source": "unknown",
@@ -316,7 +316,7 @@
       "explanation": "User often marks media with without camera metadata; without EXIF date; date source unknown; extension .jpg; tiny file size as Memes."
     },
     {
-      "id": "rule_important_object_217582744344",
+      "id": "rule_important_object_549992424607",
       "target_category": "important_object",
       "conditions": {
         "extension": ".jpg",
@@ -328,7 +328,7 @@
       "explanation": "User often marks media with without camera metadata; extension .jpg; tiny file size as Important Object."
     },
     {
-      "id": "rule_meme_or_graphic_854034504371",
+      "id": "rule_meme_or_graphic_530853425085",
       "target_category": "meme_or_graphic",
       "conditions": {
         "extension": ".jpg",
@@ -340,7 +340,7 @@
       "explanation": "User often marks media with without camera metadata; extension .jpg; tiny file size as Memes."
     },
     {
-      "id": "rule_meme_or_graphic_761858730937",
+      "id": "rule_meme_or_graphic_372482736721",
       "target_category": "meme_or_graphic",
       "conditions": {
         "extension": ".jpg",
@@ -352,7 +352,7 @@
       "explanation": "User often marks media with without camera metadata; without EXIF date; extension .jpg as Memes."
     },
     {
-      "id": "rule_important_object_182794836844",
+      "id": "rule_important_object_171847984827",
       "target_category": "important_object",
       "conditions": {
         "date_source": "unknown",
@@ -363,7 +363,7 @@
       "explanation": "User often marks media with date source unknown; extension .jpg as Important Object."
     },
     {
-      "id": "rule_meme_or_graphic_624055221306",
+      "id": "rule_meme_or_graphic_774925751942",
       "target_category": "meme_or_graphic",
       "conditions": {
         "date_source": "unknown",
@@ -374,7 +374,7 @@
       "explanation": "User often marks media with date source unknown; extension .jpg as Memes."
     },
     {
-      "id": "rule_to_print_163304209505",
+      "id": "rule_to_print_669268565182",
       "target_category": "to_print",
       "conditions": {
         "date_source": "unknown",
@@ -389,7 +389,7 @@
       "explanation": "User often marks media with without camera metadata; without EXIF date; date source unknown; extension .jpg; tiny file size as To Print."
     },
     {
-      "id": "rule_to_print_415044717262",
+      "id": "rule_to_print_716050943469",
       "target_category": "to_print",
       "conditions": {
         "extension": ".jpg",
@@ -401,7 +401,7 @@
       "explanation": "User often marks media with without camera metadata; without EXIF date; extension .jpg as To Print."
     },
     {
-      "id": "rule_meme_176082712142",
+      "id": "rule_meme_672218203275",
       "target_category": "meme",
       "conditions": {
         "date_source": "filename",
@@ -416,7 +416,7 @@
       "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; tiny file size as Meme."
     },
     {
-      "id": "rule_meme_469068910743",
+      "id": "rule_meme_559348375712",
       "target_category": "meme",
       "conditions": {
         "extension": ".jpg",
@@ -428,7 +428,7 @@
       "explanation": "User often marks media with without camera metadata; extension .jpg; tiny file size as Meme."
     },
     {
-      "id": "rule_meme_427887424734",
+      "id": "rule_meme_307270803825",
       "target_category": "meme",
       "conditions": {
         "date_source": "filename",
@@ -439,7 +439,7 @@
       "explanation": "User often marks media with date source filename; extension .jpg as Meme."
     },
     {
-      "id": "rule_da_buttare_413057728663",
+      "id": "rule_da_buttare_906614393268",
       "target_category": "da_buttare",
       "conditions": {
         "contains_whatsapp": true,
@@ -450,7 +450,7 @@
       "explanation": "User often marks media with WhatsApp-like filename; extension .jpeg as da buttare."
     },
     {
-      "id": "rule_da_buttare_307864876188",
+      "id": "rule_da_buttare_289327429309",
       "target_category": "da_buttare",
       "conditions": {
         "date_source": "filename",
@@ -461,7 +461,7 @@
       "explanation": "User often marks media with date source filename; extension .jpeg as da buttare."
     },
     {
-      "id": "rule_to_print_209533599310",
+      "id": "rule_to_print_621264649764",
       "target_category": "to_print",
       "conditions": {
         "date_source": "unknown",
@@ -476,7 +476,7 @@
       "explanation": "User often marks media with without camera metadata; with EXIF date; date source unknown; extension .jpg; tiny file size as To Print."
     },
     {
-      "id": "rule_document_or_scan_137818893761",
+      "id": "rule_document_or_scan_335471322412",
       "target_category": "document_or_scan",
       "conditions": {
         "date_source": "unknown",
@@ -491,7 +491,7 @@
       "explanation": "User often marks media with without camera metadata; without EXIF date; date source unknown; extension .jpg; tiny file size as Documents."
     },
     {
-      "id": "rule_document_or_scan_657882275248",
+      "id": "rule_document_or_scan_608086338339",
       "target_category": "document_or_scan",
       "conditions": {
         "extension": ".jpg",
@@ -503,7 +503,7 @@
       "explanation": "User often marks media with without camera metadata; extension .jpg; tiny file size as Documents."
     },
     {
-      "id": "rule_document_or_scan_867595873400",
+      "id": "rule_document_or_scan_415913984737",
       "target_category": "document_or_scan",
       "conditions": {
         "extension": ".jpg",
@@ -515,7 +515,7 @@
       "explanation": "User often marks media with without camera metadata; without EXIF date; extension .jpg as Documents."
     },
     {
-      "id": "rule_document_or_scan_310003200246",
+      "id": "rule_document_or_scan_113754071095",
       "target_category": "document_or_scan",
       "conditions": {
         "date_source": "unknown",
@@ -526,7 +526,7 @@
       "explanation": "User often marks media with date source unknown; extension .jpg as Documents."
     },
     {
-      "id": "rule_da_buttare_856320063420",
+      "id": "rule_da_buttare_522308418245",
       "target_category": "da_buttare",
       "conditions": {
         "contains_whatsapp": true,
@@ -542,7 +542,7 @@
       "explanation": "User often marks media with WhatsApp-like filename; without camera metadata; with EXIF date; date source filename; extension .jpeg; medium file size as da buttare."
     },
     {
-      "id": "rule_da_buttare_289888532078",
+      "id": "rule_da_buttare_368584869151",
       "target_category": "da_buttare",
       "conditions": {
         "extension": ".jpeg",
@@ -554,7 +554,7 @@
       "explanation": "User often marks media with without camera metadata; extension .jpeg; medium file size as da buttare."
     },
     {
-      "id": "rule_da_buttare_397090864909",
+      "id": "rule_da_buttare_140532895833",
       "target_category": "da_buttare",
       "conditions": {
         "contains_whatsapp": true,
@@ -565,7 +565,7 @@
       "explanation": "User often marks media with WhatsApp-like filename; medium file size as da buttare."
     },
     {
-      "id": "rule_unknown_538951445715",
+      "id": "rule_unknown_189581602196",
       "target_category": "unknown",
       "conditions": {
         "date_source": "filename",
@@ -580,7 +580,7 @@
       "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; tiny file size as Unknown."
     },
     {
-      "id": "rule_da_buttare_557281500471",
+      "id": "rule_da_buttare_827105216784",
       "target_category": "da_buttare",
       "conditions": {
         "date_source": "filename",
@@ -595,7 +595,7 @@
       "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; medium file size as da buttare."
     },
     {
-      "id": "rule_da_buttare_254851289822",
+      "id": "rule_da_buttare_861438185282",
       "target_category": "da_buttare",
       "conditions": {
         "extension": ".jpg",
@@ -607,7 +607,7 @@
       "explanation": "User often marks media with without camera metadata; extension .jpg; medium file size as da buttare."
     },
     {
-      "id": "rule_avaloq_280897637462",
+      "id": "rule_avaloq_555630600095",
       "target_category": "avaloq",
       "conditions": {
         "date_source": "filename",
@@ -622,7 +622,7 @@
       "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; small file size as Avaloq."
     },
     {
-      "id": "rule_avaloq_337047870775",
+      "id": "rule_avaloq_639653768806",
       "target_category": "avaloq",
       "conditions": {
         "extension": ".jpg",
@@ -634,7 +634,7 @@
       "explanation": "User often marks media with without camera metadata; extension .jpg; small file size as Avaloq."
     },
     {
-      "id": "rule_avaloq_118006099744",
+      "id": "rule_avaloq_855566694818",
       "target_category": "avaloq",
       "conditions": {
         "date_source": "filename",
@@ -645,7 +645,7 @@
       "explanation": "User often marks media with date source filename; extension .jpg as Avaloq."
     },
     {
-      "id": "rule_da_buttare_421725526249",
+      "id": "rule_da_buttare_406273124428",
       "target_category": "da_buttare",
       "conditions": {
         "date_source": "filename",
@@ -23256,7 +23256,35 @@
         "extension": ".jpg",
         "file_size_bucket": "large"
       }
+    },
+    {
+      "corrected_category": "personal_photo",
+      "source": "user",
+      "signals": {
+        "contains_whatsapp": true,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "filename",
+        "extension": ".jpg",
+        "file_size_bucket": "small"
+      }
     }
   ],
-  "updated_at": "2026-07-05T20:28:01.229224+00:00"
+  "updated_at": "2026-07-05T20:59:59.958176+00:00"
 }
