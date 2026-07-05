@@ -259,6 +259,71 @@ AlbumScoringEngine, Ranking, Photo Intelligence, Family Memory Score
 Definition:
 Implemented deterministic scoring component for annual album selected candidates.
 
+### Explainable AI
+Definition:
+An AI approach where user-visible decisions can be understood through clear reasons, evidence, confidence, and decision source.
+
+Purpose:
+Preserve user trust while allowing AI-assisted behavior.
+
+Used By:
+Product vision, decision engine, learning and classification documentation.
+
+Related Terms:
+Decision Source, Transparent Decision, Human-in-the-loop
+
+### Decision Source
+Definition:
+The origin of a decision outcome (for example deterministic rules, learned user preferences, AI inference, or hybrid decision).
+
+Purpose:
+Make decision provenance explicit and reviewable.
+
+Used By:
+Classification reasoning, review UI explainability, documentation.
+
+Related Terms:
+Explainable AI, Hybrid Classification
+
+### Human-in-the-loop
+Definition:
+A product principle where the user remains the final decision authority and can review/correct automated suggestions.
+
+Purpose:
+Ensure user control and safe correction pathways.
+
+Used By:
+Memory Review, Cleanup Review, decision/learning workflows.
+
+Related Terms:
+User Decision Engine, Transparent Decision
+
+### Transparent Decision
+Definition:
+A decision that exposes why it was made, what evidence was used, confidence, and source.
+
+Purpose:
+Enable trust, reviewability, and correction.
+
+Used By:
+Decision Engine, explainability UX, product principles.
+
+Related Terms:
+Explainable AI, Decision Source
+
+### Hybrid Classification
+Definition:
+A classification approach that combines deterministic rules, learned user preferences, and AI inference in one explainable outcome.
+
+Purpose:
+Improve classification quality without losing transparency.
+
+Used By:
+LEARN domain and future classification architecture.
+
+Related Terms:
+Decision Source, Explainable AI, Preference Learning
+
 Purpose:
 Produce explainable score breakdowns (technical, memory, date, total) and deterministic ranking order.
 
@@ -507,16 +572,87 @@ Scoring Engine, Selected Photo
 
 ### Photo Classification
 Definition:
-Future categorization of photos by semantic or quality classes.
+Current review-time classification of media into explainable labels.
 
 Purpose:
-Support advanced filtering and explainability.
+Support deterministic triage, cleanup, and user correction.
 
 Used By:
-Future AI modules.
+Memory Review, Cleanup Review, import classification, learning workflows.
 
 Related Terms:
-Photo Intelligence, Learning Engine
+Media Category, Cleanup Category, Learning Engine
+
+### Media Category
+Definition:
+The normalized, user-correctable classification label assigned to imported media.
+
+Purpose:
+Provide the current review-time vocabulary for classifying media as Family Photo, Not Family Photo, Document, Screenshot, Meme / Graphic, Video, or Unknown.
+
+Used By:
+Memory Review, Cleanup Review, import classification, and learning workflows.
+
+Related Terms:
+Photo Classification, Cleanup Category, User Category, Grouping
+
+Notes:
+User-defined categories extend this taxonomy; they do not replace the stable internal IDs.
+
+### User Category
+Definition:
+A user-created or user-renamed category used for organizing media without changing the underlying stable system IDs.
+
+Purpose:
+Allow families to tailor organization while preserving consistent internal references.
+
+Used By:
+Manage Categories, Memory Review, Cleanup Review, sidecar persistence.
+
+Related Terms:
+Media Category, System Category, Category Registry
+
+### System Category
+Definition:
+A protected built-in category with a stable internal ID and configurable display and behavior properties.
+
+Purpose:
+Provide the fixed core taxonomy that user categories extend.
+
+Used By:
+Category management, import classification, Memory Review, Cleanup Review.
+
+Related Terms:
+Media Category, User Category, Category Registry
+
+### Category Registry
+Definition:
+The local collection of system and user category definitions used by review and classification workflows.
+
+Purpose:
+Provide the editable taxonomy and the stable IDs behind it.
+
+Used By:
+Manage Categories, Memory Review, Cleanup Review, category loading, and persistence.
+
+Related Terms:
+System Category, User Category, Media Category
+
+### Grouping
+Definition:
+A review-time visualization arrangement that clusters media for scanning and decision-making.
+
+Purpose:
+Improve human review speed without changing classification semantics.
+
+Used By:
+Cleanup Review and other grid-based review surfaces.
+
+Related Terms:
+Media Category, Cleanup Category, Thumbnail Grid
+
+Notes:
+Grouping is a visualization feature only and must not be treated as media classification.
 
 ### Manual Feedback
 Definition:

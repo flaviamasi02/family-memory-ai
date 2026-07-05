@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QApplication
 
 from core.metadata_extractor import extract_basic_metadata
@@ -88,6 +88,27 @@ class PhotoMetadataTests(unittest.TestCase):
             self.assertIn(grid._photo_key(photo), grid._pending_thumbnail_updates)
 
             grid.set_photos([photo])
+            app.processEvents()
+
+            self.assertEqual(len(grid._cards), 1)
+            self.assertFalse(grid._cards[0].thumbnail_label.pixmap().isNull())
+
+    def test_photo_grid_applies_qimage_thumbnail_immediately(self):
+        app = QApplication.instance() or QApplication([])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "card_qimage.jpg"
+            path.write_bytes(b"fake jpg")
+
+            photo = Photo.from_path(path)
+            grid = PhotoGridWidget()
+            grid.set_photos([photo])
+            app.processEvents()
+
+            image = QImage(20, 20, QImage.Format.Format_RGB32)
+            image.fill(Qt.GlobalColor.red)
+
+            grid.update_thumbnail(photo, image)
             app.processEvents()
 
             self.assertEqual(len(grid._cards), 1)

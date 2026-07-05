@@ -101,6 +101,9 @@ Current implemented direction emphasizes human-in-the-loop deterministic curatio
 - Initial media classification is deterministic and explainable.
 - Classification confidence and classification explanations are first-class review concepts.
 - User corrections (Automatic Category -> User Corrected Category -> Effective Category) create the foundation for future Preference Learning.
+- Categories are taxonomy-driven: system categories remain read-only while users can define unlimited custom categories directly in-app.
+- Category records now include optional AI Description fields so future AI classifiers can learn from user-defined taxonomy intent.
+- Album and cleanup behaviors are category-driven through category flags, not hardcoded category-name checks.
 
 ---
 
@@ -135,6 +138,49 @@ The product should remain:
 - Never force AI
 
 Users should always feel that they are in control of the experience.
+
+## Explainable Intelligence
+
+Family Memory AI is designed to be an Explainable AI application.
+
+Artificial Intelligence is encouraged.
+
+Black-box user experience is not.
+
+Every important automatic decision should be understandable by the user.
+
+The user should always remain in control.
+
+## Permanent Product Decisions
+
+### FM-012
+Title:
+Explainability over Black Box
+
+Decision:
+Family Memory AI is free to use AI.
+
+However every user-visible decision must remain:
+
+- explainable
+- transparent
+- reviewable
+- user-correctable
+
+User trust has higher priority than AI automation.
+
+### FM-013
+Title:
+AI Assists. Users Decide.
+
+Decision:
+Artificial Intelligence proposes.
+
+The Decision Engine explains.
+
+The User decides.
+
+Every correction becomes a learning signal.
 
 ---
 

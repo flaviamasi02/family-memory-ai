@@ -4,6 +4,7 @@ import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from core.category_registry import get_category_registry
 from models.photo import Photo
 
 
@@ -49,6 +50,7 @@ class PhotoCleanupEngine:
         )
 
     def _classify_single_photo(self, photo: Photo) -> PhotoCleanupClassification:
+        registry = get_category_registry()
         path = Path(getattr(photo, "path", ""))
         extension = path.suffix.lower()
         filename_lower = path.name.lower()
@@ -56,25 +58,74 @@ class PhotoCleanupEngine:
         reasons: list[str] = []
 
         if extension in VIDEO_EXTENSIONS:
-            return PhotoCleanupClassification(photo, "video", 1.0, [f"Video extension detected: {extension}"], "move_to_cleanup_review")
+            category = "video"
+            return PhotoCleanupClassification(
+                photo,
+                category,
+                1.0,
+                [f"Video extension detected: {extension}"],
+                self._default_recommended_action(category, registry),
+            )
 
         if self._contains_screenshot_keyword(filename_lower):
-            return PhotoCleanupClassification(photo, "screenshot", 0.98, ["Filename indicates a screenshot."], "move_to_cleanup_review")
+            category = "screenshot"
+            return PhotoCleanupClassification(
+                photo,
+                category,
+                0.98,
+                ["Filename indicates a screenshot."],
+                self._default_recommended_action(category, registry),
+            )
 
         if self._contains_document_keyword(filename_lower):
-            return PhotoCleanupClassification(photo, "document_or_scan", 0.98, ["Filename indicates document or scan content."], "move_to_cleanup_review")
+            category = "document_or_scan"
+            return PhotoCleanupClassification(
+                photo,
+                category,
+                0.98,
+                ["Filename indicates document or scan content."],
+                self._default_recommended_action(category, registry),
+            )
 
         if self._contains_advertisement_keyword(filename_lower):
-            return PhotoCleanupClassification(photo, "advertisement", 0.96, ["Filename indicates promotional or advertisement content."], "move_to_cleanup_review")
+            category = "advertisement"
+            return PhotoCleanupClassification(
+                photo,
+                category,
+                0.96,
+                ["Filename indicates promotional or advertisement content."],
+                self._default_recommended_action(category, registry),
+            )
 
         if self._is_meme_or_graphic(filename_lower, metadata):
-            return PhotoCleanupClassification(photo, "meme_or_graphic", 0.95, ["Filename or very small WhatsApp-style dimensions indicate meme/graphic content."], "move_to_cleanup_review")
+            category = "meme_or_graphic"
+            return PhotoCleanupClassification(
+                photo,
+                category,
+                0.95,
+                ["Filename or very small WhatsApp-style dimensions indicate meme/graphic content."],
+                self._default_recommended_action(category, registry),
+            )
 
         if self._is_low_quality(photo, metadata, reasons):
-            return PhotoCleanupClassification(photo, "low_quality_photo", 0.85, reasons, "review")
+            category = "low_quality_photo"
+            return PhotoCleanupClassification(
+                photo,
+                category,
+                0.85,
+                reasons,
+                self._default_recommended_action(category, registry, fallback="review"),
+            )
 
         if extension in IMAGE_EXTENSIONS:
-            return PhotoCleanupClassification(photo, "family_photo_candidate", 0.90, ["Normal image file kept as family photo candidate by default."], "keep")
+            category = "family_photo_candidate"
+            return PhotoCleanupClassification(
+                photo,
+                category,
+                0.90,
+                ["Normal image file kept as family photo candidate by default."],
+                self._default_recommended_action(category, registry),
+            )
 
         return PhotoCleanupClassification(photo, "unknown", 0.40, [f"No deterministic cleanup rule matched for extension {extension or 'none'}."], "review")
 
@@ -187,6 +238,7 @@ class PhotoCleanupEngine:
             return None
 
     def _apply_classification_to_photo(self, classification: PhotoCleanupClassification) -> None:
+        registry = get_category_registry()
         photo = classification.photo
         metadata = getattr(photo, "metadata", {})
         metadata["relevance_category"] = classification.category
@@ -194,6 +246,13 @@ class PhotoCleanupEngine:
         metadata["cleanup_reasons"] = list(classification.reasons)
         metadata["cleanup_confidence"] = classification.confidence
         metadata["cleanup_recommended_action"] = classification.recommended_action
-        metadata["is_album_relevant_candidate"] = classification.category == "family_photo_candidate"
+        metadata["is_album_relevant_candidate"] = registry.is_album_candidate_category(classification.category)
         photo.metadata = metadata
         photo.sync_intelligence_from_metadata()
+
+    def _default_recommended_action(self, category_id: str, registry, fallback: str = "review") -> str:
+        if registry.is_album_candidate_category(category_id):
+            return "keep"
+        if registry.is_cleanup_category(category_id):
+            return "move_to_cleanup_review"
+        return fallback

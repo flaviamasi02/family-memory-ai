@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from PySide6.QtCore import QTimer, Qt, Signal
+from PySide6.QtCore import QEvent, QTimer, Qt, Signal
 from PySide6.QtGui import QFontMetrics, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
@@ -101,6 +101,10 @@ class SharedThumbnailCard(QFrame):
         self.badge_one.setText(item.badge_one)
         self.badge_two.setText(item.badge_two)
         self.badge_three.setText(item.badge_three)
+        self.thumbnail_label.update()
+        self.thumbnail_label.repaint()
+        self.update()
+        self.repaint()
 
     def set_selected(self, selected: bool) -> None:
         if selected:
@@ -150,11 +154,17 @@ class SharedThumbnailGrid(QWidget):
         self.grid_layout.setContentsMargins(10, 10, 10, 10)
         self.grid_layout.setSpacing(8)
         self.scroll_area.setWidget(self.content_widget)
+        self.scroll_area.viewport().installEventFilter(self)
         self.scroll_area.verticalScrollBar().valueChanged.connect(self._on_scroll_changed)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.addWidget(self.scroll_area)
+
+    def eventFilter(self, watched, event):
+        if watched is self.scroll_area.viewport() and event.type() == QEvent.Type.Resize:
+            self._on_viewport_resized()
+        return super().eventFilter(watched, event)
 
     def set_items(self, items: list[SharedGridItem]) -> None:
         self._items = list(items or [])
@@ -175,6 +185,7 @@ class SharedThumbnailGrid(QWidget):
         self._rebuild_grid()
 
     def update_item(self, item: SharedGridItem) -> None:
+        print(f"SharedThumbnailGrid.update_item {item.key}")
         self._items_by_key[item.key] = item
         for index, existing in enumerate(self._items):
             if existing.key == item.key:
@@ -185,6 +196,8 @@ class SharedThumbnailGrid(QWidget):
         if card is not None:
             card.refresh(item)
             card.set_selected(item.key in self._selected_keys)
+            card.update()
+            card.repaint()
 
     def visible_keys(self) -> list[str]:
         return [item.key for item in self._items]
@@ -235,6 +248,7 @@ class SharedThumbnailGrid(QWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         new_columns = self._calculate_grid_columns()
+        self._sync_content_width()
         if new_columns == self._grid_columns:
             return
         self._grid_columns = new_columns
@@ -249,6 +263,7 @@ class SharedThumbnailGrid(QWidget):
         self._rendered_keys.clear()
         self._pending_render_index = 0
         self._target_render_count = 0
+        self._sync_content_width()
         self._grid_columns = self._calculate_grid_columns()
 
         if not self._items:
@@ -264,6 +279,9 @@ class SharedThumbnailGrid(QWidget):
             self._refresh_card_selection()
             self.selection_changed.emit(set(self._selected_keys), self._selected_key)
             return
+
+        if self._pending_render_index == 0:
+            print("SharedThumbnailGrid first batch start")
 
         batch_end = min(self._pending_render_index + self._render_batch_size, render_limit)
         for index in range(self._pending_render_index, batch_end):
@@ -281,6 +299,9 @@ class SharedThumbnailGrid(QWidget):
 
         self._pending_render_index = batch_end
         self._refresh_card_selection()
+
+        if self._pending_render_index >= render_limit:
+            print("SharedThumbnailGrid first batch complete")
 
         if self._pending_render_index >= render_limit:
             self.selection_changed.emit(set(self._selected_keys), self._selected_key)
@@ -343,8 +364,24 @@ class SharedThumbnailGrid(QWidget):
         return visible_keys[end_index:start_index + 1]
 
     def _calculate_grid_columns(self) -> int:
-        width = max(176, self.scroll_area.viewport().width())
+        viewport_width = self.scroll_area.viewport().width()
+        if viewport_width <= 0:
+            viewport_width = self.width()
+        width = max(176, viewport_width)
         return max(1, width // 172)
+
+    def _sync_content_width(self) -> None:
+        viewport_width = self.scroll_area.viewport().width()
+        if viewport_width > 0:
+            self.content_widget.setMinimumWidth(viewport_width)
+
+    def _on_viewport_resized(self) -> None:
+        self._sync_content_width()
+        new_columns = self._calculate_grid_columns()
+        if new_columns == self._grid_columns:
+            return
+        self._grid_columns = new_columns
+        self._relayout_cards()
 
     def _relayout_cards(self) -> None:
         for index, key in enumerate(self._rendered_keys):

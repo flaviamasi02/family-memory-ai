@@ -1,5 +1,5 @@
 from PySide6.QtCore import Qt, QThread
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QImage, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
@@ -92,8 +92,10 @@ class MainWindow(QMainWindow):
         self.details_panel = PhotoDetailsPanel()
         self.review_page = AlbumReviewPage()
         self.review_page.review_state_changed.connect(self._refresh_album_draft)
+        self.review_page.categories_changed.connect(self._sync_review_category_options)
         self.draft_page = AlbumDraftPage()
         self.irrelevant_media_page = IrrelevantMediaPage()
+        self.irrelevant_media_page.categories_changed.connect(self._sync_cleanup_category_options)
         self.irrelevant_media_page.moved_photos.connect(self._handle_irrelevant_media_moved)
 
         browser_page = QWidget()
@@ -344,6 +346,12 @@ class MainWindow(QMainWindow):
         )
         self.draft_page.set_draft_result(draft_result)
 
+    def _sync_review_category_options(self):
+        self.irrelevant_media_page.refresh_category_options()
+
+    def _sync_cleanup_category_options(self):
+        self.review_page.refresh_category_options()
+
     def _build_review_signature(self, photos):
         return tuple(
             (
@@ -355,6 +363,7 @@ class MainWindow(QMainWindow):
         )
 
     def start_thumbnail_loading(self, photos):
+        print("thumbnail worker started")
         self.thumbnail_thread = QThread()
         self.thumbnail_worker = ThumbnailWorker(photos, batch_size=12, delay_ms=10)
 
@@ -362,13 +371,31 @@ class MainWindow(QMainWindow):
 
         self.thumbnail_thread.started.connect(self.thumbnail_worker.run)
         self.thumbnail_worker.thumbnail_ready.connect(self.update_thumbnail)
+        print("thumbnail_ready connected")
         self.thumbnail_worker.finished.connect(self.thumbnail_thread.quit)
         self.thumbnail_worker.finished.connect(self.thumbnail_worker.deleteLater)
         self.thumbnail_thread.finished.connect(self.thumbnail_thread.deleteLater)
 
         self.thumbnail_thread.start()
 
-    def update_thumbnail(self, photo, pixmap):
+    def update_thumbnail(self, photo, image_or_pixmap):
+        print(f"thumbnail signal received: {getattr(photo, 'path', None)}")
+        print("Thumbnail received", getattr(photo, "path", None))
+        if isinstance(image_or_pixmap, QImage):
+            print(f"thumbnail received image null={image_or_pixmap.isNull()}")
+        elif isinstance(image_or_pixmap, QPixmap):
+            print(f"thumbnail received pixmap null={image_or_pixmap.isNull()}")
+        else:
+            print(f"thumbnail received type={type(image_or_pixmap).__name__}")
+
+        if isinstance(image_or_pixmap, QImage):
+            pixmap = QPixmap.fromImage(image_or_pixmap)
+        else:
+            pixmap = image_or_pixmap
+
+        if pixmap is None:
+            return
+
         self.photo_model.update_thumbnail(photo, pixmap)
         self.photo_view.update_thumbnail(photo, pixmap)
         self.review_page.update_thumbnail(photo, pixmap)

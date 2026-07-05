@@ -112,6 +112,7 @@ Example milestones:
 - CLEAN-002 Improved deterministic initial media classification (completed)
 - CLEAN-003 Cleanup Review UX & Explainability (completed)
 - CLEAN-004 Advanced cleanup and duplicate workflows
+- CLEAN-005 Visual content-based local classification (completed)
 
 ---
 
@@ -145,11 +146,19 @@ Learn user preferences.
 Mission:
 Turn repeated user decisions into future personalization signals.
 
-Scope examples:
+Foundation dependency:
 
-- user decisions
-- preference scoring
-- personalization
+- MEM-008 user-defined taxonomy stores per-category AI Description metadata for future explainable AI-assisted classification.
+
+Milestones:
+
+- LEARN-001 Explainable Category Learning (completed)
+Goal:
+Learn from user corrections while remaining fully explainable.
+
+- LEARN-002 Hybrid AI Classification
+Goal:
+Combine deterministic rules, learned user preferences and AI inference into a single explainable decision.
 
 ---
 

@@ -85,6 +85,8 @@ class PhotoCardWidget(QWidget):
             Qt.TransformationMode.SmoothTransformation,
         )
         self.thumbnail_label.setPixmap(scaled)
+        self.thumbnail_label.update()
+        self.thumbnail_label.repaint()
 
     def set_selected(self, selected: bool):
         self._is_selected = bool(selected)

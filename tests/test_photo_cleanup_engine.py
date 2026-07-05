@@ -1,8 +1,11 @@
 import tempfile
 import unittest
+import os
 from pathlib import Path
 
+from core.category_registry import get_category_registry, reset_category_registry
 from core.photo_cleanup_engine import PhotoCleanupEngine
+from core.photo_cleanup_engine import PhotoCleanupClassification
 from models.photo import Photo
 from models.photo_intelligence import PhotoIntelligence
 
@@ -10,6 +13,10 @@ from models.photo_intelligence import PhotoIntelligence
 class PhotoCleanupEngineTests(unittest.TestCase):
     def setUp(self):
         self.engine = PhotoCleanupEngine()
+
+    def tearDown(self):
+        os.environ.pop("FAMILY_MEMORY_CATEGORIES_ROOT", None)
+        reset_category_registry()
 
     def _make_photo(
         self,
@@ -99,6 +106,53 @@ class PhotoCleanupEngineTests(unittest.TestCase):
             by_name = {item.photo.display_name(): item for item in result.classifications}
             self.assertEqual(by_name["keeper.jpg"].category, "family_photo_candidate")
             self.assertEqual(by_name["duplicate.jpg"].category, "duplicate_candidate")
+
+    def test_cleanup_flag_controls_default_action(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.environ["FAMILY_MEMORY_CATEGORIES_ROOT"] = tmpdir
+            reset_category_registry()
+            registry = get_category_registry(force_reload=True)
+            registry.create_user_category("Receipts To Delete", is_cleanup_category=True, is_album_candidate=False)
+
+            action = self.engine._default_recommended_action("receipts_to_delete", registry)
+            self.assertEqual(action, "move_to_cleanup_review")
+
+    def test_album_candidate_flag_controls_photo_metadata(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.environ["FAMILY_MEMORY_CATEGORIES_ROOT"] = tmpdir
+            reset_category_registry()
+            registry = get_category_registry(force_reload=True)
+            registry.create_user_category("To Print", is_cleanup_category=False, is_album_candidate=True)
+
+            photo = self._make_photo(Path(tmpdir), "sample.jpg", b"x" * 4096, {"width": 1600, "height": 1200})
+            classification = PhotoCleanupClassification(
+                photo=photo,
+                category="to_print",
+                confidence=0.81,
+                reasons=["Manual category assignment."],
+                recommended_action="keep",
+            )
+            self.engine._apply_classification_to_photo(classification)
+
+            self.assertTrue(bool(photo.metadata.get("is_album_relevant_candidate", False)))
+
+    def test_system_category_flag_update_changes_cleanup_action_without_changing_id_logic(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.environ["FAMILY_MEMORY_CATEGORIES_ROOT"] = tmpdir
+            reset_category_registry()
+            registry = get_category_registry(force_reload=True)
+            registry.update_category_properties(
+                "meme_or_graphic",
+                display_name="Funny Images",
+                is_cleanup_category=False,
+            )
+
+            photo = self._make_photo(Path(tmpdir), "meme_funny.jpg", b"x" * 4096, {"width": 600, "height": 600})
+            result = self.engine.classify_photos([photo])
+            cls = result.classifications[0]
+
+            self.assertEqual(cls.category, "meme_or_graphic")
+            self.assertEqual(cls.recommended_action, "review")
 
 
 if __name__ == "__main__":

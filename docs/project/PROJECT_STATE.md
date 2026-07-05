@@ -6,7 +6,7 @@
 
 ## Current Sprint
 
-- Sprint CLEAN-004 (Shared Thumbnail Grid for Cleanup Review) - Completed
+- Sprint LEARN-001 (Category Learning from User Corrections) - Completed
 
 ## Project Status
 
@@ -195,11 +195,11 @@ Album Builder becomes one consumer of the Memory Intelligence system rather than
 
 ## Current Active Domain
 
-- CLEAN
+- LEARN
 
 ## Current Milestone
 
-- CLEAN-004 Shared Thumbnail Grid for Cleanup Review
+- LEARN-001 Category Learning from User Corrections
 
 ## Recently Completed Milestones
 
@@ -214,10 +214,70 @@ Album Builder becomes one consumer of the Memory Intelligence system rather than
 - CLEAN-003 Cleanup Review redesigned with visual thumbnail workspace, explainable classification, grouping, and category correction
 - MEM-006 Reusable image preview dialog with double-click navigation from Memory Review and Cleanup Review
 - CLEAN-004 Cleanup Review migrated to shared thumbnail grid component with shared lazy rendering and selection model
+- CLEAN-005 Visual content-based media classification for metadata-less images
+- CLEAN-005-FIX Visual-analysis safety rollback for app responsiveness
+- LEARN-001 Persistent sidecar metadata for user category corrections and user decisions
+- MEDIA-FIX-001 Centralized orientation-aware image loading for thumbnails and previews
+- MEM-008 Custom user-defined categories with Memory/Cleanup assignment and filtering
+- MEM-009 Editable system category properties with protected stable IDs and reset-to-default
+- LEARN-001 Deterministic category learning rules from repeated user corrections
+- UI-REF-001 Cleanup Review single category assignment workflow
+
+UI-REF-001 implementation summary:
+
+- Cleanup Review now uses one category assignment flow: Category dropdown + Apply Category to Selected.
+- Redundant quick category buttons were removed from the right-side panel.
+- Bulk category assignment remains supported through multi-selection plus dropdown apply.
+
+MEDIA-FIX-001 implementation summary:
+
+- Added centralized display loader in `src/core/image_display_loader.py`.
+- EXIF orientation is respected for display thumbnails and full previews across Photo Browser, Memory Review, Cleanup Review, Image Preview Dialog, and Album Draft surfaces.
+- Thumbnail cache versioning enables safe regeneration when orientation behavior changes.
+- Original source image files are never modified.
+
+MEM-008 implementation summary:
+
+- Category taxonomy is now user-extensible; the product no longer depends only on hardcoded category values.
+- Memory Review and Cleanup Review both expose `Manage Categories` for create/rename/delete workflows.
+- Category records persist in `.familymemory/categories.json` with optional `ai_description`, visual metadata, and behavior flags.
+- Album candidacy and cleanup handling are category-driven via category flags instead of fixed category-name checks.
+- Current normalized media categories are Family Photo, Not Family Photo, Document, Screenshot, Meme / Graphic, Video, and Unknown.
+- User categories extend the taxonomy without changing stable internal IDs.
+- Grouping in review surfaces is a visualization aid only; it does not change media classification.
+
+MEM-009 implementation summary:
+
+- System categories remain protected and non-deletable, but users can now customize display and behavior properties.
+- Stable internal category IDs remain unchanged so existing media/category links continue to work after display renames.
+- System category overrides persist locally and are applied on startup after loading defaults.
+- Added per-category reset-to-default for system categories.
+
+CLEAN-005 implementation summary:
+
+- Added local visual content analysis to improve classification for metadata-less images.
+- Unknown is no longer the default for metadata-less images when visual evidence is strong.
+- Classification explanations now include visual evidence.
+- No cloud AI dependency added; local analysis remains explainable and user-correctable.
+
+CLEAN-005-FIX implementation summary:
+
+- Added emergency feature flag `ENABLE_VISUAL_CONTENT_ANALYSIS = False` as default.
+- Synchronous import/UI classification now skips visual analysis to restore fast loading and avoid Not Responding states.
+- Classifier now safely falls back to filename/metadata/user-learning rules when visual analysis is disabled, unavailable, or errors.
+- Added regression tests for disabled mode, no-image-open behavior, exception safety, and quick classification return.
+- Future work: run visual analysis only in background worker batches, never on UI thread.
+
+Runtime stability update:
+
+- Thumbnail generation now keeps `QPixmap` creation in the UI thread by emitting `QImage` from the worker.
+- Photo Browser thumbnail updates use normalized absolute path keys so late-arriving thumbnails resolve reliably.
+- Album review draft refreshes use `AlbumReviewPage.review_status_by_path()` again for current review-state mapping.
+- Visual analysis remains feature-flagged off in synchronous import/UI paths until it can run only in background batches.
 
 ## Upcoming Milestones
 
-- LEARN-001 Decision History foundations
+- LEARN-002 Preference learning and aggregation foundations
 - DUP-001 Exact Duplicate Detection refinement
 - MEMORY-001 Memory Value
 
@@ -225,6 +285,13 @@ Album Builder becomes one consumer of the Memory Intelligence system rather than
 
 - PRODUCT-DOC-001 introduced docs/product/FAMILY_MEMORY_SCORE.md as the official long-term product specification for Family Memory AI photo ranking.
 - The Family Memory Score specification is now the single source of truth for future scoring philosophy, component-level scoring design, and explainability requirements.
+
+## Product Principles
+
+- AI is encouraged.
+- Explainability is mandatory.
+- User decisions always override AI.
+- User corrections become learning signals.
 
 ## Documentation Architecture Refactoring Update
 
@@ -372,6 +439,22 @@ Long-term output framing:
 - [x] BUG-001 dedicated DateExtractionService with EXIF/filename/filesystem fallback logic
 - [x] PhotoIntelligence date context fields: date_taken/year/month/day/date_source/source_of_date
 - [x] In-memory approve/reject/reset review state
+- [x] Sidecar-based persistence for manual user category corrections and user decisions
+- [x] Import-time sidecar loading with identity checks and cautious mismatch handling
+- [x] Centralized image loader utility for orientation-aware full image and thumbnail loading
+- [x] Flexible category registry with system and user category definitions
+- [x] Manage Categories dialog in Memory Review (add, rename, delete user categories, update cleanup/album flags)
+- [x] Memory Review category selector/filter supports user-defined categories
+- [x] Cleanup Review category selector/filter supports user-defined categories
+- [x] Custom categories persisted in `.familymemory/categories.json`
+- [x] System categories protected from deletion
+- [x] Custom category assignment persists per photo via sidecar metadata
+- [x] Deterministic category learning engine with explainable signal extraction and adaptive rules
+- [x] Learned rule application during import-time classification (base deterministic classifier + learned-rule boost)
+- [x] Learning profile persistence in `.familymemory/category_learning_profile.json`
+- [x] One learning event recorded per manual category correction (single and bulk)
+- [x] Learning Summary dialog for transparency (event totals, category counts, learned rules)
+- [x] No cloud AI and no black-box ML for category learning
 - [x] Album review filters, sorting, and filename search
 - [x] Album review details panel with explanation visibility
 - [x] Review visibility for imported/candidates/selected/rejected pools with rejection reasons
@@ -406,6 +489,11 @@ Long-term output framing:
 - [x] Shared double-click preview flow between Memory Review and Cleanup Review
 - [x] Shared lazy/batched rendering and selection model for Cleanup Review grid
 - [x] Cleanup Review thumbnail cache reuse for compact-card rendering
+- [x] EXIF orientation respected in Photo Browser thumbnails, Memory Review thumbnails/previews, Cleanup Review thumbnails/previews, and preview dialog
+- [x] Thumbnail caching keys include path, target size, and file identity signature (mtime and size)
+- [x] Orientation handling uses safe auto-transform with graceful fallback for missing/corrupt metadata
+- [x] Immediate sidecar save on Memory Review and Cleanup Review manual category/decision changes
+- [x] UI indicator for saved manual category changes ("User category saved")
 - [x] Safe move to cleanup review folder with confirmation and result summary
 - [x] Exact duplicate placeholder handling using file hashes and deterministic keeper selection
 - [x] Improved deterministic initial media classification with richer multilingual indicators and conservative family-photo assignment

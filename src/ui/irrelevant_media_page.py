@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
@@ -20,34 +20,15 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.category_registry import get_category_registry
+from core.image_display_loader import load_display_thumbnail
+from core.media_classifier import MediaCategory, MediaClassifier
 from core.safe_file_move_service import CLEANUP_REVIEW_FOLDER_NAME, move_files_to_cleanup_review
+from core.user_metadata_service import UserMetadataService
+from learning.category_learning_engine import get_category_learning_engine
+from ui.category_management_dialog import CategoryManagementDialog
 from ui.image_preview_dialog import ImagePreviewDialog
 from ui.shared_thumbnail_grid import SharedGridItem, SharedThumbnailGrid
-
-
-CATEGORY_LABELS = {
-    "family_photo_candidate": "Family photos",
-    "document_or_scan": "Documents",
-    "advertisement": "Advertisements",
-    "screenshot": "Screenshots",
-    "meme_or_graphic": "Memes",
-    "video": "Videos",
-    "duplicate_candidate": "Duplicates",
-    "low_quality_photo": "Low quality",
-    "unknown": "Unknown",
-}
-
-KNOWN_CATEGORIES = [
-    "family_photo_candidate",
-    "document_or_scan",
-    "screenshot",
-    "advertisement",
-    "meme_or_graphic",
-    "duplicate_candidate",
-    "low_quality_photo",
-    "unknown",
-    "video",
-]
 
 RECOMMENDED_ACTION_LABELS = {
     "keep": "Keep",
@@ -72,6 +53,7 @@ class CleanupReviewRow:
 
 class IrrelevantMediaPage(QWidget):
     moved_photos = Signal(object)
+    categories_changed = Signal()
 
     CATEGORY_FILTER_ALL = "All categories"
     CONFIDENCE_FILTER_ALL = "All"
@@ -86,6 +68,10 @@ class IrrelevantMediaPage(QWidget):
         self._details_key: Optional[str] = None
         self._preview_dialog: Optional[ImagePreviewDialog] = None
         self._thumbnail_cache: dict[str, tuple[int, QPixmap]] = {}
+        self._user_metadata_service = UserMetadataService()
+        self._category_registry = get_category_registry()
+        self._category_learning_engine = get_category_learning_engine()
+        self._media_classifier = MediaClassifier()
 
         self.title_label = QLabel("Cleanup Review")
         self.title_label.setStyleSheet("font-size: 18px; font-weight: 600;")
@@ -123,10 +109,17 @@ class IrrelevantMediaPage(QWidget):
         self.search_input.textChanged.connect(self._trigger_refresh)
 
         self.selection_count_label = QLabel("Selected: 0")
+        self.user_saved_label = QLabel("")
+        self.user_saved_label.setStyleSheet("font-size: 12px; color: #1f6feb;")
+        self.user_saved_label.setVisible(False)
         self.select_all_button = QPushButton("Select All Visible")
         self.select_all_button.clicked.connect(self.select_all_visible)
         self.clear_selection_button = QPushButton("Clear Selection")
         self.clear_selection_button.clicked.connect(self.clear_selection)
+        self.manage_categories_button = QPushButton("Manage Categories")
+        self.manage_categories_button.clicked.connect(self._on_manage_categories)
+        self.reclassify_unknowns_button = QPushButton("Reclassify Unknowns")
+        self.reclassify_unknowns_button.clicked.connect(self.reclassify_unknowns_from_learning)
 
         toolbar = QHBoxLayout()
         toolbar.addWidget(QLabel("Category:"))
@@ -140,6 +133,9 @@ class IrrelevantMediaPage(QWidget):
         toolbar.addWidget(QLabel("Search:"))
         toolbar.addWidget(self.search_input, 1)
         toolbar.addWidget(self.selection_count_label)
+        toolbar.addWidget(self.user_saved_label)
+        toolbar.addWidget(self.manage_categories_button)
+        toolbar.addWidget(self.reclassify_unknowns_button)
         toolbar.addWidget(self.select_all_button)
         toolbar.addWidget(self.clear_selection_button)
 
@@ -187,35 +183,18 @@ class IrrelevantMediaPage(QWidget):
         self.keep_button.clicked.connect(lambda: self._set_decision_for_selected("keep"))
         self.move_button = QPushButton("Move to Cleanup Folder")
         self.move_button.clicked.connect(self.move_selected_to_quarantine)
-        self.mark_family_button = QPushButton("Mark as Family Photo")
-        self.mark_family_button.clicked.connect(lambda: self._apply_category_to_selected("family_photo_candidate"))
-        self.mark_document_button = QPushButton("Mark as Document")
-        self.mark_document_button.clicked.connect(lambda: self._apply_category_to_selected("document_or_scan"))
-        self.mark_ad_button = QPushButton("Mark as Advertisement")
-        self.mark_ad_button.clicked.connect(lambda: self._apply_category_to_selected("advertisement"))
-        self.mark_meme_button = QPushButton("Mark as Meme")
-        self.mark_meme_button.clicked.connect(lambda: self._apply_category_to_selected("meme_or_graphic"))
-        self.mark_screenshot_button = QPushButton("Mark as Screenshot")
-        self.mark_screenshot_button.clicked.connect(lambda: self._apply_category_to_selected("screenshot"))
-        self.mark_duplicate_button = QPushButton("Duplicate")
-        self.mark_duplicate_button.clicked.connect(lambda: self._apply_category_to_selected("duplicate_candidate"))
-        self.mark_unknown_button = QPushButton("Unknown")
-        self.mark_unknown_button.clicked.connect(lambda: self._apply_category_to_selected("unknown"))
+        self.category_selector = QComboBox()
+        self.apply_category_button = QPushButton("Apply Category to Selected")
+        self.apply_category_button.clicked.connect(lambda: self._apply_category_to_selected(str(self.category_selector.currentData() or "unknown")))
 
         actions_row_one = QHBoxLayout()
         actions_row_one.addWidget(self.keep_button)
         actions_row_one.addWidget(self.move_button)
 
         actions_row_two = QHBoxLayout()
-        actions_row_two.addWidget(self.mark_family_button)
-        actions_row_two.addWidget(self.mark_document_button)
-        actions_row_two.addWidget(self.mark_ad_button)
-
-        actions_row_three = QHBoxLayout()
-        actions_row_three.addWidget(self.mark_meme_button)
-        actions_row_three.addWidget(self.mark_screenshot_button)
-        actions_row_three.addWidget(self.mark_duplicate_button)
-        actions_row_three.addWidget(self.mark_unknown_button)
+        actions_row_two.addWidget(QLabel("Category:"))
+        actions_row_two.addWidget(self.category_selector, 1)
+        actions_row_two.addWidget(self.apply_category_button)
 
         details_layout = QVBoxLayout()
         details_layout.addWidget(QLabel("Preview"))
@@ -227,7 +206,7 @@ class IrrelevantMediaPage(QWidget):
         details_layout.addWidget(self.alternatives_list)
         details_layout.addLayout(actions_row_one)
         details_layout.addLayout(actions_row_two)
-        details_layout.addLayout(actions_row_three)
+        details_layout.addStretch(0)
 
         details_panel = QWidget()
         details_panel.setLayout(details_layout)
@@ -253,18 +232,28 @@ class IrrelevantMediaPage(QWidget):
         root.addWidget(splitter, 1)
 
         self._reset_filter_options()
+        self._reload_category_selector_options()
         self._clear_details()
         self._refresh_alternatives_visibility(False)
 
+    def refresh_category_options(self) -> None:
+        self._reset_filter_options()
+        self._reload_category_selector_options()
+        self._refresh_group_options()
+        self._trigger_refresh(force=True)
+
     def set_photos(self, photos, imported_root: Optional[str | Path], total_imported_count: Optional[int] = None) -> None:
+        print("Cleanup Review set_photos start")
         self._imported_root = Path(imported_root) if imported_root else None
         self._imported_total_count = int(total_imported_count) if isinstance(total_imported_count, int) else len(photos or [])
 
         self._rows = [self._build_row(photo) for photo in list(photos or [])]
         self._details_key = None
         self._reset_filter_options()
+        self._reload_category_selector_options()
         self._refresh_group_options()
         self._trigger_refresh(force=True)
+        print("Cleanup Review set_photos end")
 
     def update_thumbnail(self, photo, pixmap) -> None:
         key = self._photo_key(photo)
@@ -325,6 +314,38 @@ class IrrelevantMediaPage(QWidget):
     def clear_selection(self) -> None:
         self.thumbnail_grid.clear_selection()
         self._clear_details()
+
+    def reclassify_unknowns_from_learning(self) -> int:
+        changed_count = 0
+
+        for index, row in enumerate(list(self._rows)):
+            user_corrected = str(row.user_corrected_category or "").strip().lower()
+
+            if user_corrected or row.effective_category != MediaCategory.Unknown.value:
+                continue
+
+            previous_category = row.effective_category
+            self._media_classifier.classify_photo(row.photo)
+            updated_row = self._build_row(row.photo)
+
+            if updated_row.effective_category == previous_category:
+                continue
+
+            self._rows[index] = updated_row
+            changed_count += 1
+
+        self._show_user_saved_indicator(f"Reclassified {changed_count} unknown photos")
+
+        if changed_count:
+            selected_key = self.thumbnail_grid.selected_key()
+            self._refresh_group_options()
+            self._trigger_refresh(force=True)
+            if selected_key:
+                row = self._row_for_key(selected_key)
+                if row is not None:
+                    self._show_details(row, force=True)
+
+        return changed_count
 
     def move_selected_to_quarantine(self) -> None:
         if self._imported_root is None:
@@ -389,236 +410,249 @@ class IrrelevantMediaPage(QWidget):
         self._preview_dialog.show()
         self._preview_dialog.raise_()
         self._preview_dialog.activateWindow()
-
     def _build_row(self, photo) -> CleanupReviewRow:
         metadata = dict(getattr(photo, "metadata", {}) or {})
-        automatic = _normalize_category(
-            str(
-                metadata.get("cleanup_automatic_category")
-                or metadata.get("relevance_category")
-                or getattr(getattr(photo, "intelligence", None), "relevance_category", "")
-                or "unknown"
-            )
+
+        automatic_category = str(
+            metadata.get("automatic_media_category", "")
+            or getattr(photo, "automatic_media_category", "")
+            or metadata.get("media_category", "")
+            or getattr(photo, "media_category", "")
+            or MediaCategory.Unknown.value
+        ).strip().lower()
+
+        user_corrected_category = str(
+            metadata.get("user_corrected_media_category", "")
+            or getattr(photo, "user_corrected_media_category", "")
+            or ""
+        ).strip().lower()
+
+        effective_category = str(
+            metadata.get("effective_media_category", "")
+            or getattr(photo, "effective_media_category", "")
+            or user_corrected_category
+            or automatic_category
+            or MediaCategory.Unknown.value
+        ).strip().lower()
+
+        confidence = float(
+            metadata.get("classification_confidence", getattr(photo, "classification_confidence", 0.0) or 0.0)
+            or 0.0
         )
-        corrected = _normalize_category(str(metadata.get("cleanup_user_corrected_category", "")), allow_empty=True)
-        effective = corrected if corrected else automatic
 
-        confidence = metadata.get("cleanup_confidence")
-        if not isinstance(confidence, (int, float)):
-            confidence = metadata.get("classification_confidence", 0.0)
-        confidence_value = float(confidence or 0.0)
+        reason = str(
+            metadata.get("classification_reason", "")
+            or getattr(photo, "classification_reason", "")
+            or ""
+        ).strip()
 
-        reasons_raw = metadata.get("cleanup_reasons") or []
-        if not reasons_raw:
-            reason_single = metadata.get("relevance_reason") or metadata.get("classification_reason") or ""
-            reasons_raw = [reason_single] if str(reason_single).strip() else []
-        reasons = [str(item).strip() for item in reasons_raw if str(item).strip()]
+        if not reason:
+            reason = "No classification reason available."
 
-        recommended = _normalize_action(str(metadata.get("cleanup_recommended_action", "review")))
-        decision = str(metadata.get("cleanup_user_decision", "pending") or "pending").strip().lower()
-
-        metadata["cleanup_automatic_category"] = automatic
-        metadata["cleanup_user_corrected_category"] = corrected
-        metadata["cleanup_effective_category"] = effective
-        metadata["cleanup_recommended_action"] = recommended
-        metadata["cleanup_confidence"] = confidence_value
-        metadata["relevance_category"] = effective
-        metadata["is_album_relevant_candidate"] = effective == "family_photo_candidate"
-        photo.metadata = metadata
-        photo.relevance_category = effective
-        photo.is_album_relevant_candidate = effective == "family_photo_candidate"
-        photo.sync_intelligence_from_metadata()
+        action = self._recommended_action_for_category(effective_category)
+        user_decision = str(
+            metadata.get("user_decision", "")
+            or getattr(photo, "user_decision", "")
+            or "pending"
+        ).strip().lower() or "pending"
 
         return CleanupReviewRow(
             photo=photo,
-            automatic_category=automatic,
-            user_corrected_category=corrected,
-            effective_category=effective,
-            confidence=confidence_value,
-            recommended_action=recommended,
-            reasons=reasons,
-            user_decision=decision,
+            automatic_category=automatic_category,
+            user_corrected_category=user_corrected_category,
+            effective_category=effective_category,
+            confidence=confidence,
+            recommended_action=action,
+            reasons=self._split_reasons(reason),
+            user_decision=user_decision,
         )
+
+    def _recommended_action_for_category(self, category_id: str) -> str:
+        category_id = str(category_id or "").strip().lower()
+        registry = self._category_registry
+
+        if registry.is_cleanup_category(category_id):
+            return "move_to_cleanup_folder"
+
+        if category_id in {
+            MediaCategory.Unknown.value,
+            MediaCategory.LowQuality.value,
+            MediaCategory.DuplicateCandidate.value,
+        }:
+            return "review"
+
+        return "keep"
+
+    def _reset_filter_options(self) -> None:
+        current = self.category_filter_combo.currentData()
+        self.category_filter_combo.blockSignals(True)
+        self.category_filter_combo.clear()
+        self.category_filter_combo.addItem(self.CATEGORY_FILTER_ALL, self.CATEGORY_FILTER_ALL)
+        for category_id in self._category_registry.ordered_ids():
+            self.category_filter_combo.addItem(self._category_registry.label_for(category_id), category_id)
+        if current is not None:
+            index = self.category_filter_combo.findData(current)
+            if index >= 0:
+                self.category_filter_combo.setCurrentIndex(index)
+        self.category_filter_combo.blockSignals(False)
+
+    def _reload_category_selector_options(self) -> None:
+        current = self.category_selector.currentData()
+        self.category_selector.blockSignals(True)
+        self.category_selector.clear()
+        for category_id in self._category_registry.ordered_ids():
+            self.category_selector.addItem(self._category_registry.label_for(category_id), category_id)
+        if current is not None:
+            index = self.category_selector.findData(current)
+            if index >= 0:
+                self.category_selector.setCurrentIndex(index)
+        self.category_selector.blockSignals(False)
+
+    def _refresh_group_options(self) -> None:
+        current = self.group_combo.currentData()
+        counts: dict[str, int] = {}
+        for row in self._rows:
+            counts[row.effective_category] = counts.get(row.effective_category, 0) + 1
+
+        self.group_combo.blockSignals(True)
+        self.group_combo.clear()
+        self.group_combo.addItem("No grouping", "")
+        for category_id in sorted(counts.keys(), key=lambda item: self._category_registry.label_for(item)):
+            self.group_combo.addItem(
+                f"{self._category_registry.label_for(category_id)} ({counts[category_id]})",
+                category_id,
+            )
+
+        if current is not None:
+            index = self.group_combo.findData(current)
+            if index >= 0:
+                self.group_combo.setCurrentIndex(index)
+        self.group_combo.blockSignals(False)
+
+    def _on_group_changed(self) -> None:
+        selected_group = str(self.group_combo.currentData() or "").strip().lower()
+        if selected_group:
+            index = self.category_filter_combo.findData(selected_group)
+            if index >= 0:
+                self.category_filter_combo.setCurrentIndex(index)
+        else:
+            self.category_filter_combo.setCurrentIndex(0)
+        self._trigger_refresh(force=True)
 
     def _trigger_refresh(self, force: bool = False) -> None:
         _ = force
-        self._visible_rows = [
-            row
-            for row in self._rows
-            if self._matches_category_filter(row)
-            and self._matches_confidence_filter(row)
-            and self._matches_action_filter(row)
-            and self._matches_search(row)
-        ]
-        self._visible_rows.sort(key=lambda row: row.confidence, reverse=True)
-
-        self._refresh_statistics()
-        self._refresh_group_options()
-        self._results_text()
+        self._visible_rows = self._filtered_rows()
+        self.results_label.setText(f"Showing {len(self._visible_rows)} of {len(self._rows)} cleanup review items")
+        self._update_stats()
 
         items = [self._to_grid_item(row) for row in self._visible_rows]
         self.thumbnail_grid.set_items(items)
 
+        selected_key = self.thumbnail_grid.selected_key()
+        if selected_key:
+            row = self._row_for_key(selected_key)
+            if row is not None:
+                self._show_details(row, force=True)
+                return
+
+        if self._visible_rows:
+            first_key = self._photo_key(self._visible_rows[0].photo)
+            self.thumbnail_grid.set_single_selection(first_key)
+            self._show_details(self._visible_rows[0], force=True)
+        else:
+            self._clear_details()
+
+    def _filtered_rows(self) -> list[CleanupReviewRow]:
+        rows = list(self._rows)
+
+        category = self.category_filter_combo.currentData()
+        if category and category != self.CATEGORY_FILTER_ALL:
+            rows = [row for row in rows if row.effective_category == category]
+
+        confidence_filter = self.confidence_filter_combo.currentText()
+        if confidence_filter.startswith("High"):
+            rows = [row for row in rows if row.confidence >= 0.80]
+        elif confidence_filter.startswith("Medium"):
+            rows = [row for row in rows if 0.50 <= row.confidence < 0.80]
+        elif confidence_filter.startswith("Low"):
+            rows = [row for row in rows if row.confidence < 0.50]
+
+        action_text = self.action_filter_combo.currentText()
+        if action_text != self.ACTION_FILTER_ALL:
+            wanted = self._action_value_from_label(action_text)
+            rows = [row for row in rows if row.recommended_action == wanted]
+
+        search_text = self.search_input.text().strip().lower()
+        if search_text:
+            rows = [row for row in rows if search_text in row.photo.display_name().lower()]
+
+        rows.sort(
+            key=lambda row: (
+                row.effective_category,
+                -float(row.confidence),
+                row.photo.display_name().lower(),
+            )
+        )
+        return rows
+
     def _to_grid_item(self, row: CleanupReviewRow) -> SharedGridItem:
-        confidence_text = f"{max(0, min(100, int(round(row.confidence * 100))))}%"
+        category_label = self._category_registry.label_for(row.effective_category)
+        confidence_label = f"{max(0, min(100, int(round(row.confidence * 100))))}%"
+        action_label = RECOMMENDED_ACTION_LABELS.get(row.recommended_action, row.recommended_action.replace("_", " ").title())
+        thumbnail = getattr(row.photo, "thumbnail", None)
+        if not isinstance(thumbnail, QPixmap) or thumbnail.isNull():
+            thumbnail = None
         return SharedGridItem(
             key=self._photo_key(row.photo),
             filename=row.photo.display_name(),
-            thumbnail=self._get_cached_card_thumbnail(row),
-            badge_one=_shorten_badge(_display_category(row.automatic_category)),
-            badge_two=confidence_text,
-            badge_three=_shorten_badge(_display_action(row.recommended_action)),
+            thumbnail=thumbnail,
+            badge_one=category_label,
+            badge_two=confidence_label,
+            badge_three=action_label,
         )
-
-    def _matches_category_filter(self, row: CleanupReviewRow) -> bool:
-        selected = self.category_filter_combo.currentText().strip()
-        if not selected or selected == self.CATEGORY_FILTER_ALL:
-            return True
-        return _display_category(row.effective_category) == selected
-
-    def _matches_confidence_filter(self, row: CleanupReviewRow) -> bool:
-        selected = self.confidence_filter_combo.currentText().strip()
-        if selected == "High (>=80%)":
-            return row.confidence >= 0.8
-        if selected == "Medium (50-79%)":
-            return 0.5 <= row.confidence < 0.8
-        if selected == "Low (<50%)":
-            return row.confidence < 0.5
-        return True
-
-    def _matches_action_filter(self, row: CleanupReviewRow) -> bool:
-        selected = self.action_filter_combo.currentText().strip()
-        if not selected or selected == self.ACTION_FILTER_ALL:
-            return True
-        return _display_action(row.recommended_action) == selected
-
-    def _matches_search(self, row: CleanupReviewRow) -> bool:
-        needle = self.search_input.text().strip().lower()
-        if not needle:
-            return True
-        return needle in row.photo.display_name().lower()
-
-    def _results_text(self) -> None:
-        self.results_label.setText(
-            f"Showing {len(self._visible_rows)} of {len(self._rows)} cleanup candidates"
-        )
-
-    def _refresh_statistics(self) -> None:
-        counts = {category: 0 for category in KNOWN_CATEGORIES}
-        total_conf = 0.0
-        for row in self._rows:
-            counts[row.effective_category] = counts.get(row.effective_category, 0) + 1
-            total_conf += row.confidence
-
-        avg_conf = (total_conf / len(self._rows)) if self._rows else 0.0
-        self.stats_label.setText(
-            (
-                f"Imported: {self._imported_total_count} | Cleanup candidates: {len(self._rows)} | "
-                f"Family photos: {counts.get('family_photo_candidate', 0)} | "
-                f"Documents: {counts.get('document_or_scan', 0)} | "
-                f"Screenshots: {counts.get('screenshot', 0)} | "
-                f"Advertisements: {counts.get('advertisement', 0)} | "
-                f"Memes: {counts.get('meme_or_graphic', 0)} | "
-                f"Unknown: {counts.get('unknown', 0)} | "
-                f"Average confidence: {int(round(avg_conf * 100))}%"
-            )
-        )
-
-    def _refresh_group_options(self) -> None:
-        current = self.group_combo.currentText().strip() or self.CATEGORY_FILTER_ALL
-        self.group_combo.blockSignals(True)
-        self.group_combo.clear()
-        self.group_combo.addItem(self.CATEGORY_FILTER_ALL)
-
-        counts = {}
-        for row in self._rows:
-            counts[row.effective_category] = counts.get(row.effective_category, 0) + 1
-
-        for category in KNOWN_CATEGORIES:
-            count = counts.get(category, 0)
-            if count <= 0:
-                continue
-            self.group_combo.addItem(f"{_display_category(category)} ({count})")
-
-        index = self.group_combo.findText(current)
-        self.group_combo.setCurrentIndex(index if index >= 0 else 0)
-        self.group_combo.blockSignals(False)
-
-    def _on_group_changed(self) -> None:
-        text = self.group_combo.currentText().strip()
-        if not text or text == self.CATEGORY_FILTER_ALL:
-            self.category_filter_combo.blockSignals(True)
-            self.category_filter_combo.setCurrentText(self.CATEGORY_FILTER_ALL)
-            self.category_filter_combo.blockSignals(False)
-            self._trigger_refresh()
-            return
-
-        for category in KNOWN_CATEGORIES:
-            label = _display_category(category)
-            if text.startswith(f"{label} ("):
-                self.category_filter_combo.blockSignals(True)
-                self.category_filter_combo.setCurrentText(label)
-                self.category_filter_combo.blockSignals(False)
-                self._trigger_refresh()
-                return
-
-    def _reset_filter_options(self) -> None:
-        category_current = self.category_filter_combo.currentText().strip() or self.CATEGORY_FILTER_ALL
-        self.category_filter_combo.blockSignals(True)
-        self.category_filter_combo.clear()
-        self.category_filter_combo.addItem(self.CATEGORY_FILTER_ALL)
-        for category in KNOWN_CATEGORIES:
-            self.category_filter_combo.addItem(_display_category(category))
-        idx = self.category_filter_combo.findText(category_current)
-        self.category_filter_combo.setCurrentIndex(idx if idx >= 0 else 0)
-        self.category_filter_combo.blockSignals(False)
-
-    def _row_for_key(self, key: str) -> Optional[CleanupReviewRow]:
-        for row in self._rows:
-            if self._photo_key(row.photo) == key:
-                return row
-        return None
 
     def _show_details(self, row: CleanupReviewRow, force: bool = False) -> None:
-        row_key = self._photo_key(row.photo)
-        if self._details_key == row_key and not force:
+        key = self._photo_key(row.photo)
+        if not force and self._details_key == key:
             return
+        self._details_key = key
 
-        self._details_key = row_key
         photo = row.photo
-
-        thumbnail = self._get_cached_card_thumbnail(row)
-        if isinstance(thumbnail, QPixmap) and not thumbnail.isNull():
-            preview = thumbnail.scaled(
-                320,
-                220,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-            self.preview_label.setPixmap(preview)
-            self.preview_label.setText("")
-        else:
-            self.preview_label.setPixmap(QPixmap())
-            self.preview_label.setText("No preview")
-
         self.filename_value.setText(photo.display_name())
-        self.automatic_category_value.setText(_display_category(row.automatic_category))
+        self.automatic_category_value.setText(self._category_registry.label_for(row.automatic_category))
         self.confidence_value.setText(f"{max(0, min(100, int(round(row.confidence * 100))))}%")
-        self.recommended_action_value.setText(_display_action(row.recommended_action))
-        self.user_category_value.setText(_display_category(row.user_corrected_category) if row.user_corrected_category else "-")
-        self.effective_category_value.setText(_display_category(row.effective_category))
-        self.decision_value.setText(row.user_decision)
+        self.recommended_action_value.setText(
+            RECOMMENDED_ACTION_LABELS.get(row.recommended_action, row.recommended_action.replace("_", " ").title())
+        )
+        self.user_category_value.setText(
+            self._category_registry.label_for(row.user_corrected_category)
+            if row.user_corrected_category
+            else "-"
+        )
+        self.effective_category_value.setText(self._category_registry.label_for(row.effective_category))
+        self.decision_value.setText(row.user_decision.replace("_", " ").title())
         self.metadata_summary_value.setText(self._metadata_summary(photo))
 
         self.reasons_list.clear()
-        for reason in self._explainable_reasons(row):
-            self.reasons_list.addItem(f"[x] {reason}")
+        for reason in row.reasons:
+            self.reasons_list.addItem(reason)
 
-        alternatives = self._possible_alternatives(row)
         self.alternatives_list.clear()
-        for label, pct in alternatives:
-            self.alternatives_list.addItem(f"{label} ({pct}%)")
-        self._refresh_alternatives_visibility(bool(alternatives))
+        for label, score in self._possible_alternatives(row):
+            self.alternatives_list.addItem(f"{label} ({score}%)")
+        self._refresh_alternatives_visibility(row.confidence < 0.80)
+
+        pixmap = self._thumbnail_for_photo(photo, (320, 220))
+        if isinstance(pixmap, QPixmap) and not pixmap.isNull():
+            self.preview_label.setPixmap(pixmap)
+            self.preview_label.setText("")
+        else:
+            self.preview_label.setPixmap(QPixmap())
+            self.preview_label.setText("Preview unavailable")
+
+        category_index = self.category_selector.findData(row.effective_category)
+        if category_index >= 0:
+            self.category_selector.setCurrentIndex(category_index)
 
     def _clear_details(self) -> None:
         self._details_key = None
@@ -637,204 +671,244 @@ class IrrelevantMediaPage(QWidget):
         self._refresh_alternatives_visibility(False)
 
     def _refresh_alternatives_visibility(self, visible: bool) -> None:
-        self.alternatives_title.setVisible(visible)
-        self.alternatives_list.setVisible(visible)
+        self.alternatives_title.setVisible(bool(visible))
+        self.alternatives_list.setVisible(bool(visible))
+
+    def _possible_alternatives(self, row: CleanupReviewRow) -> list[tuple[str, int]]:
+        if row.confidence >= 0.80:
+            return []
+        current = row.effective_category
+        base = [
+            (self._category_registry.label_for(current), int(max(30, min(70, row.confidence * 100)))),
+            (self._category_registry.label_for(MediaCategory.FamilyPhoto.value), 25),
+            (self._category_registry.label_for(MediaCategory.Meme.value), 20),
+            (self._category_registry.label_for(MediaCategory.Screenshot.value), 15),
+            (self._category_registry.label_for(MediaCategory.Advertisement.value), 10),
+        ]
+
+        deduped: list[tuple[str, int]] = []
+        seen = set()
+        for label, score in base:
+            if label in seen:
+                continue
+            seen.add(label)
+            deduped.append((label, score))
+        return deduped[:4]
 
     def _metadata_summary(self, photo) -> str:
         metadata = dict(getattr(photo, "metadata", {}) or {})
         width = metadata.get("width")
         height = metadata.get("height")
-        date_taken = metadata.get("date_taken")
-        camera_make = metadata.get("camera_make") or ""
-        camera_model = metadata.get("camera_model") or ""
+        date_source = metadata.get("date_source") or metadata.get("source_of_date") or "Unknown"
+        visual = metadata.get("visual_evidence") or metadata.get("visual_signals_summary") or ""
 
-        parts = []
-        if isinstance(width, int) and isinstance(height, int):
-            parts.append(f"{width}x{height}")
-        if date_taken:
-            parts.append(f"Date: {date_taken}")
-
-        camera_text = " ".join(str(x).strip() for x in (camera_make, camera_model) if str(x).strip())
-        if camera_text:
-            parts.append(f"Camera: {camera_text}")
-
-        if not parts:
-            return "No metadata"
+        parts = [
+            f"Resolution: {width or 'Unknown'} x {height or 'Unknown'}",
+            f"Date source: {date_source}",
+        ]
+        if visual:
+            parts.append(f"Visual: {visual}")
         return " | ".join(parts)
 
-    def _explainable_reasons(self, row: CleanupReviewRow) -> list[str]:
-        metadata = dict(getattr(row.photo, "metadata", {}) or {})
-        filename = row.photo.display_name().lower()
-        width = metadata.get("width")
-        height = metadata.get("height")
-        camera_make = str(metadata.get("camera_make", "") or "").strip()
-        camera_model = str(metadata.get("camera_model", "") or "").strip()
+    def _split_reasons(self, reason: str) -> list[str]:
+        text = str(reason or "").strip()
+        if not text:
+            return ["No classification reason available."]
 
-        cleaned: list[str] = []
-        for reason in row.reasons:
-            text = str(reason).strip()
-            if not text:
-                continue
-            lowered = text.lower()
-            if lowered.startswith("classified as") and "because" in lowered:
-                text = text.split("because", 1)[1].strip().rstrip(".")
-            text = text[:1].upper() + text[1:] if text else text
-            if text and text not in cleaned:
-                cleaned.append(text)
-
-        if not camera_make and not camera_model:
-            cleaned.append("No camera metadata")
-
-        for keyword in ("buongiorno", "auguri", "sticker", "meme", "promo", "offerta", "screenshot"):
-            if keyword in filename:
-                cleaned.append(f"Filename contains '{keyword}'")
+        separators = ["; ", ". ", " because "]
+        fragments = [text]
+        for separator in separators:
+            if separator in text:
+                fragments = [part.strip(" .") for part in text.split(separator) if part.strip(" .")]
                 break
 
-        if isinstance(width, int) and isinstance(height, int):
-            if abs(width - height) <= 40 and max(width, height) <= 1200:
-                cleaned.append("Square low-resolution image")
-            if max(width, height) <= 900:
-                cleaned.append("Compact dimensions favor non-memory media")
+        cleaned = []
+        for fragment in fragments:
+            if fragment.lower().startswith("classified as"):
+                cleaned.append(fragment)
+            else:
+                cleaned.append(f"✓ {fragment}")
+        return cleaned or [text]
 
-        if any(token in filename for token in ("whatsapp", "wa", "forwarded", "download")):
-            cleaned.append("Looks like downloaded/shared graphic")
-
-        seen = set()
-        ordered = []
-        for item in cleaned:
-            key = item.lower().strip()
-            if not key or key in seen:
-                continue
-            seen.add(key)
-            ordered.append(item)
-        return ordered
-
-    def _possible_alternatives(self, row: CleanupReviewRow) -> list[tuple[str, int]]:
-        if row.confidence >= 0.8:
-            return []
-
-        alternative_map = {
-            "meme_or_graphic": [("Family Photo", 25), ("Meme", 45), ("Advertisement", 15), ("Screenshot", 15)],
-            "advertisement": [("Meme", 30), ("Advertisement", 40), ("Screenshot", 15), ("Family Photo", 15)],
-            "screenshot": [("Screenshot", 45), ("Meme", 25), ("Advertisement", 15), ("Family Photo", 15)],
-            "document_or_scan": [("Document", 45), ("Screenshot", 20), ("Family Photo", 20), ("Unknown", 15)],
-            "family_photo_candidate": [("Family Photo", 45), ("Meme", 20), ("Screenshot", 20), ("Unknown", 15)],
-            "unknown": [("Family Photo", 25), ("Meme", 25), ("Advertisement", 25), ("Screenshot", 25)],
-            "duplicate_candidate": [("Duplicate", 45), ("Family Photo", 20), ("Unknown", 20), ("Document", 15)],
-            "low_quality_photo": [("Low quality", 45), ("Meme", 20), ("Unknown", 20), ("Family Photo", 15)],
-            "video": [("Video", 55), ("Unknown", 20), ("Advertisement", 15), ("Meme", 10)],
-        }
-        return list(alternative_map.get(row.automatic_category, alternative_map["unknown"]))
+    def _action_value_from_label(self, label: str) -> str:
+        for value, display in RECOMMENDED_ACTION_LABELS.items():
+            if display == label:
+                return value
+        return str(label or "").strip().lower().replace(" ", "_")
 
     def _set_decision_for_selected(self, decision: str) -> None:
-        normalized = str(decision or "pending").strip().lower()
-        changed = False
-        for row in self._selected_rows():
-            if row.user_decision == normalized:
-                continue
-            row.user_decision = normalized
+        selected_rows = self._selected_rows()
+        for row in selected_rows:
+            row.user_decision = decision
             metadata = dict(getattr(row.photo, "metadata", {}) or {})
-            metadata["cleanup_user_decision"] = normalized
+            metadata["user_decision"] = decision
             row.photo.metadata = metadata
-            row.photo.sync_intelligence_from_metadata()
-            changed = True
-
-        if changed:
-            selected_key = self.thumbnail_grid.selected_key()
-            if selected_key:
-                row = self._row_for_key(selected_key)
-                if row is not None:
-                    self._show_details(row, force=True)
-
-    def _apply_category_to_selected(self, category: str) -> None:
-        normalized_category = _normalize_category(category)
-        changed = False
-        for row in self._selected_rows():
-            if row.effective_category == normalized_category and row.user_corrected_category == normalized_category:
-                continue
-
-            row.user_corrected_category = normalized_category
-            row.effective_category = normalized_category
-            metadata = dict(getattr(row.photo, "metadata", {}) or {})
-            metadata["cleanup_user_corrected_category"] = normalized_category
-            metadata["cleanup_effective_category"] = normalized_category
-            metadata["relevance_category"] = normalized_category
-            metadata["is_album_relevant_candidate"] = normalized_category == "family_photo_candidate"
-            row.photo.metadata = metadata
-            row.photo.relevance_category = normalized_category
-            row.photo.is_album_relevant_candidate = normalized_category == "family_photo_candidate"
-            row.photo.sync_intelligence_from_metadata()
-            changed = True
-
-        if changed:
-            self._refresh_group_options()
+            row.photo.user_decision = decision
+            self._save_photo_user_metadata(row.photo)
+        if selected_rows:
+            self._show_user_saved_indicator("Decision saved")
             self._trigger_refresh(force=True)
 
+    def _apply_category_to_selected(self, category: str) -> None:
+        category = str(category or "").strip().lower()
+        if not category:
+            return
+
+        selected_rows = self._selected_rows()
+        if not selected_rows:
+            return
+
+        for row in selected_rows:
+            previous = row.effective_category
+            metadata = dict(getattr(row.photo, "metadata", {}) or {})
+            automatic = str(
+                metadata.get("automatic_media_category", "")
+                or getattr(row.photo, "automatic_media_category", "")
+                or row.automatic_category
+                or previous
+            ).strip().lower()
+
+            metadata["automatic_media_category"] = automatic
+            metadata["user_corrected_media_category"] = category
+            metadata["effective_media_category"] = category
+            metadata["media_category"] = category
+            row.photo.metadata = metadata
+
+            row.photo.automatic_media_category = automatic
+            row.photo.user_corrected_media_category = category
+            row.photo.effective_media_category = category
+            row.photo.media_category = category
+            row.photo.sync_intelligence_from_metadata()
+
+            self._category_learning_engine.record_category_correction(
+                row.photo,
+                previous_category=previous,
+                corrected_category=category,
+                source="user_bulk" if len(selected_rows) > 1 else "user",
+            )
+            self._save_photo_user_metadata(row.photo)
+
+        self._rows = [self._build_row(row.photo) for row in self._rows]
+        self._show_user_saved_indicator("User category saved")
+        self._refresh_group_options()
+        self._trigger_refresh(force=True)
+
+    def _save_photo_user_metadata(self, photo) -> None:
+        try:
+            self._user_metadata_service.save_photo_metadata(photo)
+        except Exception:
+            pass
+
     def _selected_rows(self) -> list[CleanupReviewRow]:
-        selected_lookup = set(self.thumbnail_grid.selected_keys())
-        return [row for row in self._rows if self._photo_key(row.photo) in selected_lookup]
+        selected_keys = self.thumbnail_grid.selected_keys()
+        return [row for row in self._rows if self._photo_key(row.photo) in selected_keys]
+
+    def _row_for_key(self, key: str) -> Optional[CleanupReviewRow]:
+        for row in self._rows:
+            if self._photo_key(row.photo) == key:
+                return row
+        return None
 
     def _photo_key(self, photo) -> str:
         return str(getattr(photo, "path", ""))
 
-    def grid_column_count(self) -> int:
-        return self.thumbnail_grid.grid_column_count()
+    def _thumbnail_for_photo(self, photo, target_size) -> Optional[QPixmap]:
+        thumbnail = getattr(photo, "thumbnail", None)
+        if isinstance(thumbnail, QPixmap) and not thumbnail.isNull():
+            return thumbnail
 
-    def compact_card_size(self) -> tuple[int, int]:
-        return self.thumbnail_grid.compact_card_size()
+        thumbnail_path = str(getattr(photo, "thumbnail_path", "") or "")
+        if thumbnail_path and Path(thumbnail_path).exists():
+            thumbnail = load_display_thumbnail(thumbnail_path, target_size)
+            if isinstance(thumbnail, QPixmap) and not thumbnail.isNull():
+                return thumbnail
 
-    def rendered_card_count(self) -> int:
-        return len(self._cards_by_key)
+        file_path = str(getattr(photo, "path", "") or "")
+        if file_path and Path(file_path).exists():
+            thumbnail = load_display_thumbnail(file_path, target_size)
+            if isinstance(thumbnail, QPixmap) and not thumbnail.isNull():
+                return thumbnail
 
-    def _get_cached_card_thumbnail(self, row: CleanupReviewRow) -> Optional[QPixmap]:
-        key = self._photo_key(row.photo)
-        photo_thumb = getattr(row.photo, "thumbnail", None)
-        if isinstance(photo_thumb, QPixmap) and not photo_thumb.isNull():
-            signature = int(photo_thumb.cacheKey())
-            cached = self._thumbnail_cache.get(key)
-            if cached is not None and cached[0] == signature:
-                return cached[1]
-            scaled = photo_thumb.scaled(
-                140,
-                140,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-            self._thumbnail_cache[key] = (signature, scaled)
-            return scaled
-
-        self._thumbnail_cache.pop(key, None)
         return None
 
+    def _update_stats(self) -> None:
+        imported = self._imported_total_count
+        cleanup_candidates = len([
+            row for row in self._rows
+            if row.recommended_action in {"move_to_cleanup_folder", "move_to_cleanup_review", "review"}
+        ])
+        family = len([row for row in self._rows if row.effective_category == MediaCategory.FamilyPhoto.value])
+        documents = len([
+            row for row in self._rows
+            if row.effective_category in {MediaCategory.Document.value, MediaCategory.Receipt.value, MediaCategory.Invoice.value}
+        ])
+        screenshots = len([row for row in self._rows if row.effective_category == MediaCategory.Screenshot.value])
+        advertisements = len([row for row in self._rows if row.effective_category == MediaCategory.Advertisement.value])
+        memes = len([row for row in self._rows if row.effective_category in {MediaCategory.Meme.value, MediaCategory.Graphic.value}])
+        unknown = len([row for row in self._rows if row.effective_category == MediaCategory.Unknown.value])
 
-def _display_category(category: str) -> str:
-    return CATEGORY_LABELS.get(category, category or "Unknown")
+        avg_conf = 0
+        if self._rows:
+            avg_conf = int(round(sum(row.confidence for row in self._rows) / len(self._rows) * 100))
 
+        self.stats_label.setText(
+            " | ".join(
+                [
+                    f"Imported: {imported}",
+                    f"Cleanup candidates: {cleanup_candidates}",
+                    f"Family photos: {family}",
+                    f"Documents: {documents}",
+                    f"Screenshots: {screenshots}",
+                    f"Advertisements: {advertisements}",
+                    f"Memes/Graphics: {memes}",
+                    f"Unknown: {unknown}",
+                    f"Average confidence: {avg_conf}%",
+                ]
+            )
+        )
 
-def _display_action(action: str) -> str:
-    return RECOMMENDED_ACTION_LABELS.get(action, action.replace("_", " ").title() if action else "Unknown")
+    def _on_manage_categories(self) -> None:
+        usage = self._category_usage_counts()
+        dialog = CategoryManagementDialog(
+            registry=self._category_registry,
+            usage_counts=usage,
+            reassignment_callback=self._reassign_deleted_category,
+            parent=self,
+        )
+        dialog.exec()
+        self.refresh_category_options()
+        self.categories_changed.emit()
 
+    def _category_usage_counts(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for row in self._rows:
+            counts[row.effective_category] = counts.get(row.effective_category, 0) + 1
+        return counts
 
-def _shorten_badge(text: str, max_len: int = 11) -> str:
-    clean = str(text or "").strip()
-    if len(clean) <= max_len:
-        return clean
-    return f"{clean[:max_len - 2]}.."
+    def _reassign_deleted_category(self, old_category_id: str, new_category_id: str) -> None:
+        old_id = str(old_category_id or "").strip().lower()
+        new_id = str(new_category_id or "").strip().lower()
+        if not old_id or not new_id or old_id == new_id:
+            return
 
+        for row in self._rows:
+            metadata = dict(getattr(row.photo, "metadata", {}) or {})
+            changed = False
+            for field in ("automatic_media_category", "user_corrected_media_category", "effective_media_category", "media_category"):
+                if str(metadata.get(field, "") or "").strip().lower() == old_id:
+                    metadata[field] = new_id
+                    changed = True
+            if changed:
+                row.photo.metadata = metadata
+                row.photo.automatic_media_category = str(metadata.get("automatic_media_category", "") or "")
+                row.photo.user_corrected_media_category = str(metadata.get("user_corrected_media_category", "") or "")
+                row.photo.effective_media_category = str(metadata.get("effective_media_category", "") or "")
+                row.photo.media_category = str(metadata.get("media_category", "") or "")
+                row.photo.sync_intelligence_from_metadata()
 
-def _normalize_category(category_value: str, allow_empty: bool = False) -> str:
-    value = str(category_value or "").strip().lower()
-    if value in KNOWN_CATEGORIES:
-        return value
-    if allow_empty and not value:
-        return ""
-    return "unknown"
+        self._rows = [self._build_row(row.photo) for row in self._rows]
 
-
-def _normalize_action(action_value: str) -> str:
-    value = str(action_value or "").strip().lower()
-    if value in {"move_to_cleanup_review", "move_to_cleanup_folder"}:
-        return "move_to_cleanup_folder"
-    if value in {"keep", "review", "unknown"}:
-        return value
-    return "review"
+    def _show_user_saved_indicator(self, text: str) -> None:
+        self.user_saved_label.setText(text)
+        self.user_saved_label.setVisible(True)
+        QTimer.singleShot(2500, lambda: self.user_saved_label.setVisible(False))

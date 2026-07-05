@@ -49,9 +49,10 @@ Current completed foundation work includes:
 - Duplicate Engine
 - People Learning
 
-Current next milestone:
+Current status:
 
-- LEARN-001 Decision History foundations (Next)
+- LEARN-001 is complete.
+- This file is historical and transitional only; use docs/project/DOMAIN_ROADMAP.md for future milestones.
 
 Recently completed domain milestones relevant to Learning readiness:
 

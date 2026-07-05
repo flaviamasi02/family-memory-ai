@@ -1,0 +1,31 @@
+{
+  "system_overrides": [],
+  "categories": [
+    {
+      "id": "avaloq",
+      "display_name": "Avaloq",
+      "description": "colleghi di lavoro di avaloq",
+      "ai_description": "photos of events done at work or with work collegues",
+      "color": "",
+      "icon": "",
+      "is_system": false,
+      "is_cleanup_category": true,
+      "is_album_candidate": true,
+      "created_at": "2026-07-05T16:48:51.260309+00:00",
+      "updated_at": "2026-07-05T16:48:56.116830+00:00"
+    },
+    {
+      "id": "da_buttare",
+      "display_name": "da buttare",
+      "description": "all immages that have no value",
+      "ai_description": "all immages that have no value",
+      "color": "",
+      "icon": "",
+      "is_system": false,
+      "is_cleanup_category": true,
+      "is_album_candidate": false,
+      "created_at": "2026-07-05T20:04:16.623357+00:00",
+      "updated_at": "2026-07-05T20:04:16.623357+00:00"
+    }
+  ]
+}

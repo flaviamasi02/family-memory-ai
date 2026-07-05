@@ -26,6 +26,38 @@ It optimizes for meaningful memories.
 
 ---
 
+# Explainable Intelligence
+
+Family Memory AI may use:
+
+- deterministic rules
+- statistical models
+- machine learning
+- local AI models
+- cloud AI services
+
+However every important decision must expose:
+
+- why the decision was made
+- evidence used
+- confidence
+- decision source
+
+Decision source examples:
+
+- Deterministic Rules
+- Learned User Preferences
+- AI Inference
+- Hybrid Decision
+
+Explainability requirement for classification:
+
+- Visual-content-based decisions must expose human-readable evidence (for example white page-like background, text-like regions, tall screenshot layout, banner layout, or graphic-like low-resolution square structure).
+- Metadata-less images should use local visual evidence before falling back to Unknown.
+- Unknown remains valid when evidence is weak or conflicting.
+
+---
+
 ## Scoring Philosophy
 
 - Memories are more important than perfect photography.
@@ -240,6 +272,26 @@ Current Memory Review behavior is deterministic, explainable, and correction-ori
 - multi-selection and bulk editing
 - Media Category review with Automatic Category, User Corrected Category, and Effective Category
 - confidence and reasoning visibility as first-class decision context
+
+MEM-008 taxonomy update:
+
+- Users can define custom media categories directly in-app and apply them in Memory Review and Cleanup Review.
+- Custom categories are metadata-only organizational controls (no AI learning/scoring changes in this milestone).
+- Category definitions persist in `.familymemory/categories.json`; per-photo category overrides continue to persist via sidecar metadata.
+
+LEARN-001 deterministic category-learning update:
+
+- Repeated manual category corrections now produce deterministic, explainable learning rules.
+- Learned rules are local-only and transparent (no cloud AI, no black-box ML).
+- Learned rules can boost future import-time category decisions when matching signals are observed.
+- Learning profile persists locally in `.familymemory/category_learning_profile.json`.
+
+LEARN-001 persistence foundation:
+
+- Manual category corrections and user decisions are now stored in sidecar JSON files beside each image.
+- Sidecar loading on import restores user-corrected category and user decision when file identity matches.
+- If file identity changes, loading remains cautious and marks an identity-mismatch warning while preserving user correction/decision when filename still matches.
+- Original image binary metadata is not modified yet; sidecar storage is the current safe persistence path.
 
 Cleanup Review now follows the same UX philosophy as Memory Review:
 

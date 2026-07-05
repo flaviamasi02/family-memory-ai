@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import os
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
@@ -10,6 +11,7 @@ from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from album.album_scoring_engine import AlbumScoreBreakdown
+from core.category_registry import get_category_registry, reset_category_registry
 from core.media_classifier import MediaCategory
 from models.photo import Photo
 from models.photo_intelligence import PhotoIntelligence
@@ -20,6 +22,10 @@ class AlbumReviewPageTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls._app = QApplication.instance() or QApplication([])
+
+    def tearDown(self):
+        os.environ.pop("FAMILY_MEMORY_CATEGORIES_ROOT", None)
+        reset_category_registry()
 
     def _make_breakdown(
         self,
@@ -206,9 +212,36 @@ class AlbumReviewPageTests(unittest.TestCase):
             self.assertIn("family photo", page.classification_reason_value.text().lower())
             self.assertEqual(page.confidence_value.text(), "82%")
             self.assertEqual(page.date_source_value.text(), "EXIF")
+            self.assertTrue(hasattr(page, "visual_summary_value"))
             self.assertFalse(hasattr(page, "metadata_value"))
             self.assertEqual(page.explanations_list.count(), 3)
             self.assertIn("technical", page.explanations_list.item(0).text())
+
+    def test_memory_review_shows_visual_summary_when_available(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            breakdown = self._make_breakdown(
+                root,
+                "visual.jpg",
+                70,
+                70,
+                70,
+                70,
+                "2024:06:10 10:00:00",
+                metadata={
+                    "visual_signals_summary": "photo=0.74, document=0.20, graphic=0.15, screenshot=0.10, advertisement=0.05",
+                    "visual_evidence": "Color palette diversity looks photo-like.",
+                },
+            )
+
+            page = AlbumReviewPage()
+            page.set_scored_photos([breakdown])
+            self._flush_ui(wait_ms=60)
+            self.assertTrue(page.select_photo_by_filename("visual.jpg"))
+
+            text = page.visual_summary_value.text().lower()
+            self.assertIn("photo=0.74", text)
+            self.assertIn("photo-like", text)
 
     def test_automatic_category_visible_on_card(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -275,6 +308,128 @@ class AlbumReviewPageTests(unittest.TestCase):
             page.category_filter_combo.setCurrentText("Invoice")
             self._flush_ui(wait_ms=40)
             self.assertEqual(self._visible_filenames(page), ["invoice_one.jpg"])
+
+    def test_custom_category_appears_in_memory_dropdown_and_filter(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.environ["FAMILY_MEMORY_CATEGORIES_ROOT"] = tmpdir
+            reset_category_registry()
+            registry = get_category_registry(force_reload=True)
+            registry.create_user_category("Travel")
+
+            root = Path(tmpdir)
+            breakdown = self._make_breakdown(root, "travel.jpg", 80, 80, 80, 80, "2024:06:10 10:00:00")
+            page = AlbumReviewPage()
+            page.set_scored_photos([breakdown])
+            self._flush_ui(wait_ms=60)
+
+            self.assertIn("travel", page.category_selector_values())
+            self.assertIn("Travel", page.category_filter_labels())
+
+    def test_system_category_customized_display_name_is_used_in_dropdown_with_stable_id(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.environ["FAMILY_MEMORY_CATEGORIES_ROOT"] = tmpdir
+            reset_category_registry()
+            registry = get_category_registry(force_reload=True)
+            registry.update_category_properties("meme", display_name="Funny Images")
+
+            root = Path(tmpdir)
+            breakdown = self._make_breakdown(
+                root,
+                "funny.jpg",
+                80,
+                80,
+                80,
+                80,
+                "2024:06:10 10:00:00",
+                metadata={
+                    "automatic_media_category": "meme",
+                    "effective_media_category": "meme",
+                    "media_category": "meme",
+                },
+            )
+            page = AlbumReviewPage()
+            page.set_scored_photos([breakdown])
+            self._flush_ui(wait_ms=60)
+
+            self.assertIn("Funny Images", page.category_filter_labels())
+            idx = page.category_selector.findData("meme")
+            self.assertGreaterEqual(idx, 0)
+            self.assertEqual(page.category_selector.itemText(idx), "Funny Images")
+
+            page.category_filter_combo.setCurrentText("Funny Images")
+            self._flush_ui(wait_ms=60)
+            self.assertEqual(self._visible_filenames(page), ["funny.jpg"])
+
+    def test_custom_category_assignment_and_filter_in_memory_review(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.environ["FAMILY_MEMORY_CATEGORIES_ROOT"] = tmpdir
+            reset_category_registry()
+            registry = get_category_registry(force_reload=True)
+            registry.create_user_category("To Print")
+
+            root = Path(tmpdir)
+            first = self._make_breakdown(root, "a.jpg", 80, 80, 80, 80, "2024:06:10 10:00:00")
+            second = self._make_breakdown(root, "b.jpg", 80, 80, 80, 80, "2024:06:11 10:00:00")
+
+            page = AlbumReviewPage()
+            page.set_scored_photos([first, second])
+            self._flush_ui(wait_ms=60)
+
+            self.assertTrue(page.select_photo_by_filename("a.jpg"))
+            idx = page.category_selector.findData("to_print")
+            self.assertGreaterEqual(idx, 0)
+            page.category_selector.setCurrentIndex(idx)
+            page._apply_selector_category()
+            self._flush_ui(wait_ms=60)
+
+            self.assertEqual(first.photo.metadata.get("effective_media_category"), "to_print")
+
+            page.category_filter_combo.setCurrentText("To Print")
+            self._flush_ui(wait_ms=60)
+            self.assertEqual(self._visible_filenames(page), ["a.jpg"])
+
+    def test_bulk_custom_category_assignment_in_memory_review(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.environ["FAMILY_MEMORY_CATEGORIES_ROOT"] = tmpdir
+            reset_category_registry()
+            registry = get_category_registry(force_reload=True)
+            registry.create_user_category("Important Object")
+
+            root = Path(tmpdir)
+            one = self._make_breakdown(root, "one.jpg", 80, 80, 80, 80, "2024:06:10 10:00:00")
+            two = self._make_breakdown(root, "two.jpg", 80, 80, 80, 80, "2024:06:10 10:00:00")
+
+            page = AlbumReviewPage()
+            page.set_scored_photos([one, two])
+            self._flush_ui(wait_ms=80)
+
+            page.select_all_visible()
+            idx = page.category_selector.findData("important_object")
+            self.assertGreaterEqual(idx, 0)
+            page.category_selector.setCurrentIndex(idx)
+            page._apply_selector_category()
+            self._flush_ui(wait_ms=60)
+
+            self.assertEqual(one.photo.metadata.get("effective_media_category"), "important_object")
+            self.assertEqual(two.photo.metadata.get("effective_media_category"), "important_object")
+
+    def test_memory_review_uses_centralized_display_loader(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            breakdown = self._make_breakdown(root, "loader_source.jpg", 80, 80, 80, 80, "2024:06:10 10:00:00")
+            breakdown.photo.thumbnail = None
+            breakdown.photo.thumbnail_path = ""
+
+            page = AlbumReviewPage()
+            page.set_scored_photos([breakdown])
+
+            fake = QPixmap(80, 120)
+            fake.fill(Qt.GlobalColor.blue)
+            with patch("ui.album_review_page.load_display_thumbnail", return_value=fake) as mocked:
+                self._flush_ui(wait_ms=80)
+                page.card_summary_for_filename("loader_source.jpg")
+
+            self.assertTrue(mocked.called)
 
     def test_user_can_correct_category_and_effective_category_uses_override(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -362,6 +517,29 @@ class AlbumReviewPageTests(unittest.TestCase):
             self.assertTrue(page.select_photo_by_filename("rejected.jpg"))
             self.assertEqual(page.pipeline_value.text(), "Rejected")
             self.assertEqual(page.rejection_reason_value.text(), "year_mismatch")
+
+    def test_review_status_by_path_returns_row_statuses(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            approved_breakdown = self._make_breakdown(root, "approved.jpg", 90, 90, 90, 90, "2024:01:01 00:00:00")
+            rejected_breakdown = self._make_breakdown(root, "rejected.jpg", 10, 10, 10, 10, "2022:01:01 00:00:00")
+
+            page = AlbumReviewPage()
+            page.set_pipeline_data(
+                imported_photos=[approved_breakdown.photo, rejected_breakdown.photo],
+                candidate_photos=[approved_breakdown.photo, rejected_breakdown.photo],
+                selected_photos=[approved_breakdown.photo],
+                rejected_photos=[rejected_breakdown.photo],
+                scored_breakdowns={str(approved_breakdown.photo.path): approved_breakdown, str(rejected_breakdown.photo.path): rejected_breakdown},
+                rejection_reasons={},
+            )
+
+            page._all_rows[0].review_state = "approved"
+            page._all_rows[1].review_state = "rejected"
+
+            status_by_path = page.review_status_by_path()
+            self.assertEqual(status_by_path[str(approved_breakdown.photo.path)], "approved")
+            self.assertEqual(status_by_path[str(rejected_breakdown.photo.path)], "rejected")
 
     def test_explanations_widget_has_large_minimum_height(self):
         page = AlbumReviewPage()
@@ -466,6 +644,48 @@ class AlbumReviewPageTests(unittest.TestCase):
             self._flush_ui(wait_ms=120)
 
             self.assertGreaterEqual(page.grid_column_count(), 3)
+
+    def test_grid_content_expands_to_viewport_width(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            items = [
+                self._make_breakdown(root, f"expand_{index}.jpg", 100 - index, 80, 80, 80, "2024:01:01 00:00:00")
+                for index in range(10)
+            ]
+
+            page = AlbumReviewPage()
+            page.resize(1800, 980)
+            page.show()
+            page.set_scored_photos(items)
+            self._flush_ui(wait_ms=120)
+
+            viewport_width = page.grid_scroll.viewport().width()
+            self.assertGreater(viewport_width, 400)
+            self.assertGreaterEqual(page.grid_content.width(), viewport_width)
+
+    def test_cards_are_not_forced_into_single_column_when_wide(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            items = [
+                self._make_breakdown(root, f"cols_{index}.jpg", 100 - index, 80, 80, 80, "2024:01:01 00:00:00")
+                for index in range(20)
+            ]
+
+            page = AlbumReviewPage()
+            page.resize(1800, 980)
+            page.show()
+            page.set_scored_photos(items)
+            self._flush_ui(wait_ms=140)
+
+            self.assertGreater(page.grid_column_count(), 1)
+
+            rendered = len(page._cards_by_key)
+            self.assertGreater(rendered, 1)
+            seen_columns = set()
+            for index in range(min(rendered, 8)):
+                _row, column, _row_span, _column_span = page.grid_layout.getItemPosition(index)
+                seen_columns.add(column)
+            self.assertGreater(len(seen_columns), 1)
 
     def test_card_text_is_concise_and_long_lines_hidden(self):
         with tempfile.TemporaryDirectory() as tmpdir:

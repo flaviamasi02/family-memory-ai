@@ -35,3 +35,28 @@ Canonical definition:
 
 Canonical definition:
 [project/GLOSSARY.md](project/GLOSSARY.md)
+
+### Explainable AI
+
+Canonical definition:
+[project/GLOSSARY.md](project/GLOSSARY.md)
+
+### Decision Source
+
+Canonical definition:
+[project/GLOSSARY.md](project/GLOSSARY.md)
+
+### Human-in-the-loop
+
+Canonical definition:
+[project/GLOSSARY.md](project/GLOSSARY.md)
+
+### Transparent Decision
+
+Canonical definition:
+[project/GLOSSARY.md](project/GLOSSARY.md)
+
+### Hybrid Classification
+
+Canonical definition:
+[project/GLOSSARY.md](project/GLOSSARY.md)

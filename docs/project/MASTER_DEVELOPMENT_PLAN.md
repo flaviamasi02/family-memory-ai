@@ -43,6 +43,16 @@ The long-term mission is:
 
 ---
 
+## Permanent Product Principles
+
+- Explainable Intelligence
+- Human-in-the-loop
+- Continuous Learning
+- User Trust
+- Transparent Decisions
+
+---
+
 ## Development Methodology
 
 Historical implementation remains unchanged:
@@ -99,7 +109,22 @@ Future milestones:
 - MEM-003 Multi-Select Bulk Category Editing (completed)
 - MEM-004 Compact Thumbnail-First Memory Review Grid (completed)
 - MEM-005 True Multi-Column Memory Review Grid (completed)
-- MEM-006 Memory Review UX polishing and keyboard workflow improvements
+- MEM-006 Memory Review UX polishing and keyboard workflow improvements (completed)
+- MEM-008 Custom User Categories (completed)
+- MEM-009 Editable System Category Properties (completed)
+
+MEM-008 completed outcome:
+
+- Categories are no longer limited to hardcoded values.
+- Users can manage custom taxonomy from Memory Review and Cleanup Review.
+- Category metadata includes optional AI Description for future classifier learning.
+- Album and cleanup decisions are category-flag driven (album candidate / cleanup category).
+
+MEM-009 completed outcome:
+
+- System categories are now customizable while keeping protected stable IDs.
+- System category deletion remains disallowed.
+- System-category reset-to-default is available per category.
 
 ### CLEAN
 
@@ -118,6 +143,13 @@ Future milestones:
 - CLEAN-002 Improved deterministic initial media classification (completed)
 - CLEAN-003 Cleanup Review UX & Explainability (completed)
 - CLEAN-004 Advanced cleanup and duplicate cleanup workflows
+- CLEAN-005 Visual content-based media classification (completed)
+
+CLEAN-005 completed outcome:
+
+- Local visual analysis now augments deterministic metadata/filename classification.
+- Metadata-less images are classified by explainable visual evidence when strong signals are present.
+- Unknown remains a conservative fallback for weak or conflicting evidence.
 
 ### DUP
 
@@ -154,7 +186,7 @@ Continuously improve recommendations and scoring from repeated user behavior.
 
 Future milestones:
 
-- LEARN-001 Decision History
+- LEARN-001 Category Learning from User Corrections (completed)
 - LEARN-002 Preference Learning
 - LEARN-003 Adaptive Scoring
 

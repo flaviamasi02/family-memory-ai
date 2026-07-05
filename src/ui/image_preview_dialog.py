@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QImageReader, QPixmap
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QDialog,
     QFormLayout,
@@ -14,6 +14,8 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QVBoxLayout,
 )
+
+from core.image_display_loader import load_display_pixmap
 
 
 class ImagePreviewDialog(QDialog):
@@ -178,14 +180,10 @@ class ImagePreviewDialog(QDialog):
             if isinstance(cached, QPixmap) and not cached.isNull():
                 return signature, cached
 
-            reader = QImageReader(str(path))
-            reader.setAutoTransform(True)
-            image = reader.read()
-            if not image.isNull():
-                pixmap = QPixmap.fromImage(image)
-                if not pixmap.isNull():
-                    self._source_pixmap_cache[signature] = pixmap
-                    return signature, pixmap
+            pixmap = load_display_pixmap(path)
+            if isinstance(pixmap, QPixmap) and not pixmap.isNull():
+                self._source_pixmap_cache[signature] = pixmap
+                return signature, pixmap
 
         thumb = getattr(photo, "thumbnail", None)
         if isinstance(thumb, QPixmap) and not thumb.isNull():

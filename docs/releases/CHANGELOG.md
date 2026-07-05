@@ -1,6 +1,52 @@
 # Changelog
 
 ## Unreleased
+### Runtime Stability Hardening
+- Switched background thumbnail generation to emit `QImage` and moved `QPixmap` conversion into the UI thread.
+- Normalized Photo Browser thumbnail keys so late thumbnail updates resolve against stable absolute paths.
+- Restored `AlbumReviewPage.review_status_by_path()` so MainWindow can refresh album draft state from current review statuses.
+- Kept visual content analysis out of synchronous import/UI paths while the feature flag remains disabled by default.
+
+### CLEAN-005-FIX - Visual-analysis safety rollback for app responsiveness
+- Added emergency feature flag `ENABLE_VISUAL_CONTENT_ANALYSIS = False` as the default.
+- Synchronous import/UI classification now skips visual analysis to restore fast loading and avoid Not Responding states.
+- Classifier now safely falls back to filename, metadata, and user-learning rules when visual analysis is disabled, unavailable, or errors.
+- Added regression tests for disabled mode, no-image-open behavior, exception safety, and quick classification return.
+- Future work: run visual analysis only in background worker batches, never on the UI thread.
+
+### MEDIA-FIX-001 - Centralized orientation-aware image loading
+- Added a centralized display loader in `src/core/image_display_loader.py`.
+- EXIF orientation is respected for display thumbnails and full previews across Photo Browser, Memory Review, Cleanup Review, Image Preview Dialog, and Album Draft surfaces.
+- Thumbnail cache versioning enables safe regeneration when orientation behavior changes.
+- Original source image files are never modified.
+
+### MEM-008 - Custom user-defined categories with Memory/Cleanup assignment and filtering
+- Category taxonomy is user-extensible; the product no longer depends only on hardcoded category values.
+- Memory Review and Cleanup Review both expose `Manage Categories` for create, rename, and delete workflows.
+- Category records persist in `.familymemory/categories.json` with optional `ai_description`, visual metadata, and behavior flags.
+- Album candidacy and cleanup handling are category-driven via category flags instead of fixed category-name checks.
+
+### MEM-009 - Editable system category properties with protected stable IDs and reset-to-default
+- System categories remain protected and non-deletable, but users can customize display and behavior properties.
+- Stable internal category IDs remain unchanged so existing media/category links continue to work after display renames.
+- System category overrides persist locally and are applied on startup after loading defaults.
+- Added per-category reset-to-default for system categories.
+
+### LEARN-001 - Persistent sidecar metadata and deterministic learning rules from user corrections
+- Added `UserMetadataService` for sidecar persistence of manual category corrections and user decisions.
+- Sidecars are saved as `photo.familymemory.json` next to each image and include file identity, classification context, and update metadata.
+- Import ignores sidecar files as media and applies sidecar values when identity matches.
+- Import handles identity mismatches cautiously by preserving user correction and decision when filename matches and attaching a warning flag.
+- Memory Review and Cleanup Review now save sidecar metadata immediately after category and decision changes.
+- Added UI confirmation text for category saves: `User category saved`.
+- Added tests for creation, persistence, load, effective-category override, missing sidecar safety, and mismatch handling.
+- Sidecar-first only: no original image binary metadata writes.
+
+### UI-REF-001 - Cleanup Review single category assignment workflow
+- Cleanup Review now uses one category assignment flow: Category dropdown plus `Apply Category to Selected`.
+- Redundant quick category buttons were removed from the right-side panel.
+- Bulk category assignment remains supported through multi-selection plus dropdown apply.
+
 ### CLEAN-004 - Shared Thumbnail Grid for Cleanup Review
 - Migrated Cleanup Review to a shared thumbnail-grid component used for review workflows.
 - Shared grid supports compact cards, responsive multi-column layout, lazy/batched rendering, multi-selection, and double-click handling.

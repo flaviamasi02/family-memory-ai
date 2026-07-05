@@ -1,6 +1,95 @@
 # Changelog
 
 ## Unreleased
+### Sprint CLEAN-005-FIX - Visual Analysis Safety & Responsiveness
+- Added feature flag `ENABLE_VISUAL_CONTENT_ANALYSIS = False` (default disabled) for emergency safe rollout.
+- Synchronous import/classification paths now skip visual-content analysis by default to protect UI responsiveness.
+- Media classification now falls back safely to filename/metadata/user-learning rules when visual analysis is disabled, unavailable, or fails.
+- Added fail-safe handling so visual-analysis exceptions never crash classification.
+- Added explicit skip/unavailable reason notes in fallback classification paths.
+- Added regression tests to ensure classification works quickly without opening image content when visual analysis is disabled.
+- Future work: re-enable visual analysis only via background worker (non-UI thread, batched processing).
+
+### Sprint CLEAN-005 - Visual Content-Based Media Classification
+- Added local `VisualContentAnalyzer` for lightweight, explainable image-content heuristics (no cloud AI dependency).
+- Integrated visual signals into media classification pipeline to improve metadata-less image categorization.
+- Reduced automatic fallback to `Unknown` when strong visual evidence is present.
+- Added visual evidence summaries to review details surfaces for explainability.
+- Kept all classifications user-correctable and non-destructive.
+
+### Sprint MEM-009 - Editable System Category Properties
+- System categories are now editable for user-facing and behavior properties (`display_name`, `description`, `ai_description`, `color`, `icon`, cleanup/album flags).
+- System category IDs remain protected and stable; categories cannot be deleted.
+- Added persistence for system-category overrides in `.familymemory/categories.json`.
+- Startup now loads default system categories, applies system overrides, then loads user categories.
+- Added reset-to-default action for individual system categories.
+- Dropdowns and filters now reflect customized system display names while internal logic keeps using stable IDs.
+
+### UI-REF-001 - Simplify Cleanup Review Category Assignment
+- Cleanup Review now uses a single category assignment workflow.
+- Removed redundant quick category buttons (Family Photo, Document, Advertisement, Meme, Screenshot, Duplicate, Unknown).
+- Category dropdown + `Apply Category to Selected` is now the only category assignment control.
+- Kept `Keep` and `Move to Cleanup Folder` actions unchanged.
+- Bulk category assignment remains supported through multi-selection and dropdown apply.
+
+### PRODUCT-DOC-006 - AI Explainability & User Trust Principles
+- Added `Explainable Intelligence` section to product vision as a permanent product principle.
+- Added permanent product decisions `FM-012` (Explainability over Black Box) and `FM-013` (AI Assists. Users Decide.).
+- Added `Explainable Intelligence` chapter to Family Memory Score documenting decision evidence, confidence, and source requirements.
+- Updated Master Development Plan with permanent principles: Explainable Intelligence, Human-in-the-loop, Continuous Learning, User Trust, Transparent Decisions.
+- Updated LEARN roadmap milestones with explainable-category-learning and explainable-hybrid-classification goals.
+- Updated project state with explicit product-principles summary (AI encouraged, explainability mandatory, user override, learning from corrections).
+- Updated handover guidance so AI feature proposals prioritize explainability and trust over raw accuracy.
+- Added glossary terms: Explainable AI, Decision Source, Human-in-the-loop, Transparent Decision, Hybrid Classification.
+- Documentation update only; no application code changes.
+
+### Sprint LEARN-001 - Category Learning from User Corrections
+- Added deterministic `CategoryLearningEngine` with explicit learning-event, rule, and profile models.
+- Added explainable signal extraction from filename, dimensions/aspect, metadata presence, and file attributes.
+- Added conservative adaptive-rule creation from repeated corrections with minimum-support thresholds (5 for system categories, 3 for user categories).
+- Integrated learned-rule application into import-time media classification (base deterministic classifier first, then explainable learned-rule adjustment).
+- Classification reasons now explicitly mention matched learned user rules.
+- Added profile persistence in `.familymemory/category_learning_profile.json` (event summaries, learned rules, category counts, updated timestamp).
+- Integrated event recording into Memory Review and Cleanup Review manual category corrections (single and bulk).
+- Added `Learning Summary` dialog in Memory Review to expose learned totals, counts, and rules.
+- Added tests in `tests/test_category_learning_engine.py` for event creation, signal extraction, support thresholds, rule matching, persistence/load, bulk events, and custom-category support thresholds.
+- No cloud AI and no black-box ML introduced.
+
+### Sprint MEM-008 - Custom User Categories
+- Added a flexible category registry with system and user categories, including metadata fields (`id`, `display_name`, `description`, `ai_description`, `color`, `icon`, `is_system`, cleanup/album flags, timestamps).
+- Preserved system categories and protected them from deletion.
+- Added user category persistence in `.familymemory/categories.json`.
+- Added `Manage Categories` in both Memory Review and Cleanup Review to add, edit, rename, and delete user categories.
+- Added category editor fields for optional AI Description, visual metadata, and behavior flags.
+- Added custom category support in Memory Review dropdowns, filters, and bulk category assignment.
+- Added custom category support in Cleanup Review dropdowns, filters, and bulk category assignment.
+- Kept automatic classifier behavior unchanged (system categories are still assigned automatically; user categories remain manual).
+- Kept effective category logic (`user_corrected_media_category` overrides automatic category) while supporting both system and custom IDs.
+- Album relevance and cleanup behavior are now category-driven using category flags instead of hardcoded category checks.
+- Added tests for create/rename/delete constraints, duplicate-name rejection, dropdown/filter inclusion, custom assignment, bulk assignment, and `categories.json` persistence.
+- No AI training added, no scoring-rule changes, and no permanent deletion behavior added.
+
+### Sprint MEDIA-FIX-001 - Respect EXIF Orientation in Previews and Thumbnails
+- Added centralized orientation-aware display loading utility in `src/core/image_display_loader.py`.
+- Added `load_display_pixmap(file_path)` and `load_display_thumbnail(file_path, target_size)` with safe error handling.
+- Applied centralized loader to thumbnail generation, Memory Review fallback image loading, and image preview dialog source loading.
+- Ensured EXIF orientation auto-transform is applied for common orientation tags (including 1, 3, 6, 8) when supported by image metadata.
+- Added thumbnail-oriented caching keyed by file path, target size, and file identity signature (mtime and size).
+- Added thumbnail cache versioning to safely regenerate display thumbnails when orientation handling logic changes.
+- Added tests for orientation 6, orientation 3, missing EXIF safety, corrupt-image safety, and thumbnail/full-loader orientation consistency.
+- Original image files are never modified.
+
+### Sprint LEARN-001 - Persistent User Category Metadata
+- Added `UserMetadataService` to persist manual category corrections and user decisions in sidecar JSON files next to media.
+- Sidecar naming now follows `photo.familymemory.json` and stores file identity plus user/automatic/effective classification fields.
+- Import now ignores sidecar files as media and loads matching sidecar metadata for each photo.
+- Import applies persisted `user_corrected_media_category` and `user_decision`, with `effective_media_category` prioritizing user correction.
+- Added cautious mismatch handling: when file identity changes, user correction/decision are preserved if filename matches and a warning flag is attached.
+- Memory Review and Cleanup Review now save sidecar metadata immediately when user category or decision changes.
+- Added visual confirmation label for manual category persistence: `User category saved`.
+- Added full test coverage in `tests/test_user_metadata_service.py` for sidecar creation, save/load behavior, effective category override, missing sidecar safety, and cautious mismatch handling.
+- No image binary metadata modification yet (sidecar-first storage only).
+
 ### Sprint CLEAN-004 - Shared Thumbnail Grid for Cleanup Review
 - Migrated Cleanup Review to a shared compact thumbnail-grid component with responsive multi-column layout.
 - Shared component preserves lazy rendering, batched loading, multi-selection, and double-click behavior.

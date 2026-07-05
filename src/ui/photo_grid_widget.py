@@ -1,4 +1,7 @@
+from pathlib import Path
+
 from PySide6.QtCore import QTimer, Qt, Signal
+from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QGridLayout, QScrollArea, QSizePolicy, QWidget
 
 from ui.photo_card_widget import PhotoCardWidget
@@ -51,8 +54,22 @@ class PhotoGridWidget(QWidget):
 
     def update_thumbnail(self, photo, pixmap):
         key = self._photo_key(photo)
-        if key in self._cards_by_key:
-            self._cards_by_key[key].set_thumbnail(pixmap)
+        print(f"photo grid update thumbnail: {key}")
+        card = self._cards_by_key.get(key)
+        print(f"photo grid card found: {card is not None}")
+
+        if isinstance(pixmap, QImage):
+            pixmap = QPixmap.fromImage(pixmap)
+
+        if not isinstance(pixmap, QPixmap) or pixmap.isNull():
+            print(f"photo grid thumbnail null: {key}")
+            return
+
+        if card is not None:
+            card.set_thumbnail(pixmap)
+            card.update()
+            card.repaint()
+            print(f"card pixmap set: {key}")
             return
 
         self._pending_thumbnail_updates[key] = pixmap
@@ -83,7 +100,18 @@ class PhotoGridWidget(QWidget):
         self._cards_by_key = {}
 
     def _photo_key(self, photo):
-        return str(getattr(photo, "path", ""))
+        raw_path = getattr(photo, "path", photo)
+        return self._normalize_path_key(raw_path)
+
+    def _normalize_path_key(self, value) -> str:
+        if value is None:
+            return ""
+
+        path = Path(str(value))
+        try:
+            return str(path.resolve())
+        except Exception:
+            return str(path)
 
     def _schedule_batch_add(self):
         QTimer.singleShot(0, self._add_next_batch)

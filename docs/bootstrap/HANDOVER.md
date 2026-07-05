@@ -155,6 +155,11 @@ Before making architecture decisions, read:
 
 These documents define the product philosophy and take precedence over implementation details whenever design decisions are required.
 
+When proposing AI features:
+
+- Never optimize only for accuracy.
+- Always preserve explainability and user trust.
+
 ---
 
 ## Single Source of Truth
