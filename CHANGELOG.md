@@ -1,6 +1,22 @@
 # Changelog
 
 ## Unreleased
+### Sprint DEV-002 - Photo Intelligence Foundation
+- Added PhotoIntelligence dataclass with safe grouped placeholders for basic, quality, people, duplicate, album, and AI-related fields.
+- Updated Photo model to include optional intelligence and safe initialization in Photo.from_path().
+- Added intelligence synchronization from metadata with derived year/month/date_taken when available.
+- Updated metadata extraction to include year/month derivation from date_taken.
+- Added tests for PhotoIntelligence defaults, Photo integration, and metadata-derived year/month.
+- Maintained existing annual album foundation behavior (album builder tests pass).
+- Foundation only: no UI redesign, no AI implementation, no face recognition, no duplicate detection engine, and no export pipeline.
+
+### Sprint DEV-001 - Annual Album Foundation
+- Added AnnualAlbum as the first Version 1 annual album domain model.
+- Added AlbumBuilder for metadata-year filtering and annual album creation.
+- Added initial tests for album foundation behavior.
+- Foundation only: candidate initialization without selection or ranking engines.
+- No UI changes in this sprint.
+
 ### Sprint D001 - Documentation Review
 - Reviewed required repository documentation for consistency and single-source-of-truth alignment.
 - Fixed cross-document responsibility boundaries (state vs roadmap vs changelog).

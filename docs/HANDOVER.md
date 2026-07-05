@@ -1,86 +1,68 @@
 # Family Memory AI - Handover
 
-## Purpose
+# START HERE
 
-This document is the primary entry point for any AI assistant.
+Every new AI assistant must begin with this document.
 
-Read this document first.
-
----
-
-## Project Vision
-
-Family Memory AI is an AI-first desktop application that helps families organize, understand and preserve their memories.
-
-The Product Owner focuses on vision, priorities, requirements and testing.
-
-AI assistants perform as much implementation as possible.
+This is the single entry point for onboarding and orientation before any planning or implementation work.
 
 ---
 
-## Current Status
+## Reading Order
 
-Refer to:
+Read the documentation in this exact order:
 
-- PROJECT_STATE.md
-
----
-
-## Documentation Order
-
-Read the following documents in this order:
-
-1. HANDOVER.md
-2. development/PROJECT_CONTEXT.md
+1. docs/HANDOVER.md
+2. PROJECT_CONTEXT.md
 3. PROJECT_STATE.md
-4. DECISIONS.md
-5. IDEAS.md
+4. docs/AI_PROJECT_PLAYBOOK.md
+5. docs/DECISIONS.md
 6. ROADMAP.md
-7. AI_PROJECT_PLAYBOOK.md
-8. ARCHITECTURE.md
-9. AI_DEVELOPER_GUIDE.md
-10. CODING_STANDARDS.md
-11. UI_GUIDELINES.md
+
+After reading these documents, the AI should have enough context to continue development safely.
 
 ---
 
-## Development Principles
+## Product North Star
 
-- Documentation First Development.
-- Single Source of Truth.
-- One Sprint = one objective.
-- Keep documentation synchronized.
-- Wait for Product Owner approval before changing project direction.
+Version 1 of Family Memory AI has one primary objective:
 
----
+"Automatically create the best possible annual family photo album."
 
-## Current Working Method
-
-The project follows an AI-first development methodology.
-
-Mobile is used for:
-
-- documentation
-- planning
-- product decisions
-
-PC is used for:
-
-- implementation
-- testing
-- debugging
+Future capabilities (Vacation Albums, Gift Albums, Story Timeline, and similar expansions) are intentionally postponed while keeping the architecture extensible.
 
 ---
 
-## Next Step
+## Current Development
 
-Read PROJECT_STATE.md and continue with the next planned Sprint.
+DEV-001 (Annual Album Foundation) has been completed.
+
+DEV-002 (Photo Intelligence Foundation) has been completed.
+
+Next planned sprint: DEV-003 - Candidate Selection Engine.
+
+For detailed operational status, always refer to PROJECT_STATE.md.
+
+---
+
+## First Actions for a New AI
+
+- Read the required documents in order.
+- Verify PROJECT_STATE.md before proposing any work.
+- Continue with the next planned Sprint.
+- Respect all approved decisions.
+- Never change project direction without Product Owner approval.
 
 ---
 
 ## Single Source of Truth
 
-- PROJECT_STATE.md: Current operational state
-- ROADMAP.md: Planned milestones
-- CHANGELOG.md: Historical sprint changes
-- development/PROJECT_CONTEXT.md: Long-term collaboration and development context
+Each information type has one official location. Reference these documents instead of duplicating their content:
+
+- PROJECT_STATE.md: current operational state
+- ROADMAP.md: planned milestones and priorities
+- CHANGELOG.md: implementation history by sprint
+- docs/DECISIONS.md: approved decisions
+- docs/AI_PROJECT_PLAYBOOK.md: working method and sprint discipline
+- docs/development/PROJECT_CONTEXT.md: long-term collaboration and development context
+

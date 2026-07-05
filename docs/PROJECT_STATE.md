@@ -6,7 +6,7 @@
 
 ## Current Sprint
 
-- Sprint 14
+- Sprint DEV-003 (Candidate Selection Engine) - Planned
 
 ## Project Status
 
@@ -26,7 +26,7 @@
 
 Family Memory AI is currently in an early-stage desktop prototype phase. The application launches and supports a basic workflow around importing photos, scanning folders, generating thumbnails, and displaying a photo browser experience.
 
-The immediate goals are to strengthen grid scalability, improve selection/detail synchronization reliability, and keep the architecture ready for future AI features.
+The immediate goals are to use the completed Photo Intelligence foundation to build deterministic candidate selection behavior while keeping the app stable and without adding AI or export features yet.
 
 ## Sprint 9 Update
 
@@ -49,6 +49,35 @@ Sprint 12 added a simple metadata details panel to the main window and fixed the
 ## Sprint 14 Update
 
 Sprint 14 polished the custom card UX and status presentation. Photo cards remain focused on thumbnail and filename, and details-panel status values were normalized to user-friendly labels. Status refresh behavior between model updates and details rendering was improved for clearer runtime feedback.
+
+## Sprint DEV-001 Update
+
+DEV-001 introduced the first annual album domain foundation for the Version 1 objective. A new AnnualAlbum model was added with safe defaults for year-based album state (photos, candidate_photos, selected_photos, rejected_photos, status). A first AlbumBuilder was added to group photos by metadata year and create an annual album for a selected year, initially placing all matching photos into candidate_photos. This sprint intentionally does not add AI scoring/selection, PDF export, CEWE/Crew export, or significant UI changes.
+
+Current limitations after DEV-001:
+
+- candidate_photos are initialized but not yet ranked or curated
+- no candidate selection engine yet
+- no album scoring engine yet
+- no album layout or export pipeline yet
+
+## Sprint DEV-002 Update
+
+DEV-002 introduced the Photo Intelligence foundation used by future annual album selection/scoring engines. A new PhotoIntelligence dataclass was added with safe grouped placeholders for metadata context, quality placeholders, people placeholders, duplicate placeholders, album placeholders, and AI placeholders. The Photo model now includes optional intelligence with safe initialization in Photo.from_path(), plus synchronization from metadata when available. Year/month/date_taken intelligence values are now derived when metadata provides date information. This sprint intentionally does not add AI models, face recognition, duplicate detection engine behavior, export, or significant UI changes.
+
+Current limitations after DEV-002:
+
+- intelligence fields are placeholders without production scoring logic
+- no candidate selection engine yet
+- no album scoring engine yet
+- no album review UI flow yet
+- no layout/export pipeline yet
+
+Development sequence status:
+
+- DEV-001 Annual Album Foundation: Completed
+- DEV-002 Photo Intelligence Foundation: Completed
+- DEV-003 Candidate Selection Engine: Planned
 
 ---
 
@@ -76,6 +105,9 @@ The current implementation is a lightweight Qt desktop application with a modula
 - Thumbnail cache
 - Photo scanning flow
 - Metadata extraction flow
+- Annual album domain model
+- Annual album builder
+- Photo intelligence model
 
 ---
 
@@ -99,6 +131,8 @@ The current implementation is a lightweight Qt desktop application with a modula
 | Sprint 12 | Completed | Custom Photo Grid and Details Panel |
 | Sprint 13 | Completed | Batch Photo Grid Loading |
 | Sprint 14 | Completed | UI polish and status synchronization |
+| Sprint DEV-001 | Completed | Annual album domain foundation |
+| Sprint DEV-002 | Completed | Photo intelligence foundation |
 
 ---
 
@@ -118,6 +152,12 @@ The current implementation is a lightweight Qt desktop application with a modula
 - [x] Custom photo card grid foundation
 - [x] Progressive batch creation of photo cards
 - [x] Details panel updates from card selection
+- [x] Annual album domain model (year-based)
+- [x] Annual album builder with metadata-year filtering
+- [x] Candidate album initialization for selected year
+- [x] Photo intelligence dataclass foundation
+- [x] Photo-intelligence linkage on Photo model
+- [x] Intelligence year/month/date population when metadata exists
 
 ---
 
@@ -128,8 +168,10 @@ The current implementation is a lightweight Qt desktop application with a modula
 - Large folders still load progressively rather than instantly
 - No database yet
 - No AI scoring yet
+- No deterministic candidate selection engine yet
 - No face recognition yet
 - No duplicate detection yet
+- No print-ready export pipeline yet
 - No HEIC support yet
 - No cloud integration yet
 
@@ -160,32 +202,32 @@ The current implementation is a lightweight Qt desktop application with a modula
 
 ## Title
 
-Photo Grid Performance and Virtualization Foundation
+Candidate Selection Engine
 
 ## Objective
 
-Improve the custom photo grid for large libraries by introducing a more scalable rendering strategy and reducing the cost of creating many card widgets.
+Build the first deterministic candidate selection engine for annual albums using the Photo Intelligence foundation (without AI ranking).
 
 ## Expected Result
 
-A smoother photo browser experience for large folders with better memory behavior and more explicit performance boundaries.
+A deterministic flow that moves annual album photos from candidate_photos toward selected_photos/rejected_photos based on explicit non-AI rules.
 
 ## Files likely to change
 
-- src/ui/
-- src/workers/
-- src/cache/
+- src/album/
+- src/models/
+- tests/
 
 ## Architecture impact
 
-High
+Medium
 
 ## Acceptance criteria
 
 - The application remains functional.
-- The custom card grid remains responsive for large folders.
-- Thumbnail loading continues to work with the existing cache.
-- The architecture remains easy to extend for metadata and AI features.
+- Deterministic non-AI rules can evaluate album candidates.
+- Candidate photos can transition to selected/rejected states with reasons.
+- Existing app import, thumbnail, details, and cache behavior remain functional.
 
 ---
 
@@ -221,7 +263,7 @@ See ROADMAP.md for the authoritative milestone plan.
 | Classes | TBD |
 | Modules | TBD |
 | Implemented features | TBD |
-| Completed Sprints | 14 |
+| Completed Sprints | 16 |
 | Architecture maturity | Emerging |
 
 ---

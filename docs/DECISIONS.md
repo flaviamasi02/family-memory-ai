@@ -147,3 +147,58 @@ The architecture should remain extensible.
 - PROJECT_STATE.md
 - ROADMAP.md
 - HANDOVER.md
+
+### DEC-0025
+Print Ready Export
+
+**Value:** Product  
+**Impact:** Medium
+
+Decision:
+
+The final objective is to export a print-ready album for external printing providers (initial target: CEWE/Crew), while keeping the export engine provider-independent.
+
+**Impacted documents:**
+- ROADMAP.md
+- PROJECT_STATE.md
+- HANDOVER.md
+- ARCHITECTURE.md
+
+**Impacted Sprints:**
+DEV-006 and DEV-007.
+
+### DEC-0026
+DOCSYNC Command
+
+**Value:** Method  
+**Impact:** Low
+
+Decision:
+
+Documentation synchronization is performed through DOCSYNC PC / DOCSYNC MOBILE commands.
+
+**Impacted documents:**
+- HANDOVER.md
+- AI_PROJECT_PLAYBOOK.md
+- SYNC_QUEUE.md
+
+**Impacted Sprints:**
+Documentation sprints and end-of-sprint sync activity.
+
+### DEC-0027
+Photo Intelligence Foundation
+
+**Value:** Product  
+**Impact:** Medium
+
+Decision:
+
+Before implementing selection rules or AI ranking, the project will first build a Photo Intelligence model.
+
+**Impacted documents:**
+- ROADMAP.md
+- PROJECT_STATE.md
+- HANDOVER.md
+
+**Impacted Sprints:**
+DEV-002 and later.

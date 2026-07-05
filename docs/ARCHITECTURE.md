@@ -248,6 +248,49 @@ It is responsible for:
 - creating Photo objects
 - passing discovered files to the rest of the system
 
+## AnnualAlbum
+
+AnnualAlbum is the Version 1 album domain container for one target year.
+
+It is responsible for:
+
+- storing year-scoped album collections
+- tracking photos, candidate_photos, selected_photos, and rejected_photos
+- exposing a simple status field for album workflow state
+
+It does not perform selection/scoring logic by itself.
+
+## PhotoIntelligence
+
+PhotoIntelligence is a structured placeholder model attached to each Photo.
+
+It is responsible for:
+
+- storing normalized intelligence fields (basic metadata context, quality placeholders, people placeholders, duplicate placeholders, album placeholders, and AI placeholders)
+- providing a stable schema for future candidate selection and scoring engines
+- allowing safe initialization when metadata is missing
+
+Current implementation includes metadata-driven year/month/date initialization when available.
+
+## AlbumBuilder
+
+AlbumBuilder is the first annual album orchestration helper.
+
+It is responsible for:
+
+- grouping photos by year
+- creating an AnnualAlbum for a selected year
+- initializing candidate_photos from matching-year photos
+
+Current behavior is deterministic and foundational; it does not yet implement full candidate selection or ranking.
+
+## Relationship Summary
+
+- Photo objects are the core item-level entities.
+- PhotoIntelligence is attached to Photo as structured intelligence state.
+- AlbumBuilder reads Photo and PhotoIntelligence date context to group and assemble albums.
+- AnnualAlbum stores the resulting year-scoped album state used by later selection/scoring workflows.
+
 ## Future Database
 
 A future database will provide structured persistence for metadata and relationships.

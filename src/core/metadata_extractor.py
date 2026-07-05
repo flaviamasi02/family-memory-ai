@@ -28,6 +28,8 @@ def extract_basic_metadata(path: Optional[Path | str] = None) -> Dict[str, Any]:
         "width": None,
         "height": None,
         "date_taken": None,
+        "year": None,
+        "month": None,
         "camera_make": None,
         "camera_model": None,
         "orientation": None,
@@ -47,6 +49,9 @@ def extract_basic_metadata(path: Optional[Path | str] = None) -> Dict[str, Any]:
                 date_taken = exif.get(EXIF_TAGS["date_taken"])
                 if date_taken:
                     metadata["date_taken"] = str(date_taken)
+                    year, month = _derive_year_month(metadata["date_taken"])
+                    metadata["year"] = year
+                    metadata["month"] = month
 
                 make = exif.get(EXIF_TAGS["camera_make"])
                 if make:
@@ -67,3 +72,19 @@ def extract_basic_metadata(path: Optional[Path | str] = None) -> Dict[str, Any]:
         return metadata
 
     return metadata
+
+
+def _derive_year_month(date_value: Optional[str]) -> tuple[Optional[int], Optional[int]]:
+    if not date_value:
+        return None, None
+
+    text = str(date_value).strip()
+    if len(text) < 4 or not text[:4].isdigit():
+        return None, None
+
+    year = int(text[:4])
+    month = None
+    if len(text) >= 7 and text[4:5] in {":", "-", "/"} and text[5:7].isdigit():
+        month = int(text[5:7])
+
+    return year, month
