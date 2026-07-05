@@ -6,7 +6,7 @@
 
 ## Current Sprint
 
-- Sprint DEV-003 (Candidate Selection Engine) - Planned
+- Sprint DEV-003 (Candidate Selection Engine) - Completed
 
 ## Project Status
 
@@ -26,7 +26,7 @@
 
 Family Memory AI is currently in an early-stage desktop prototype phase. The application launches and supports a basic workflow around importing photos, scanning folders, generating thumbnails, and displaying a photo browser experience.
 
-The immediate goals are to use the completed Photo Intelligence foundation to build deterministic candidate selection behavior while keeping the app stable and without adding AI or export features yet.
+The immediate goals are to build album scoring and prioritization on top of the completed deterministic candidate selection and Photo Intelligence foundations, while keeping the app stable and without adding export features yet.
 
 ## Sprint 9 Update
 
@@ -77,7 +77,39 @@ Development sequence status:
 
 - DEV-001 Annual Album Foundation: Completed
 - DEV-002 Photo Intelligence Foundation: Completed
-- DEV-003 Candidate Selection Engine: Planned
+- DEV-003 Candidate Selection Engine: Completed
+
+## Sprint DEV-003 Update
+
+DEV-003 introduced the first deterministic CandidateSelectionEngine for annual albums. The engine evaluates AnnualAlbum.candidate_photos without deleting the original candidate pool and fills selected_photos/rejected_photos deterministically. Rejection reasons are recorded without AI using explicit rule outcomes (invalid_photo_object, missing_file_path, missing_year, year_mismatch). A lightweight CandidateSelectionResult now summarizes selected/rejected counts and rejection reason totals. Selection uses PhotoIntelligence year when available and falls back safely to metadata/date parsing when intelligence is missing. This sprint intentionally does not add AI ranking, face recognition, duplicate detection engine behavior, database persistence, export, or significant UI changes.
+
+Additional UI improvement after DEV-003 completion:
+
+- the photo browser now shows a clear visible selected-card state (highlight/border badge) so the currently selected photo in the grid stays visually synchronized with the details panel selection.
+- Added visible selected-photo state in the photo browser so the active photo is clearly highlighted in the grid.
+
+Current limitations after DEV-003:
+
+- deterministic rule set is intentionally minimal and non-AI
+- no album scoring engine yet
+- no album review UI flow yet
+- no layout/export pipeline yet
+
+## Documentation Architecture Refactoring Update
+
+Project documentation was fully reorganized into a modular folder structure to improve scalability and AI initialization consistency.
+
+Migration completed:
+
+- bootstrap documents moved to `docs/bootstrap/`
+- project operational/context docs moved to `docs/project/`
+- workflow/decision/doc-governance docs moved to `docs/development/`
+- architecture references moved to `docs/architecture/`
+- testing docs organized under `docs/testing/`
+- release docs organized under `docs/releases/`
+- legacy root-level context/state snapshots preserved in `docs/archive/`
+
+Internal references were updated to the new structure.
 
 ---
 
@@ -108,6 +140,7 @@ The current implementation is a lightweight Qt desktop application with a modula
 - Annual album domain model
 - Annual album builder
 - Photo intelligence model
+- Candidate selection engine
 
 ---
 
@@ -133,6 +166,7 @@ The current implementation is a lightweight Qt desktop application with a modula
 | Sprint 14 | Completed | UI polish and status synchronization |
 | Sprint DEV-001 | Completed | Annual album domain foundation |
 | Sprint DEV-002 | Completed | Photo intelligence foundation |
+| Sprint DEV-003 | Completed | Deterministic candidate selection engine |
 
 ---
 
@@ -158,6 +192,11 @@ The current implementation is a lightweight Qt desktop application with a modula
 - [x] Photo intelligence dataclass foundation
 - [x] Photo-intelligence linkage on Photo model
 - [x] Intelligence year/month/date population when metadata exists
+- [x] Deterministic candidate selection engine
+- [x] Candidate rejection reason tracking (non-AI)
+- [x] Candidate selection result summary counts
+- [x] Visible selected-photo highlight in the photo grid
+- [x] Documentation architecture refactored into modular folders
 
 ---
 
@@ -168,9 +207,9 @@ The current implementation is a lightweight Qt desktop application with a modula
 - Large folders still load progressively rather than instantly
 - No database yet
 - No AI scoring yet
-- No deterministic candidate selection engine yet
 - No face recognition yet
 - No duplicate detection yet
+- No album scoring engine yet
 - No print-ready export pipeline yet
 - No HEIC support yet
 - No cloud integration yet
@@ -202,38 +241,38 @@ The current implementation is a lightweight Qt desktop application with a modula
 
 ## Title
 
-Candidate Selection Engine
+Album Scoring Engine
 
 ## Objective
 
-Build the first deterministic candidate selection engine for annual albums using the Photo Intelligence foundation (without AI ranking).
+Build the first deterministic album scoring layer that prioritizes selected annual album candidates using non-AI, explainable scoring rules.
 
 ## Expected Result
 
-A deterministic flow that moves annual album photos from candidate_photos toward selected_photos/rejected_photos based on explicit non-AI rules.
+A stable scoring baseline for selected candidates with explicit score components and explainable outputs, still without AI ranking.
 
 ## Files likely to change
 
-- src/album/
 - src/models/
+- src/album/
 - tests/
 
 ## Architecture impact
 
-Medium
+High
 
 ## Acceptance criteria
 
 - The application remains functional.
-- Deterministic non-AI rules can evaluate album candidates.
-- Candidate photos can transition to selected/rejected states with reasons.
+- Deterministic non-AI scoring can prioritize selected album candidates.
+- Scoring outputs are explainable and test-covered.
 - Existing app import, thumbnail, details, and cache behavior remain functional.
 
 ---
 
 # Upcoming Roadmap
 
-See ROADMAP.md for the authoritative milestone plan.
+See docs/project/ROADMAP.md for the authoritative milestone plan.
 
 ---
 
@@ -263,7 +302,7 @@ See ROADMAP.md for the authoritative milestone plan.
 | Classes | TBD |
 | Modules | TBD |
 | Implemented features | TBD |
-| Completed Sprints | 16 |
+| Completed Sprints | 17 |
 | Architecture maturity | Emerging |
 
 ---
@@ -274,17 +313,17 @@ This document should be the first document read by any AI assistant before makin
 
 It provides the current project status and operational context. The other project documents describe long-term direction and standards:
 
-- [AI_DEVELOPER_GUIDE.md](AI_DEVELOPER_GUIDE.md)
-- [ARCHITECTURE.md](ARCHITECTURE.md)
+- [AI_DEVELOPER_GUIDE.md](../development/AI_DEVELOPER_GUIDE.md)
+- [ARCHITECTURE.md](../architecture/ARCHITECTURE.md)
 - [PRODUCT_VISION.md](PRODUCT_VISION.md)
-- [CODING_STANDARDS.md](CODING_STANDARDS.md)
-- [ARCHITECTURAL_DECISIONS.md](ARCHITECTURAL_DECISIONS.md)
+- [CODING_STANDARDS.md](../development/CODING_STANDARDS.md)
+- [ARCHITECTURAL_DECISIONS.md](../architecture/ARCHITECTURAL_DECISIONS.md)
 
 PROJECT_STATE.md is the single source of truth for current version, active sprint, completed sprint count, and operational implementation status.
 
-ROADMAP.md is the single source of truth for planned milestones.
+docs/project/ROADMAP.md is the single source of truth for planned milestones.
 
-CHANGELOG.md is the single source of truth for historical sprint changes.
+docs/releases/CHANGELOG.md is the single source of truth for historical sprint changes.
 
 ---
 

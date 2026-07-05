@@ -37,13 +37,13 @@ Status: Approved
 
 Each PC development session should start with a documentation synchronization Sprint if pending decisions exist.
 
-### IDEA 3 - DECISIONS.md
+### IDEA 3 - docs/development/DECISIONS.md
 
 Status: Approved
 
 Create a document to record official project decisions chronologically.
 
-### IDEA 4 - SYNC_QUEUE.md
+### IDEA 4 - docs/development/SYNC_QUEUE.md
 
 Status: Approved
 
@@ -67,13 +67,13 @@ Status: Approved
 
 Use the GitHub mobile app and Copilot to create and update project documentation directly from mobile.
 
-### IDEA 8 - PROMPT_TEMPLATE.md
+### IDEA 8 - docs/development/PROMPT_TEMPLATE.md
 
 Status: Approved
 
 Create an official prompt template so every Copilot prompt follows the same structure.
 
-### IDEA 9 - AI_PROJECT_PLAYBOOK.md
+### IDEA 9 - docs/development/AI_PROJECT_PLAYBOOK.md
 
 Status: Approved
 

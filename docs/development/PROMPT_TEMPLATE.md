@@ -48,8 +48,8 @@ Documentation Update (Mandatory)
 
 Update:
 
-- PROJECT_STATE.md
-- CHANGELOG.md
+- docs/project/PROJECT_STATE.md
+- docs/releases/CHANGELOG.md
 - Any affected documentation
 
 Commit message

@@ -1,6 +1,14 @@
 # Changelog
 
 ## Unreleased
+### Sprint DEV-003 - Candidate Selection Engine
+- Added CandidateSelectionEngine to evaluate AnnualAlbum candidate pools deterministically.
+- Added CandidateSelectionResult with selected/rejected counters and rejection reason summaries.
+- Candidate evaluation now populates selected_photos and rejected_photos while preserving candidate_photos as the original pool.
+- Added explicit non-AI rejection reasons: invalid_photo_object, missing_file_path, missing_year, and year_mismatch.
+- Added tests for same-year selection, year mismatch rejection, missing intelligence safety, and result count accuracy.
+- No AI ranking, no face recognition, no duplicate detection engine, no database persistence, and no export pipeline in this sprint.
+
 ### Sprint DEV-002 - Photo Intelligence Foundation
 - Added PhotoIntelligence dataclass with safe grouped placeholders for basic, quality, people, duplicate, album, and AI-related fields.
 - Updated Photo model to include optional intelligence and safe initialization in Photo.from_path().

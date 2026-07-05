@@ -1,4 +1,4 @@
-# PROJECT_STATE.md
+# docs/project/PROJECT_STATE.md
 
 ## Current Priorities
 

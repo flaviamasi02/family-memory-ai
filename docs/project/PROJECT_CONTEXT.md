@@ -7,9 +7,9 @@ Its purpose is to ensure that every AI understands how the project is developed 
 Single source role:
 
 - This file defines long-term collaboration and development context.
-- docs/PROJECT_STATE.md defines current operational status.
-- ROADMAP.md defines planned milestones.
-- CHANGELOG.md defines historical implementation changes.
+- docs/project/PROJECT_STATE.md defines current operational status.
+- docs/project/ROADMAP.md defines planned milestones.
+- docs/releases/CHANGELOG.md defines historical implementation changes.
 
 ---
 

@@ -16,6 +16,7 @@ class PhotoGridWidget(QWidget):
         self._pending_photo_index = 0
         self._batch_size = 50
         self._pending_thumbnail_updates = {}
+        self._selected_photo_key = None
 
         self.scroll_area = QScrollArea(self)
         self.scroll_area.setWidgetResizable(True)
@@ -32,12 +33,19 @@ class PhotoGridWidget(QWidget):
         layout.addWidget(self.scroll_area)
 
     def set_photos(self, photos):
+        existing_pending = dict(self._pending_thumbnail_updates)
+
         self._clear_cards()
         self._cards = []
         self._cards_by_key = {}
         self._photos = list(photos or [])
         self._pending_photo_index = 0
-        self._pending_thumbnail_updates = {}
+        self._selected_photo_key = None
+
+        valid_keys = {self._photo_key(photo) for photo in self._photos}
+        self._pending_thumbnail_updates = {
+            key: pixmap for key, pixmap in existing_pending.items() if key in valid_keys
+        }
 
         self._schedule_batch_add()
 
@@ -56,7 +64,16 @@ class PhotoGridWidget(QWidget):
             card.refresh_from_photo()
 
     def _handle_card_click(self, photo):
+        self.set_selected_photo(photo)
         self.photo_selected.emit(photo)
+
+    def set_selected_photo(self, photo):
+        self._selected_photo_key = self._photo_key(photo) if photo is not None else None
+        self._refresh_selection_styles()
+
+    def _refresh_selection_styles(self):
+        for key, card in self._cards_by_key.items():
+            card.set_selected(key == self._selected_photo_key)
 
     def _clear_cards(self):
         for card in self._cards:
@@ -87,11 +104,13 @@ class PhotoGridWidget(QWidget):
             self._cards.append(card)
             self._cards_by_key[key] = card
 
+            card.set_selected(key == self._selected_photo_key)
+
+            card.refresh_from_photo()
+
             pending_pixmap = self._pending_thumbnail_updates.pop(key, None)
             if pending_pixmap is not None:
                 card.set_thumbnail(pending_pixmap)
-
-            card.refresh_from_photo()
 
         self._pending_photo_index = batch_end
 

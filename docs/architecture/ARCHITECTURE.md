@@ -284,11 +284,25 @@ It is responsible for:
 
 Current behavior is deterministic and foundational; it does not yet implement full candidate selection or ranking.
 
+## CandidateSelectionEngine
+
+CandidateSelectionEngine is the first deterministic selection step between yearly candidate pools and selected album sets.
+
+It is responsible for:
+
+- evaluating AnnualAlbum.candidate_photos using explicit non-AI rules
+- populating AnnualAlbum.selected_photos and AnnualAlbum.rejected_photos
+- preserving candidate_photos as the original candidate pool
+- recording clear rejection reasons for traceable decisions
+
+A lightweight CandidateSelectionResult summarizes counts and rejection reason totals for verification and testing.
+
 ## Relationship Summary
 
 - Photo objects are the core item-level entities.
 - PhotoIntelligence is attached to Photo as structured intelligence state.
 - AlbumBuilder reads Photo and PhotoIntelligence date context to group and assemble albums.
+- CandidateSelectionEngine evaluates AnnualAlbum candidate pools using PhotoIntelligence year when available and safe metadata fallback.
 - AnnualAlbum stores the resulting year-scoped album state used by later selection/scoring workflows.
 
 ## Future Database

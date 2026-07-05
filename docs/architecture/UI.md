@@ -209,8 +209,8 @@ Any AI modifying the UI must:
 
 Whenever a Sprint changes the user interface, update:
 
-- docs/UI_GUIDELINES.md
-- PROJECT_STATE.md
-- CHANGELOG.md
+- docs/architecture/UI.md
+- docs/project/PROJECT_STATE.md
+- docs/releases/CHANGELOG.md
 
 The documentation must always reflect the current implementation.

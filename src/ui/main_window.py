@@ -25,6 +25,7 @@ class MainWindow(QMainWindow):
 
         self.thumbnail_thread = None
         self.thumbnail_worker = None
+        self.selected_photo = None
 
         title = QLabel("Family Memory AI")
         title.setStyleSheet("font-size: 28px; font-weight: bold;")
@@ -100,11 +101,17 @@ class MainWindow(QMainWindow):
     def update_thumbnail(self, photo, pixmap):
         self.photo_model.update_thumbnail(photo, pixmap)
         self.photo_view.update_thumbnail(photo, pixmap)
-        self.details_panel.set_photo(photo)
+
+        if (
+            self.selected_photo is not None
+            and str(getattr(self.selected_photo, "path", "")) == str(getattr(photo, "path", ""))
+        ):
+            self.details_panel.set_photo(self.selected_photo)
 
     def _handle_photo_selection(self, photo):
         if photo is not None:
             print(f"MainWindow received selected photo: {photo.display_name()}")
         else:
             print("MainWindow received selected photo: None")
+        self.selected_photo = photo
         self.details_panel.set_photo(photo)

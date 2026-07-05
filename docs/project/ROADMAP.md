@@ -4,9 +4,9 @@
 
 This document tracks planned milestones only.
 
-Implementation history belongs in CHANGELOG.md.
+Implementation history belongs in docs/releases/CHANGELOG.md.
 
-Current runtime status belongs in docs/PROJECT_STATE.md.
+Current runtime status belongs in docs/project/PROJECT_STATE.md.
 
 ---
 
@@ -33,8 +33,8 @@ Technical development sequence:
 
 - DEV-001 Annual Album Foundation (Completed)
 - DEV-002 Photo Intelligence Foundation (Completed)
-- DEV-003 Candidate Selection Engine (Next)
-- DEV-004 Album Scoring Engine
+- DEV-003 Candidate Selection Engine (Completed)
+- DEV-004 Album Scoring Engine (Next)
 - DEV-005 Album Review UI
 - DEV-006 Album Layout Engine
 - DEV-007 Print Ready Export

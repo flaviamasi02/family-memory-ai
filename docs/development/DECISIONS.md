@@ -21,12 +21,12 @@ Documentation Sync Sprint
 Approved.
 
 ### DEC-0003
-Create DECISIONS.md
+Create docs/development/DECISIONS.md
 
 Approved.
 
 ### DEC-0004
-Create SYNC_QUEUE.md
+Create docs/development/SYNC_QUEUE.md
 
 Approved.
 
@@ -46,12 +46,12 @@ Mobile Documentation Repository
 Approved.
 
 ### DEC-0008
-PROMPT_TEMPLATE.md
+docs/development/PROMPT_TEMPLATE.md
 
 Approved.
 
 ### DEC-0009
-AI_PROJECT_PLAYBOOK.md
+docs/development/AI_PROJECT_PLAYBOOK.md
 
 Approved.
 
@@ -104,9 +104,9 @@ Story Timeline Architecture
 Version 1 is **NOT** focused on Story Timeline. Story Timeline is an approved future capability. The application architecture must remain extensible so future album types can be added without major redesign.
 
 **Impacted documents:**
-- PROJECT_CONTEXT.md
-- PROJECT_STATE.md
-- ROADMAP.md
+- docs/project/PROJECT_CONTEXT.md
+- docs/project/PROJECT_STATE.md
+- docs/project/ROADMAP.md
 - HANDOVER.md
 
 ### DEC-0023
@@ -143,9 +143,9 @@ are approved future directions but are **NOT** part of Version 1.
 The architecture should remain extensible.
 
 **Impacted documents:**
-- PROJECT_CONTEXT.md
-- PROJECT_STATE.md
-- ROADMAP.md
+- docs/project/PROJECT_CONTEXT.md
+- docs/project/PROJECT_STATE.md
+- docs/project/ROADMAP.md
 - HANDOVER.md
 
 ### DEC-0025
@@ -159,10 +159,10 @@ Decision:
 The final objective is to export a print-ready album for external printing providers (initial target: CEWE/Crew), while keeping the export engine provider-independent.
 
 **Impacted documents:**
-- ROADMAP.md
-- PROJECT_STATE.md
-- HANDOVER.md
-- ARCHITECTURE.md
+- docs/project/ROADMAP.md
+- docs/project/PROJECT_STATE.md
+- docs/bootstrap/HANDOVER.md
+- docs/architecture/ARCHITECTURE.md
 
 **Impacted Sprints:**
 DEV-006 and DEV-007.
@@ -178,9 +178,9 @@ Decision:
 Documentation synchronization is performed through DOCSYNC PC / DOCSYNC MOBILE commands.
 
 **Impacted documents:**
-- HANDOVER.md
-- AI_PROJECT_PLAYBOOK.md
-- SYNC_QUEUE.md
+- docs/bootstrap/HANDOVER.md
+- docs/development/AI_PROJECT_PLAYBOOK.md
+- docs/development/SYNC_QUEUE.md
 
 **Impacted Sprints:**
 Documentation sprints and end-of-sprint sync activity.
@@ -196,9 +196,52 @@ Decision:
 Before implementing selection rules or AI ranking, the project will first build a Photo Intelligence model.
 
 **Impacted documents:**
-- ROADMAP.md
-- PROJECT_STATE.md
-- HANDOVER.md
+- docs/project/ROADMAP.md
+- docs/project/PROJECT_STATE.md
+- docs/bootstrap/HANDOVER.md
 
 **Impacted Sprints:**
 DEV-002 and later.
+
+### DEC-0028
+Documentation Structure Refactoring
+
+**Value:** Both  
+**Impact:** High
+
+Decision:
+
+Documentation was reorganized into a modular folder architecture under `docs/` to support long-term scalability, predictable navigation, and AI-friendly initialization across conversations and assistant types.
+
+Expected benefits:
+
+- clearer ownership boundaries per documentation domain
+- lower duplication and easier synchronization
+- faster initialization for humans and AI assistants
+- safer future expansion without repeated structural migrations
+
+Folder responsibilities:
+
+- `docs/bootstrap/`: initialization and command references
+- `docs/project/`: project context/state/planning/terminology
+- `docs/development/`: methods, decisions, and doc governance
+- `docs/architecture/`: technical architecture references
+- `docs/testing/`: testing documentation artifacts
+- `docs/releases/`: release and migration communication
+- `docs/archive/`: preserved legacy snapshots
+
+Backward compatibility considerations:
+
+- all internal references must be migrated to new paths
+- legacy root-level context/state docs are preserved in `docs/archive/`
+- command and reading-order workflows must continue to resolve mandatory documents
+
+**Impacted documents:**
+- docs/bootstrap/HANDOVER.md
+- docs/bootstrap/AI_BOOTSTRAP.md
+- docs/bootstrap/COMMANDS.md
+- docs/development/DOCUMENTATION_ARCHITECTURE.md
+- docs/project/PROJECT_STATE.md
+
+**Impacted Sprints:**
+Post DEV-003 documentation refactoring activities.

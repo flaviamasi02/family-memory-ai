@@ -18,25 +18,25 @@ No pending synchronization tasks.
 
 ### SQ-000
 
-Create IDEAS.md
+Create docs/development/IDEAS.md
 
 Completed.
 
 ### SQ-001
 
-Create DECISIONS.md
+Create docs/development/DECISIONS.md
 
 Completed.
 
 ### SQ-002
 
-Create PROMPT_TEMPLATE.md
+Create docs/development/PROMPT_TEMPLATE.md
 
 Completed.
 
 ### SQ-003
 
-Create AI_PROJECT_PLAYBOOK.md
+Create docs/development/AI_PROJECT_PLAYBOOK.md
 
 Completed.
 
