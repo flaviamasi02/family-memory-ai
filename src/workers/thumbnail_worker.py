@@ -6,6 +6,9 @@ from PySide6.QtGui import QImageReader, QPixmap
 from cache.thumbnail_cache import get_thumbnail_cache_path
 
 
+THUMBNAIL_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+
+
 class ThumbnailWorker(QObject):
     thumbnail_ready = Signal(object, QPixmap)
     thumbnail_status_updated = Signal(object)
@@ -24,6 +27,9 @@ class ThumbnailWorker(QObject):
             batch = self.photos[start : start + self.batch_size]
 
             for photo in batch:
+                if Path(photo.path).suffix.lower() not in THUMBNAIL_IMAGE_EXTENSIONS:
+                    continue
+
                 photo.set_status("thumbnail_loading")
                 self.thumbnail_status_updated.emit(photo)
                 cache_path = get_thumbnail_cache_path(str(photo.path))

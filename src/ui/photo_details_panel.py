@@ -40,6 +40,14 @@ class PhotoDetailsPanel(QWidget):
             f"Status: {self._format_status(photo.status)}",
         ]
 
+        intelligence = getattr(photo, "intelligence", None)
+        date_taken_value = None
+        date_source_value = None
+
+        if intelligence is not None:
+            date_taken_value = getattr(intelligence, "date_taken", None)
+            date_source_value = getattr(intelligence, "date_source", None)
+
         metadata = getattr(photo, "metadata", {}) or {}
         if metadata:
             width = metadata.get("width")
@@ -47,9 +55,10 @@ class PhotoDetailsPanel(QWidget):
             if width is not None and height is not None:
                 lines.append(f"Dimensions: {width} x {height}")
 
-            date_taken = metadata.get("date_taken")
-            if date_taken:
-                lines.append(f"Date taken: {date_taken}")
+            if not date_taken_value:
+                date_taken_value = metadata.get("date_taken")
+            if not date_source_value:
+                date_source_value = metadata.get("date_source")
 
             camera_make = metadata.get("camera_make")
             camera_model = metadata.get("camera_model")
@@ -63,6 +72,13 @@ class PhotoDetailsPanel(QWidget):
 
             if metadata.get("has_gps"):
                 lines.append("GPS: present")
+
+        lines.append(f"Date: {date_taken_value or '-'}")
+        lines.append(f"Date source: {date_source_value or 'Unknown'}")
+        lines.append(f"Relevance: {getattr(intelligence, 'relevance_category', 'unknown') if intelligence is not None else 'unknown'}")
+        reason = getattr(intelligence, "relevance_reason", "") if intelligence is not None else ""
+        if reason:
+            lines.append(f"Relevance reason: {reason}")
 
         self.title_label.setText(photo.display_name())
         self.details_label.setText("\n".join(lines))

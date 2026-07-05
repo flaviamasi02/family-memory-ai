@@ -31,6 +31,8 @@ Framework components:
 - PROJECT_CONSTITUTION
 - PROJECT_CONTEXT
 - PROJECT_STATE
+- MASTER_DEVELOPMENT_PLAN
+- DOMAIN_ROADMAP
 - AI_PROJECT_PLAYBOOK
 - DECISIONS
 - ROADMAP
@@ -144,3 +146,7 @@ If compatibility cannot be verified, the AI should report the gap before proceed
 ## Definition of Done
 
 DOCUMENTATION_FRAMEWORK.md is the authoritative reference for documentation framework versioning in Family Memory AI.
+
+MASTER_DEVELOPMENT_PLAN.md is one of the core framework documents and defines the highest-level product planning direction.
+
+DOMAIN_ROADMAP.md is one of the core framework documents and defines the official domain-based future roadmap.

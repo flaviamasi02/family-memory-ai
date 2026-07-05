@@ -30,9 +30,11 @@ Mandatory initialization order:
 6. Read docs/project/PROJECT_STATE.md.
 7. Read docs/development/AI_PROJECT_PLAYBOOK.md.
 8. Read docs/development/DECISIONS.md.
-9. Read docs/project/ROADMAP.md (if present).
-10. Read docs/project/GLOSSARY.md.
-11. Read any additional mandatory documents referenced by those files.
+9. Read docs/project/MASTER_DEVELOPMENT_PLAN.md.
+10. Read docs/project/DOMAIN_ROADMAP.md.
+11. Read docs/project/ROADMAP.md (historical/transitional, if present).
+12. Read docs/project/GLOSSARY.md.
+13. Read any additional mandatory documents referenced by those files.
 
 The bootstrap must be completed before answering project-related requests.
 
@@ -47,6 +49,7 @@ The AI must:
 - Understand project version.
 - Understand completed work.
 - Understand pending work.
+- Identify the active functional domain and milestone before planning new work.
 - Understand architectural decisions.
 - Understand documentation responsibilities.
 - Understand project commands.
@@ -61,6 +64,17 @@ Before executing any project command:
 3. Execute only if prerequisites are satisfied.
 
 Prerequisite definitions are owned by docs/bootstrap/COMMANDS.md and must not be duplicated in this document.
+
+Before planning implementation:
+
+1. Identify the functional domain.
+2. Check whether documentation already exists.
+3. Continue the existing domain roadmap.
+4. Preserve product philosophy.
+
+The AI should reason in terms of domains rather than sequential sprint numbers.
+
+MASTER_DEVELOPMENT_PLAN.md is the highest-level planning document and should be consulted before the domain roadmap is used to scope implementation.
 
 ---
 
@@ -123,6 +137,9 @@ Business vision.
 ### PROJECT_STATE
 Current implementation.
 
+### MASTER_DEVELOPMENT_PLAN
+Highest-level product planning document.
+
 ### AI_PROJECT_PLAYBOOK
 Development workflow.
 
@@ -131,6 +148,9 @@ Architectural decisions.
 
 ### ROADMAP
 Future work.
+
+### DOMAIN_ROADMAP
+Official domain-based future roadmap.
 
 ### GLOSSARY
 Official terminology.

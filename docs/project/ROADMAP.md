@@ -4,40 +4,78 @@
 
 This document tracks planned milestones only.
 
+It is retained as historical and transitional planning context.
+
+The official future roadmap now lives in docs/project/DOMAIN_ROADMAP.md.
+
 Implementation history belongs in docs/releases/CHANGELOG.md.
 
 Current runtime status belongs in docs/project/PROJECT_STATE.md.
 
 ---
 
-## Version 1 (Current Focus)
+## Product Mission Roadmap
 
-Version 1 is dedicated **exclusively** to the **Annual Family Album**.
+Family Memory AI is evolving into a Family Memory Intelligence system.
 
-- Annual Family Album
+Albums are one possible output, not the sole product objective.
 
-Current implementation baseline:
+### Phase 1 - Foundation
 
-- Annual album domain foundation completed (DEV-001)
-	- AnnualAlbum model
-	- AlbumBuilder year grouping and annual album creation
-	- Candidate pool initialization from matching-year photos
-	- No AI selection and no export pipeline yet
-- Photo intelligence foundation completed (DEV-002)
-	- PhotoIntelligence model
-	- Photo linkage and safe initialization
-	- Metadata-based year/month intelligence population
-	- Foundation placeholders only (no AI/selection engines yet)
+- Import
+- Metadata
+- Date extraction
+- Classification
+- Scoring
+- Memory Review
 
-Technical development sequence:
+Current completed foundation work includes:
 
-- DEV-001 Annual Album Foundation (Completed)
-- DEV-002 Photo Intelligence Foundation (Completed)
-- DEV-003 Candidate Selection Engine (Completed)
-- DEV-004 Album Scoring Engine (Next)
-- DEV-005 Album Review UI
-- DEV-006 Album Layout Engine
-- DEV-007 Print Ready Export
+- DEV-001 Annual Album Foundation
+- DEV-002 Photo Intelligence Foundation
+- DEV-003 Candidate Selection Engine
+- DEV-004 Album Scoring Engine
+- DEV-005 Hybrid Album Review UI
+- BUG-001 Robust Date Extraction Pipeline
+- PERF-001 Album Review Performance Optimization
+- DEV-006 Album Draft Builder
+- DEV-007 Photo Cleanup & Relevance Engine
+
+### Phase 2 - Learning
+
+- Decision Engine
+- Preference Learning
+- Cleanup Engine
+- Duplicate Engine
+- People Learning
+
+Current next milestone:
+
+- MEM-001 Memory Review UI foundations evolving toward User Decision Engine behavior (Next)
+
+### Phase 3 - Memory Intelligence
+
+- Memory Value
+- Storytelling
+- Event Detection
+- Album Balance
+- Family Timeline
+
+### Phase 4 - Outputs
+
+- Album Builder
+- Album Refinement
+- PDF Export
+- Photo Books
+- Slideshows
+- Timeline Viewer
+- Advanced Search
+
+Product-direction update:
+
+- Memory Review becomes the central interaction layer for future learning-oriented behavior.
+- Preference Learning is a product-level priority before deeper output refinement.
+- Album creation remains important, but as one consumer of broader Memory Intelligence.
 
 ---
 

@@ -208,19 +208,21 @@ Actions:
 9. Verify documentation completeness for all implemented and planned changes.
 10. Run Documentation Health Check (mandatory phase).
 11. Produce a final synchronization report and Documentation Health Report.
+12. Verify MASTER_DEVELOPMENT_PLAN consistency, DOMAIN_ROADMAP consistency, active domain, current milestone, product vision alignment, and Family Memory Score alignment.
 
 Documentation Health Check (mandatory):
 1. Missing Documents: Detect references to documentation files that do not exist, including markdown files, architecture documents, playbooks, roadmaps, and glossaries.
 2. Broken Links: Verify relative markdown links, internal anchors, Mermaid references, and cross-document links.
-3. Documentation Ownership: Verify information is in the correct source document (for example, current sprint -> PROJECT_STATE, architecture decision -> DECISIONS, commands -> COMMANDS, vision -> PROJECT_CONTEXT). Report misplaced or duplicated ownership.
+3. Documentation Ownership: Verify information is in the correct source document (for example, current sprint -> PROJECT_STATE, architecture decision -> DECISIONS, commands -> COMMANDS, highest-level planning -> MASTER_DEVELOPMENT_PLAN, product vision -> product/PRODUCT_VISION.md). Report misplaced or duplicated ownership.
 4. Duplicate Information: Detect duplicated architecture descriptions, duplicated workflows, duplicated command definitions, and repeated glossary entries.
-5. Outdated Documentation: Detect inconsistencies across PROJECT_STATE, ROADMAP, DECISIONS, architecture documents, and playbook (for example, completed sprint marked active, implemented feature undocumented, superseded decision not updated).
+5. Outdated Documentation: Detect inconsistencies across PROJECT_STATE, MASTER_DEVELOPMENT_PLAN, ROADMAP, DOMAIN_ROADMAP, DECISIONS, architecture documents, and playbook (for example, completed sprint marked active, implemented feature undocumented, superseded decision not updated).
 6. Missing Decision Records: Identify architectural changes that should have a DEC record but do not (for example, major folder reorganization, new subsystem, breaking architectural changes).
 7. Missing Documentation: Detect newly introduced project concepts that are undocumented (for example, new engines, services, UI components, commands, workflows).
 8. Documentation Completeness: Verify that every implemented change has its required documentation updates and ownership updates completed.
 9. Terminology Consistency: Verify terminology against GLOSSARY.md and report inconsistent naming.
 10. Folder Organization: Verify each document is located in the correct folder according to DOCUMENTATION_ARCHITECTURE.md.
-11. AI Readiness: Verify a new AI assistant can bootstrap successfully and discover mandatory documents in the expected order: HANDOVER, DOCUMENTATION_FRAMEWORK, AI_BOOTSTRAP, COMMANDS, DOCUMENTATION_ARCHITECTURE, PROJECT_CONTEXT, PROJECT_STATE, AI_PROJECT_PLAYBOOK, DECISIONS, ROADMAP (if present), GLOSSARY.
+11. AI Readiness: Verify a new AI assistant can bootstrap successfully and discover mandatory documents in the expected order: HANDOVER, DOCUMENTATION_FRAMEWORK, AI_BOOTSTRAP, COMMANDS, DOCUMENTATION_ARCHITECTURE, PROJECT_CONTEXT, PROJECT_STATE, AI_PROJECT_PLAYBOOK, DECISIONS, MASTER_DEVELOPMENT_PLAN, DOMAIN_ROADMAP, ROADMAP (historical/transitional, if present), GLOSSARY.
+12. Domain Workflow Readiness: Verify MASTER_DEVELOPMENT_PLAN and DOMAIN_ROADMAP are referenced correctly, the active domain is clear, the current milestone is clear, and workflow planning aligns with product vision and Family Memory Score.
 
 Output:
 - Full synchronization report with findings and resolved items.
@@ -229,6 +231,10 @@ Output:
   - Check Results for all health-check items
   - Warnings
   - Recommended Improvements
+  - MASTER_DEVELOPMENT_PLAN consistency
+  - DOMAIN_ROADMAP consistency
+  - Active domain and current milestone status
+  - Product vision alignment status
 
 Notes:
 - Use this after major sprint work or multi-session implementation.
@@ -354,6 +360,11 @@ Actions:
    - Documentation Minimalism validation
    - Cross-reference validation
    - Architecture consistency
+  - MASTER_DEVELOPMENT_PLAN consistency
+  - DOMAIN_ROADMAP consistency
+  - active domain and current milestone consistency
+  - product vision alignment
+  - Family Memory Score alignment
 4. Produce a full verification report.
 
 Output:

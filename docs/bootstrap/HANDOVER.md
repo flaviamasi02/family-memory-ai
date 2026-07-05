@@ -23,9 +23,11 @@ The assistant must read mandatory documents in this order:
 7. docs/project/PROJECT_STATE.md
 8. docs/development/AI_PROJECT_PLAYBOOK.md
 9. docs/development/DECISIONS.md
-10. docs/project/ROADMAP.md (if present)
-11. docs/project/GLOSSARY.md
-12. Any additional mandatory documents referenced by the documents above
+10. docs/project/MASTER_DEVELOPMENT_PLAN.md
+11. docs/project/DOMAIN_ROADMAP.md
+12. docs/project/ROADMAP.md (historical/transitional, if present)
+13. docs/project/GLOSSARY.md
+14. Any additional mandatory documents referenced by the documents above
 
 The assistant must complete the full initialization workflow before responding to project requests.
 
@@ -59,9 +61,11 @@ Read the documentation in this exact order:
 7. docs/project/PROJECT_STATE.md
 8. docs/development/AI_PROJECT_PLAYBOOK.md
 9. docs/development/DECISIONS.md
-10. docs/project/ROADMAP.md (if present)
-11. docs/project/GLOSSARY.md
-12. Any additional mandatory documents referenced by the documents above
+10. docs/project/MASTER_DEVELOPMENT_PLAN.md
+11. docs/project/DOMAIN_ROADMAP.md
+12. docs/project/ROADMAP.md (historical/transitional, if present)
+13. docs/project/GLOSSARY.md
+14. Any additional mandatory documents referenced by the documents above
 
 This document defines what must be read, in which order, and why the initialization sequence is mandatory.
 
@@ -77,11 +81,34 @@ This document must not duplicate command definitions; command behavior is owned 
 
 ---
 
+# Development Workflow
+
+Historical implementation used the sequential milestone chain:
+
+- DEV-001
+- DEV-002
+- DEV-003
+- DEV-004
+- DEV-005
+- DEV-006
+
+Future implementation uses domain-based development.
+
+Whenever a new feature is requested, the AI must first determine the correct functional domain.
+
+Never automatically continue with DEV-007, DEV-008, and later numbers as the default planning model.
+
+Instead, create or continue work inside the appropriate domain defined in docs/project/MASTER_DEVELOPMENT_PLAN.md and docs/project/DOMAIN_ROADMAP.md.
+
+---
+
 ## Product North Star
 
-Version 1 of Family Memory AI has one primary objective:
+Family Memory AI is evolving into a Family Memory Intelligence system.
 
-"Automatically create the best possible annual family photo album."
+Its mission is:
+
+"Help families preserve, organize and understand the memories that matter most, while continuously learning what is important for each family."
 
 Future capabilities (Vacation Albums, Gift Albums, Story Timeline, and similar expansions) are intentionally postponed while keeping the architecture extensible.
 
@@ -93,7 +120,17 @@ DEV-001 (Annual Album Foundation) has been completed.
 
 DEV-002 (Photo Intelligence Foundation) has been completed.
 
-Next planned sprint: DEV-004 - Album Scoring Engine.
+DEV-003 (Candidate Selection Engine) has been completed.
+
+DEV-004 (Album Scoring Engine) has been completed.
+
+DEV-005 (Hybrid Album Review UI) has been completed.
+
+DEV-006 (Album Draft Builder) has been completed.
+
+DEV-007 (Photo Cleanup & Relevance Engine) has been completed.
+
+Current active domain and current milestone are defined in docs/project/PROJECT_STATE.md and docs/project/DOMAIN_ROADMAP.md.
 
 For detailed operational status, always refer to docs/project/PROJECT_STATE.md.
 
@@ -103,9 +140,20 @@ For detailed operational status, always refer to docs/project/PROJECT_STATE.md.
 
 - Complete the mandatory initialization workflow in the required order.
 - Verify docs/project/PROJECT_STATE.md before proposing any work.
-- Continue with the next planned Sprint.
+- Read docs/project/MASTER_DEVELOPMENT_PLAN.md before planning new work.
+- Identify the correct functional domain before planning new implementation.
 - Respect all approved decisions.
 - Never change project direction without Product Owner approval.
+- When working on photo scoring, album generation, duplicate detection, AI ranking, or album selection, always read docs/product/FAMILY_MEMORY_SCORE.md before making design decisions.
+
+Before modifying Album Review, always read docs/product/FAMILY_MEMORY_SCORE.md because it contains the official product decisions.
+
+Before making architecture decisions, read:
+
+- docs/product/PRODUCT_VISION.md
+- docs/product/FAMILY_MEMORY_SCORE.md
+
+These documents define the product philosophy and take precedence over implementation details whenever design decisions are required.
 
 ---
 
@@ -114,7 +162,9 @@ For detailed operational status, always refer to docs/project/PROJECT_STATE.md.
 Each information type has one official location. Reference these documents instead of duplicating their content:
 
 - docs/project/PROJECT_STATE.md: current operational state
-- docs/project/ROADMAP.md: planned milestones and priorities
+- docs/project/MASTER_DEVELOPMENT_PLAN.md: highest-level product planning and domain rule set
+- docs/project/DOMAIN_ROADMAP.md: official domain roadmap and future capability structure
+- docs/project/ROADMAP.md: historical and transitional planning context
 - docs/releases/CHANGELOG.md: implementation history by sprint
 - docs/development/DECISIONS.md: approved decisions
 - docs/development/AI_PROJECT_PLAYBOOK.md: working method and sprint discipline

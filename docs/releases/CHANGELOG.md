@@ -1,6 +1,136 @@
 # Changelog
 
 ## Unreleased
+### MEM-003 - Multi-Select Bulk Category Editing
+- Added multi-select behavior in Memory Review grid with intuitive single click, Ctrl+click toggle selection, and Shift+click visible range selection.
+- Added in-memory selection state by file path with selected-count display, clear selection, and select-all-visible actions.
+- Added bulk category editor with Apply Category to Selected; automatic category is preserved while user-corrected and effective categories are updated.
+- Added bulk decision editor with Apply Decision to Selected for UserDecision updates across selected photos.
+- Added safety confirmation for bulk actions over 20 selected photos with cancel support.
+- Added per-photo in-memory learning events for bulk category and decision changes with source=user_bulk.
+- Added deterministic tests for multi-select, selection actions, bulk apply behavior, effective-category override behavior, learning events, and large-bulk confirmation flow.
+- No persistence and no AI training added in this milestone.
+
+### CLEAN-002 - Deterministic Meme & Irrelevant Media Classification Refinement
+- Strengthened deterministic MediaClassifier rules for meme, graphic, advertisement, screenshot, document, and unknown/non-family media.
+- Added richer filename indicators for meme-like/shared/downloaded media patterns.
+- Added dimension-aware classification heuristics for very small images, banner-like images, and tall phone screenshot shapes.
+- Added metadata-aware confidence behavior so family_photo requires stronger evidence and weak metadata profiles move toward unknown/graphic outputs.
+- Expanded explainable classification reasons to include filename, dimension, and metadata rationale.
+- Added deterministic tests for WhatsApp meme-like images, downloaded funny images, banner images, small square non-camera images, normal camera photos, screenshots, and documents.
+- No cloud AI, no persistence, and no permanent deletion added in this milestone.
+
+### MEM-002 - Visible & Correctable Media Category in Memory Review
+- Promoted automatic media category to a first-class Memory Review concept with card-level visibility.
+- Added readable classification fields in details panel (category, reason, confidence, user decision, date, date source, score).
+- Added dedicated category filter independent from decision-status filter.
+- Added user category correction controls with Apply Category behavior.
+- Added in-memory category state fields: automatic_media_category, user_corrected_media_category, effective_media_category.
+- Added in-memory learning events for category corrections and decision changes with file_path, event_type, previous_value, new_value, and source=user.
+- Added deterministic tests for card visibility, category filtering, category correction, effective category override, learning-event recording, and details display behavior.
+- No persistence added and no AI model training added in this milestone.
+
+### CLEAN-001 - Media Classification & Decision Engine Foundation
+- Added deterministic media classifier foundation with explicit MediaCategory and UserDecision enums.
+- Added classification outputs for media_category, classification_reason, and classification_confidence for imported media.
+- Added model integration for media_category, user_decision, classification_reason, and classification_confidence.
+- Replaced simple Album Review action buttons with a full decision selector supporting all UserDecision values.
+- Added in-memory decision history object to capture every user decision event for future preference-learning integration.
+- Added deterministic tests for classifier behavior, decision assignment, and decision persistence.
+- No AI behavior added, no permanent deletion behavior added, and no AlbumDraftBuilder modifications in this milestone.
+
+### PRODUCT-DOC-005
+- Introduced docs/project/MASTER_DEVELOPMENT_PLAN.md as the highest-level project planning document.
+- Documented product domains, permanent principles, future decision model, and the rule that new work must map to an owning product domain.
+- Updated bootstrap, framework, commands, state, and roadmap documents to treat MASTER_DEVELOPMENT_PLAN.md as the primary planning document.
+- No application code modified.
+
+### PRODUCT-DOC-004
+- Adopted domain-based development workflow as the official future methodology.
+- Added docs/project/DOMAIN_ROADMAP.md as the official future roadmap.
+- Replaced single next-sprint planning with current active domain, current milestone, recently completed domains, and future planned domains.
+- Updated bootstrap, framework, commands, product docs, and documentation ownership to validate domain-roadmap consistency and product vision alignment.
+- No application code modified.
+
+### PRODUCT-DOC-002
+- Redefined the product mission around Family Memory Intelligence rather than album creation alone.
+- Documented Memory Review as the long-term central interaction point between the user and the system.
+- Added Continuous Learning, future learning categories, and broader Family Memory Intelligence workflow direction to the product documentation.
+- Reorganized the roadmap into Foundation, Learning, Memory Intelligence, and Outputs phases.
+- Established docs/product/PRODUCT_VISION.md as the canonical product-vision document and aligned documentation ownership around it.
+- No application code modified.
+
+### PRODUCT-DECISION-001
+- Updated the major long-term product direction before further implementation work.
+- Defined Album Review as the future central decision engine instead of a simple Approve / Reject / Pending screen.
+- Introduced preference learning into the official product architecture and documentation.
+- Documented the future PhotoDecision model and User Decision Engine workflow.
+- No application code modified.
+
+### Sprint DEV-007 - Photo Cleanup & Relevance Engine
+- Added PhotoCleanupEngine for deterministic cleanup categorization during import.
+- Added cleanup categories: family_photo_candidate, document_or_scan, advertisement, screenshot, meme_or_graphic, video, duplicate_candidate, low_quality_photo, and unknown.
+- Added exact duplicate placeholder handling using file hashes, keeping the technically best version when deterministically available, otherwise keeping the largest file.
+- Added Cleanup Review tab with category grouping/filtering, thumbnails when available, filename, reasons, recommended action, checkbox selection, and select-all in current category.
+- Added Photo Browser cleanup/relevance filtering for family candidates, documents/scans, advertisements, screenshots, memes/graphics, videos, duplicates, low quality, and unknown files.
+- Added safe move workflow through `_family_memory_cleanup_review` inside the imported folder.
+- Added explicit confirmation before safe move, including file count, destination, and warning text.
+- Added safe move result summary with moved, skipped, and failed counts.
+- Added tests for deterministic cleanup classification and safe cleanup-folder move behavior.
+- No permanent delete, no AI behavior changes, no album export, and no AlbumDraftBuilder rule changes in this sprint.
+
+### Sprint DEV-006 - Album Builder
+- Added AlbumDraftBuilder for deterministic in-memory annual album draft creation from reviewed/scored photos.
+- Added AlbumDraftPage, AlbumDraft, and AlbumDraftBuildResult dataclasses for structured draft outputs and traceable build metrics.
+- Added deterministic inclusion logic: approved photos included, rejected photos excluded, and pending fallback when no approved photos exist.
+- Added deterministic default draft cap (120 photos) with exclusion reason tracking.
+- Added monthly draft page grouping plus Undated Memories fallback for missing date context.
+- Added deterministic sorting by date then score.
+- Added tests for inclusion/exclusion rules, limits, monthly/undated grouping, counters, explanations, and deterministic ordering.
+- No AI scoring-rule changes, no export, no database persistence, no face recognition, and no duplicate-detection implementation in this sprint.
+
+### PRODUCT-DOC-001 - Family Memory Score Product Specification
+- Added official Family Memory Score product specification at docs/product/FAMILY_MEMORY_SCORE.md.
+- Documented long-term explainable multi-factor scoring philosophy and component definitions.
+- Documented intended future scoring architecture with independent scorers and FamilyMemoryScoreEngine composition.
+- Documentation update only: no application code changed.
+
+### Sprint DEV-005 - Album Review UI
+- Added Album Review page with the official hybrid layout: top toolbar (search, filter, sorting), central thumbnail grid, and right-side details panel.
+- The thumbnail grid displays filename plus total, technical, memory, and date scores for each scored photo (no list-only review layout).
+- Added review details panel with larger preview, score explanation list, metadata summary, people summary, and date context for selected photos.
+- Added in-memory review actions: Approve, Reject, and Reset to Pending.
+- Added review filters: All, Pending, Approved, and Rejected.
+- Added sorting controls: Highest score, Lowest score, and Date.
+- Added filename search for quick review narrowing.
+- Added scalable batch card rendering and responsive grid columns to support large photo libraries.
+- BUG-001: Added dedicated DateExtractionService for robust photo date resolution during import.
+- Added robust import-time date extraction priority: EXIF DateTimeOriginal, EXIF CreateDate, other EXIF date fields, filename parsing fallback, then filesystem creation/modification timestamp.
+- Added filename date parsing support for common patterns including WhatsApp/IMG/PXL/Screenshot and VID_20240118_093015.mp4.
+- Added PhotoIntelligence date fields population: date_taken, year, month, day, date_source/source_of_date.
+- Added date_source values: EXIF, Filename, Filesystem, Unknown.
+- CandidateSelectionEngine now reliably uses extracted intelligence year values from the new pipeline.
+- Photo Browser details panel now shows Date and Date source.
+- Album Review now surfaces Imported/Candidates/Selected/Rejected summary and rejection reasons.
+- Added UI/unit tests for sorting, filtering, review actions, detail panel behavior, and explanation visibility.
+- Added unit tests for each supported filename date pattern and WhatsApp import scoring visibility.
+- UI-FIX-001: increased default/minimum application window size while keeping standard resizable window behavior.
+- UI-FIX-001: improved Album Review readability with a wider details panel, smaller preview box, and a taller score explanation area for multi-line visibility.
+- Added UI tests for explanation panel minimum height and larger main-window minimum size.
+- PERF-001: optimized Album Review scalability for large libraries (4,000+ photos) with lazy on-demand card rendering and reduced UI-thread work.
+- PERF-001: added debounced search, card/preview pixmap caching, and selection-preserving details updates to avoid unnecessary full refreshes.
+- PERF-001: added in-memory review pipeline cache in main window to avoid repeated scoring rebuilds when imported photos are unchanged.
+- PERF-001: documentation and performance-safe tests added; no product behavior changed.
+- Scope remains deterministic and local-only: no AI behavior changes, no export pipeline, no persistence/database support.
+
+### Sprint DEV-004 - Album Scoring Engine
+- Added AlbumScoringEngine to score AnnualAlbum selected candidates deterministically.
+- Added AlbumScoreBreakdown dataclass with technical_score, memory_score, date_score, total_score, and explanation fields.
+- Added AlbumScoringResult dataclass to return scored photos and scored count.
+- Scoring now persists total score to PhotoIntelligence.album_candidate_score.
+- Added tests for selected-only scoring, ignored non-selected pools, descending sort, score persistence, blurry technical penalty, missing intelligence safety, and explanation generation.
+- Deterministic non-AI scoring only: no AI ranking, no face recognition, no duplicate detection engine behavior, no export pipeline, no database persistence, and no significant UI changes.
+
 ### Sprint DEV-003 - Candidate Selection Engine
 - Added CandidateSelectionEngine to evaluate AnnualAlbum candidate pools deterministically.
 - Added CandidateSelectionResult with selected/rejected counters and rejection reason summaries.

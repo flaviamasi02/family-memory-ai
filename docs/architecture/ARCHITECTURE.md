@@ -297,13 +297,93 @@ It is responsible for:
 
 A lightweight CandidateSelectionResult summarizes counts and rejection reason totals for verification and testing.
 
+## DateExtractionService
+
+DateExtractionService is the deterministic date-resolution component used during import.
+
+It is responsible for:
+
+- resolving photo date context using a strict priority order
+- populating date_taken/year/month/day and date source context
+- enabling stable year-aware candidate selection and review summaries
+
+Priority order:
+
+- EXIF DateTimeOriginal
+- EXIF CreateDate
+- other EXIF date fields
+- filename parsing (including WhatsApp/IMG/PXL/Screenshot/VID patterns)
+- filesystem timestamps
+
+## AlbumScoringEngine
+
+AlbumScoringEngine is the deterministic non-AI scoring component for selected annual album candidates.
+
+It is responsible for:
+
+- scoring AnnualAlbum.selected_photos only
+- producing explainable technical, memory, and date score breakdowns
+- sorting scored candidates by total score for downstream review
+- persisting the resulting candidate score for deterministic workflows
+
+## AlbumReviewPage
+
+AlbumReviewPage is the current hybrid review UI for scored annual album candidates and the precursor to future Memory Review.
+
+It is responsible for:
+
+- top toolbar controls (search, filters, sorting)
+- central thumbnail-grid review experience
+- right-side details panel with preview and score explanations
+- in-memory review state transitions (approve, reject, pending)
+
+In the long-term product direction, this interaction surface evolves into Memory Review: the main point where users teach the system what matters.
+
+## AlbumDraftBuilder
+
+AlbumDraftBuilder is the deterministic draft assembly component that follows current review flows.
+
+It is responsible for:
+
+- including approved photos and excluding rejected photos
+- using pending photos only as deterministic fallback when no approved photos exist
+- enforcing deterministic draft-size limits
+- sorting included photos deterministically by date then score
+- grouping pages by month with an Undated Memories fallback page
+- returning draft build counters, exclusion reasons, and explanations
+
 ## Relationship Summary
 
 - Photo objects are the core item-level entities.
 - PhotoIntelligence is attached to Photo as structured intelligence state.
+- DateExtractionService resolves deterministic date context at import time.
 - AlbumBuilder reads Photo and PhotoIntelligence date context to group and assemble albums.
 - CandidateSelectionEngine evaluates AnnualAlbum candidate pools using PhotoIntelligence year when available and safe metadata fallback.
-- AnnualAlbum stores the resulting year-scoped album state used by later selection/scoring workflows.
+- AlbumScoringEngine scores selected candidates with explainable non-AI breakdowns.
+- AlbumReviewPage captures in-memory review decisions over scored candidates and provides the future bridge toward Memory Review.
+- AlbumDraftBuilder builds deterministic in-memory album drafts from reviewed/scored candidates.
+- AnnualAlbum stores the year-scoped album state used by the deterministic curation flow.
+
+## Long-Term Memory Intelligence Pipeline
+
+The long-term product-direction pipeline is:
+
+Import
+-> Metadata Extraction
+-> Classification
+-> Technical Analysis
+-> Scoring
+-> Memory Review
+-> Decision Engine
+-> Preference Learning
+-> Cleanup
+-> Duplicate Management
+-> Memory Intelligence
+-> Album Builder
+-> Album Refinement
+-> Outputs
+
+Current deterministic album flow remains an early implementation subset of this broader pipeline.
 
 ## Future Database
 
@@ -333,8 +413,12 @@ Future services will provide high-level capabilities such as:
 
 - memory curation
 - album generation
+- cleanup and clutter reduction
+- duplicate management
 - search
 - recommendation
+
+Album generation is treated as one consumer of Memory Intelligence rather than the sole center of the product.
 
 These services should coordinate lower-level components without embedding UI behavior.
 

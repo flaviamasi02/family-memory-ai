@@ -32,7 +32,7 @@ Notes (optional)
 
 ### Family Memory AI
 Definition:
-AI-first desktop product focused on creating meaningful annual family photo albums.
+Family Memory Intelligence platform focused on helping families preserve, organize, understand, and rediscover meaningful memories.
 
 Purpose:
 Represents the full product identity and scope.
@@ -41,7 +41,7 @@ Used By:
 All product, architecture, and development documentation.
 
 Related Terms:
-Annual Album, Photo Library, Album Generation
+Memory Intelligence, Annual Album, Photo Library, Memory Review
 
 ### Annual Album
 Definition:
@@ -201,16 +201,16 @@ Annual Album, Candidate Photo, Candidate Selection Engine
 
 ### Album Generation
 Definition:
-End-to-end process of building an annual album from library photos.
+One of several possible output-generation processes built on top of broader memory understanding.
 
 Purpose:
-Defines the curation pipeline from import to output-ready set.
+Defines one output pipeline from memory understanding to album-ready output.
 
 Used By:
 Roadmap, sprint planning, architecture.
 
 Related Terms:
-Album Builder, Candidate Selection Engine, Scoring Engine
+Album Builder, Memory Intelligence, Candidate Selection Engine, Scoring Engine
 
 ---
 
@@ -244,16 +244,253 @@ Manual Feedback, AI Feedback
 
 ### Scoring Engine
 Definition:
-Future engine that assigns explainable scores to selected candidates.
+Deterministic non-AI engine that assigns explainable scores to selected album candidates.
 
 Purpose:
 Prioritize photos for album composition.
 
 Used By:
-Planned DEV-004 and later.
+DEV-004 implementation and downstream review workflows.
 
 Related Terms:
-Ranking, Photo Intelligence
+AlbumScoringEngine, Ranking, Photo Intelligence, Family Memory Score
+
+### AlbumScoringEngine
+Definition:
+Implemented deterministic scoring component for annual album selected candidates.
+
+Purpose:
+Produce explainable score breakdowns (technical, memory, date, total) and deterministic ranking order.
+
+Used By:
+DEV-004 runtime flow and Album Review.
+
+Related Terms:
+Scoring Engine, Family Memory Score, Album Review
+
+### Date Extraction Pipeline
+Definition:
+Deterministic date-resolution process used during import.
+
+Purpose:
+Populate reliable date context for selection, scoring, and review.
+
+Used By:
+BUG-001 implementation, Photo Intelligence synchronization, and candidate selection.
+
+Related Terms:
+DateExtractionService, Photo Metadata, Candidate Selection Engine
+
+### DateExtractionService
+Definition:
+Component that resolves photo date values using prioritized sources.
+
+Purpose:
+Ensure robust date_taken/year/month/day extraction with source transparency.
+
+Used By:
+Import-time metadata processing and deterministic album pipeline.
+
+Related Terms:
+Date Extraction Pipeline, Photo Metadata, Photo Intelligence
+
+### Album Review
+Definition:
+Hybrid UI step where scored candidates are reviewed and where future user decisions become long-term teaching signals. In the long-term product direction, this evolves into Memory Review.
+
+Purpose:
+Capture current review decisions and evolve into the central decision interface for future learning-oriented workflows.
+
+Used By:
+DEV-005 implementation, future Memory Review / User Decision Engine work, and Album Draft Builder inputs.
+
+Related Terms:
+AlbumScoringEngine, Album Draft Builder, Photo Decision, User Decision Engine, Selected Photo, Rejected Photo
+
+### Memory Review
+Definition:
+The future evolution of Album Review as the main interaction point between the user and the Memory Intelligence system.
+
+Purpose:
+Turn review interactions into durable decision, cleanup, and preference-learning signals.
+
+Used By:
+Future User Decision Engine, Preference Learning, cleanup suggestions, and album-building improvements.
+
+Related Terms:
+Album Review, Photo Decision, User Decision Engine, Preference Learning
+
+### User Decision
+Definition:
+Any meaningful user action that teaches the system how a memory should be interpreted, prioritized, or cleaned.
+
+Purpose:
+Provide learning signals for scoring, cleanup, duplicate handling, and future outputs.
+
+Used By:
+Memory Review, User Decision Engine, Preference Learning.
+
+Related Terms:
+Photo Decision, Decision Engine, Memory Review
+
+### Photo Decision
+Definition:
+The long-term normalized user decision state assigned to a photo after review interaction.
+
+Purpose:
+Provide a stable decision vocabulary for album curation, cleanup, and future learning signals.
+
+Used By:
+Future User Decision Engine, Preference Learning, Album Review, and cleanup/recommendation workflows.
+
+Related Terms:
+Album Review, User Decision Engine, Preference Learning, Cleanup Category
+
+### User Decision Engine
+Definition:
+Future architectural layer where user actions in Album Review are interpreted as durable product signals.
+
+Purpose:
+Transform review actions into preference-learning, cleanup, and recommendation inputs.
+
+Used By:
+Future scoring evolution, cleanup suggestions, and decision-aware album-building workflows.
+
+Related Terms:
+Photo Decision, Preference Learning, Album Review, Family Memory Score
+
+### Decision Engine
+Definition:
+Future system layer that transforms user actions into normalized durable decisions.
+
+Purpose:
+Bridge interaction behavior and long-term memory intelligence behavior.
+
+Used By:
+Future Memory Review, cleanup workflows, duplicate handling, and recommendation systems.
+
+Related Terms:
+User Decision, User Decision Engine, Preference Learning
+
+### Preference Learning
+Definition:
+Future process by which repeated user decisions influence scoring and recommendation behavior.
+
+Purpose:
+Help the application learn what matters to each family while preserving explainability.
+
+Used By:
+Future User Preference Score, Memory Value evolution, cleanup suggestions, and album recommendations.
+
+Related Terms:
+User Decision Engine, Photo Decision, Family Memory Score
+
+### Memory Intelligence
+Definition:
+The broader system knowledge that models what matters to a family across memories, preferences, cleanup, duplicates, and outputs.
+
+Purpose:
+Provide reusable understanding that powers albums, stories, timelines, search, and recommendations.
+
+Used By:
+Future scoring, review, cleanup, album generation, storytelling, and output systems.
+
+Related Terms:
+Family Memory AI, Memory Review, Preference Learning, Album Generation
+
+### Domain
+Definition:
+A functional development area that groups related capabilities and milestones.
+
+Purpose:
+Replace a purely sequential sprint model with capability-based planning.
+
+Used By:
+MASTER_DEVELOPMENT_PLAN, DOMAIN_ROADMAP, PROJECT_STATE, and future planning workflows.
+
+Related Terms:
+Milestone, Capability, Memory Intelligence
+
+### Milestone
+Definition:
+A named implementation step inside a functional domain.
+
+Purpose:
+Provide precise progress tracking inside domain-based development.
+
+Used By:
+DOMAIN_ROADMAP, PROJECT_STATE, and implementation planning.
+
+Related Terms:
+Domain, Capability
+
+### Capability
+Definition:
+A product or technical ability delivered by one or more domain milestones.
+
+Purpose:
+Describe what the system should be able to do independent of historical sprint numbering.
+
+Used By:
+Product vision, roadmap planning, and domain development.
+
+Related Terms:
+Domain, Milestone, Memory Intelligence
+
+### Cleanup Category
+Definition:
+The normalized category used to mark non-album-relevant or cleanup-oriented media.
+
+Purpose:
+Support cleanup review, safe triage, and future decision-aware cleanup recommendations.
+
+Used By:
+Cleanup Review, cleanup engine behavior, and future User Decision Engine flows.
+
+Related Terms:
+Photo Decision, User Decision Engine, Photo Classification
+
+### Cleanup Engine
+Definition:
+System layer responsible for classifying clutter, irrelevant media, and cleanup-oriented recommendations.
+
+Purpose:
+Support safe cleanup workflows and future learning-aware clutter reduction.
+
+Used By:
+Cleanup Review, cleanup classification, and future decision-driven cleanup suggestions.
+
+Related Terms:
+Cleanup Category, Memory Intelligence, Duplicate Engine
+
+### Album Draft Builder
+Definition:
+Deterministic component that builds in-memory annual draft pages from reviewed/scored photos.
+
+Purpose:
+Create grouped monthly draft output with explicit inclusion/exclusion reasoning.
+
+Used By:
+DEV-006 implementation and upcoming draft UI workflows.
+
+Related Terms:
+Album Review, Annual Album, Family Memory Score, Album Generation
+
+### Family Memory Score
+Definition:
+The explainable multi-factor scoring system used by Family Memory AI to rank photos.
+
+Purpose:
+Defines how ranking should prioritize meaningful memories over purely technical quality.
+
+Used By:
+Future scoring algorithms, ranking design decisions, and album curation specifications.
+
+Related Terms:
+Scoring Engine, Ranking, Memory Value Score, Album Balance
+
+Reference:
+../product/FAMILY_MEMORY_SCORE.md
 
 ### Ranking
 Definition:

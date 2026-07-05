@@ -6,7 +6,7 @@
 
 ## Current Sprint
 
-- Sprint DEV-003 (Candidate Selection Engine) - Completed
+- Sprint MEM-003 (Multi-Select Bulk Category Editing in Memory Review) - Completed
 
 ## Project Status
 
@@ -26,7 +26,13 @@
 
 Family Memory AI is currently in an early-stage desktop prototype phase. The application launches and supports a basic workflow around importing photos, scanning folders, generating thumbnails, and displaying a photo browser experience.
 
-The immediate goals are to build album scoring and prioritization on top of the completed deterministic candidate selection and Photo Intelligence foundations, while keeping the app stable and without adding export features yet.
+The immediate goals are to refine the photo library before deeper album work by improving deterministic cleanup, relevance categorization, and safe library triage, while keeping the app stable and without adding export features yet.
+
+The immediate next goal is to shift product architecture toward Family Memory Intelligence, where Memory Review becomes the central interface for teaching future scoring, preference learning, cleanup, duplicate management, and memory-building improvements while keeping behavior deterministic, explainable, and local-only for now.
+
+Future development is now organized by functional domains rather than by a single sequential DEV-XXX chain.
+
+MASTER_DEVELOPMENT_PLAN.md defines the highest-level planning direction.
 
 ## Sprint 9 Update
 
@@ -78,6 +84,10 @@ Development sequence status:
 - DEV-001 Annual Album Foundation: Completed
 - DEV-002 Photo Intelligence Foundation: Completed
 - DEV-003 Candidate Selection Engine: Completed
+- DEV-004 Album Scoring Engine: Completed
+- DEV-005 Album Review UI: Completed
+- DEV-006 Album Builder: Completed
+- DEV-007 Photo Cleanup & Relevance Engine: Completed
 
 ## Sprint DEV-003 Update
 
@@ -94,6 +104,123 @@ Current limitations after DEV-003:
 - no album scoring engine yet
 - no album review UI flow yet
 - no layout/export pipeline yet
+
+## Sprint DEV-004 Update
+
+DEV-004 introduced a deterministic non-AI AlbumScoringEngine for annual albums. The engine scores only AnnualAlbum.selected_photos and produces an explainable score breakdown per photo with technical_score, memory_score, date_score, and total_score. Scored photos are ordered by total score descending and the final score is persisted to PhotoIntelligence.album_candidate_score for downstream deterministic workflows. This sprint intentionally does not add AI ranking, face recognition, duplicate detection behavior, database persistence, export pipeline, or significant UI changes.
+
+Current limitations after DEV-004:
+
+- scoring is deterministic and intentionally non-AI
+- no album review UI flow yet
+- no layout/export pipeline yet
+
+## Sprint DEV-005 Update
+
+DEV-005 introduced the official hybrid Album Review UI direction for scored annual album candidates: a top toolbar (search, filters, sorting), a central thumbnail grid, and a right-side details panel. The grid displays thumbnail, filename, total score, technical score, memory score, and date score for each reviewed photo, with in-memory review actions (approve, reject, reset to pending). The details panel shows a larger preview, score explanation lines, metadata, people, and date context for the selected photo. The grid rendering uses progressive batch population and responsive column layout to keep behavior scalable for large photo libraries. BUG-001 added a dedicated DateExtractionService and a robust import-time date extraction pipeline to populate PhotoIntelligence.date_taken/year/month/day plus date_source/source_of_date using prioritized sources (EXIF DateTimeOriginal, EXIF CreateDate, other EXIF date fields, filename parsing fallback including WhatsApp/IMG/PXL/Screenshot/VID patterns, then filesystem timestamps). Candidate selection now consistently uses extracted year values, Photo Browser details now shows date + date source, and Album Review shows Imported/Candidates/Selected/Rejected summary with rejection reasons. UI-FIX-001 increased default/minimum application window size and improved Album Review readability with a wider details panel, smaller preview area, and taller score explanation section. PERF-001 optimized Album Review scalability for very large libraries with debounced search, lazy on-demand card rendering, thumbnail/preview pixmap caching, and reduced unnecessary grid/details recomputation. This sprint intentionally does not add AI ranking, persistence/database storage, or export behavior.
+
+Current limitations after DEV-005:
+
+- review decisions are in-memory only
+- no album builder workflow yet
+- no layout/export pipeline yet
+
+## Sprint DEV-006 Update
+
+DEV-006 introduced the first deterministic AlbumDraftBuilder that builds an in-memory annual album draft from reviewed/scored photos. Approved photos are prioritized, rejected photos are excluded, and pending photos are used as a deterministic fallback when no approved photos exist. Draft assembly enforces a deterministic maximum draft size (120 photos), sorts included photos by date then score, and groups output pages by month with an Undated Memories page when date context is missing. The result now includes explicit inclusion/exclusion counters, exclusion reasons, and draft-level explanations for traceable curation behavior. This sprint intentionally does not add AI ranking, export generation, face recognition, duplicate detection behavior, database persistence, or cloud persistence.
+
+Current limitations after DEV-006:
+
+- album draft is in-memory only
+- no print/export pipeline yet
+- no duplicate-detection refinement yet
+
+Current active domain and milestone are defined through the domain-based workflow.
+
+## Sprint DEV-007 Update
+
+DEV-007 introduced a deterministic Photo Cleanup & Relevance Engine that runs during import and prepares the library for safe review before later album refinement. The new cleanup layer classifies media into family_photo_candidate, document_or_scan, advertisement, screenshot, meme_or_graphic, video, duplicate_candidate, low_quality_photo, and unknown. Cleanup Review now provides category-based review, reason visibility, recommended actions, checkbox selection, select-all within the active category, and safe bulk move into `_family_memory_cleanup_review` under the imported folder. Exact duplicate handling is implemented as a placeholder using file hashes only: the technically best version is kept when deterministically available, otherwise the largest file is kept and the remaining exact duplicates become duplicate_candidate items. This sprint intentionally does not add AI behavior, permanent deletion, export behavior, or modifications to AlbumDraftBuilder logic.
+
+Current limitations after DEV-007:
+
+- cleanup classification is deterministic only (no AI)
+- duplicate detection is exact-hash only; no visual similarity yet
+- cleanup move uses quarantine move only; no permanent deletion workflow
+- cleanup review still needs richer batch-review ergonomics
+- no print/export pipeline yet
+
+Future work now follows domain-based planning rather than a single global next sprint.
+
+## Product Decision Update
+
+PRODUCT-DECISION-001 changes the long-term architecture priority.
+
+Album Review is no longer treated only as a simple approve/reject screen.
+
+It becomes the central decision interface where future user actions should teach the application through:
+
+- User Decision Engine
+- Preference Learning
+- Photo Cleanup
+- Album Builder improvements
+
+This changes the development priority order. Instead of moving directly to Album Builder refinement, the next milestone focus becomes:
+
+- User Decision Engine
+- Preference Learning
+- Photo Cleanup
+- Album Builder improvements
+
+## Product Evolution
+
+PRODUCT-DOC-002 redefines the product mission around Family Memory Intelligence.
+
+Family Memory AI is not primarily an album creator.
+
+Its mission is to help families preserve, organize, and understand the memories that matter most while continuously learning what is important for each family.
+
+This creates a strategic shift in development priority.
+
+Future development priority becomes:
+
+1. Decision Engine
+2. Preference Learning
+3. Cleanup
+4. Duplicate Management
+5. Memory Intelligence
+6. Album Builder
+7. Album Refinement
+
+Album Builder becomes one consumer of the Memory Intelligence system rather than the sole center of the product mission.
+
+## Current Active Domain
+
+- MEM
+
+## Current Milestone
+
+- MEM-003 Multi-Select Bulk Category Editing
+
+## Recently Completed Milestones
+
+- FOUNDATION historical milestones completed
+- DEV-007 Photo Cleanup & Relevance Engine
+- CLEAN-001 Media Classification & Decision Engine Foundation
+- MEM-002 Visible & Correctable Media Category in Memory Review
+- CLEAN-002 Deterministic meme and irrelevant media classification refinement
+- MEM-003 Multi-select Memory Review with bulk category and decision editing
+
+## Upcoming Milestones
+
+- LEARN-001 Decision History foundations
+- CLEAN-003 Bulk cleanup ergonomics and review quality improvements
+- DUP-001 Exact Duplicate Detection refinement
+- MEMORY-001 Memory Value
+
+## Product Documentation
+
+- PRODUCT-DOC-001 introduced docs/product/FAMILY_MEMORY_SCORE.md as the official long-term product specification for Family Memory AI photo ranking.
+- The Family Memory Score specification is now the single source of truth for future scoring philosophy, component-level scoring design, and explainability requirements.
 
 ## Documentation Architecture Refactoring Update
 
@@ -116,6 +243,26 @@ Internal references were updated to the new structure.
 # Current Architecture
 
 The current implementation is a lightweight Qt desktop application with a modular structure centered on the Photo model and a custom photo card experience.
+
+Current deterministic curation pipeline:
+
+Import
+-> Date Extraction
+-> Cleanup Classification
+-> Classification
+-> Technical Analysis
+-> Candidate Selection
+-> Album Scoring
+-> Memory Review
+-> User Decision Engine (future)
+-> Preference Learning (future)
+-> Cleanup (future decision-informed)
+-> Duplicate Management (future)
+-> Memory Intelligence (future)
+-> Album Draft Builder
+-> Album Draft UI
+
+Cleanup review now happens before album refinement work.
 
 ## Current Folders
 
@@ -141,6 +288,25 @@ The current implementation is a lightweight Qt desktop application with a modula
 - Annual album builder
 - Photo intelligence model
 - Candidate selection engine
+- Album scoring engine
+- Album review page
+- Cleanup review page
+- Album draft builder
+- Album draft page
+
+Future architectural emphasis:
+
+- User Decision Engine over simple approve/reject state changes
+- Preference-learning signals derived from repeated user decisions
+- Decision-aware cleanup and recommendation flows
+- Album Builder as one output of broader Memory Intelligence
+
+Long-term output framing:
+
+- albums as one output
+- stories as one output
+- timelines as one output
+- search as one output
 
 ---
 
@@ -167,6 +333,10 @@ The current implementation is a lightweight Qt desktop application with a modula
 | Sprint DEV-001 | Completed | Annual album domain foundation |
 | Sprint DEV-002 | Completed | Photo intelligence foundation |
 | Sprint DEV-003 | Completed | Deterministic candidate selection engine |
+| Sprint DEV-004 | Completed | Deterministic album scoring engine |
+| Sprint DEV-005 | Completed | Album review UI with in-memory decisions |
+| Sprint DEV-006 | Completed | Deterministic monthly album draft builder |
+| Sprint DEV-007 | Completed | Photo cleanup, cleanup review, and safe cleanup-folder move workflow |
 
 ---
 
@@ -195,8 +365,44 @@ The current implementation is a lightweight Qt desktop application with a modula
 - [x] Deterministic candidate selection engine
 - [x] Candidate rejection reason tracking (non-AI)
 - [x] Candidate selection result summary counts
+- [x] Deterministic album scoring engine
+- [x] Explainable album score breakdown per selected photo
+- [x] Album candidate score persistence on PhotoIntelligence
+- [x] Album review page for scored candidates
+- [x] Hybrid review layout (toolbar + thumbnail grid + details panel)
+- [x] BUG-001 dedicated DateExtractionService with EXIF/filename/filesystem fallback logic
+- [x] PhotoIntelligence date context fields: date_taken/year/month/day/date_source/source_of_date
+- [x] In-memory approve/reject/reset review state
+- [x] Album review filters, sorting, and filename search
+- [x] Album review details panel with explanation visibility
+- [x] Review visibility for imported/candidates/selected/rejected pools with rejection reasons
+- [x] UI-FIX-001 readability improvements for main window sizing and Album Review details/explanation area
+- [x] PERF-001 Album Review scalability improvements for 4,000+ photo libraries
+- [x] Deterministic AlbumDraftBuilder for annual draft assembly
+- [x] Monthly draft pages plus Undated Memories fallback grouping
+- [x] Review-driven inclusion rules (approved/rejected/pending fallback)
+- [x] Draft build counters, exclusion reasons, and explanations
+- [x] Deterministic photo cleanup and relevance classification during import
+- [x] Photo Browser cleanup/relevance filter
+- [x] Cleanup Review tab with grouped category review and bulk selection
+- [x] Safe move to cleanup review folder with confirmation and result summary
+- [x] Exact duplicate placeholder handling using file hashes and deterministic keeper selection
+- [x] Deterministic end-to-end curation pipeline from import through draft assembly
 - [x] Visible selected-photo highlight in the photo grid
 - [x] Documentation architecture refactored into modular folders
+
+Future product priority after PRODUCT-DECISION-001:
+
+- Memory Review as the central decision engine
+- Preference learning from repeated user actions
+- Decision-aware cleanup and album-building improvements
+
+Future product priority after PRODUCT-DOC-002:
+
+- Memory Review as the main interaction point between user and system
+- Preference learning from all meaningful user actions
+- Cleanup and duplicate management as learning-aware infrastructure
+- Memory Intelligence before deeper output refinement
 
 ---
 
@@ -209,7 +415,8 @@ The current implementation is a lightweight Qt desktop application with a modula
 - No AI scoring yet
 - No face recognition yet
 - No duplicate detection yet
-- No album scoring engine yet
+- No AI cleanup classification yet
+- No visual-similarity duplicate detection yet
 - No print-ready export pipeline yet
 - No HEIC support yet
 - No cloud integration yet
@@ -237,36 +444,15 @@ The current implementation is a lightweight Qt desktop application with a modula
 
 ---
 
-# Next Sprint
+# Domain Workflow
 
-## Title
+Historical DEV-XXX milestones remain valid as implementation history.
 
-Album Scoring Engine
+Future planning must use domains and milestones defined in docs/project/DOMAIN_ROADMAP.md.
 
-## Objective
+MASTER_DEVELOPMENT_PLAN.md defines the higher-level product-planning rule set that all domain planning must follow.
 
-Build the first deterministic album scoring layer that prioritizes selected annual album candidates using non-AI, explainable scoring rules.
-
-## Expected Result
-
-A stable scoring baseline for selected candidates with explicit score components and explainable outputs, still without AI ranking.
-
-## Files likely to change
-
-- src/models/
-- src/album/
-- tests/
-
-## Architecture impact
-
-High
-
-## Acceptance criteria
-
-- The application remains functional.
-- Deterministic non-AI scoring can prioritize selected album candidates.
-- Scoring outputs are explainable and test-covered.
-- Existing app import, thumbnail, details, and cache behavior remain functional.
+Before planning implementation, the correct functional domain must be identified first.
 
 ---
 
@@ -302,7 +488,7 @@ See docs/project/ROADMAP.md for the authoritative milestone plan.
 | Classes | TBD |
 | Modules | TBD |
 | Implemented features | TBD |
-| Completed Sprints | 17 |
+| Completed Sprints | 20 |
 | Architecture maturity | Emerging |
 
 ---
@@ -321,7 +507,11 @@ It provides the current project status and operational context. The other projec
 
 PROJECT_STATE.md is the single source of truth for current version, active sprint, completed sprint count, and operational implementation status.
 
-docs/project/ROADMAP.md is the single source of truth for planned milestones.
+docs/project/DOMAIN_ROADMAP.md is the single source of truth for future planned domains and milestones.
+
+docs/project/MASTER_DEVELOPMENT_PLAN.md is the single source of truth for highest-level product planning direction.
+
+docs/project/ROADMAP.md is retained as historical and transitional planning context.
 
 docs/releases/CHANGELOG.md is the single source of truth for historical sprint changes.
 

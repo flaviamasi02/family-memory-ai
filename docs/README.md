@@ -56,6 +56,7 @@ Core framework references:
 ```text
 docs/
   bootstrap/
+  product/
   project/
   development/
   architecture/
@@ -67,6 +68,7 @@ docs/
 Folder responsibilities:
 
 - `bootstrap/`: Mandatory onboarding and execution entry points for AI sessions.
+- `product/`: Official product-design specifications and long-term behavior definitions.
 - `project/`: Product direction, state, roadmap, principles, and official terminology.
 - `development/`: Team workflow, decisions, coding standards, and documentation governance.
 - `architecture/`: System structure, components, data model, UI architecture, and API boundaries.
@@ -91,8 +93,12 @@ Read in this order:
 7. [project/PROJECT_STATE.md](project/PROJECT_STATE.md)
 8. [development/AI_PROJECT_PLAYBOOK.md](development/AI_PROJECT_PLAYBOOK.md)
 9. [development/DECISIONS.md](development/DECISIONS.md)
-10. [project/ROADMAP.md](project/ROADMAP.md) (if present)
-11. [project/GLOSSARY.md](project/GLOSSARY.md)
+10. [project/MASTER_DEVELOPMENT_PLAN.md](project/MASTER_DEVELOPMENT_PLAN.md)
+11. [project/DOMAIN_ROADMAP.md](project/DOMAIN_ROADMAP.md)
+12. [project/ROADMAP.md](project/ROADMAP.md) (historical/transitional)
+13. [project/GLOSSARY.md](project/GLOSSARY.md)
+14. [product/FAMILY_MEMORY_SCORE.md](product/FAMILY_MEMORY_SCORE.md) when working on scoring/ranking direction
+15. [product/PRODUCT_VISION.md](product/PRODUCT_VISION.md) when making product or architecture decisions
 
 ### For Developers
 
@@ -103,6 +109,12 @@ Start from the document that matches your goal:
 - Review architecture: [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md)
 - Understand AI workflow: [development/AI_PROJECT_PLAYBOOK.md](development/AI_PROJECT_PLAYBOOK.md)
 - Review decisions: [development/DECISIONS.md](development/DECISIONS.md)
+
+### Product Documentation
+
+- Family Memory Score specification: [product/FAMILY_MEMORY_SCORE.md](product/FAMILY_MEMORY_SCORE.md)
+- Product Vision: [product/PRODUCT_VISION.md](product/PRODUCT_VISION.md)
+- Master Development Plan: [project/MASTER_DEVELOPMENT_PLAN.md](project/MASTER_DEVELOPMENT_PLAN.md)
 
 ---
 
@@ -116,8 +128,12 @@ Start from the document that matches your goal:
 | [bootstrap/COMMANDS.md](bootstrap/COMMANDS.md) | Official command system and execution semantics | AI assistants, developers | Workflow governance |
 | [project/PROJECT_CONTEXT.md](project/PROJECT_CONTEXT.md) | Product intent, context, and long-term direction | Developers, AI assistants | Product owner |
 | [project/PROJECT_STATE.md](project/PROJECT_STATE.md) | Current implementation state and active sprint status | Developers, AI assistants | Development workflow |
+| [project/MASTER_DEVELOPMENT_PLAN.md](project/MASTER_DEVELOPMENT_PLAN.md) | Highest-level product planning direction | Product owner, AI assistants, developers | Product planning |
+| [project/DOMAIN_ROADMAP.md](project/DOMAIN_ROADMAP.md) | Official future roadmap by domain | Product owner, developers, AI assistants | Product planning |
 | [project/ROADMAP.md](project/ROADMAP.md) | Planned milestones and forward priorities | Product owner, developers | Product planning |
 | [project/GLOSSARY.md](project/GLOSSARY.md) | Official terminology definitions | Developers, AI assistants | Documentation governance |
+| [product/PRODUCT_VISION.md](product/PRODUCT_VISION.md) | Canonical product mission, philosophy, and objectives | Product owner, AI assistants, developers | Product design |
+| [product/FAMILY_MEMORY_SCORE.md](product/FAMILY_MEMORY_SCORE.md) | Official Family Memory Score product specification | Product owner, AI assistants, developers | Product design |
 | [PROJECT_CONSTITUTION.md](PROJECT_CONSTITUTION.md) | Stable constitutional principles of the project | Product owner, developers, AI assistants | Product/Architecture governance |
 | [development/AI_PROJECT_PLAYBOOK.md](development/AI_PROJECT_PLAYBOOK.md) | Development methodology and sprint discipline | AI assistants, developers | Development workflow |
 | [development/DECISIONS.md](development/DECISIONS.md) | Architecture Decision (DEC) ledger | Developers, architects, AI assistants | Architecture governance |
@@ -145,9 +161,10 @@ Starting a new sprint
 
 ```text
 PROJECT_STATE
-  -> ROADMAP
-    -> DECISIONS
-      -> AI_PROJECT_PLAYBOOK
+  -> MASTER_DEVELOPMENT_PLAN
+    -> DOMAIN_ROADMAP
+      -> DECISIONS
+        -> AI_PROJECT_PLAYBOOK
 ```
 
 Documentation synchronization
@@ -186,11 +203,12 @@ DECISIONS
 
 Canonical ownership:
 
-- Project vision: [project/PROJECT_CONTEXT.md](project/PROJECT_CONTEXT.md)
+- Product vision: [product/PRODUCT_VISION.md](product/PRODUCT_VISION.md)
 - Current sprint and implementation status: [project/PROJECT_STATE.md](project/PROJECT_STATE.md)
 - Architecture: [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md)
 - Commands: [bootstrap/COMMANDS.md](bootstrap/COMMANDS.md)
 - Terminology: [project/GLOSSARY.md](project/GLOSSARY.md)
+- Family Memory Score specification: [product/FAMILY_MEMORY_SCORE.md](product/FAMILY_MEMORY_SCORE.md)
 - Workflow and process: [development/AI_PROJECT_PLAYBOOK.md](development/AI_PROJECT_PLAYBOOK.md)
 - Architecture decisions: [development/DECISIONS.md](development/DECISIONS.md)
 - Documentation architecture: [development/DOCUMENTATION_ARCHITECTURE.md](development/DOCUMENTATION_ARCHITECTURE.md)
@@ -244,6 +262,7 @@ Prefer extending existing documents before creating unnecessary new files.
 - [development/DECISIONS.md](development/DECISIONS.md)
 - [project/ROADMAP.md](project/ROADMAP.md)
 - [project/GLOSSARY.md](project/GLOSSARY.md)
+- [product/FAMILY_MEMORY_SCORE.md](product/FAMILY_MEMORY_SCORE.md)
 - [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md)
 
 ---

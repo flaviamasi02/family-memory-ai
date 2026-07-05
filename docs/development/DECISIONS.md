@@ -128,9 +128,15 @@ Product North Star
 **Value:** Product  
 **Impact:** Low
 
-Version 1 of Family Memory AI has one primary objective:
+Superseded by later product-direction updates in PRODUCT-DECISION-001 and PRODUCT-DOC-002.
+
+Original decision:
 
 > "Automatically create the best possible annual family photo album."
+
+Current interpretation:
+
+Annual album creation remains an important output, but the broader product mission now centers on Family Memory Intelligence: helping families preserve, organize, understand, and continuously teach the system what matters most.
 
 Future album types including:
 - Vacation Albums

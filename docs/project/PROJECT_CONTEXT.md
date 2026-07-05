@@ -8,7 +8,9 @@ Single source role:
 
 - This file defines long-term collaboration and development context.
 - docs/project/PROJECT_STATE.md defines current operational status.
-- docs/project/ROADMAP.md defines planned milestones.
+- docs/project/MASTER_DEVELOPMENT_PLAN.md defines the highest-level product planning direction.
+- docs/project/DOMAIN_ROADMAP.md defines official future domains and milestones.
+- docs/project/ROADMAP.md defines historical and transitional planning context.
 - docs/releases/CHANGELOG.md defines historical implementation changes.
 
 ---

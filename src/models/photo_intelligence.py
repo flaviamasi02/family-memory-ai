@@ -8,8 +8,21 @@ class PhotoIntelligence:
     # Basic
     year: Optional[int] = None
     month: Optional[int] = None
+    day: Optional[int] = None
     date_taken: Optional[datetime | str] = None
+    date_source: str = "Unknown"
+    source_of_date: str = "Unknown"
     has_metadata: bool = False
+    relevance_category: str = "unknown"
+    relevance_reason: str = ""
+    is_album_relevant_candidate: bool = True
+    media_category: str = "unknown"
+    automatic_media_category: str = "unknown"
+    user_corrected_media_category: str = ""
+    effective_media_category: str = "unknown"
+    user_decision: str = "pending"
+    classification_reason: str = ""
+    classification_confidence: float = 0.0
 
     # Quality placeholders
     quality_score: Optional[float] = None

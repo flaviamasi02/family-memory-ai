@@ -1,6 +1,12 @@
 # Family Memory AI
 
-AI-powered desktop assistant for family photo memories.
+Family Memory AI is a Family Memory Intelligence platform.
+
+Its long-term mission is to help families preserve, organize, understand, and rediscover the memories that matter most while continuously learning what is important for each family. Albums are only one possible output generated from that knowledge, not the primary purpose of the system.
+
+Historical implementation remains organized through completed DEV-XXX milestones. Future work follows domain-based milestones so new capabilities are planned inside functional areas such as Memory Review, Cleanup, Duplicate Management, Preference Learning, Memory Intelligence, and Outputs.
+
+The highest-level planning document is docs/project/MASTER_DEVELOPMENT_PLAN.md.
 
 Version: v0.1.0
 Status: In development
@@ -21,6 +27,8 @@ Start here for project context and current status:
 
 ## Documentation Map
 
+- docs/project/DOMAIN_ROADMAP.md: Official domain-based future roadmap
+- docs/project/MASTER_DEVELOPMENT_PLAN.md: Highest-level product planning document
 - docs/project/ROADMAP.md: Planned milestones and priorities
 - docs/releases/CHANGELOG.md: Sprint-by-sprint implementation history
 - docs/project/PROJECT_STATE.md: Current operational state (single source of truth for current sprint and status)
