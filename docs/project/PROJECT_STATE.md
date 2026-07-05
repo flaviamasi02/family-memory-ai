@@ -6,7 +6,7 @@
 
 ## Current Sprint
 
-- Sprint MEM-006 (Image Preview on Double Click) - Completed
+- Sprint CLEAN-004 (Shared Thumbnail Grid for Cleanup Review) - Completed
 
 ## Project Status
 
@@ -195,11 +195,11 @@ Album Builder becomes one consumer of the Memory Intelligence system rather than
 
 ## Current Active Domain
 
-- MEM
+- CLEAN
 
 ## Current Milestone
 
-- MEM-006 Image Preview on Double Click
+- CLEAN-004 Shared Thumbnail Grid for Cleanup Review
 
 ## Recently Completed Milestones
 
@@ -213,6 +213,7 @@ Album Builder becomes one consumer of the Memory Intelligence system rather than
 - MEM-005 True multi-column Memory Review grid with compact cards and right-panel details
 - CLEAN-003 Cleanup Review redesigned with visual thumbnail workspace, explainable classification, grouping, and category correction
 - MEM-006 Reusable image preview dialog with double-click navigation from Memory Review and Cleanup Review
+- CLEAN-004 Cleanup Review migrated to shared thumbnail grid component with shared lazy rendering and selection model
 
 ## Upcoming Milestones
 
@@ -400,6 +401,11 @@ Long-term output framing:
 - [x] Preview dialog keyboard shortcuts: Esc (close), Left/Right (previous/next)
 - [x] Preview dialog uses original image when available and falls back to thumbnail when original is unavailable
 - [x] Preview dialog shows filename, media category, user decision, score (when available), and position (N of total)
+- [x] Shared thumbnail grid component for review workspaces (compact cards, multi-column layout, lazy rendering)
+- [x] Cleanup Review migrated to shared thumbnail grid and shared interaction model
+- [x] Shared double-click preview flow between Memory Review and Cleanup Review
+- [x] Shared lazy/batched rendering and selection model for Cleanup Review grid
+- [x] Cleanup Review thumbnail cache reuse for compact-card rendering
 - [x] Safe move to cleanup review folder with confirmation and result summary
 - [x] Exact duplicate placeholder handling using file hashes and deterministic keeper selection
 - [x] Improved deterministic initial media classification with richer multilingual indicators and conservative family-photo assignment

@@ -1,6 +1,14 @@
 # Changelog
 
 ## Unreleased
+### Sprint CLEAN-004 - Shared Thumbnail Grid for Cleanup Review
+- Migrated Cleanup Review to a shared compact thumbnail-grid component with responsive multi-column layout.
+- Shared component preserves lazy rendering, batched loading, multi-selection, and double-click behavior.
+- Cleanup filtering, details panel updates, bulk actions, and safe move workflow now run on top of the shared grid model.
+- Reused preview dialog behavior from Memory Review for Cleanup double-click preview and navigation.
+- Added test coverage for grid rendering, columns, filtering, selection model, lazy rendering, and thumbnail-cache reuse.
+- No AI, no scoring changes, no AlbumBuilder changes, and no persistence added.
+
 ### Sprint MEM-006 - Image Preview on Double Click
 - Added reusable image preview dialog for larger visual inspection from compact thumbnail grids.
 - Enabled double-click preview opening from Memory Review and Cleanup Review cards.

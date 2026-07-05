@@ -1,6 +1,16 @@
 # Changelog
 
 ## Unreleased
+### CLEAN-004 - Shared Thumbnail Grid for Cleanup Review
+- Migrated Cleanup Review to a shared thumbnail-grid component used for review workflows.
+- Shared grid supports compact cards, responsive multi-column layout, lazy/batched rendering, multi-selection, and double-click handling.
+- Cleanup cards remain compact and display only thumbnail, filename, automatic category badge, confidence badge, and recommended action badge.
+- Kept existing Cleanup filters (category, confidence, recommended action, search) with grid refresh behavior.
+- Preserved bulk actions (category correction, safe move to cleanup folder, decision updates) on top of shared selection model.
+- Reused image-preview dialog flow so Cleanup double-click opens the same preview with next/previous and Esc support.
+- Added/updated tests for shared-grid rendering in Cleanup Review, multi-column behavior, details updates, filtering, multi-selection, lazy rendering, and thumbnail-cache reuse.
+- No AI added, no scoring/AlbumBuilder changes, and no persistence added.
+
 ### MEM-006 - Image Preview on Double Click
 - Added reusable `ImagePreviewDialog` for large visual inspection from compact review grids.
 - Added double-click preview opening from Memory Review cards.

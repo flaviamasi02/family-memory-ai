@@ -209,6 +209,91 @@ class IrrelevantMediaPageTests(unittest.TestCase):
             page.clear_selection()
             self.assertEqual(page.selected_count(), 0)
 
+    def test_cleanup_review_grid_renders_multiple_columns_when_wide(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            items = [
+                self._make_photo(root, f"img_{index}.jpg", {"relevance_category": "unknown", "cleanup_confidence": 0.5})
+                for index in range(12)
+            ]
+
+            page = IrrelevantMediaPage()
+            page.resize(1800, 980)
+            page.show()
+            page.set_photos(items, root, total_imported_count=12)
+            self._flush_ui(wait_ms=120)
+
+            self.assertGreaterEqual(page.grid_column_count(), 3)
+
+    def test_cleanup_review_filtering_refreshes_shared_grid(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            doc = self._make_photo(root, "doc.jpg", {"relevance_category": "document_or_scan", "cleanup_confidence": 0.9})
+            meme = self._make_photo(root, "meme.jpg", {"relevance_category": "meme_or_graphic", "cleanup_confidence": 0.7})
+
+            page = IrrelevantMediaPage()
+            page.set_photos([doc, meme], root, total_imported_count=2)
+            self._flush_ui(wait_ms=80)
+
+            page.category_filter_combo.setCurrentText("Documents")
+            self._flush_ui(wait_ms=80)
+            self.assertEqual(page.visible_filenames(), ["doc.jpg"])
+
+    def test_cleanup_review_multi_selection_ctrl_and_shift(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            one = self._make_photo(root, "one.jpg", {"relevance_category": "unknown", "cleanup_confidence": 0.9})
+            two = self._make_photo(root, "two.jpg", {"relevance_category": "unknown", "cleanup_confidence": 0.8})
+            three = self._make_photo(root, "three.jpg", {"relevance_category": "unknown", "cleanup_confidence": 0.7})
+
+            page = IrrelevantMediaPage()
+            page.set_photos([one, two, three], root, total_imported_count=3)
+            self._flush_ui(wait_ms=100)
+
+            k1 = str(one.path)
+            k2 = str(two.path)
+            k3 = str(three.path)
+
+            # Ctrl adds second item.
+            page.thumbnail_grid._on_card_clicked(k1, 0)
+            page.thumbnail_grid._on_card_clicked(k2, int(Qt.KeyboardModifier.ControlModifier.value))
+            self.assertEqual(page.selected_count(), 2)
+
+            # Shift range-select from first anchor to third item.
+            page.thumbnail_grid._on_card_clicked(k1, 0)
+            page.thumbnail_grid._on_card_clicked(k3, int(Qt.KeyboardModifier.ShiftModifier.value))
+            self.assertEqual(page.selected_count(), 3)
+
+    def test_cleanup_review_lazy_rendering_preserved(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            items = [
+                self._make_photo(root, f"lazy_{index}.jpg", {"relevance_category": "unknown", "cleanup_confidence": 0.6})
+                for index in range(260)
+            ]
+
+            page = IrrelevantMediaPage()
+            page.set_photos(items, root, total_imported_count=260)
+            self._flush_ui(wait_ms=120)
+
+            self.assertEqual(len(page.visible_filenames()), 260)
+            self.assertLess(page.rendered_card_count(), 260)
+
+    def test_cleanup_review_thumbnail_cache_reused(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            photo = self._make_photo(root, "cache.jpg", {"relevance_category": "unknown", "cleanup_confidence": 0.9})
+
+            page = IrrelevantMediaPage()
+            page.set_photos([photo], root, total_imported_count=1)
+            self._flush_ui(wait_ms=80)
+
+            row = page._visible_rows[0]
+            first = page._get_cached_card_thumbnail(row)
+            second = page._get_cached_card_thumbnail(row)
+            self.assertIsNotNone(first)
+            self.assertIs(first, second)
+
     def test_move_to_cleanup_folder_action_moves_selected_files(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

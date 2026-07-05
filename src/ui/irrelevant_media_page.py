@@ -4,21 +4,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import QTimer, Qt, Signal
-from PySide6.QtGui import QFontMetrics, QPixmap
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
     QFormLayout,
-    QFrame,
-    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QListWidget,
     QMessageBox,
     QPushButton,
-    QScrollArea,
-    QSizePolicy,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -26,6 +22,7 @@ from PySide6.QtWidgets import (
 
 from core.safe_file_move_service import CLEANUP_REVIEW_FOLDER_NAME, move_files_to_cleanup_review
 from ui.image_preview_dialog import ImagePreviewDialog
+from ui.shared_thumbnail_grid import SharedGridItem, SharedThumbnailGrid
 
 
 CATEGORY_LABELS = {
@@ -73,104 +70,6 @@ class CleanupReviewRow:
     user_decision: str = "pending"
 
 
-class CleanupReviewCardWidget(QFrame):
-    clicked = Signal(str, int)
-    double_clicked = Signal(str)
-
-    def __init__(self, row: CleanupReviewRow, key: str, parent=None):
-        super().__init__(parent)
-        self.row = row
-        self.key = key
-
-        self.setObjectName("cleanupReviewCard")
-        self.setFrameShape(QFrame.Shape.StyledPanel)
-        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        self.setFixedWidth(164)
-        self.setFixedHeight(228)
-
-        self.thumbnail_label = QLabel("No thumbnail")
-        self.thumbnail_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.thumbnail_label.setFixedSize(140, 140)
-        self.thumbnail_label.setStyleSheet("border: 1px solid #bbb; background: #f6f6f6;")
-
-        self.filename_label = QLabel("")
-        self.filename_label.setWordWrap(False)
-        self.filename_label.setStyleSheet("font-weight: 600;")
-        self.filename_label.setFixedWidth(148)
-        self.filename_label.setMaximumHeight(20)
-
-        self.category_badge = QLabel("")
-        self.confidence_badge = QLabel("")
-        self.action_badge = QLabel("")
-        for badge in (self.category_badge, self.confidence_badge, self.action_badge):
-            badge.setStyleSheet("background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 6px; padding: 2px 6px;")
-            badge.setMaximumHeight(22)
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(6, 6, 6, 6)
-        layout.setSpacing(4)
-        layout.addWidget(self.thumbnail_label, 0, Qt.AlignmentFlag.AlignHCenter)
-        layout.addWidget(self.filename_label)
-
-        badges = QHBoxLayout()
-        badges.setContentsMargins(0, 0, 0, 0)
-        badges.setSpacing(4)
-        badges.addWidget(self.category_badge)
-        badges.addWidget(self.confidence_badge)
-        badges.addWidget(self.action_badge)
-        layout.addLayout(badges)
-
-        self.refresh_from_row()
-        self.set_selected(False)
-
-    def refresh_from_row(self) -> None:
-        photo = self.row.photo
-        thumbnail = getattr(photo, "thumbnail", None)
-        if isinstance(thumbnail, QPixmap) and not thumbnail.isNull():
-            scaled = thumbnail.scaled(
-                140,
-                140,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-            self.thumbnail_label.setPixmap(scaled)
-            self.thumbnail_label.setText("")
-        else:
-            self.thumbnail_label.setPixmap(QPixmap())
-            self.thumbnail_label.setText("No thumbnail")
-
-        full_name = photo.display_name()
-        self.filename_label.setToolTip(full_name)
-        metrics = QFontMetrics(self.filename_label.font())
-        self.filename_label.setText(metrics.elidedText(full_name, Qt.TextElideMode.ElideRight, self.filename_label.width()))
-
-        category_text = _display_category(self.row.automatic_category)
-        confidence_text = f"{max(0, min(100, int(round(self.row.confidence * 100))))}%"
-        action_text = _display_action(self.row.recommended_action)
-
-        self.category_badge.setText(_shorten_badge(category_text))
-        self.confidence_badge.setText(confidence_text)
-        self.action_badge.setText(_shorten_badge(action_text))
-
-    def set_selected(self, selected: bool) -> None:
-        if selected:
-            self.setStyleSheet(
-                "QFrame#cleanupReviewCard { border: 2px solid #1f6feb; border-radius: 6px; background: #eef6ff; }"
-            )
-        else:
-            self.setStyleSheet(
-                "QFrame#cleanupReviewCard { border: 1px solid #c9c9c9; border-radius: 6px; background: #ffffff; }"
-            )
-
-    def mousePressEvent(self, event):
-        self.clicked.emit(self.key, int(event.modifiers().value))
-        super().mousePressEvent(event)
-
-    def mouseDoubleClickEvent(self, event):
-        self.double_clicked.emit(self.key)
-        super().mouseDoubleClickEvent(event)
-
-
 class IrrelevantMediaPage(QWidget):
     moved_photos = Signal(object)
 
@@ -182,25 +81,11 @@ class IrrelevantMediaPage(QWidget):
         super().__init__(parent)
         self._rows: list[CleanupReviewRow] = []
         self._visible_rows: list[CleanupReviewRow] = []
-        self._cards_by_key: dict[str, CleanupReviewCardWidget] = {}
-        self._rendered_keys: list[str] = []
-        self._selected_keys: set[str] = set()
-        self._selected_key: Optional[str] = None
-        self._selection_anchor_key: Optional[str] = None
-        self._details_key: Optional[str] = None
         self._imported_root: Optional[Path] = None
         self._imported_total_count = 0
-        self._pending_render_index = 0
-        self._target_render_count = 0
-        self._initial_render_count = 100
-        self._render_batch_size = 60
-        self._grid_columns = 4
+        self._details_key: Optional[str] = None
         self._preview_dialog: Optional[ImagePreviewDialog] = None
-
-        self._search_timer = QTimer(self)
-        self._search_timer.setSingleShot(True)
-        self._search_timer.setInterval(220)
-        self._search_timer.timeout.connect(self._trigger_refresh)
+        self._thumbnail_cache: dict[str, tuple[int, QPixmap]] = {}
 
         self.title_label = QLabel("Cleanup Review")
         self.title_label.setStyleSheet("font-size: 18px; font-weight: 600;")
@@ -235,7 +120,7 @@ class IrrelevantMediaPage(QWidget):
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search filename...")
-        self.search_input.textChanged.connect(self._on_search_changed)
+        self.search_input.textChanged.connect(self._trigger_refresh)
 
         self.selection_count_label = QLabel("Selected: 0")
         self.select_all_button = QPushButton("Select All Visible")
@@ -260,15 +145,10 @@ class IrrelevantMediaPage(QWidget):
 
         self.results_label = QLabel("Showing 0 photos")
 
-        self.grid_scroll = QScrollArea(self)
-        self.grid_scroll.setWidgetResizable(True)
-        self.grid_content = QWidget(self.grid_scroll)
-        self.grid_content.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        self.grid_layout = QGridLayout(self.grid_content)
-        self.grid_layout.setContentsMargins(10, 10, 10, 10)
-        self.grid_layout.setSpacing(8)
-        self.grid_scroll.setWidget(self.grid_content)
-        self.grid_scroll.verticalScrollBar().valueChanged.connect(self._on_scroll_changed)
+        self.thumbnail_grid = SharedThumbnailGrid(self)
+        self.thumbnail_grid.selection_changed.connect(self._on_grid_selection_changed)
+        self.thumbnail_grid.card_double_clicked.connect(self._on_card_double_clicked)
+        self._cards_by_key = self.thumbnail_grid._cards_by_key
 
         self.preview_label = QLabel("No preview")
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -354,10 +234,10 @@ class IrrelevantMediaPage(QWidget):
         details_panel.setMinimumWidth(440)
 
         grid_panel = QWidget()
-        grid_panel_layout = QVBoxLayout(grid_panel)
-        grid_panel_layout.setContentsMargins(0, 0, 0, 0)
-        grid_panel_layout.addWidget(self.results_label)
-        grid_panel_layout.addWidget(self.grid_scroll, 1)
+        grid_layout = QVBoxLayout(grid_panel)
+        grid_layout.setContentsMargins(0, 0, 0, 0)
+        grid_layout.addWidget(self.results_label)
+        grid_layout.addWidget(self.thumbnail_grid, 1)
 
         splitter = QSplitter()
         splitter.addWidget(grid_panel)
@@ -381,11 +261,7 @@ class IrrelevantMediaPage(QWidget):
         self._imported_total_count = int(total_imported_count) if isinstance(total_imported_count, int) else len(photos or [])
 
         self._rows = [self._build_row(photo) for photo in list(photos or [])]
-        self._selected_keys = set()
-        self._selected_key = None
-        self._selection_anchor_key = None
         self._details_key = None
-
         self._reset_filter_options()
         self._refresh_group_options()
         self._trigger_refresh(force=True)
@@ -397,10 +273,9 @@ class IrrelevantMediaPage(QWidget):
                 continue
             if isinstance(pixmap, QPixmap) and not pixmap.isNull():
                 row.photo.thumbnail = pixmap
-            card = self._cards_by_key.get(key)
-            if card is not None:
-                card.refresh_from_row()
-            if self._selected_key == key:
+            self._thumbnail_cache.pop(key, None)
+            self.thumbnail_grid.update_item(self._to_grid_item(row))
+            if self.thumbnail_grid.selected_key() == key:
                 self._show_details(row, force=True)
             break
 
@@ -408,7 +283,7 @@ class IrrelevantMediaPage(QWidget):
         return [row.photo.display_name() for row in self._visible_rows]
 
     def selected_count(self) -> int:
-        return len(self._selected_keys)
+        return self.thumbnail_grid.selected_count()
 
     def select_photo_by_filename(self, filename: str) -> bool:
         target = (filename or "").strip()
@@ -418,11 +293,7 @@ class IrrelevantMediaPage(QWidget):
         for row in self._visible_rows:
             if row.photo.display_name() == target:
                 key = self._photo_key(row.photo)
-                self._selected_key = key
-                self._selected_keys = {key}
-                self._selection_anchor_key = key
-                self._refresh_card_selection()
-                self._refresh_selection_label()
+                self.thumbnail_grid.set_single_selection(key)
                 self._show_details(row, force=True)
                 return True
         return False
@@ -439,9 +310,9 @@ class IrrelevantMediaPage(QWidget):
             if card is None:
                 return None
             return {
-                "category": card.category_badge.text(),
-                "confidence": card.confidence_badge.text(),
-                "action": card.action_badge.text(),
+                "category": card.badge_one.text(),
+                "confidence": card.badge_two.text(),
+                "action": card.badge_three.text(),
             }
         return None
 
@@ -449,20 +320,10 @@ class IrrelevantMediaPage(QWidget):
         return (not self.alternatives_title.isHidden()) and (not self.alternatives_list.isHidden())
 
     def select_all_visible(self) -> None:
-        self._selected_keys = {self._photo_key(row.photo) for row in self._visible_rows}
-        if self._visible_rows:
-            self._selected_key = self._photo_key(self._visible_rows[0].photo)
-            self._selection_anchor_key = self._selected_key
-            self._show_details(self._visible_rows[0], force=True)
-        self._refresh_card_selection()
-        self._refresh_selection_label()
+        self.thumbnail_grid.select_all_visible()
 
     def clear_selection(self) -> None:
-        self._selected_keys = set()
-        self._selected_key = None
-        self._selection_anchor_key = None
-        self._refresh_card_selection()
-        self._refresh_selection_label()
+        self.thumbnail_grid.clear_selection()
         self._clear_details()
 
     def move_selected_to_quarantine(self) -> None:
@@ -496,11 +357,38 @@ class IrrelevantMediaPage(QWidget):
         moved_photos = [row.photo for row in selected_rows if str(row.photo.path) in moved_sources]
         if moved_photos:
             self._rows = [row for row in self._rows if str(row.photo.path) not in moved_sources]
-            self._selected_keys = {key for key in self._selected_keys if key not in moved_sources}
-            self._selected_key = None if self._selected_key in moved_sources else self._selected_key
             self._refresh_group_options()
             self._trigger_refresh(force=True)
             self.moved_photos.emit(moved_photos)
+
+    def _on_grid_selection_changed(self, selected_keys: set[str], selected_key: Optional[str]) -> None:
+        _ = selected_keys
+        self.selection_count_label.setText(f"Selected: {self.thumbnail_grid.selected_count()}")
+        if not selected_key:
+            self._clear_details()
+            return
+        row = self._row_for_key(selected_key)
+        if row is None:
+            self._clear_details()
+            return
+        self._show_details(row)
+
+    def _on_card_double_clicked(self, key: str) -> None:
+        self.open_preview_for_key(key)
+
+    def open_preview_for_key(self, key: str) -> None:
+        visible_keys = [self._photo_key(row.photo) for row in self._visible_rows]
+        if key not in visible_keys:
+            return
+
+        photos = [row.photo for row in self._visible_rows]
+        start_index = visible_keys.index(key)
+        if self._preview_dialog is None:
+            self._preview_dialog = ImagePreviewDialog(self)
+        self._preview_dialog.set_items(photos, start_index=start_index)
+        self._preview_dialog.show()
+        self._preview_dialog.raise_()
+        self._preview_dialog.activateWindow()
 
     def _build_row(self, photo) -> CleanupReviewRow:
         metadata = dict(getattr(photo, "metadata", {}) or {})
@@ -552,27 +440,6 @@ class IrrelevantMediaPage(QWidget):
             user_decision=decision,
         )
 
-    def _on_search_changed(self) -> None:
-        self._search_timer.start()
-
-    def _on_group_changed(self) -> None:
-        text = self.group_combo.currentText().strip()
-        if not text or text == self.CATEGORY_FILTER_ALL:
-            self.category_filter_combo.blockSignals(True)
-            self.category_filter_combo.setCurrentText(self.CATEGORY_FILTER_ALL)
-            self.category_filter_combo.blockSignals(False)
-            self._trigger_refresh()
-            return
-
-        for category in KNOWN_CATEGORIES:
-            label = _display_category(category)
-            if text.startswith(f"{label} ("):
-                self.category_filter_combo.blockSignals(True)
-                self.category_filter_combo.setCurrentText(label)
-                self.category_filter_combo.blockSignals(False)
-                self._trigger_refresh()
-                return
-
     def _trigger_refresh(self, force: bool = False) -> None:
         _ = force
         self._visible_rows = [
@@ -584,10 +451,24 @@ class IrrelevantMediaPage(QWidget):
             and self._matches_search(row)
         ]
         self._visible_rows.sort(key=lambda row: row.confidence, reverse=True)
+
         self._refresh_statistics()
         self._refresh_group_options()
         self._results_text()
-        self._rebuild_grid()
+
+        items = [self._to_grid_item(row) for row in self._visible_rows]
+        self.thumbnail_grid.set_items(items)
+
+    def _to_grid_item(self, row: CleanupReviewRow) -> SharedGridItem:
+        confidence_text = f"{max(0, min(100, int(round(row.confidence * 100))))}%"
+        return SharedGridItem(
+            key=self._photo_key(row.photo),
+            filename=row.photo.display_name(),
+            thumbnail=self._get_cached_card_thumbnail(row),
+            badge_one=_shorten_badge(_display_category(row.automatic_category)),
+            badge_two=confidence_text,
+            badge_three=_shorten_badge(_display_action(row.recommended_action)),
+        )
 
     def _matches_category_filter(self, row: CleanupReviewRow) -> bool:
         selected = self.category_filter_combo.currentText().strip()
@@ -663,6 +544,24 @@ class IrrelevantMediaPage(QWidget):
         self.group_combo.setCurrentIndex(index if index >= 0 else 0)
         self.group_combo.blockSignals(False)
 
+    def _on_group_changed(self) -> None:
+        text = self.group_combo.currentText().strip()
+        if not text or text == self.CATEGORY_FILTER_ALL:
+            self.category_filter_combo.blockSignals(True)
+            self.category_filter_combo.setCurrentText(self.CATEGORY_FILTER_ALL)
+            self.category_filter_combo.blockSignals(False)
+            self._trigger_refresh()
+            return
+
+        for category in KNOWN_CATEGORIES:
+            label = _display_category(category)
+            if text.startswith(f"{label} ("):
+                self.category_filter_combo.blockSignals(True)
+                self.category_filter_combo.setCurrentText(label)
+                self.category_filter_combo.blockSignals(False)
+                self._trigger_refresh()
+                return
+
     def _reset_filter_options(self) -> None:
         category_current = self.category_filter_combo.currentText().strip() or self.CATEGORY_FILTER_ALL
         self.category_filter_combo.blockSignals(True)
@@ -674,167 +573,11 @@ class IrrelevantMediaPage(QWidget):
         self.category_filter_combo.setCurrentIndex(idx if idx >= 0 else 0)
         self.category_filter_combo.blockSignals(False)
 
-    def _rebuild_grid(self) -> None:
-        for card in self._cards_by_key.values():
-            self.grid_layout.removeWidget(card)
-            card.deleteLater()
-
-        self._cards_by_key = {}
-        self._rendered_keys = []
-        self._pending_render_index = 0
-        self._grid_columns = self._calculate_grid_columns()
-
-        visible_keys = {self._photo_key(row.photo) for row in self._visible_rows}
-        self._selected_keys = {key for key in self._selected_keys if key in visible_keys}
-        if self._selected_keys:
-            self._selected_key = next(iter(self._selected_keys))
-        elif self._visible_rows:
-            self._selected_key = self._photo_key(self._visible_rows[0].photo)
-            self._selected_keys = {self._selected_key}
-            self._selection_anchor_key = self._selected_key
-        else:
-            self._selected_key = None
-
-        if not self._visible_rows:
-            self._refresh_selection_label()
-            self._clear_details()
-            return
-
-        self._target_render_count = min(self._initial_render_count, len(self._visible_rows))
-        self._schedule_render_batch()
-
-    def _schedule_render_batch(self) -> None:
-        QTimer.singleShot(0, self._add_next_batch)
-
-    def _add_next_batch(self) -> None:
-        render_limit = min(self._target_render_count, len(self._visible_rows))
-        if self._pending_render_index >= render_limit:
-            self._refresh_card_selection()
-            self._refresh_selection_label()
-            selected = self._selected_row()
-            if selected is not None:
-                self._show_details(selected)
-            return
-
-        batch_end = min(self._pending_render_index + self._render_batch_size, render_limit)
-        for index in range(self._pending_render_index, batch_end):
-            row = self._visible_rows[index]
-            key = self._photo_key(row.photo)
-            card = CleanupReviewCardWidget(row=row, key=key)
-            card.clicked.connect(self._on_card_clicked)
-            card.double_clicked.connect(self._on_card_double_clicked)
-            self._cards_by_key[key] = card
-            self._rendered_keys.append(key)
-
-            card_index = len(self._rendered_keys) - 1
-            grid_row = card_index // self._grid_columns
-            grid_column = card_index % self._grid_columns
-            self.grid_layout.addWidget(card, grid_row, grid_column)
-
-        self._pending_render_index = batch_end
-        self._refresh_card_selection()
-        self._refresh_selection_label()
-
-    def _on_scroll_changed(self, value: int) -> None:
-        scrollbar = self.grid_scroll.verticalScrollBar()
-        if scrollbar.maximum() <= 0:
-            return
-        if value < scrollbar.maximum() - 180:
-            return
-        if self._target_render_count >= len(self._visible_rows):
-            return
-
-        self._target_render_count = min(self._target_render_count + self._render_batch_size, len(self._visible_rows))
-        self._schedule_render_batch()
-
-    def _on_card_clicked(self, key: str, modifiers: int = 0) -> None:
-        ctrl_pressed = bool(modifiers & int(Qt.KeyboardModifier.ControlModifier.value))
-        shift_pressed = bool(modifiers & int(Qt.KeyboardModifier.ShiftModifier.value))
-
-        if shift_pressed and self._selection_anchor_key:
-            range_keys = self._range_keys_between(self._selection_anchor_key, key)
-            if ctrl_pressed:
-                self._selected_keys.update(range_keys)
-            else:
-                self._selected_keys = set(range_keys)
-        elif ctrl_pressed:
-            if key in self._selected_keys:
-                self._selected_keys.remove(key)
-            else:
-                self._selected_keys.add(key)
-            self._selection_anchor_key = key
-        else:
-            self._selected_keys = {key}
-            self._selection_anchor_key = key
-
-        self._selected_key = key
-        self._refresh_card_selection()
-        self._refresh_selection_label()
-        selected = self._selected_row()
-        if selected is None:
-            self._clear_details()
-            return
-        self._show_details(selected)
-
-    def _on_card_double_clicked(self, key: str) -> None:
-        visible_keys = [self._photo_key(row.photo) for row in self._visible_rows]
-        if key not in visible_keys:
-            return
-
-        self._selected_key = key
-        if key not in self._selected_keys:
-            self._selected_keys = {key}
-        self._refresh_card_selection()
-        self._refresh_selection_label()
-
-        self.open_preview_for_key(key)
-
-    def open_preview_for_key(self, key: str) -> None:
-        visible_keys = [self._photo_key(row.photo) for row in self._visible_rows]
-        if key not in visible_keys:
-            return
-
-        photos = [row.photo for row in self._visible_rows]
-        start_index = visible_keys.index(key)
-        if self._preview_dialog is None:
-            self._preview_dialog = ImagePreviewDialog(self)
-        self._preview_dialog.set_items(photos, start_index=start_index)
-        self._preview_dialog.show()
-        self._preview_dialog.raise_()
-        self._preview_dialog.activateWindow()
-
-    def _selected_row(self) -> Optional[CleanupReviewRow]:
-        if not self._selected_key:
-            return None
+    def _row_for_key(self, key: str) -> Optional[CleanupReviewRow]:
         for row in self._rows:
-            if self._photo_key(row.photo) == self._selected_key:
+            if self._photo_key(row.photo) == key:
                 return row
         return None
-
-    def _selected_rows(self) -> list[CleanupReviewRow]:
-        selected_lookup = set(self._selected_keys)
-        rows = []
-        for row in self._rows:
-            if self._photo_key(row.photo) in selected_lookup:
-                rows.append(row)
-        return rows
-
-    def _range_keys_between(self, start_key: str, end_key: str) -> list[str]:
-        keys = [self._photo_key(row.photo) for row in self._visible_rows]
-        if start_key not in keys or end_key not in keys:
-            return [end_key]
-        start_index = keys.index(start_key)
-        end_index = keys.index(end_key)
-        if start_index <= end_index:
-            return keys[start_index:end_index + 1]
-        return keys[end_index:start_index + 1]
-
-    def _refresh_card_selection(self) -> None:
-        for key, card in self._cards_by_key.items():
-            card.set_selected(key in self._selected_keys)
-
-    def _refresh_selection_label(self) -> None:
-        self.selection_count_label.setText(f"Selected: {len(self._selected_keys)}")
 
     def _show_details(self, row: CleanupReviewRow, force: bool = False) -> None:
         row_key = self._photo_key(row.photo)
@@ -844,7 +587,7 @@ class IrrelevantMediaPage(QWidget):
         self._details_key = row_key
         photo = row.photo
 
-        thumbnail = getattr(photo, "thumbnail", None)
+        thumbnail = self._get_cached_card_thumbnail(row)
         if isinstance(thumbnail, QPixmap) and not thumbnail.isNull():
             preview = thumbnail.scaled(
                 320,
@@ -996,11 +739,12 @@ class IrrelevantMediaPage(QWidget):
             row.photo.sync_intelligence_from_metadata()
             changed = True
 
-        if not changed:
-            return
-        selected = self._selected_row()
-        if selected is not None:
-            self._show_details(selected, force=True)
+        if changed:
+            selected_key = self.thumbnail_grid.selected_key()
+            if selected_key:
+                row = self._row_for_key(selected_key)
+                if row is not None:
+                    self._show_details(row, force=True)
 
     def _apply_category_to_selected(self, category: str) -> None:
         normalized_category = _normalize_category(category)
@@ -1022,36 +766,45 @@ class IrrelevantMediaPage(QWidget):
             row.photo.sync_intelligence_from_metadata()
             changed = True
 
-        if not changed:
-            return
+        if changed:
+            self._refresh_group_options()
+            self._trigger_refresh(force=True)
 
-        self._refresh_group_options()
-        self._trigger_refresh(force=True)
-        selected = self._selected_row()
-        if selected is not None:
-            self._show_details(selected, force=True)
+    def _selected_rows(self) -> list[CleanupReviewRow]:
+        selected_lookup = set(self.thumbnail_grid.selected_keys())
+        return [row for row in self._rows if self._photo_key(row.photo) in selected_lookup]
 
     def _photo_key(self, photo) -> str:
         return str(getattr(photo, "path", ""))
 
-    def _calculate_grid_columns(self) -> int:
-        width = max(176, self.grid_scroll.viewport().width())
-        return max(1, width // 172)
+    def grid_column_count(self) -> int:
+        return self.thumbnail_grid.grid_column_count()
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        new_columns = self._calculate_grid_columns()
-        if new_columns == self._grid_columns:
-            return
-        self._grid_columns = new_columns
-        for index, key in enumerate(self._rendered_keys):
-            card = self._cards_by_key.get(key)
-            if card is None:
-                continue
-            self.grid_layout.removeWidget(card)
-            row = index // self._grid_columns
-            col = index % self._grid_columns
-            self.grid_layout.addWidget(card, row, col)
+    def compact_card_size(self) -> tuple[int, int]:
+        return self.thumbnail_grid.compact_card_size()
+
+    def rendered_card_count(self) -> int:
+        return len(self._cards_by_key)
+
+    def _get_cached_card_thumbnail(self, row: CleanupReviewRow) -> Optional[QPixmap]:
+        key = self._photo_key(row.photo)
+        photo_thumb = getattr(row.photo, "thumbnail", None)
+        if isinstance(photo_thumb, QPixmap) and not photo_thumb.isNull():
+            signature = int(photo_thumb.cacheKey())
+            cached = self._thumbnail_cache.get(key)
+            if cached is not None and cached[0] == signature:
+                return cached[1]
+            scaled = photo_thumb.scaled(
+                140,
+                140,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            self._thumbnail_cache[key] = (signature, scaled)
+            return scaled
+
+        self._thumbnail_cache.pop(key, None)
+        return None
 
 
 def _display_category(category: str) -> str:
