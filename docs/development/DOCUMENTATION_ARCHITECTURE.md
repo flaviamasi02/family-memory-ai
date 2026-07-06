@@ -246,10 +246,22 @@ AI assistants should:
 - Report missing documentation and unresolved references.
 - Report missing or outdated contextual workspace Help as a documentation issue.
 
-DOCSYNC and DOCVERIFY Workspace Help rule:
+DOCSYNC and DOCVERIFY Workspace Help obligations:
 
-- DOCSYNC must update workspace Help content whenever functionality changes user experience or user decision flow.
-- DOCVERIFY must validate that workspace Help content matches implemented behavior.
+DOCSYNC must:
+- Update workspace Help content when functionality changes user experience or user decision flow.
+- Update workspace Help workflow descriptions when user interaction changes.
+- Update workspace Help tips when new capabilities are introduced.
+- Keep workspace Help synchronized with the current implementation.
+- Treat Help updates as mandatory, not optional.
+
+DOCVERIFY must:
+- Verify that every user-facing workspace has contextual Help content.
+- Verify that Help content matches the currently implemented behavior.
+- Verify that Help workflow descriptions are correct and up to date.
+- Verify that Help tips remain valid for the current feature set.
+- Verify that Help has been updated after any UI or AI behavior change.
+- Report missing or outdated workspace Help as a documentation issue with FAIL or WARNING status.
 
 ---
 
@@ -259,6 +271,8 @@ This document is the official reference describing the documentation ecosystem o
 
 Future documentation changes must remain consistent with this architecture.
 
-Additional permanent requirement:
+Permanent Workspace Help requirement:
 
 "A user-facing feature is not considered complete until its contextual Workspace Help has been updated and accurately reflects the current functionality."
+
+This is a permanent project rule adopted as part of the Workspace Help Documentation Policy.

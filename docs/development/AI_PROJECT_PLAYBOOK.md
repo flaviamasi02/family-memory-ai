@@ -28,15 +28,18 @@ It allows any future AI to immediately understand how the project is managed.
 
 Family Memory AI treats contextual Workspace Help as part of the shipped product, not optional documentation.
 
+The Workspace Help System is a permanent architectural component. It is not a supplementary feature and it is not optional.
+
 Policy requirements:
 
 - Every user-facing workspace must provide contextual Help.
 - Help content is mandatory product functionality.
-- Every feature that changes user experience must update corresponding workspace Help content.
-- Every workflow change must update corresponding workspace Help content.
-- Every UI interaction change must update corresponding workspace Help content.
-- Every AI behavior change that affects user decisions must update corresponding workspace Help content.
-- No feature is complete until workspace Help content is updated.
+- Help documentation must evolve together with the product.
+- Every new feature must update the corresponding workspace Help content.
+- Every workflow change must update the corresponding workspace Help content.
+- Every UI change affecting user interaction must update the corresponding workspace Help content.
+- Every AI behavior change that affects user decisions must update the corresponding workspace Help content.
+- No user-facing feature is considered complete until workspace Help content has been updated.
 
 Required Help coverage per workspace:
 
@@ -192,6 +195,21 @@ The Git workflow is the official development workflow for Family Memory AI.
 
 Future AI assistants should consistently follow this workflow.
 
+### Permanent Definition of Done Requirements
+
+A sprint or feature is complete only when all of the following are satisfied:
+
+- Implementation is complete and working.
+- Tests and/or manual validation are complete where applicable.
+- Documentation is updated for all impacted areas.
+- **A user-facing feature is not considered complete until its contextual Workspace Help accurately reflects the implemented functionality.**
+- Workspace Help content is updated for every impacted user-facing workspace.
+- docs/project/PROJECT_STATE.md is updated.
+- docs/releases/CHANGELOG.md is updated.
+- docs/development/SYNC_QUEUE.md is reviewed and cleared of completed items.
+
+This Workspace Help requirement is a permanent project rule and cannot be waived.
+
 ## Documentation Validation Workflow
 
 Recommended flow for documentation governance:
@@ -228,16 +246,31 @@ If WARNING or FAIL
 
 Generate follow-up prompts
 
-DOCSYNC obligations:
+### DOCSYNC Obligations
 
-- Always update contextual workspace Help content whenever functionality, workflow, UI interaction, or AI decision behavior changes.
+Every DOCSYNC execution must:
 
-DOCVERIFY obligations:
+- Update contextual workspace Help content when functionality changes.
+- Update workspace Help workflow descriptions when user interaction changes.
+- Update workspace Help tips when new capabilities are introduced.
+- Keep workspace Help synchronized with the current implementation at all times.
 
-- Always verify that contextual workspace Help matches implemented behavior.
-- Report missing or outdated workspace Help as a documentation issue.
+Workspace Help updates are mandatory during every DOCSYNC. They are not optional.
 
-Definition of Done enforcement:
+### DOCVERIFY Obligations
+
+Every DOCVERIFY execution must verify:
+
+- Every user-facing workspace has contextual Help content.
+- Help content matches the currently implemented behavior.
+- Help workflow descriptions are correct and up to date.
+- Help tips remain valid for the current feature set.
+- Help content has been updated after any UI or AI behavior change.
+
+If Help is missing or outdated, it must be reported as a documentation issue with FAIL or WARNING status.
+
+### Definition of Done Enforcement
 
 - Future AI assistants must treat workspace Help updates as part of Definition of Done.
 - A user-facing feature is not considered complete until its contextual Workspace Help has been updated and accurately reflects current functionality.
+- DOCSYNC prepares and applies Help updates. DOCVERIFY validates that Help updates were applied correctly.

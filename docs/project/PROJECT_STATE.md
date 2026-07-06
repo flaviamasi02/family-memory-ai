@@ -22,6 +22,84 @@
 
 ---
 
+# Documentation Governance Update (DOCSYNC post-DOCVERIFY)
+
+## Workspace Help System
+
+The Workspace Help System introduced in UI-HELP-001 is now formally declared a permanent architectural component of Family Memory AI.
+
+It is not optional documentation. It is part of the shipped product.
+
+## Workspace Help Documentation Policy
+
+The Workspace Help Documentation Policy has been formally adopted as a permanent project development standard.
+
+Full policy definition: docs/development/AI_PROJECT_PLAYBOOK.md (Workspace Help Documentation Policy section).
+
+Summary:
+
+- Every user-facing workspace must provide contextual Help.
+- Every new feature, workflow change, UI change, and AI behavior change must include a corresponding Help update.
+- No user-facing feature is considered complete until Help content is updated.
+- Help must cover: what the workspace does, why it exists, when to use it, how to use it, what AI does automatically, what decisions the user makes, best practices, and tips.
+
+## Definition of Done Update
+
+The Definition of Done has been updated with a permanent mandatory rule:
+
+"A user-facing feature is not considered complete until its contextual Workspace Help accurately reflects the implemented functionality."
+
+This rule is permanent and cannot be waived.
+
+Full updated Definition of Done: docs/development/AI_PROJECT_PLAYBOOK.md (Definition of Done section).
+
+## DOCSYNC and DOCVERIFY Include Help Verification
+
+DOCSYNC and DOCVERIFY have been updated to include explicit workspace Help obligations.
+
+DOCSYNC must:
+- Update Help content when functionality changes.
+- Update Help workflows when user interaction changes.
+- Update Help tips when new capabilities are introduced.
+- Keep Help synchronized with implementation at all times.
+
+DOCVERIFY must:
+- Verify every workspace has contextual Help.
+- Verify Help matches implemented behavior.
+- Verify Help workflows are correct.
+- Verify Help tips are still valid.
+- Report missing or outdated Help as a documentation issue.
+
+Full updated obligations: docs/development/AI_PROJECT_PLAYBOOK.md and docs/bootstrap/COMMANDS.md.
+
+## Knowledge First Architecture
+
+Knowledge First Architecture is now the official long-term architectural direction for Family Memory AI.
+
+The conceptual flow is:
+
+```
+Photo → AI Analysis → Knowledge Database → (Memory Review, Cleanup Review) → AI Learning → Better Recommendations
+```
+
+Categories are not the AI's first decision. The AI first builds knowledge about a photo. Categories are a result of that knowledge.
+
+Full architecture definition: docs/architecture/ARCHITECTURE.md (Knowledge First Architecture section).
+
+## Memory Review and Cleanup Review Responsibilities
+
+The distinct responsibilities of Memory Review and Cleanup Review have been formally documented.
+
+- Memory Review purpose: Teach the AI. Users review memories, correct AI decisions, confirm important photos, assign categories, improve people recognition, validate events, and increase AI knowledge. Objective: improve the knowledge base.
+
+- Cleanup Review purpose: Reduce noise. Users review duplicates, screenshots, low-quality images, and unnecessary files. Objective: clean the collection without affecting valuable memories.
+
+Both workspaces operate on the same underlying knowledge and are distinct views with different goals.
+
+Full philosophy documentation: docs/product/PRODUCT_VISION.md (Memory Review and Cleanup Review Philosophy section).
+
+---
+
 # Executive Summary
 
 Family Memory AI is currently in an early-stage desktop prototype phase. The application launches and supports a basic workflow around importing photos, scanning folders, generating thumbnails, and displaying a photo browser experience.
