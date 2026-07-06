@@ -107,6 +107,65 @@ Current implemented direction emphasizes human-in-the-loop deterministic curatio
 
 ---
 
+# Memory Review and Cleanup Review Philosophy
+
+Memory Review and Cleanup Review are two distinct workspaces with different responsibilities. They operate on the same underlying knowledge base but serve different goals.
+
+## Memory Review
+
+**Purpose: Teach the AI.**
+
+Memory Review is the workspace where the user reviews memories, corrects AI decisions, confirms important photos, assigns categories, improves people recognition, validates events, and increases the AI knowledge base.
+
+The objective of Memory Review is improving the knowledge base.
+
+User actions in Memory Review:
+
+- Review AI-assigned media categories and correct them when wrong.
+- Confirm which photos are family memories and which are not.
+- Assign or adjust media categories to improve future AI classification.
+- Mark important photos so the system learns what matters.
+- Validate people recognition and event context.
+- Approve or reject photos from album candidates.
+
+Every decision in Memory Review is a learning signal. The AI uses these corrections to improve future classification and recommendations.
+
+## Cleanup Review
+
+**Purpose: Reduce noise.**
+
+Cleanup Review is the workspace where the user reviews duplicate candidates, screenshots, low-quality images, and unnecessary files.
+
+The objective of Cleanup Review is cleaning the collection without affecting valuable memories.
+
+User actions in Cleanup Review:
+
+- Review photos flagged as potential duplicates.
+- Review screenshots and memes that may not belong in the memory collection.
+- Review low-quality or blurry images.
+- Review files that appear to have no family memory value.
+- Decide what to move to the cleanup review folder and what to keep.
+
+Cleanup Review does not teach the AI what matters — that is Memory Review's role. Cleanup Review reduces clutter so the rest of the system works with higher-quality input.
+
+## Shared Knowledge
+
+Both workspaces operate on the same underlying Knowledge Database. A category correction made in Memory Review is reflected in Cleanup Review. A cleanup decision does not remove a memory from Memory Review unless the user explicitly moves it.
+
+They are different views of the same collection, with different goals and different user tasks.
+
+## Summary
+
+| Aspect | Memory Review | Cleanup Review |
+| --- | --- | --- |
+| Primary goal | Teach the AI | Reduce noise |
+| User task | Review, correct, confirm, validate | Review, triage, move to cleanup |
+| What improves | Knowledge base quality | Collection quality |
+| Effect on AI | Creates learning signals | Removes low-value inputs |
+| Shared knowledge | Yes | Yes |
+
+---
+
 # Future Features
 
 Over time, the product may expand into a richer family memory platform.

@@ -108,12 +108,20 @@ DOCSYNC:
 - May generate implementation prompts.
 - Synchronizes documentation updates.
 - Must update contextual workspace Help definitions when functionality, workflow, UI interaction, or AI decision behavior changes.
+- Must update Help workflow descriptions when user interaction changes.
+- Must update Help tips when new capabilities are introduced.
+- Must keep Help synchronized with the current implementation at all times.
+- Help updates during DOCSYNC are mandatory, not optional.
 - Never performs repository verification.
 
 DOCVERIFY:
 - Verification only.
 - Validates repository contents.
-- Must verify contextual workspace Help coverage and behavioral accuracy for changed user-facing areas.
+- Must verify that every user-facing workspace has contextual Help content.
+- Must verify that Help content matches the currently implemented behavior.
+- Must verify that Help workflow descriptions are correct and up to date.
+- Must verify that Help tips remain valid for the current feature set.
+- Must verify that Help has been updated after any UI or AI behavior changes.
 - Must report missing or outdated workspace Help as a documentation issue.
 - Never generates implementation prompts.
 - Never modifies documentation.

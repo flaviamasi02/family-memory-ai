@@ -385,6 +385,149 @@ Import
 
 Current deterministic album flow remains an early implementation subset of this broader pipeline.
 
+---
+
+# Knowledge First Architecture
+
+## Official Long-Term Vision
+
+Knowledge First Architecture is the official long-term architectural direction for Family Memory AI.
+
+The central principle is:
+
+The AI should first understand a photo and build knowledge about it. Categories, scores, and recommendations are results of that knowledge — not the starting point.
+
+## Conceptual Flow
+
+The Knowledge First Architecture replaces the simple Photo → Category flow with:
+
+```text
+Photo
+↓
+AI Analysis
+↓
+Knowledge Database
+↓
+Memory Review          Cleanup Review
+↓
+AI Learning
+↓
+Better Recommendations
+```
+
+## What This Means
+
+- **Photo → AI Analysis**: When a photo is imported, the AI analyzes it to build a structured knowledge representation. This includes understanding content, faces, context, quality, and relevance signals.
+- **AI Analysis → Knowledge Database**: The AI stores its understanding in a persistent Knowledge Database. This knowledge is the foundation for all downstream decisions.
+- **Knowledge Database → Memory Review / Cleanup Review**: Both review workspaces operate on the same underlying knowledge. They are different views with different goals, not separate systems.
+- **Memory Review / Cleanup Review → AI Learning**: User decisions in both workspaces feed back into the AI as learning signals. The system becomes more accurate over time.
+- **AI Learning → Better Recommendations**: Accumulated knowledge and user feedback improve ranking, categorization, cleanup suggestions, and memory outputs.
+
+## Categories Are Not the First AI Decision
+
+Under Knowledge First Architecture, categories are not the AI's first decision.
+
+The AI first understands the photo. Categories become one result of that understanding.
+
+This distinction is important: a category is a label attached to knowledge, not a substitute for it.
+
+## Why This Architecture
+
+- Knowledge accumulates over time rather than being computed on demand.
+- Both Memory Review and Cleanup Review share the same knowledge source.
+- AI improvements benefit all workspaces simultaneously.
+- User feedback from any workspace enriches the shared knowledge base.
+- Future capabilities (search, timeline, stories) build on knowledge rather than re-classifying from scratch.
+
+## Status
+
+Knowledge First Architecture is the official long-term direction for Family Memory AI.
+
+Current implementation is a deterministic early subset working toward this architecture.
+
+---
+
+# Workspace Help Architecture
+
+## Purpose
+
+The Workspace Help System is a permanent architectural component of Family Memory AI.
+
+Its purpose is to provide contextual, workspace-specific guidance to users without requiring them to leave their current workflow.
+
+## Design Principles
+
+- **Help is separated from the UI**: Help content is defined in dedicated data models, not embedded in UI widget logic. This separation keeps UI components focused and makes Help easy to update independently.
+- **Help is data-driven**: Workspaces provide Help definitions as structured data. The panel renders them. This allows Help to evolve without touching UI rendering code.
+- **Help must evolve with the product**: Every user-facing change that affects how a workspace works must include a corresponding Help update. Help is not a one-time document.
+
+## Implementation Components
+
+| Component | Location | Purpose |
+| --- | --- | --- |
+| WorkspaceHelpPanel | `src/ui/components/workspace_help_panel.py` | Reusable dock panel that renders Help content |
+| WorkspaceHeader | `src/ui/components/workspace_header.py` | Title row with Help action trigger |
+| WorkspaceHelpModels | `src/ui/help/workspace_help_models.py` | Typed Help data models |
+| WorkspaceHelpRegistry | `src/ui/help/workspace_help_registry.py` | Maps workspace IDs to Help definitions |
+| WorkspaceHelpContent | `src/ui/help/workspace_help_content.py` | All workspace Help definitions |
+
+## Supported Help Section Kinds
+
+| Section Kind | Purpose |
+| --- | --- |
+| Purpose | Explains what the workspace does and why it exists |
+| Workflow | Step-by-step guidance on how to use the workspace |
+| Best Practices | Recommendations for effective use |
+| Tips | Short practical tips and keyboard shortcuts |
+| AI Status | Describes current AI capabilities and limitations in this workspace |
+
+## Developer Guide: Adding a New Workspace Help Page
+
+Adding Help for a new workspace requires four steps:
+
+### Step 1: Define the Help content
+
+Add a new `WorkspaceHelpDefinition` entry in `src/ui/help/workspace_help_content.py`.
+
+Each definition must include at minimum:
+
+- A unique workspace ID string.
+- A `Purpose` section explaining what the workspace does, why it exists, and when it should be used.
+- A `Workflow` section explaining how the user should use it.
+- An `AI Status` section describing what the AI does automatically and what is expected from the user.
+- A `Best Practices` section.
+- A `Tips` section.
+
+### Step 2: Register the workspace ID
+
+Ensure the workspace ID is registered in `src/ui/help/workspace_help_registry.py` so the Help panel can look it up at runtime.
+
+### Step 3: Connect the workspace header
+
+In the workspace widget, use `WorkspaceHeader` and connect its help action signal to emit the workspace ID.
+
+### Step 4: Connect to main-window tab mapping
+
+Ensure the main window tab-to-workspace ID mapping includes the new workspace so Help updates automatically when the user switches tabs.
+
+## Why Help Is Separated from the UI
+
+Keeping Help definitions separate from UI rendering code provides three long-term benefits:
+
+1. UI refactoring does not break Help content.
+2. Help can be reviewed and updated without touching UI widget logic.
+3. Future export, search, or translation of Help content is straightforward.
+
+## Why the Help System Is Designed to Evolve
+
+The Help system uses a section-kind renderer pattern. The panel renders sections by kind, not by position. This means:
+
+- New section kinds can be added without changing existing workspace Help definitions.
+- Existing workspace Help definitions continue working after new section kinds are introduced.
+- Help can grow in structured richness over time as the product matures.
+
+---
+
 ## Future Database
 
 A future database will provide structured persistence for metadata and relationships.
