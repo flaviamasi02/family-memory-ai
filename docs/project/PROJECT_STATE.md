@@ -14,7 +14,7 @@
 
 ## Last Updated
 
-- 2026-07-05
+- 2026-07-06
 
 ## Overall Completion
 
@@ -227,6 +227,7 @@ Album Builder becomes one consumer of the Memory Intelligence system rather than
 - MEM-009 Editable system category properties with protected stable IDs and reset-to-default
 - LEARN-001 Deterministic category learning rules from repeated user corrections
 - UI-REF-001 Cleanup Review single category assignment workflow
+- UI-HELP-001 Reusable workspace help system with contextual right-side dock panel
 
 UI-REF-001 implementation summary:
 
@@ -291,6 +292,53 @@ Runtime stability update:
 - Photo Browser thumbnail updates use normalized absolute path keys so late-arriving thumbnails resolve reliably.
 - Album review draft refreshes use `AlbumReviewPage.review_status_by_path()` again for current review-state mapping.
 - Visual analysis remains feature-flagged off in synchronous import/UI paths until it can run only in background batches.
+
+## Sprint UI-HELP-001 Update
+
+UI-HELP-001 introduced a reusable Workspace Help System across all primary workspaces: Photo Browser, Memory Review, Cleanup Review, Album Draft, and Settings.
+
+Implemented user experience:
+
+- Each workspace now exposes a top-right `? Help` action.
+- Help opens as a right-side dock panel (non-modal), so users can continue working while reading guidance.
+- Help content automatically updates to the currently active workspace.
+
+Implemented architecture:
+
+- Reusable panel widget: `src/ui/components/workspace_help_panel.py`.
+- Reusable title-row component with help action: `src/ui/components/workspace_header.py`.
+- Typed help data models: `src/ui/help/workspace_help_models.py`.
+- Workspace help registry: `src/ui/help/workspace_help_registry.py`.
+- Workspace content definitions: `src/ui/help/workspace_help_content.py`.
+- Main-window dock integration and tab-context synchronization in `src/ui/main_window.py`.
+
+Panel section model currently supports:
+
+- Purpose
+- Workflow
+- Best Practices
+- Tips
+- AI Status
+
+Extensibility pattern for future sections:
+
+- Help text is not hardcoded inside the panel; workspaces provide data definitions.
+- The panel renders by section `kind`, enabling additional section types through renderer extension without changing existing workspace definitions.
+- Adding a new workspace guide requires only a new help definition plus workspace ID mapping.
+
+Permanent architecture policy:
+
+- Workspace Help System is a permanent architectural component of the application.
+- It must evolve together with every future user-facing feature.
+- Any functionality, workflow, UI interaction, or AI decision-behavior change that affects a workspace must include corresponding Workspace Help updates.
+- A user-facing feature is not complete until contextual Workspace Help is accurate and synchronized.
+
+How to add new workspace help definitions:
+
+1. Add a `WorkspaceHelpDefinition` entry in `src/ui/help/workspace_help_content.py`.
+2. Include required sections and any additional sections needed by the workspace.
+3. Connect the workspace header help action to emit its workspace ID.
+4. Ensure the workspace ID is included in main-window tab-to-workspace mapping.
 
 ## Upcoming Milestones
 
@@ -376,6 +424,8 @@ Memory Review and Cleanup Review now share the same visual UX philosophy and bot
 - Cleanup review page
 - Album draft builder
 - Album draft page
+- Workspace help panel component
+- Workspace help registry and content modules
 
 Future architectural emphasis:
 
@@ -517,6 +567,7 @@ Long-term output framing:
 - [x] Deterministic end-to-end curation pipeline from import through draft assembly
 - [x] Visible selected-photo highlight in the photo grid
 - [x] Documentation architecture refactored into modular folders
+- [x] Reusable Workspace Help System with per-workspace contextual guides in a right-side dock panel
 
 Future product priority after PRODUCT-DECISION-001:
 

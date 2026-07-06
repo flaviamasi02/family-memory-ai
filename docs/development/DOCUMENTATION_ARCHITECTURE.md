@@ -37,6 +37,10 @@ AI assistants must be able to initialize context without hidden assumptions.
 Documentation is treated as a first-class project artifact.
 Implementation work is incomplete until required documentation updates are completed.
 
+### Contextual Workspace Help Is Product Documentation
+Contextual workspace Help is part of product functionality, not optional supporting text.
+User-facing behavior changes require synchronized updates to workspace Help definitions.
+
 ### Human Readability
 Documentation must remain clear for humans, not only for automation.
 Use concise language, clear sections, and explicit boundaries.
@@ -240,6 +244,12 @@ AI assistants should:
 - Respect document ownership boundaries.
 - Always update the correct document based on ownership.
 - Report missing documentation and unresolved references.
+- Report missing or outdated contextual workspace Help as a documentation issue.
+
+DOCSYNC and DOCVERIFY Workspace Help rule:
+
+- DOCSYNC must update workspace Help content whenever functionality changes user experience or user decision flow.
+- DOCVERIFY must validate that workspace Help content matches implemented behavior.
 
 ---
 
@@ -248,3 +258,7 @@ AI assistants should:
 This document is the official reference describing the documentation ecosystem of Family Memory AI.
 
 Future documentation changes must remain consistent with this architecture.
+
+Additional permanent requirement:
+
+"A user-facing feature is not considered complete until its contextual Workspace Help has been updated and accurately reflects the current functionality."

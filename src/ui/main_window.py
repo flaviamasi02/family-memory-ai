@@ -1,7 +1,10 @@
+from pathlib import Path
+
 from PySide6.QtCore import Qt, QThread
 from PySide6.QtGui import QGuiApplication, QImage, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
+    QDockWidget,
     QFileDialog,
     QHBoxLayout,
     QLabel,
@@ -22,9 +25,14 @@ from core.safe_file_move_service import CLEANUP_REVIEW_FOLDER_NAME
 from models.photo_model import PhotoModel
 from ui.album_draft_page import AlbumDraftPage
 from ui.album_review_page import AlbumReviewPage
+from ui.components.workspace_header import WorkspaceHeader
+from ui.components.workspace_help_panel import WorkspaceHelpPanel
+from ui.help.workspace_help_content import PHOTO_BROWSER_WORKSPACE
+from ui.help.workspace_help_registry import WorkspaceHelpRegistry
 from ui.irrelevant_media_page import IrrelevantMediaPage
 from ui.photo_details_panel import PhotoDetailsPanel
 from ui.photo_grid_widget import PhotoGridWidget
+from ui.settings_page import SettingsPage
 from workers.thumbnail_worker import ThumbnailWorker
 
 
@@ -55,6 +63,8 @@ class MainWindow(QMainWindow):
         self._current_scored_photos = []
         self._all_photos = []
         self._imported_folder = None
+        self._workspace_help_registry = WorkspaceHelpRegistry()
+        self._tab_workspace_ids: list[str] = []
 
         title = QLabel("Family Memory AI")
         title.setStyleSheet("font-size: 28px; font-weight: bold;")
@@ -91,16 +101,24 @@ class MainWindow(QMainWindow):
 
         self.details_panel = PhotoDetailsPanel()
         self.review_page = AlbumReviewPage()
+        self.review_page.help_requested.connect(self._on_workspace_help_requested)
         self.review_page.review_state_changed.connect(self._refresh_album_draft)
         self.review_page.categories_changed.connect(self._sync_review_category_options)
         self.draft_page = AlbumDraftPage()
+        self.draft_page.help_requested.connect(self._on_workspace_help_requested)
         self.irrelevant_media_page = IrrelevantMediaPage()
+        self.irrelevant_media_page.help_requested.connect(self._on_workspace_help_requested)
         self.irrelevant_media_page.categories_changed.connect(self._sync_cleanup_category_options)
         self.irrelevant_media_page.moved_photos.connect(self._handle_irrelevant_media_moved)
         self.irrelevant_media_page.faces_analyzed.connect(self._handle_faces_analyzed)
+        self.settings_page = SettingsPage()
+        self.settings_page.help_requested.connect(self._on_workspace_help_requested)
 
         browser_page = QWidget()
         browser_layout = QVBoxLayout(browser_page)
+        browser_header = WorkspaceHeader("Photo Browser")
+        browser_header.help_clicked.connect(lambda: self._on_workspace_help_requested(PHOTO_BROWSER_WORKSPACE))
+        browser_layout.addWidget(browser_header)
         filter_layout = QHBoxLayout()
         filter_layout.addWidget(QLabel("Relevance:"))
         filter_layout.addWidget(self.browser_filter_combo)
@@ -113,9 +131,18 @@ class MainWindow(QMainWindow):
 
         self.tabs = QTabWidget()
         self.tabs.addTab(browser_page, "Photo Browser")
-        self.tabs.addTab(self.review_page, "Album Review")
+        self.tabs.addTab(self.review_page, "Memory Review")
         self.tabs.addTab(self.irrelevant_media_page, "Cleanup Review")
         self.tabs.addTab(self.draft_page, "Album Draft")
+        self.tabs.addTab(self.settings_page, "Settings")
+        self._tab_workspace_ids = [
+            PHOTO_BROWSER_WORKSPACE,
+            self.review_page.WORKSPACE_ID,
+            self.irrelevant_media_page.WORKSPACE_ID,
+            self.draft_page.WORKSPACE_ID,
+            self.settings_page.WORKSPACE_ID,
+        ]
+        self.tabs.currentChanged.connect(self._on_tab_changed)
 
         layout = QVBoxLayout()
         layout.addWidget(title)
@@ -127,6 +154,40 @@ class MainWindow(QMainWindow):
         container.setLayout(layout)
 
         self.setCentralWidget(container)
+
+        self._build_workspace_help_dock()
+        self._on_tab_changed(self.tabs.currentIndex())
+
+    def _build_workspace_help_dock(self) -> None:
+        self.workspace_help_panel = WorkspaceHelpPanel(self)
+        self.workspace_help_panel.close_requested.connect(self._close_workspace_help)
+
+        self.workspace_help_dock = QDockWidget("Workspace Help", self)
+        self.workspace_help_dock.setObjectName("workspaceHelpDock")
+        self.workspace_help_dock.setAllowedAreas(Qt.DockWidgetArea.RightDockWidgetArea)
+        self.workspace_help_dock.setWidget(self.workspace_help_panel)
+        self.workspace_help_dock.setFeatures(
+            QDockWidget.DockWidgetFeature.DockWidgetClosable
+            | QDockWidget.DockWidgetFeature.DockWidgetMovable
+        )
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.workspace_help_dock)
+        self.workspace_help_dock.hide()
+
+    def _on_tab_changed(self, index: int) -> None:
+        if index < 0 or index >= len(self._tab_workspace_ids):
+            return
+        workspace_id = self._tab_workspace_ids[index]
+        definition = self._workspace_help_registry.get(workspace_id)
+        self.workspace_help_panel.set_help_definition(definition)
+
+    def _on_workspace_help_requested(self, workspace_id: str) -> None:
+        definition = self._workspace_help_registry.get(workspace_id)
+        self.workspace_help_panel.set_help_definition(definition)
+        self.workspace_help_dock.show()
+        self.workspace_help_dock.raise_()
+
+    def _close_workspace_help(self) -> None:
+        self.workspace_help_dock.hide()
 
     def _configure_window_size(self):
         min_width = 1280

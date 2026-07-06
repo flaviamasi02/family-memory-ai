@@ -20,6 +20,34 @@ It allows any future AI to immediately understand how the project is managed.
 - Keep commits focused.
 - Documentation updates are mandatory.
 - Documentation is Production Code (constitutional principle).
+- Contextual Workspace Help is a mandatory product feature.
+
+---
+
+# Workspace Help Documentation Policy (Permanent)
+
+Family Memory AI treats contextual Workspace Help as part of the shipped product, not optional documentation.
+
+Policy requirements:
+
+- Every user-facing workspace must provide contextual Help.
+- Help content is mandatory product functionality.
+- Every feature that changes user experience must update corresponding workspace Help content.
+- Every workflow change must update corresponding workspace Help content.
+- Every UI interaction change must update corresponding workspace Help content.
+- Every AI behavior change that affects user decisions must update corresponding workspace Help content.
+- No feature is complete until workspace Help content is updated.
+
+Required Help coverage per workspace:
+
+- What this workspace does.
+- Why it exists.
+- When it should be used.
+- How the user should use it.
+- What the AI does automatically.
+- What decisions are expected from the user.
+- Best practices.
+- Tips and recommendations.
 
 ---
 
@@ -86,6 +114,7 @@ Before considering a Sprint complete:
 - objective completed and verified;
 - tests/manual validation completed when applicable;
 - documentation updated where affected;
+- workspace Help updated for all impacted user-facing workspaces;
 - documentation completeness verified for all impacted ownership documents;
 - docs/project/PROJECT_STATE.md updated;
 - docs/releases/CHANGELOG.md updated;
@@ -198,3 +227,17 @@ Continue development
 If WARNING or FAIL
 
 Generate follow-up prompts
+
+DOCSYNC obligations:
+
+- Always update contextual workspace Help content whenever functionality, workflow, UI interaction, or AI decision behavior changes.
+
+DOCVERIFY obligations:
+
+- Always verify that contextual workspace Help matches implemented behavior.
+- Report missing or outdated workspace Help as a documentation issue.
+
+Definition of Done enforcement:
+
+- Future AI assistants must treat workspace Help updates as part of Definition of Done.
+- A user-facing feature is not considered complete until its contextual Workspace Help has been updated and accurately reflects current functionality.

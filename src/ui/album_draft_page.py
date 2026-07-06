@@ -3,7 +3,7 @@ from __future__ import annotations
 from statistics import mean
 from typing import Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
@@ -17,12 +17,21 @@ from PySide6.QtWidgets import (
 )
 
 from album.album_draft_builder import AlbumDraftBuildResult, AlbumDraftPage as DraftPageModel
+from ui.components.workspace_header import WorkspaceHeader
+from ui.help.workspace_help_content import ALBUM_DRAFT_WORKSPACE
 from ui.photo_grid_widget import PhotoGridWidget
 
 
 class AlbumDraftPage(QWidget):
+    help_requested = Signal(str)
+
+    WORKSPACE_ID = ALBUM_DRAFT_WORKSPACE
+
     def __init__(self, parent=None):
         super().__init__(parent)
+
+        self.header = WorkspaceHeader("Album Draft")
+        self.header.help_clicked.connect(self._on_help_clicked)
 
         self._draft_result: Optional[AlbumDraftBuildResult] = None
         self._selected_page: Optional[DraftPageModel] = None
@@ -112,6 +121,7 @@ class AlbumDraftPage(QWidget):
         self.stack_layout.addWidget(self.content_widget)
 
         root_layout = QVBoxLayout(self)
+        root_layout.addWidget(self.header)
         root_layout.addLayout(summary_layout)
         root_layout.addLayout(stats_layout)
 
@@ -120,6 +130,9 @@ class AlbumDraftPage(QWidget):
         root_layout.addWidget(stack_host, 1)
 
         self.set_draft_result(None)
+
+    def _on_help_clicked(self) -> None:
+        self.help_requested.emit(self.WORKSPACE_ID)
 
     def _create_summary_block(self, title: str, value_label: QLabel) -> QWidget:
         title_label = QLabel(title)

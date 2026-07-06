@@ -39,8 +39,10 @@ from core.image_display_loader import load_display_pixmap, load_display_thumbnai
 from core.user_metadata_service import UserMetadataService
 from learning.category_learning_engine import get_category_learning_engine
 from ui.category_management_dialog import CategoryManagementDialog
+from ui.components.workspace_header import WorkspaceHeader
 from ui.image_preview_dialog import ImagePreviewDialog
 from ui.learning_summary_dialog import LearningSummaryDialog
+from ui.help.workspace_help_content import MEMORY_REVIEW_WORKSPACE
 
 
 @dataclass
@@ -184,6 +186,9 @@ class AlbumReviewPage(QWidget):
 
     review_state_changed = Signal()
     categories_changed = Signal()
+    help_requested = Signal(str)
+
+    WORKSPACE_ID = MEMORY_REVIEW_WORKSPACE
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -219,8 +224,8 @@ class AlbumReviewPage(QWidget):
         self._category_learning_engine = get_category_learning_engine()
         self._media_classifier = MediaClassifier()
 
-        self.memory_review_label = QLabel("Memory Review")
-        self.memory_review_label.setStyleSheet("font-size: 18px; font-weight: 600;")
+        self.header = WorkspaceHeader("Memory Review")
+        self.header.help_clicked.connect(self._on_help_clicked)
 
         self.filter_combo = QComboBox()
         self.filter_combo.addItems(
@@ -379,11 +384,14 @@ class AlbumReviewPage(QWidget):
         splitter.setSizes([1000, 420])
 
         root_layout = QVBoxLayout(self)
-        root_layout.addWidget(self.memory_review_label)
+        root_layout.addWidget(self.header)
         root_layout.addLayout(controls_layout)
         root_layout.addWidget(splitter, 1)
 
         self._reload_category_controls()
+
+    def _on_help_clicked(self) -> None:
+        self.help_requested.emit(self.WORKSPACE_ID)
 
     def _reload_category_controls(self) -> None:
         current_filter = self.category_filter_combo.currentText().strip() or self.CATEGORY_FILTER_ALL

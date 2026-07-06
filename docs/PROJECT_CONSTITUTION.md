@@ -183,5 +183,10 @@ A feature is complete only when:
 - Implementation completed.
 - Tests completed (where applicable).
 - Documentation updated.
+- Contextual Workspace Help updated for any impacted user-facing workspace.
 - Architecture decisions recorded (if required).
 - Documentation synchronization completed.
+
+Permanent Definition of Done requirement:
+
+"A user-facing feature is not considered complete until its contextual Workspace Help has been updated and accurately reflects the current functionality."

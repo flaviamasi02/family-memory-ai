@@ -107,11 +107,14 @@ DOCSYNC:
 - Preparation and synchronization only.
 - May generate implementation prompts.
 - Synchronizes documentation updates.
+- Must update contextual workspace Help definitions when functionality, workflow, UI interaction, or AI decision behavior changes.
 - Never performs repository verification.
 
 DOCVERIFY:
 - Verification only.
 - Validates repository contents.
+- Must verify contextual workspace Help coverage and behavioral accuracy for changed user-facing areas.
+- Must report missing or outdated workspace Help as a documentation issue.
 - Never generates implementation prompts.
 - Never modifies documentation.
 
@@ -170,7 +173,7 @@ Actions:
 1. Read docs/project/PROJECT_STATE.md.
 2. Read docs/development/SYNC_QUEUE.md.
 3. Detect pending documentation updates.
-4. Verify documentation completeness for the implemented changes.
+4. Verify documentation completeness for the implemented changes, including contextual workspace Help updates when user-facing behavior changed.
 5. Update required documents.
 6. Verify internal consistency.
 7. Report completed updates.

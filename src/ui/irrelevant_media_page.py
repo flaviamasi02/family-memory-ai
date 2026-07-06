@@ -27,8 +27,10 @@ from core.safe_file_move_service import CLEANUP_REVIEW_FOLDER_NAME, move_files_t
 from core.user_metadata_service import UserMetadataService
 from learning.category_learning_engine import get_category_learning_engine
 from ui.category_management_dialog import CategoryManagementDialog
+from ui.components.workspace_header import WorkspaceHeader
 from ui.image_preview_dialog import ImagePreviewDialog
 from ui.shared_thumbnail_grid import SharedGridItem, SharedThumbnailGrid
+from ui.help.workspace_help_content import CLEANUP_REVIEW_WORKSPACE
 from workers.face_detection_worker import FaceDetectionWorker
 
 RECOMMENDED_ACTION_LABELS = {
@@ -56,6 +58,9 @@ class IrrelevantMediaPage(QWidget):
     moved_photos = Signal(object)
     categories_changed = Signal()
     faces_analyzed = Signal(object)
+    help_requested = Signal(str)
+
+    WORKSPACE_ID = CLEANUP_REVIEW_WORKSPACE
 
     CATEGORY_FILTER_ALL = "All categories"
     CONFIDENCE_FILTER_ALL = "All"
@@ -77,8 +82,8 @@ class IrrelevantMediaPage(QWidget):
         self._face_detection_thread: Optional[QThread] = None
         self._face_detection_worker: Optional[FaceDetectionWorker] = None
 
-        self.title_label = QLabel("Cleanup Review")
-        self.title_label.setStyleSheet("font-size: 18px; font-weight: 600;")
+        self.header = WorkspaceHeader("Cleanup Review")
+        self.header.help_clicked.connect(self._on_help_clicked)
 
         self.stats_label = QLabel("Imported: 0 | Cleanup candidates: 0 | Average confidence: 0%")
         self.stats_label.setWordWrap(True)
@@ -237,7 +242,7 @@ class IrrelevantMediaPage(QWidget):
         splitter.setSizes([1000, 440])
 
         root = QVBoxLayout(self)
-        root.addWidget(self.title_label)
+        root.addWidget(self.header)
         root.addWidget(self.stats_label)
         root.addLayout(toolbar)
         root.addWidget(splitter, 1)
@@ -246,6 +251,9 @@ class IrrelevantMediaPage(QWidget):
         self._reload_category_selector_options()
         self._clear_details()
         self._refresh_alternatives_visibility(False)
+
+    def _on_help_clicked(self) -> None:
+        self.help_requested.emit(self.WORKSPACE_ID)
 
     def refresh_category_options(self) -> None:
         self._reset_filter_options()
