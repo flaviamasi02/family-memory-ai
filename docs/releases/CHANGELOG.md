@@ -1,6 +1,17 @@
 # Changelog
 
 ## Unreleased
+### LEARN-002 - Preference Learning and Aggregation Foundations
+- Added `PreferenceLearningEngine` with `PreferenceLearningEvent`, `PreferenceSignal`, and `PreferenceLearningProfile` dataclasses.
+- Aggregates local preference signals from category corrections, memory decisions, and cleanup-oriented decisions.
+- Preference signals include signal type, target, decision, support count, strength, explanation, and source action.
+- Persists the local preference profile at `.familymemory/preference_learning_profile.json`.
+- Missing or corrupted preference profiles safely fall back to an empty profile.
+- Added a summary API for UI/debug usage: total events, signal counts, strongest preference signals, and last-updated timestamp.
+- Integrated preference event recording with existing Memory Review and Cleanup Review save points.
+- Added focused tests for empty profile creation, event recording, aggregation, persistence/reload, corrupted profile fallback, and explainability.
+- No cloud AI, black-box ML, database storage, face identity recognition, visual-analysis UI/import path changes, or original image modifications.
+
 ### PRODUCT-DOC-006 - DOCSYNC PC FULL canonical alignment
 - Synchronized project state, domain roadmap, and historical roadmap on active domain/milestone and strategic priority order.
 - Standardized priority order across planning/product docs: classification reliability, correction learning, cleanup quality, people intelligence, outputs.

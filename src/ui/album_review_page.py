@@ -38,6 +38,7 @@ from core.media_classifier import (
 from core.image_display_loader import load_display_pixmap, load_display_thumbnail
 from core.user_metadata_service import UserMetadataService
 from learning.category_learning_engine import get_category_learning_engine
+from learning.preference_learning_engine import get_preference_learning_engine
 from ui.category_management_dialog import CategoryManagementDialog
 from ui.components.workspace_header import WorkspaceHeader
 from ui.image_preview_dialog import ImagePreviewDialog
@@ -222,6 +223,7 @@ class AlbumReviewPage(QWidget):
         self._user_metadata_service = UserMetadataService()
         self._category_registry = get_category_registry()
         self._category_learning_engine = get_category_learning_engine()
+        self._preference_learning_engine = get_preference_learning_engine()
         self._media_classifier = MediaClassifier()
 
         self.header = WorkspaceHeader("Memory Review")
@@ -1043,6 +1045,12 @@ class AlbumReviewPage(QWidget):
                 new_value=row.user_decision,
                 source=source,
             )
+            self._preference_learning_engine.record_decision(
+                photo,
+                previous_decision=previous,
+                new_decision=row.user_decision,
+                source=source,
+            )
             self._save_photo_user_metadata(photo)
 
             card = self._cards_by_key.get(self._row_key(row))
@@ -1090,6 +1098,12 @@ class AlbumReviewPage(QWidget):
                 source=source,
             )
             self._category_learning_engine.record_category_correction(
+                photo,
+                previous_category=previous,
+                corrected_category=category,
+                source=source,
+            )
+            self._preference_learning_engine.record_category_correction(
                 photo,
                 previous_category=previous,
                 corrected_category=category,
@@ -1294,6 +1308,30 @@ class AlbumReviewPage(QWidget):
 
     def selected_count(self) -> int:
         return len(self._selected_keys)
+
+    def set_selected_decision(self, decision: str) -> None:
+        selected = self._selected_row()
+        if selected is None:
+            return
+        self._apply_decision_to_rows([selected], decision, source="user")
+
+    def decision_for_filename(self, filename: str) -> str:
+        for row in self._all_rows:
+            if row.breakdown.photo.display_name() == filename:
+                return row.user_decision
+        return ""
+
+    def review_state_for_filename(self, filename: str) -> str:
+        for row in self._all_rows:
+            if row.breakdown.photo.display_name() == filename:
+                return row.review_state
+        return ""
+
+    def decision_history_entries(self):
+        return list(self._decision_history.entries)
+
+    def learning_events(self):
+        return self.decision_history_entries()
 
     def rendered_card_count(self) -> int:
         return len(self._cards_by_key)

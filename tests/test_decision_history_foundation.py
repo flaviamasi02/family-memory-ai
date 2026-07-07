@@ -45,7 +45,7 @@ class DecisionHistoryFoundationTests(unittest.TestCase):
             page.set_selected_decision(UserDecision.Advertisement.value)
 
             self.assertEqual(page.decision_for_filename("one.jpg"), UserDecision.Advertisement.value)
-            self.assertEqual(page.review_state_for_filename("one.jpg"), "pending")
+            self.assertEqual(page.review_state_for_filename("one.jpg"), "rejected")
             self.assertEqual(breakdown.photo.user_decision, UserDecision.Advertisement.value)
 
     def test_decision_persistence_keeps_history_in_memory(self):

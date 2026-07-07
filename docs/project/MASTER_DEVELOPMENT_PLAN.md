@@ -195,8 +195,9 @@ Continuously improve recommendations and scoring from repeated user behavior.
 Future milestones:
 
 - LEARN-001 Category Learning from User Corrections (completed)
-- LEARN-002 Preference Learning
-- LEARN-003 Adaptive Scoring
+- LEARN-002 Preference Learning and Aggregation Foundations (completed)
+- LEARN-003 Hybrid AI Classification
+- LEARN-004 Adaptive Scoring
 
 ### PEOPLE
 

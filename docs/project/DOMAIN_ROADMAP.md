@@ -156,7 +156,11 @@ Milestones:
 Goal:
 Learn from user corrections while remaining fully explainable.
 
-- LEARN-002 Hybrid AI Classification
+- LEARN-002 Preference Learning and Aggregation Foundations (completed)
+Goal:
+Aggregate category corrections, user decisions, and cleanup-oriented decisions into local deterministic preference signals.
+
+- LEARN-003 Hybrid AI Classification
 Goal:
 Combine deterministic rules, learned user preferences and AI inference into a single explainable decision.
 
@@ -259,13 +263,14 @@ Scope examples:
 
 ## Current Milestone
 
-- LEARN-002 Preference Learning and Aggregation Foundations (next)
+- LEARN-002 Preference Learning and Aggregation Foundations (completed)
 
 ## Recently Completed Domains
 
 - FOUNDATION
 - MEM (review UX and decision ergonomics foundation)
 - CLEAN (deterministic classification and cleanup-review UX foundation)
+- LEARN-002 Preference Learning and Aggregation Foundations
 
 ## Strategic Priority Order
 

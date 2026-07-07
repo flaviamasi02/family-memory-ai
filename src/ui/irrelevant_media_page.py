@@ -26,6 +26,7 @@ from core.media_classifier import MediaCategory, MediaClassifier
 from core.safe_file_move_service import CLEANUP_REVIEW_FOLDER_NAME, move_files_to_cleanup_review
 from core.user_metadata_service import UserMetadataService
 from learning.category_learning_engine import get_category_learning_engine
+from learning.preference_learning_engine import get_preference_learning_engine
 from ui.category_management_dialog import CategoryManagementDialog
 from ui.components.workspace_header import WorkspaceHeader
 from ui.image_preview_dialog import ImagePreviewDialog
@@ -78,6 +79,7 @@ class IrrelevantMediaPage(QWidget):
         self._user_metadata_service = UserMetadataService()
         self._category_registry = get_category_registry()
         self._category_learning_engine = get_category_learning_engine()
+        self._preference_learning_engine = get_preference_learning_engine()
         self._media_classifier = MediaClassifier()
         self._face_detection_thread: Optional[QThread] = None
         self._face_detection_worker: Optional[FaceDetectionWorker] = None
@@ -792,11 +794,18 @@ class IrrelevantMediaPage(QWidget):
     def _set_decision_for_selected(self, decision: str) -> None:
         selected_rows = self._selected_rows()
         for row in selected_rows:
+            previous = row.user_decision
             row.user_decision = decision
             metadata = dict(getattr(row.photo, "metadata", {}) or {})
             metadata["user_decision"] = decision
             row.photo.metadata = metadata
             row.photo.user_decision = decision
+            self._preference_learning_engine.record_cleanup_decision(
+                row.photo,
+                previous_decision=previous,
+                new_decision=decision,
+                source="user_bulk" if len(selected_rows) > 1 else "user",
+            )
             self._save_photo_user_metadata(row.photo)
         if selected_rows:
             self._show_user_saved_indicator("Decision saved")
@@ -834,6 +843,12 @@ class IrrelevantMediaPage(QWidget):
             row.photo.sync_intelligence_from_metadata()
 
             self._category_learning_engine.record_category_correction(
+                row.photo,
+                previous_category=previous,
+                corrected_category=category,
+                source="user_bulk" if len(selected_rows) > 1 else "user",
+            )
+            self._preference_learning_engine.record_category_correction(
                 row.photo,
                 previous_category=previous,
                 corrected_category=category,

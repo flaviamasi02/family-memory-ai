@@ -6,7 +6,7 @@
 
 ## Current Sprint
 
-- Sprint LEARN-001 (Category Learning from User Corrections) - Completed
+- Sprint LEARN-002 (Preference Learning and Aggregation Foundations) - Completed
 
 ## Project Status
 
@@ -14,7 +14,7 @@
 
 ## Last Updated
 
-- 2026-07-06
+- 2026-07-07
 
 ## Overall Completion
 
@@ -281,10 +281,11 @@ Album Builder becomes one consumer of the Memory Intelligence system rather than
 
 ## Current Milestone
 
-- LEARN-002 Preference Learning and Aggregation Foundations (next)
+- LEARN-002 Preference Learning and Aggregation Foundations (completed)
 
 ## Recently Completed Milestones
 
+- LEARN-002 Preference Learning and Aggregation Foundations
 - PEOPLE-001 Face Detection and Family Photo Classification
 - FOUNDATION historical milestones completed
 - DEV-007 Photo Cleanup & Relevance Engine
@@ -306,6 +307,16 @@ Album Builder becomes one consumer of the Memory Intelligence system rather than
 - LEARN-001 Deterministic category learning rules from repeated user corrections
 - UI-REF-001 Cleanup Review single category assignment workflow
 - UI-HELP-001 Reusable workspace help system with contextual right-side dock panel
+- LEARN-002 Preference learning and aggregation foundations
+
+LEARN-002 implementation summary:
+
+- Added a deterministic local PreferenceLearningEngine for category corrections, user decisions, and cleanup-oriented decisions.
+- Preference signals include signal type, target, decision, support count, strength, explanation, and source action.
+- Preference profile data persists under `.familymemory/preference_learning_profile.json`.
+- Missing or corrupted preference profiles safely fall back to an empty profile.
+- Added a summary API for UI/debug use with total events, signal counts, strongest signals, and last-updated timestamp.
+- No cloud AI, black-box ML, database storage, face identity recognition, or original image modification was added.
 
 UI-REF-001 implementation summary:
 
@@ -420,7 +431,6 @@ How to add new workspace help definitions:
 
 ## Upcoming Milestones
 
-- LEARN-002 Preference learning and aggregation foundations
 - DUP-001 Exact Duplicate Detection refinement
 - MEMORY-001 Memory Value
 
@@ -548,6 +558,7 @@ Long-term output framing:
 | Sprint DEV-005 | Completed | Album review UI with in-memory decisions |
 | Sprint DEV-006 | Completed | Deterministic monthly album draft builder |
 | Sprint DEV-007 | Completed | Photo cleanup, cleanup review, and safe cleanup-folder move workflow |
+| Sprint LEARN-002 | Completed | Deterministic local preference learning profile from category and decision signals |
 
 ---
 
@@ -600,6 +611,11 @@ Long-term output framing:
 - [x] One learning event recorded per manual category correction (single and bulk)
 - [x] Learning Summary dialog for transparency (event totals, category counts, learned rules)
 - [x] No cloud AI and no black-box ML for category learning
+- [x] Deterministic preference learning engine with explainable event aggregation
+- [x] Preference profile persistence in `.familymemory/preference_learning_profile.json`
+- [x] Preference signals recorded from category corrections, memory decisions, and cleanup-oriented decisions
+- [x] Preference learning summary for UI/debug use with total events, signal counts, strongest signals, and last-updated timestamp
+- [x] Safe preference profile loading with empty-profile fallback for missing or corrupted files
 - [x] Album review filters, sorting, and filename search
 - [x] Album review details panel with explanation visibility
 - [x] Review visibility for imported/candidates/selected/rejected pools with rejection reasons
@@ -681,8 +697,8 @@ Operational priority order for active planning:
 - No duplicate detection yet
 - No AI cleanup classification yet
 - No visual-similarity duplicate detection yet
-- Cleanup and Memory review corrections are in-memory only (no persistence yet)
-- Preference Learning engine is not active yet (decision signals are foundation only)
+- Some review UI state remains in-memory, while category corrections and user decisions persist through sidecar metadata.
+- Preference learning signals are aggregated and persisted locally, but are not yet applied to scoring or recommendations.
 - No print-ready export pipeline yet
 - No HEIC support yet
 - No cloud integration yet
@@ -759,7 +775,7 @@ See docs/project/ROADMAP.md for the authoritative milestone plan.
 | Classes | TBD |
 | Modules | TBD |
 | Implemented features | TBD |
-| Completed Sprints | 20 |
+| Completed Sprints | 21 |
 | Architecture maturity | Emerging |
 
 ---

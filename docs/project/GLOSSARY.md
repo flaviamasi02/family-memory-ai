@@ -450,6 +450,19 @@ Future User Preference Score, Memory Value evolution, cleanup suggestions, and a
 Related Terms:
 User Decision Engine, Photo Decision, Family Memory Score
 
+### Preference Learning Engine
+Definition:
+Deterministic local engine that records user category corrections, memory decisions, and cleanup-oriented decisions as explainable preference signals.
+
+Purpose:
+Provide the foundation for future User Preference Score, recommendation, cleanup, and memory-intelligence personalization without cloud AI or black-box ML.
+
+Used By:
+Memory Review, Cleanup Review, future scoring and recommendation workflows.
+
+Related Terms:
+Preference Learning, User Decision, Photo Decision, User Decision Engine
+
 ### Memory Intelligence
 Definition:
 The broader system knowledge that models what matters to a family across memories, preferences, cleanup, duplicates, and outputs.
