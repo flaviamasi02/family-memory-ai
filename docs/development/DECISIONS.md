@@ -251,3 +251,169 @@ Backward compatibility considerations:
 
 **Impacted Sprints:**
 Post DEV-003 documentation refactoring activities.
+
+### DEC-0029
+Prompt Standards for Implementation Prompts
+
+**Value:** Method  
+**Impact:** Medium
+
+Implementation prompts must include:
+
+- Why We Test
+- Manual Test Plan
+- Acceptance Checklist
+
+Testing must explain why the feature exists, how to test it manually, what persistence and regression checks matter, and what result qualifies as done.
+
+**Impacted documents:**
+- docs/development/PROMPT_TEMPLATE.md
+- docs/development/AI_PROJECT_PLAYBOOK.md
+- docs/project/PROJECT_CONTEXT.md
+
+**Impacted Sprints:**
+All future implementation prompts.
+
+### DEC-0030
+Memory Review Learning Focus
+
+**Value:** Product  
+**Impact:** High
+
+Memory Review primarily exists to teach the AI.
+
+Its future UI should focus on:
+
+- media category correction
+- AI teaching
+- preference learning
+- classification validation
+
+Decision editing should move out of the Memory Review UI in a future milestone while preserving the underlying decision model.
+
+**Impacted documents:**
+- docs/project/PROJECT_STATE.md
+- docs/project/PROJECT_CONTEXT.md
+- docs/product/PRODUCT_VISION.md
+- docs/product/FAMILY_MEMORY_SCORE.md
+
+**Impacted Sprints:**
+Memory Review UX and learning workflow milestones.
+
+### DEC-0031
+Learning Transparency and Learning Inspector
+
+**Value:** Product  
+**Impact:** Medium
+
+Learning must be visible and understandable to users.
+
+Future learning views should expose:
+
+- learned rules
+- learned preferences
+- learned signals
+- support count
+- confidence
+- explanation
+- date learned
+- time learned
+
+**Impacted documents:**
+- docs/project/PROJECT_STATE.md
+- docs/project/PROJECT_CONTEXT.md
+- docs/product/PRODUCT_VISION.md
+- docs/product/FAMILY_MEMORY_SCORE.md
+- docs/project/MASTER_DEVELOPMENT_PLAN.md
+- docs/project/DOMAIN_ROADMAP.md
+- docs/project/GLOSSARY.md
+
+**Impacted Sprints:**
+MEM learning transparency milestones.
+
+### DEC-0032
+Content-First Learning
+
+**Value:** Product  
+**Impact:** High
+
+Preference learning must prioritize the visual content of an image.
+
+Visual evidence comes first. Metadata is secondary support only.
+
+Learning rules must not rely primarily on metadata such as filename, extension, EXIF, file size, or date source.
+
+**Impacted documents:**
+- docs/project/PROJECT_STATE.md
+- docs/product/PRODUCT_VISION.md
+- docs/product/FAMILY_MEMORY_SCORE.md
+- docs/project/MASTER_DEVELOPMENT_PLAN.md
+- docs/project/DOMAIN_ROADMAP.md
+- docs/project/GLOSSARY.md
+
+**Impacted Sprints:**
+LEARN and CLEAN milestones that affect learning or classification.
+
+### DEC-0033
+Category Semantics
+
+**Value:** Product  
+**Impact:** High
+
+The system must distinguish between category types:
+
+- Content Categories
+- Organizational Categories
+- Workflow Categories
+
+Workflow categories describe actions, not visual meaning, and must not learn visual rules.
+
+**Impacted documents:**
+- docs/project/PROJECT_STATE.md
+- docs/product/PRODUCT_VISION.md
+- docs/product/FAMILY_MEMORY_SCORE.md
+- docs/project/MASTER_DEVELOPMENT_PLAN.md
+- docs/project/DOMAIN_ROADMAP.md
+- docs/project/GLOSSARY.md
+
+**Impacted Sprints:**
+MEM, LEARN, CLEAN, and future workflow milestones.
+
+### DEC-0034
+Memory Review UX Continuity
+
+**Value:** Product  
+**Impact:** Medium
+
+Memory Review and Cleanup Review should preserve scroll position, selection, and user context during category corrections and filtering changes.
+
+If the active photo disappears because of filtering, the workspace should remain at the same scroll position and select the next visible photo.
+
+**Impacted documents:**
+- docs/project/PROJECT_STATE.md
+- docs/project/PROJECT_CONTEXT.md
+- docs/product/PRODUCT_VISION.md
+- docs/product/FAMILY_MEMORY_SCORE.md
+
+**Impacted Sprints:**
+Memory Review and Cleanup Review UX milestones.
+
+### DEC-0035
+Product Testing Workflow
+
+**Value:** Method  
+**Impact:** Medium
+
+Every implementation cycle should follow:
+
+Implementation -> Manual Test -> Product Owner Feedback -> Documentation Update -> Commit -> Push -> Next Sprint
+
+Testing feedback is product design input and UX observations made during testing should be preserved as product decisions when appropriate.
+
+**Impacted documents:**
+- docs/project/PROJECT_CONTEXT.md
+- docs/development/AI_PROJECT_PLAYBOOK.md
+- docs/development/PROMPT_TEMPLATE.md
+
+**Impacted Sprints:**
+All future implementation cycles.

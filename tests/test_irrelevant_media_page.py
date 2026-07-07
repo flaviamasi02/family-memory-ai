@@ -265,6 +265,62 @@ class IrrelevantMediaPageTests(unittest.TestCase):
             page.clear_selection()
             self.assertEqual(page.selected_count(), 0)
 
+    def test_cleanup_category_change_preserves_scroll_and_selection(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            photos = [
+                self._make_photo(root, f"cleanup_scroll_{index:03d}.jpg", {"relevance_category": "unknown", "cleanup_confidence": 0.6})
+                for index in range(90)
+            ]
+
+            page = IrrelevantMediaPage()
+            page.resize(900, 700)
+            page.show()
+            page.set_photos(photos, root, total_imported_count=len(photos))
+            self._flush_ui(wait_ms=140)
+
+            self.assertTrue(page.select_photo_by_filename("cleanup_scroll_030.jpg"))
+            scrollbar = page.thumbnail_grid.scroll_area.verticalScrollBar()
+            scrollbar.setValue(min(360, scrollbar.maximum()))
+            before_scroll = scrollbar.value()
+            before_rendered = page.rendered_card_count()
+
+            page._apply_category_to_selected("meme_or_graphic")
+            self._flush_ui(wait_ms=140)
+
+            self.assertEqual(page.thumbnail_grid.selected_key(), str(photos[30].path))
+            self.assertEqual(scrollbar.value(), before_scroll)
+            self.assertEqual(page.rendered_card_count(), before_rendered)
+            self.assertEqual(photos[30].metadata.get("cleanup_effective_category"), "meme_or_graphic")
+
+    def test_cleanup_category_change_selects_next_when_current_filter_excludes_modified_photo(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            photos = [
+                self._make_photo(root, f"cleanup_unknown_{index:03d}.jpg", {"relevance_category": "unknown", "cleanup_confidence": 0.6})
+                for index in range(60)
+            ]
+
+            page = IrrelevantMediaPage()
+            page.resize(900, 700)
+            page.show()
+            page.set_photos(photos, root, total_imported_count=len(photos))
+            self._flush_ui(wait_ms=120)
+            page.category_filter_combo.setCurrentText("Unknown")
+            self._flush_ui(wait_ms=80)
+
+            self.assertTrue(page.select_photo_by_filename("cleanup_unknown_005.jpg"))
+            scrollbar = page.thumbnail_grid.scroll_area.verticalScrollBar()
+            scrollbar.setValue(min(160, scrollbar.maximum()))
+            before_scroll = scrollbar.value()
+
+            page._apply_category_to_selected("family_photo")
+            self._flush_ui(wait_ms=140)
+
+            self.assertNotIn("cleanup_unknown_005.jpg", page.visible_filenames())
+            self.assertEqual(page.thumbnail_grid.selected_key(), str(photos[6].path))
+            self.assertEqual(scrollbar.value(), before_scroll)
+
     def test_cleanup_review_uses_single_category_assignment_workflow(self):
         page = IrrelevantMediaPage()
 

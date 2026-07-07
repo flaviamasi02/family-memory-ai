@@ -80,10 +80,10 @@ Title:
 Memory Review
 
 Purpose:
-Review meaningful memories.
+Review meaningful memories through category correction, AI teaching, preference learning, and classification validation.
 
 Mission:
-Teach the system what memories matter.
+Teach the system what memories matter while preserving explainability and user context.
 
 Example milestones:
 
@@ -91,6 +91,13 @@ Example milestones:
 - MEM-004 Compact Memory Review thumbnail grid (completed)
 - MEM-005 True multi-column Memory Review grid (completed)
 - MEM-006 Memory Review UX polishing and keyboard workflow improvements
+- MEM-010 Learning Transparency and Learning Inspector
+
+MEM-010 direction:
+
+- expose learned rules, learned preferences, learned signals, support count, confidence, explanation, date learned, and time learned in a non-technical view
+- keep learning understandable to non-technical users
+- surface a visible learning counter inside Memory Review
 
 ---
 
@@ -105,6 +112,7 @@ Detect irrelevant media.
 Mission:
 Safely identify clutter and cleanup-oriented media without permanent deletion.
 Cleanup Review should follow the same UX philosophy as Memory Review: toolbar filters, compact thumbnail grid, and right-side explainable details.
+Cleanup Review should also preserve scroll position and selection when filters or category changes remove the current item.
 
 Example milestones:
 
@@ -149,6 +157,7 @@ Turn repeated user decisions into future personalization signals.
 Foundation dependency:
 
 - MEM-008 user-defined taxonomy stores per-category AI Description metadata for future explainable AI-assisted classification.
+- Content categories, organizational categories, and workflow categories must be treated differently by future learning models.
 
 Milestones:
 
@@ -162,7 +171,7 @@ Aggregate category corrections, user decisions, and cleanup-oriented decisions i
 
 - LEARN-003 Hybrid AI Classification
 Goal:
-Combine deterministic rules, learned user preferences and AI inference into a single explainable decision.
+Combine deterministic rules, learned user preferences and AI inference into a single explainable decision while keeping visual evidence primary and metadata secondary.
 
 ---
 

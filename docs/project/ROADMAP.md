@@ -94,6 +94,11 @@ Product-direction update:
 - Memory Review becomes the central interaction layer for future learning-oriented behavior.
 - Preference Learning is a product-level priority before deeper output refinement.
 - Album creation remains important, but as one consumer of broader Memory Intelligence.
+- Memory Review should focus on category correction, AI teaching, preference learning, and classification validation.
+- Learning should prioritize visual content, with metadata treated as secondary support.
+- Content categories, organizational categories, and workflow categories should be treated differently by the learning engine.
+- Learning history should remain understandable with confidence, support count, explanation, and timestamps.
+- Memory Review and Cleanup Review should preserve scroll position and selection during filtering and category correction.
 
 ---
 

@@ -777,6 +777,86 @@ class AlbumReviewPageTests(unittest.TestCase):
             after = card.thumbnail_label.pixmap()
             self.assertIsNotNone(after)
 
+    def test_memory_review_category_change_preserves_scroll_and_selection(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            items = [
+                self._make_breakdown(root, f"scroll_{index:03d}.jpg", 100 - index, 80, 80, 80, "2024:01:01 00:00:00")
+                for index in range(90)
+            ]
+
+            page = AlbumReviewPage()
+            page.resize(900, 700)
+            page.show()
+            page.set_scored_photos(items)
+            self._flush_ui(wait_ms=120)
+
+            self.assertTrue(page.select_photo_by_filename("scroll_030.jpg"))
+            scrollbar = page.grid_scroll.verticalScrollBar()
+            scrollbar.setValue(min(360, scrollbar.maximum()))
+            before_scroll = scrollbar.value()
+            before_rebuilds = page.grid_rebuild_count()
+
+            category_index = page.category_selector.findData(MediaCategory.Advertisement.value)
+            page.category_selector.setCurrentIndex(category_index)
+            page._apply_selector_category()
+            self._flush_ui(wait_ms=120)
+
+            self.assertEqual(page._selected_key, str(items[30].photo.path))
+            self.assertEqual(scrollbar.value(), before_scroll)
+            self.assertEqual(page.grid_rebuild_count(), before_rebuilds)
+            self.assertEqual(items[30].photo.effective_media_category, MediaCategory.Advertisement.value)
+
+    def test_memory_review_category_change_selects_next_when_current_filter_excludes_modified_photo(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            items = [
+                self._make_breakdown(
+                    root,
+                    f"unknown_{index:03d}.jpg",
+                    100 - index,
+                    80,
+                    80,
+                    80,
+                    "2024:01:01 00:00:00",
+                    metadata={
+                        "automatic_media_category": MediaCategory.Unknown.value,
+                        "effective_media_category": MediaCategory.Unknown.value,
+                        "media_category": MediaCategory.Unknown.value,
+                    },
+                )
+                for index in range(60)
+            ]
+
+            page = AlbumReviewPage()
+            page.resize(900, 700)
+            page.show()
+            page.set_scored_photos(items)
+            self._flush_ui(wait_ms=120)
+            page.category_filter_combo.setCurrentText("Unknown")
+            self._flush_ui(wait_ms=80)
+
+            self.assertTrue(page.select_photo_by_filename("unknown_005.jpg"))
+            scrollbar = page.grid_scroll.verticalScrollBar()
+            scrollbar.setValue(min(160, scrollbar.maximum()))
+            before_scroll = scrollbar.value()
+
+            category_index = page.category_selector.findData(MediaCategory.FamilyPhoto.value)
+            page.category_selector.setCurrentIndex(category_index)
+            page._apply_selector_category()
+            self._flush_ui(wait_ms=120)
+
+            self.assertNotIn("unknown_005.jpg", page.visible_filenames())
+            self.assertEqual(page._selected_key, str(items[6].photo.path))
+            self.assertEqual(scrollbar.value(), before_scroll)
+
+    def test_memory_review_decision_editing_controls_are_hidden(self):
+        page = AlbumReviewPage()
+
+        self.assertTrue(page.decision_selector.isHidden())
+        self.assertTrue(page.apply_decision_button.isHidden())
+        self.assertTrue(page.decision_action_label.isHidden())
+
     def test_multi_select_ctrl_click_adds_and_removes_selection(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

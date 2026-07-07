@@ -57,3 +57,9 @@ Completed.
 DOCSYNC PC FULL canonical consistency pass (priority order, active domain alignment, category semantics, People roadmap wording, and workflow reference cleanup).
 
 Completed.
+
+### SQ-007
+
+DOCSYNC product decision synchronization (prompt standards, learning transparency, content-first learning, category semantics, and product testing workflow).
+
+Completed.

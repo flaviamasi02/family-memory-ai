@@ -611,6 +611,46 @@ Photo Classification, Cleanup Category, User Category, Grouping
 
 Notes:
 User-defined categories extend this taxonomy; they do not replace the stable internal IDs.
+Category types can represent content, organization, or workflow intent depending on the category definition.
+
+### Content Category
+Definition:
+A category that describes what the image contains.
+
+Purpose:
+Support visual classification and content-based learning.
+
+Used By:
+Memory Review, preference learning, classification workflows.
+
+Related Terms:
+Media Category, Organizational Category, Workflow Category
+
+### Organizational Category
+Definition:
+A category that describes logical organization rather than visual content.
+
+Purpose:
+Help users group media by topic, project, or family context.
+
+Used By:
+Memory Review, Cleanup Review, category management.
+
+Related Terms:
+Media Category, Content Category, Workflow Category
+
+### Workflow Category
+Definition:
+A category that describes what should happen next rather than what the image contains.
+
+Purpose:
+Drive action-oriented review and cleanup workflows.
+
+Used By:
+Memory Review, Cleanup Review, workflow-driven review systems.
+
+Related Terms:
+Media Category, Content Category, Organizational Category
 
 ### User Category
 Definition:

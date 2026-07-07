@@ -104,6 +104,12 @@ Current implemented direction emphasizes human-in-the-loop deterministic curatio
 - Categories are taxonomy-driven: system categories remain read-only while users can define unlimited custom categories directly in-app.
 - Category records now include optional AI Description fields so future AI classifiers can learn from user-defined taxonomy intent.
 - Album and cleanup behaviors are category-driven through category flags, not hardcoded category-name checks.
+- Memory Review should focus on media category correction, AI teaching, preference learning, and classification validation.
+- Learning should be visible to users, including a future always-visible counter such as "AI has learned from 24 corrections."
+- Memory Review should eventually surface the phrase "Changing Category teaches the AI".
+- Decision editing will move out of the Memory Review UI in a future milestone while preserving the underlying decision model.
+- Preference learning should be content-first, with visual evidence primary and metadata secondary.
+- Category semantics must distinguish content categories, organizational categories, and workflow categories.
 
 ---
 
@@ -117,7 +123,7 @@ Memory Review and Cleanup Review are two distinct workspaces with different resp
 
 Memory Review is the workspace where the user reviews memories, corrects AI decisions, confirms important photos, assigns categories, improves people recognition, validates events, and increases the AI knowledge base.
 
-The objective of Memory Review is improving the knowledge base.
+The objective of Memory Review is improving the knowledge base through media category correction, AI teaching, preference learning, and classification validation.
 
 User actions in Memory Review:
 
@@ -129,6 +135,15 @@ User actions in Memory Review:
 - Approve or reject photos from album candidates.
 
 Every decision in Memory Review is a learning signal. The AI uses these corrections to improve future classification and recommendations.
+
+Future Memory Review UX:
+
+- preserve scroll position and current selection during category changes
+- keep user context when filtering removes the active photo
+- automatically select the next visible image when the active image disappears
+- keep learning visible with an always-visible counter such as "AI has learned from 24 corrections."
+- show the teaching language "Changing Category teaches the AI"
+- remove decision editing controls from the Memory Review UI in a future milestone while preserving the underlying decision model
 
 ## Cleanup Review
 
@@ -148,11 +163,70 @@ User actions in Cleanup Review:
 
 Cleanup Review does not teach the AI what matters — that is Memory Review's role. Cleanup Review reduces clutter so the rest of the system works with higher-quality input.
 
+Future Cleanup Review UX should follow the same continuity rules as Memory Review:
+
+- preserve scroll position during category changes
+- preserve selection during category changes
+- remain at the current scroll position if filtering removes the active photo
+- automatically select the next visible image after a filtered item disappears
+
 ## Shared Knowledge
 
 Both workspaces operate on the same underlying Knowledge Database. A category correction made in Memory Review is reflected in Cleanup Review. A cleanup decision does not remove a memory from Memory Review unless the user explicitly moves it.
 
 They are different views of the same collection, with different goals and different user tasks.
+
+## Learning Transparency
+
+Learning should be understandable to non-technical users.
+
+Future learning history and Learning Inspector views should expose:
+
+- learned rules
+- learned preferences
+- learned signals
+- support count
+- confidence
+- explanation
+- date learned
+- time learned
+
+## Content-First Learning
+
+Preference learning should prioritize the visual content of an image.
+
+Primary evidence:
+
+- image content
+- detected objects
+- scene understanding
+- document structure
+- people
+- faces
+- landscapes
+- screenshots
+- visual evidence
+
+Secondary evidence:
+
+- filename
+- extension
+- EXIF
+- file size
+- date source
+
+Learning rules should never rely primarily on metadata.
+
+## Category Architecture
+
+Not every category represents the same concept.
+
+Content categories describe what the image contains.
+Organizational categories describe logical organization.
+Workflow categories describe what should happen next.
+
+Future learning models must treat these category types differently.
+Workflow categories must not learn visual rules.
 
 ## Summary
 

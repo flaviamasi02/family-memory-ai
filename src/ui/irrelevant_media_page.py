@@ -295,6 +295,24 @@ class IrrelevantMediaPage(QWidget):
     def selected_count(self) -> int:
         return self.thumbnail_grid.selected_count()
 
+    def grid_column_count(self) -> int:
+        return self.thumbnail_grid.grid_column_count()
+
+    def rendered_card_count(self) -> int:
+        return self.thumbnail_grid.rendered_card_count()
+
+    def category_selector_values(self) -> list[str]:
+        return [
+            str(self.category_selector.itemData(index) or "")
+            for index in range(self.category_selector.count())
+        ]
+
+    def category_filter_labels(self) -> list[str]:
+        return [
+            self.category_filter_combo.itemText(index)
+            for index in range(self.category_filter_combo.count())
+        ]
+
     def select_photo_by_filename(self, filename: str) -> bool:
         target = (filename or "").strip()
         if not target:
@@ -465,7 +483,9 @@ class IrrelevantMediaPage(QWidget):
         metadata = dict(getattr(photo, "metadata", {}) or {})
 
         automatic_category = str(
-            metadata.get("automatic_media_category", "")
+            metadata.get("cleanup_automatic_category", "")
+            or metadata.get("automatic_media_category", "")
+            or metadata.get("relevance_category", "")
             or getattr(photo, "automatic_media_category", "")
             or metadata.get("media_category", "")
             or getattr(photo, "media_category", "")
@@ -473,13 +493,16 @@ class IrrelevantMediaPage(QWidget):
         ).strip().lower()
 
         user_corrected_category = str(
-            metadata.get("user_corrected_media_category", "")
+            metadata.get("cleanup_user_corrected_category", "")
+            or metadata.get("user_corrected_media_category", "")
             or getattr(photo, "user_corrected_media_category", "")
             or ""
         ).strip().lower()
 
         effective_category = str(
-            metadata.get("effective_media_category", "")
+            metadata.get("cleanup_effective_category", "")
+            or metadata.get("effective_media_category", "")
+            or metadata.get("relevance_category", "")
             or getattr(photo, "effective_media_category", "")
             or user_corrected_category
             or automatic_category
@@ -487,20 +510,28 @@ class IrrelevantMediaPage(QWidget):
         ).strip().lower()
 
         confidence = float(
-            metadata.get("classification_confidence", getattr(photo, "classification_confidence", 0.0) or 0.0)
+            metadata.get("cleanup_confidence", metadata.get("classification_confidence", getattr(photo, "classification_confidence", 0.0) or 0.0))
             or 0.0
         )
 
-        reason = str(
-            metadata.get("classification_reason", "")
-            or getattr(photo, "classification_reason", "")
-            or ""
-        ).strip()
+        cleanup_reasons = metadata.get("cleanup_reasons", "")
+        if isinstance(cleanup_reasons, (list, tuple)):
+            reason = "; ".join(str(item) for item in cleanup_reasons if str(item).strip())
+        else:
+            reason = str(cleanup_reasons or "").strip()
+        if not reason:
+            reason = str(
+                metadata.get("cleanup_reason", "")
+                or metadata.get("classification_reason", "")
+                or getattr(photo, "classification_reason", "")
+                or metadata.get("relevance_reason", "")
+                or ""
+            ).strip()
 
         if not reason:
             reason = "No classification reason available."
 
-        action = self._recommended_action_for_category(effective_category)
+        action = str(metadata.get("cleanup_recommended_action", "") or "").strip() or self._recommended_action_for_category(effective_category)
         user_decision = str(
             metadata.get("user_decision", "")
             or getattr(photo, "user_decision", "")
@@ -592,6 +623,8 @@ class IrrelevantMediaPage(QWidget):
 
     def _trigger_refresh(self, force: bool = False) -> None:
         _ = force
+        previous_scroll = self.thumbnail_grid.scroll_value()
+        selected_key_before = self.thumbnail_grid.selected_key()
         self._visible_rows = self._filtered_rows()
         self.results_label.setText(f"Showing {len(self._visible_rows)} of {len(self._rows)} cleanup review items")
         self._update_stats()
@@ -599,11 +632,13 @@ class IrrelevantMediaPage(QWidget):
         items = [self._to_grid_item(row) for row in self._visible_rows]
         self.thumbnail_grid.set_items(items)
 
-        selected_key = self.thumbnail_grid.selected_key()
+        selected_key = self.thumbnail_grid.selected_key() or selected_key_before
         if selected_key:
             row = self._row_for_key(selected_key)
-            if row is not None:
+            if row is not None and selected_key in {self._photo_key(item.photo) for item in self._visible_rows}:
+                self.thumbnail_grid.set_single_selection(selected_key)
                 self._show_details(row, force=True)
+                self.thumbnail_grid.restore_scroll_value(previous_scroll)
                 return
 
         if self._visible_rows:
@@ -612,6 +647,11 @@ class IrrelevantMediaPage(QWidget):
             self._show_details(self._visible_rows[0], force=True)
         else:
             self._clear_details()
+        self.thumbnail_grid.restore_scroll_value(previous_scroll)
+        QTimer.singleShot(
+            50,
+            lambda value=previous_scroll: self.thumbnail_grid.restore_scroll_value(value),
+        )
 
     def _filtered_rows(self) -> list[CleanupReviewRow]:
         rows = list(self._rows)
@@ -650,9 +690,7 @@ class IrrelevantMediaPage(QWidget):
         category_label = self._category_registry.label_for(row.effective_category)
         confidence_label = f"{max(0, min(100, int(round(row.confidence * 100))))}%"
         action_label = RECOMMENDED_ACTION_LABELS.get(row.recommended_action, row.recommended_action.replace("_", " ").title())
-        thumbnail = getattr(row.photo, "thumbnail", None)
-        if not isinstance(thumbnail, QPixmap) or thumbnail.isNull():
-            thumbnail = None
+        thumbnail = self._get_cached_card_thumbnail(row)
         return SharedGridItem(
             key=self._photo_key(row.photo),
             filename=row.photo.display_name(),
@@ -770,7 +808,7 @@ class IrrelevantMediaPage(QWidget):
         if not text:
             return ["No classification reason available."]
 
-        separators = ["; ", ". ", " because "]
+        separators = ["; ", " because ", ". "]
         fragments = [text]
         for separator in separators:
             if separator in text:
@@ -782,7 +820,7 @@ class IrrelevantMediaPage(QWidget):
             if fragment.lower().startswith("classified as"):
                 cleaned.append(fragment)
             else:
-                cleaned.append(f"✓ {fragment}")
+                cleaned.append(f"- {fragment}")
         return cleaned or [text]
 
     def _action_value_from_label(self, label: str) -> str:
@@ -820,13 +858,18 @@ class IrrelevantMediaPage(QWidget):
         if not selected_rows:
             return
 
+        affected_keys = [self._photo_key(row.photo) for row in selected_rows]
+        preferred_key = self.thumbnail_grid.selected_key() or (affected_keys[0] if affected_keys else None)
+        previous_visible_keys = [self._photo_key(row.photo) for row in self._visible_rows]
+        previous_scroll = self.thumbnail_grid.scroll_value()
+
         for row in selected_rows:
             previous = row.effective_category
             metadata = dict(getattr(row.photo, "metadata", {}) or {})
             automatic = str(
                 metadata.get("automatic_media_category", "")
-                or getattr(row.photo, "automatic_media_category", "")
                 or row.automatic_category
+                or getattr(row.photo, "automatic_media_category", "")
                 or previous
             ).strip().lower()
 
@@ -834,6 +877,10 @@ class IrrelevantMediaPage(QWidget):
             metadata["user_corrected_media_category"] = category
             metadata["effective_media_category"] = category
             metadata["media_category"] = category
+            metadata["cleanup_automatic_category"] = automatic
+            metadata["cleanup_user_corrected_category"] = category
+            metadata["cleanup_effective_category"] = category
+            metadata["relevance_category"] = category
             row.photo.metadata = metadata
 
             row.photo.automatic_media_category = automatic
@@ -859,7 +906,71 @@ class IrrelevantMediaPage(QWidget):
         self._rows = [self._build_row(row.photo) for row in self._rows]
         self._show_user_saved_indicator("User category saved")
         self._refresh_group_options()
-        self._trigger_refresh(force=True)
+        self._refresh_after_category_change(
+            affected_keys=affected_keys,
+            preferred_key=preferred_key,
+            previous_visible_keys=previous_visible_keys,
+            previous_scroll=previous_scroll,
+        )
+
+    def _refresh_after_category_change(
+        self,
+        affected_keys: list[str],
+        preferred_key: Optional[str],
+        previous_visible_keys: list[str],
+        previous_scroll: int,
+    ) -> None:
+        new_visible_rows = self._filtered_rows()
+        new_visible_keys = [self._photo_key(row.photo) for row in new_visible_rows]
+
+        self.results_label.setText(f"Showing {len(new_visible_rows)} of {len(self._rows)} cleanup review items")
+        self._update_stats()
+
+        if new_visible_keys == previous_visible_keys:
+            self._visible_rows = new_visible_rows
+            for key in affected_keys:
+                row = self._row_for_key(key)
+                if row is not None:
+                    self.thumbnail_grid.update_item(self._to_grid_item(row))
+            selected_key = self.thumbnail_grid.selected_key()
+            if selected_key:
+                selected_row = self._row_for_key(selected_key)
+                if selected_row is not None:
+                    self._show_details(selected_row, force=True)
+            self.thumbnail_grid.restore_scroll_value(previous_scroll)
+            return
+
+        selected_key = self._choose_selection_after_filter_change(
+            preferred_key=preferred_key,
+            previous_visible_keys=previous_visible_keys,
+            new_visible_keys=new_visible_keys,
+        )
+        self._visible_rows = new_visible_rows
+        self.thumbnail_grid.set_items([self._to_grid_item(row) for row in self._visible_rows])
+
+        if selected_key:
+            self.thumbnail_grid.set_single_selection(selected_key)
+            selected_row = self._row_for_key(selected_key)
+            if selected_row is not None:
+                self._show_details(selected_row, force=True)
+        else:
+            self._clear_details()
+        self.thumbnail_grid.restore_scroll_value(previous_scroll)
+
+    def _choose_selection_after_filter_change(
+        self,
+        preferred_key: Optional[str],
+        previous_visible_keys: list[str],
+        new_visible_keys: list[str],
+    ) -> Optional[str]:
+        if not new_visible_keys:
+            return None
+        if preferred_key in new_visible_keys:
+            return preferred_key
+        previous_index = 0
+        if preferred_key in previous_visible_keys:
+            previous_index = previous_visible_keys.index(preferred_key)
+        return new_visible_keys[min(previous_index, len(new_visible_keys) - 1)]
 
     def _save_photo_user_metadata(self, photo) -> None:
         try:
@@ -924,6 +1035,18 @@ class IrrelevantMediaPage(QWidget):
 
         return None
 
+    def _get_cached_card_thumbnail(self, row: CleanupReviewRow) -> Optional[QPixmap]:
+        key = self._photo_key(row.photo)
+        cached = self._thumbnail_cache.get(key)
+        if cached is not None:
+            return cached[1]
+
+        pixmap = self._thumbnail_for_photo(row.photo, (140, 140))
+        if isinstance(pixmap, QPixmap) and not pixmap.isNull():
+            self._thumbnail_cache[key] = (0, pixmap)
+            return pixmap
+        return None
+
     def _update_stats(self) -> None:
         imported = self._imported_total_count
         cleanup_candidates = len([
@@ -933,11 +1056,19 @@ class IrrelevantMediaPage(QWidget):
         family = len([row for row in self._rows if row.effective_category == MediaCategory.FamilyPhoto.value])
         documents = len([
             row for row in self._rows
-            if row.effective_category in {MediaCategory.Document.value, MediaCategory.Receipt.value, MediaCategory.Invoice.value}
+            if row.effective_category in {
+                MediaCategory.Document.value,
+                MediaCategory.Receipt.value,
+                MediaCategory.Invoice.value,
+                "document_or_scan",
+            }
         ])
         screenshots = len([row for row in self._rows if row.effective_category == MediaCategory.Screenshot.value])
         advertisements = len([row for row in self._rows if row.effective_category == MediaCategory.Advertisement.value])
-        memes = len([row for row in self._rows if row.effective_category in {MediaCategory.Meme.value, MediaCategory.Graphic.value}])
+        memes = len([
+            row for row in self._rows
+            if row.effective_category in {MediaCategory.Meme.value, MediaCategory.Graphic.value, "meme_or_graphic"}
+        ])
         unknown = len([row for row in self._rows if row.effective_category == MediaCategory.Unknown.value])
 
         avg_conf = 0
@@ -953,7 +1084,7 @@ class IrrelevantMediaPage(QWidget):
                     f"Documents: {documents}",
                     f"Screenshots: {screenshots}",
                     f"Advertisements: {advertisements}",
-                    f"Memes/Graphics: {memes}",
+                    f"Memes: {memes}",
                     f"Unknown: {unknown}",
                     f"Average confidence: {avg_conf}%",
                 ]

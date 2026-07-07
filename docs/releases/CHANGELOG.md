@@ -1,6 +1,20 @@
 # Changelog
 
 ## Unreleased
+### DOCSYNC - Product decision synchronization and prompt standard refresh
+- Updated implementation prompt standards to require Why We Test, Manual Test Plan, and Acceptance Checklist sections.
+- Documented Memory Review as the AI-teaching surface with learning visibility, content-first learning, and future Learning Inspector direction.
+- Documented category semantics so content categories, organizational categories, and workflow categories are treated differently.
+- Added the approved product testing workflow and aligned glossary, roadmap, and decision ledger terminology.
+
+### UX-001/UX-002/UX-003 - Memory Review usability and Learning Summary timestamps
+- Preserved thumbnail-grid scroll position and selection when category corrections are applied in Memory Review and Cleanup Review.
+- When a corrected photo no longer matches the active filter, the review grid removes it, keeps the user's position, and selects the next visible photo.
+- Memory Review now hides Decision editing controls so the workspace focuses on category correction, AI teaching, preference learning, and classification review.
+- The underlying decision model and non-Memory Review decision workflows remain intact.
+- Learning Summary now shows stored local date/time values for learned category rules, preference signals, and learning events.
+- Updated contextual Help for Memory Review and Learning Summary behavior.
+
 ### LEARN-002 - Preference Learning and Aggregation Foundations
 - Added `PreferenceLearningEngine` with `PreferenceLearningEvent`, `PreferenceSignal`, and `PreferenceLearningProfile` dataclasses.
 - Aggregates local preference signals from category corrections, memory decisions, and cleanup-oriented decisions.

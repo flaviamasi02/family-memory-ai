@@ -28,6 +28,8 @@ class CategoryLearningRule:
     confidence_boost: float
     support_count: int
     explanation: str
+    first_learned_at: str = ""
+    last_learned_at: str = ""
 
 
 @dataclass
@@ -180,6 +182,7 @@ class CategoryLearningEngine:
             {
                 "corrected_category": event.corrected_category,
                 "source": event.source,
+                "timestamp": event.timestamp,
                 "signals": dict(event.extracted_signals),
             }
         )
@@ -239,11 +242,13 @@ class CategoryLearningEngine:
             "total_events": int(self.profile.total_events),
             "category_event_counts": dict(self.profile.category_event_counts),
             "rules": [asdict(rule) for rule in self.profile.rules],
+            "event_summaries": list(self._event_summaries),
         }
 
     def _recompute_profile(self) -> None:
         counts: dict[str, int] = {}
         grouped_signatures: dict[tuple[str, tuple[tuple[str, Any], ...]], int] = {}
+        grouped_timestamps: dict[tuple[str, tuple[tuple[str, Any], ...]], list[str]] = {}
 
         for summary in self._event_summaries:
             category = str(summary.get("corrected_category", "") or "").strip().lower()
@@ -252,6 +257,7 @@ class CategoryLearningEngine:
 
             counts[category] = counts.get(category, 0) + 1
             signals = dict(summary.get("signals", {}) or {})
+            timestamp = str(summary.get("timestamp", "") or "").strip()
 
             # Important improvement:
             # Previously the engine created rules only when many images shared
@@ -265,6 +271,8 @@ class CategoryLearningEngine:
                     continue
                 signature = (category, tuple(sorted(conditions.items())))
                 grouped_signatures[signature] = grouped_signatures.get(signature, 0) + 1
+                if timestamp:
+                    grouped_timestamps.setdefault(signature, []).append(timestamp)
 
         rules: list[CategoryLearningRule] = []
         registry = get_category_registry()
@@ -290,6 +298,8 @@ class CategoryLearningEngine:
                 confidence_boost=round(float(confidence_boost), 3),
                 support_count=int(support_count),
                 explanation=_rule_explanation(target_category, conditions),
+                first_learned_at=_first_timestamp(grouped_timestamps.get((target_category, condition_items), [])),
+                last_learned_at=_latest_timestamp(grouped_timestamps.get((target_category, condition_items), [])),
             )
             rules.append(rule)
 
@@ -351,6 +361,7 @@ class CategoryLearningEngine:
                 category = str(raw.get("corrected_category", "") or "").strip().lower()
                 signals = dict(raw.get("signals", {}) or {})
                 source = str(raw.get("source", "user") or "user")
+                timestamp = str(raw.get("timestamp", "") or "")
 
                 if not category or not signals:
                     continue
@@ -359,6 +370,7 @@ class CategoryLearningEngine:
                     {
                         "corrected_category": category,
                         "source": source,
+                        "timestamp": timestamp,
                         "signals": signals,
                     }
                 )
@@ -579,6 +591,16 @@ def _to_int(value: Any) -> Optional[int]:
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _first_timestamp(timestamps: list[str]) -> str:
+    values = [str(item or "").strip() for item in timestamps if str(item or "").strip()]
+    return min(values) if values else ""
+
+
+def _latest_timestamp(timestamps: list[str]) -> str:
+    values = [str(item or "").strip() for item in timestamps if str(item or "").strip()]
+    return max(values) if values else ""
 
 
 _default_engine: Optional[CategoryLearningEngine] = None

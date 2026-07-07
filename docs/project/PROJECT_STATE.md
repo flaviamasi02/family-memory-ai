@@ -6,7 +6,7 @@
 
 ## Current Sprint
 
-- Sprint LEARN-002 (Preference Learning and Aggregation Foundations) - Completed
+- Sprint UX-001/UX-002/UX-003 (Memory Review usability and Learning Summary timestamps) - Completed
 
 ## Project Status
 
@@ -90,7 +90,8 @@ Full architecture definition: docs/architecture/ARCHITECTURE.md (Knowledge First
 
 The distinct responsibilities of Memory Review and Cleanup Review have been formally documented.
 
-- Memory Review purpose: Teach the AI. Users review memories, correct AI decisions, confirm important photos, assign categories, improve people recognition, validate events, and increase AI knowledge. Objective: improve the knowledge base.
+- Memory Review purpose: Teach the AI through media category correction, AI teaching, preference learning, and classification validation. Users review memories, correct AI decisions, confirm important photos, assign categories, improve people recognition, validate events, and increase AI knowledge. Objective: improve the knowledge base.
+- Future Memory Review UI direction: focus on media category correction, AI teaching, preference learning, and classification validation. Decision editing will move out of the Memory Review UI in a future milestone while preserving the underlying decision model.
 
 - Cleanup Review purpose: Reduce noise. Users review duplicates, screenshots, low-quality images, and unnecessary files. Objective: clean the collection without affecting valuable memories.
 
@@ -113,6 +114,16 @@ Current strategic priority order:
 5. Memory output generation (albums as one downstream consumer)
 
 Immediate execution remains local-first, deterministic-first, and explainable-first. Memory Review is the central interface for teaching future scoring, preference learning, cleanup, duplicate management, and memory-building improvements.
+
+Recent UX update:
+
+- Memory Review now preserves scroll position and selected photo when users correct media categories, including when the corrected photo leaves the active filter.
+- Cleanup Review uses the same preserved-position behavior for category corrections and filtered-list transitions.
+- Memory Review now surfaces learning as part of the product direction, including an always-visible learning counter and user-facing teaching language such as "Changing Category teaches the AI".
+- Learning Summary now displays stored local date/time values for learned category rules, preference signals, and learning events.
+- Learned items are expected to remain understandable to non-technical users with confidence, support count, and explanation available in future learning views.
+- Preference learning is now documented as content-first: visual evidence leads, metadata is secondary support only.
+- Category semantics now distinguish content categories, organizational categories, and workflow categories; workflow categories are not visual-learning labels.
 
 Future development is now organized by functional domains rather than by a single sequential DEV-XXX chain.
 

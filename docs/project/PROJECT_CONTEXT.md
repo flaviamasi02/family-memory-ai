@@ -108,6 +108,43 @@ Every prompt should have one well-defined objective.
 
 Avoid asking the AI to redesign the entire project.
 
+Implementation prompts must also explain why the feature exists, what is being validated, how to test it manually, which persistence and regression checks matter, and how the work will be accepted.
+
+---
+
+# Product Testing Workflow
+
+Every implementation cycle should follow:
+
+Implementation
+
+↓
+
+Manual Test
+
+↓
+
+Product Owner Feedback
+
+↓
+
+Documentation Update
+
+↓
+
+Commit
+
+↓
+
+Push
+
+↓
+
+Next Sprint
+
+Testing feedback is product design input.
+UX observations made during testing should be preserved as product decisions whenever appropriate.
+
 ---
 
 # Documentation Philosophy

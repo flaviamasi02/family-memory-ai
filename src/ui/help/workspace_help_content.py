@@ -132,19 +132,19 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
             title="Memory Review",
             sections=(
                 _purpose_section(
-                    why_this_workspace_exists="Memory Review is the core workspace for deciding which moments should contribute to family memories and future album quality.",
-                    problem_it_solves="Raw imported photos contain noise, ambiguity, and mixed quality that must be resolved through guided decision-making.",
+                    why_this_workspace_exists="Memory Review is the core workspace for teaching which moments should contribute to family memories and future album quality.",
+                    problem_it_solves="Raw imported photos contain noise, ambiguity, and mixed quality that must be resolved through guided category correction.",
                     ai_automation="The system pre-scores candidates, predicts categories, and keeps explainable reasoning visible for each item.",
-                    user_interaction="Apply decisions and category corrections in small batches; every correction is captured for deterministic learning.",
-                    expected_outcome="A cleaner, higher-confidence reviewed set that improves draft quality and teaches future recommendations.",
+                    user_interaction="Correct Media Category values in small batches; every correction is captured for deterministic category and preference learning.",
+                    expected_outcome="A cleaner, higher-confidence reviewed set that teaches future classification and recommendation behavior without mixing in album-decision editing.",
                 ),
                 _workflow_section(
                     [
                         "Review AI Suggested Priority",
                         "Confirm or Correct Category",
-                        "Apply Keep or Reject Decisions",
                         "Validate Explanations and Confidence",
                         "Feed Learning Signals from Corrections",
+                        "Open Learning Summary to Review Timestamped Learning History",
                         "Improve Future Ranking Quality",
                     ]
                 ),
@@ -153,8 +153,9 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                         "Review visually similar photos together to keep decisions consistent.",
                         "Use multi-selection for repeated patterns instead of editing one by one.",
                         "Correct category mistakes immediately when confidence is low.",
+                        "Use Learning Summary to see when rules and preference signals were learned.",
                         "Do focused sessions of 15 to 30 minutes to reduce fatigue.",
-                        "Aim for consistent decisions, not perfect decisions, in each session.",
+                        "Aim for consistent category corrections, not album-decision editing, in each session.",
                     ]
                 ),
                 _tips_section(
@@ -165,14 +166,14 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                         ),
                         WorkspaceHelpTip(
                             title="Learning Tip",
-                            body="When uncertain, choose the closest valid category now and refine in later passes.",
+                            body="Learning Summary shows stored event dates and times so you can understand when the system learned each pattern.",
                         ),
                     ]
                 ),
                 _ai_status_section(
                     [
                         WorkspaceAIStatusMetric("Category Learning", 72, "Consuming correction signals from this workspace"),
-                        WorkspaceAIStatusMetric("Decision Consistency", 63, "Learning from repeated keep or reject patterns"),
+                        WorkspaceAIStatusMetric("Preference Learning", 63, "Aggregating repeated category and review signals"),
                         WorkspaceAIStatusMetric("Ranking Calibration", 58, "Adapting score weighting from user behavior"),
                     ]
                 ),

@@ -142,6 +142,7 @@ class SharedThumbnailGrid(QWidget):
         self._selection_anchor_key: Optional[str] = None
         self._selected_key: Optional[str] = None
         self._selected_keys: set[str] = set()
+        self._pending_scroll_restore: Optional[int] = None
 
         self._cards_by_key: dict[str, SharedThumbnailCard] = {}
         self._rendered_keys: list[str] = []
@@ -164,6 +165,7 @@ class SharedThumbnailGrid(QWidget):
     def eventFilter(self, watched, event):
         if watched is self.scroll_area.viewport() and event.type() == QEvent.Type.Resize:
             self._on_viewport_resized()
+            self._apply_pending_scroll_restore()
         return super().eventFilter(watched, event)
 
     def set_items(self, items: list[SharedGridItem]) -> None:
@@ -183,6 +185,19 @@ class SharedThumbnailGrid(QWidget):
             self._selection_anchor_key = self._selected_key
 
         self._rebuild_grid()
+
+    def scroll_value(self) -> int:
+        return int(self.scroll_area.verticalScrollBar().value())
+
+    def restore_scroll_value(self, value: int) -> None:
+        self._pending_scroll_restore = max(0, int(value or 0))
+        self._apply_pending_scroll_restore()
+        QTimer.singleShot(0, self._apply_pending_scroll_restore)
+        QTimer.singleShot(50, self._apply_pending_scroll_restore)
+        QTimer.singleShot(100, self._apply_pending_scroll_restore)
+
+    def rendered_card_count(self) -> int:
+        return len(self._cards_by_key)
 
     def update_item(self, item: SharedGridItem) -> None:
         print(f"SharedThumbnailGrid.update_item {item.key}")
@@ -250,9 +265,11 @@ class SharedThumbnailGrid(QWidget):
         new_columns = self._calculate_grid_columns()
         self._sync_content_width()
         if new_columns == self._grid_columns:
+            self._apply_pending_scroll_restore()
             return
         self._grid_columns = new_columns
         self._relayout_cards()
+        self._apply_pending_scroll_restore()
 
     def _rebuild_grid(self) -> None:
         for card in self._cards_by_key.values():
@@ -305,6 +322,20 @@ class SharedThumbnailGrid(QWidget):
 
         if self._pending_render_index >= render_limit:
             self.selection_changed.emit(set(self._selected_keys), self._selected_key)
+        self._apply_pending_scroll_restore()
+
+    def _apply_pending_scroll_restore(self) -> None:
+        if self._pending_scroll_restore is None:
+            return
+
+        target = self._pending_scroll_restore
+        scrollbar = self.scroll_area.verticalScrollBar()
+        self.content_widget.adjustSize()
+        if target > 0 and scrollbar.maximum() <= 0:
+            return
+
+        scrollbar.setValue(min(target, scrollbar.maximum()))
+        self._pending_scroll_restore = None
 
     def _on_scroll_changed(self, value: int) -> None:
         scrollbar = self.scroll_area.verticalScrollBar()

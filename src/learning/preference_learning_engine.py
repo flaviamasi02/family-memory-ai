@@ -34,6 +34,8 @@ class PreferenceSignal:
     strength: float
     explanation: str
     source_action: str
+    first_learned_at: str = ""
+    last_learned_at: str = ""
 
 
 @dataclass
@@ -159,18 +161,24 @@ class PreferenceLearningEngine:
         return {
             "total_events": int(self.profile.total_events),
             "signal_counts": dict(self.profile.signal_counts),
+            "preference_signals": [asdict(signal) for signal in strongest],
             "strongest_preference_signals": [asdict(signal) for signal in strongest[:5]],
             "last_updated_at": self.profile.last_updated_at,
+            "event_summaries": list(self._event_summaries),
         }
 
     def _recompute_profile(self) -> None:
         grouped: dict[tuple[str, str, str, str], int] = {}
+        grouped_timestamps: dict[tuple[str, str, str, str], list[str]] = {}
 
         for event in self._event_summaries:
             for signal_type, target, decision in _signal_specs_for_event(event):
                 source_action = _source(event.get("source_action", "user"))
                 key = (signal_type, target, decision, source_action)
                 grouped[key] = grouped.get(key, 0) + 1
+                timestamp = str(event.get("timestamp", "") or "").strip()
+                if timestamp:
+                    grouped_timestamps.setdefault(key, []).append(timestamp)
 
         signals: list[PreferenceSignal] = []
         signal_counts: dict[str, int] = {}
@@ -188,6 +196,8 @@ class PreferenceLearningEngine:
                     strength=float(strength),
                     explanation=_signal_explanation(signal_type, target, decision, support_count, source_action),
                     source_action=source_action,
+                    first_learned_at=_first_timestamp(grouped_timestamps.get((signal_type, target, decision, source_action), [])),
+                    last_learned_at=_latest_timestamp_values(grouped_timestamps.get((signal_type, target, decision, source_action), [])),
                 )
             )
 
@@ -353,6 +363,16 @@ def _signal_id(signal_type: str, target: str, decision: str, source_action: str)
 def _latest_timestamp(events: list[dict[str, Any]]) -> str:
     timestamps = [str(event.get("timestamp", "") or "") for event in events if event.get("timestamp")]
     return max(timestamps) if timestamps else ""
+
+
+def _first_timestamp(timestamps: list[str]) -> str:
+    values = [str(item or "").strip() for item in timestamps if str(item or "").strip()]
+    return min(values) if values else ""
+
+
+def _latest_timestamp_values(timestamps: list[str]) -> str:
+    values = [str(item or "").strip() for item in timestamps if str(item or "").strip()]
+    return max(values) if values else ""
 
 
 def _normalize(value: Any) -> str:

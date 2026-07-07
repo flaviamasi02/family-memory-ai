@@ -65,6 +65,17 @@ Explainability requirement for classification:
 - Metadata-less images should use local visual evidence before falling back to Unknown.
 - Unknown remains valid when evidence is weak or conflicting.
 
+Content-first learning rule:
+
+- Preference learning should primarily use visual content, detected objects, scene understanding, document structure, people, faces, landscapes, screenshots, and other visual evidence.
+- Metadata is secondary supporting evidence only.
+- Learning rules must not rely primarily on filename, extension, EXIF, file size, or date source.
+
+Learning transparency rule:
+
+- Future learning summaries should clearly separate Visual Evidence, Metadata Evidence, Confidence, Support, and Learning Timestamp.
+- Every learned item should remain understandable to non-technical users.
+
 People-001 classification rule:
 
 - Local face detection is allowed as Family Photo evidence.
@@ -286,13 +297,20 @@ MASTER_DEVELOPMENT_PLAN.md defines the high-level product-planning rule set that
 
 Memory Review is the main interaction point between the user and the application.
 
-It is where users teach the application what matters.
+It is where users teach the application what matters through category correction, AI teaching, preference learning, and classification validation.
 
 Current Memory Review behavior is deterministic, explainable, and correction-oriented:
 
 - multi-selection and bulk editing
 - Media Category review with Automatic Category, User Corrected Category, and Effective Category
 - confidence and reasoning visibility as first-class decision context
+
+Category semantics for learning and review:
+
+- Content categories describe what the image contains.
+- Organizational categories describe logical grouping.
+- Workflow categories describe what should happen next.
+- Workflow categories must not be treated as visual-learning labels.
 
 MEM-008 taxonomy update:
 
@@ -475,6 +493,10 @@ Over time these decisions should influence:
 - cleanup suggestions
 
 Preference Learning must remain explainable. Future scoring should be able to trace how repeated user decisions changed scoring behavior.
+
+Preference learning should remain content-first. Visual evidence should dominate learned rules, with metadata serving only as support.
+
+When learning history is surfaced to users, it should expose confidence, support count, explanation, and learning timestamp in a human-readable way.
 
 ## Continuous Learning
 

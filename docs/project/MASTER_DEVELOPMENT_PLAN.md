@@ -58,6 +58,8 @@ Current strategic priority order:
 - Continuous Learning
 - User Trust
 - Transparent Decisions
+- Content-first Learning
+- Category Semantics
 
 ---
 
@@ -107,7 +109,7 @@ Title:
 Memory Review
 
 Purpose:
-Teach the system what memories matter.
+Teach the system what memories matter through category correction, AI teaching, preference learning, and classification validation.
 
 Mission:
 Make Memory Review the central place where meaningful user decisions are captured.
@@ -120,6 +122,7 @@ Future milestones:
 - MEM-006 Memory Review UX polishing and keyboard workflow improvements (completed)
 - MEM-008 Custom User Categories (completed)
 - MEM-009 Editable System Category Properties (completed)
+- MEM-010 Learning Transparency and Learning Inspector (future)
 
 MEM-008 completed outcome:
 
@@ -133,6 +136,12 @@ MEM-009 completed outcome:
 - System categories are now customizable while keeping protected stable IDs.
 - System category deletion remains disallowed.
 - System-category reset-to-default is available per category.
+
+Future MEM direction:
+
+- Memory Review should preserve scroll position, selection, and user context during category changes.
+- Memory Review should make AI teaching visible to users.
+- Memory Review should focus on category correction, preference learning, and classification validation rather than decision editing.
 
 ### CLEAN
 
@@ -190,13 +199,20 @@ Purpose:
 Learn from user decisions.
 
 Mission:
-Continuously improve recommendations and scoring from repeated user behavior.
+Continuously improve recommendations and scoring from repeated user behavior while keeping the learning path explainable and content-first.
 
 Future milestones:
 
 - LEARN-001 Category Learning from User Corrections (completed)
 - LEARN-002 Preference Learning and Aggregation Foundations (completed)
 - LEARN-003 Hybrid AI Classification
+
+LEARN-003 future direction:
+
+- combine deterministic rules, learned user preferences, and AI inference into a single explainable decision
+- treat visual content as primary learning evidence
+- treat metadata as secondary supporting evidence
+- keep category semantics distinct for content, organizational, and workflow categories
 - LEARN-004 Adaptive Scoring
 
 ### PEOPLE
@@ -336,6 +352,12 @@ Category terminology for review interfaces:
 - User Corrected Category
 - Effective Category
 
+Category semantics:
+
+- Content Category: describes what the image contains
+- Organizational Category: describes logical grouping
+- Workflow Category: describes what should happen next
+
 Classification principles:
 
 - initial classification remains deterministic and explainable
@@ -343,6 +365,7 @@ Classification principles:
 - default system categories are stable, user-correctable, and taxonomy-driven
 - Effective Category (Automatic Category -> User Corrected Category -> Effective Category) is authoritative for review behavior
 - grouping remains a review visualization aid and must not change underlying classification semantics
+- workflow categories must not learn visual rules
 
 ---
 

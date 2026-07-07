@@ -104,6 +104,7 @@ Why this order exists:
 | docs/project/MASTER_DEVELOPMENT_PLAN.md | Highest-level project planning | Product mission, domains, principles, planning rule | Implementation status details |
 | docs/project/DOMAIN_ROADMAP.md | Official future roadmap | Domains, milestones, capability structure | Historical implementation log |
 | docs/development/AI_PROJECT_PLAYBOOK.md | Development methodology | Development rules, coding workflow, documentation workflow, AI collaboration rules | Project state ownership |
+| docs/development/PROMPT_TEMPLATE.md | Official prompt templates | Implementation prompt structure, mandatory testing, and acceptance sections | Project state ownership |
 | docs/development/DECISIONS.md | Architectural Decision Record (ADR) ledger | Historical approved project decisions | Day-to-day task execution details |
 | docs/project/ROADMAP.md | Future direction | Future releases, planned sprints | Current implementation status details |
 

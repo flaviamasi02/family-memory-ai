@@ -356,9 +356,10 @@ class AlbumReviewPage(QWidget):
         actions_layout.addWidget(QLabel("Category:"))
         actions_layout.addWidget(self.category_selector, 1)
         actions_layout.addWidget(self.apply_category_button)
-        actions_layout.addWidget(QLabel("Decision:"))
-        actions_layout.addWidget(self.decision_selector, 1)
-        actions_layout.addWidget(self.apply_decision_button)
+        self.decision_action_label = QLabel("Decision:")
+        self.decision_action_label.setVisible(False)
+        self.decision_selector.setVisible(False)
+        self.apply_decision_button.setVisible(False)
 
         details_layout = QVBoxLayout()
         details_layout.addWidget(QLabel("Preview"))
@@ -435,7 +436,11 @@ class AlbumReviewPage(QWidget):
         self._trigger_refresh(force=True)
 
     def _on_learning_summary(self) -> None:
-        dialog = LearningSummaryDialog(self._category_learning_engine, self)
+        dialog = LearningSummaryDialog(
+            self._category_learning_engine,
+            self,
+            preference_engine=self._preference_learning_engine,
+        )
         dialog.exec()
 
     def reclassify_unknowns_from_learning(self) -> int:
@@ -644,9 +649,7 @@ class AlbumReviewPage(QWidget):
         self._grid_columns = self._calculate_columns()
         self._grid_rebuild_count += 1
 
-        self.results_label.setText(
-            f"Showing {len(self._visible_rows)} of {len(self._all_rows)} photos"
-        )
+        self.results_label.setText(self._results_label_text())
 
         self._add_next_batch()
 
@@ -655,6 +658,26 @@ class AlbumReviewPage(QWidget):
             self._select_key(first_key, additive=False, range_select=False)
 
         self._update_selection_count()
+
+    def _results_label_text(self) -> str:
+        if self._candidate_count or self._rejection_reasons_summary:
+            selected = sum(1 for row in self._all_rows if row.pipeline_state == "selected")
+            rejected = sum(1 for row in self._all_rows if row.pipeline_state == "rejected")
+            reasons = ", ".join(
+                f"{reason}:{count}"
+                for reason, count in sorted(self._rejection_reasons_summary.items())
+            )
+            parts = [
+                f"Imported: {len(self._all_rows)}",
+                f"Candidates: {self._candidate_count}",
+                f"Selected: {selected}",
+                f"Rejected: {rejected}",
+            ]
+            if reasons:
+                parts.append(f"Reasons: {reasons}")
+            parts.append(f"Showing {len(self._visible_rows)}")
+            return " | ".join(parts)
+        return f"Showing {len(self._visible_rows)} of {len(self._all_rows)} photos"
 
     def _filtered_sorted_rows(self) -> List[AlbumReviewRow]:
         rows = list(self._all_rows)
@@ -687,7 +710,7 @@ class AlbumReviewPage(QWidget):
         if sort_mode == self.SORT_LOWEST:
             rows.sort(key=lambda row: (row.breakdown.total_score, self._photo_date_sort_value(row.breakdown.photo)))
         elif sort_mode == self.SORT_DATE:
-            rows.sort(key=lambda row: (self._photo_date_sort_value(row.breakdown.photo), -row.breakdown.total_score))
+            rows.sort(key=lambda row: (self._photo_date_sort_value(row.breakdown.photo), row.breakdown.total_score), reverse=True)
         else:
             rows.sort(key=lambda row: (-row.breakdown.total_score, self._photo_date_sort_value(row.breakdown.photo)))
 
@@ -761,7 +784,8 @@ class AlbumReviewPage(QWidget):
             self._add_next_batch()
 
     def eventFilter(self, watched, event):
-        if watched is self.grid_scroll.viewport() and event.type() == QEvent.Type.Resize:
+        grid_scroll = getattr(self, "grid_scroll", None)
+        if grid_scroll is not None and watched is grid_scroll.viewport() and event.type() == QEvent.Type.Resize:
             new_columns = self._calculate_columns()
             if new_columns != self._grid_columns:
                 self._relayout_existing_cards(new_columns)
@@ -833,12 +857,11 @@ class AlbumReviewPage(QWidget):
         start_index = keys.index(key)
         photos = [row.breakdown.photo for row in rows]
 
-        self._preview_dialog = ImagePreviewDialog(
-            photos=photos,
-            start_index=start_index,
-            parent=self,
-        )
-        self._preview_dialog.exec()
+        self._preview_dialog = ImagePreviewDialog(self)
+        self._preview_dialog.set_items(photos, start_index=start_index)
+        self._preview_dialog.show()
+        self._preview_dialog.raise_()
+        self._preview_dialog.activateWindow()
 
     def select_all_visible(self) -> None:
         rendered_keys = set(self._rendered_keys)
@@ -911,7 +934,11 @@ class AlbumReviewPage(QWidget):
         category_value = self._effective_category_for_photo(photo)
         self.media_category_value.setText(media_category_label(category_value))
         self.classification_reason_value.setText(str(getattr(photo, "classification_reason", "") or "-"))
-        self.visual_summary_value.setText(str(photo.metadata.get("visual_evidence", "") or photo.metadata.get("visual_signals_summary", "") or "-"))
+        visual_parts = [
+            str(photo.metadata.get("visual_signals_summary", "") or "").strip(),
+            str(photo.metadata.get("visual_evidence", "") or "").strip(),
+        ]
+        self.visual_summary_value.setText(" | ".join(part for part in visual_parts if part) or "-")
 
         confidence = float(getattr(photo, "classification_confidence", 0.0) or 0.0)
         self.confidence_value.setText(f"{max(0, min(100, int(round(confidence * 100))))}%")
@@ -931,7 +958,7 @@ class AlbumReviewPage(QWidget):
         self.date_value.setText(date_value)
         self.date_source_value.setText(date_source)
 
-        self.pipeline_value.setText(row.pipeline_state)
+        self.pipeline_value.setText(row.pipeline_state.title())
         self.rejection_reason_value.setText(row.rejection_reason or "-")
 
         self.explanations_list.clear()
@@ -981,12 +1008,12 @@ class AlbumReviewPage(QWidget):
         self._category_selector_syncing = False
 
     def _on_decision_selector_changed(self, value: str) -> None:
+        _ = value
         if self._decision_selector_syncing:
             return
-        selected = self._selected_row()
-        if selected is None:
-            return
-        self._apply_decision_to_rows([selected], value, source="user")
+        # Memory Review no longer exposes decision editing; hidden selector changes
+        # must not write decisions implicitly.
+        return
 
     def _on_category_selector_changed(self, _value: str) -> None:
         if self._category_selector_syncing:
@@ -1014,7 +1041,7 @@ class AlbumReviewPage(QWidget):
         if not self._confirm_bulk_if_needed(len(rows), f"apply category {media_category_label(category)}"):
             return
 
-        self._apply_category_to_rows(rows, category, source="user_bulk")
+        self._apply_category_to_rows(rows, category, source="user_bulk" if len(rows) > 1 else "user")
 
     def _confirm_bulk_if_needed(self, count: int, action_text: str) -> bool:
         if count <= 20:
@@ -1070,6 +1097,12 @@ class AlbumReviewPage(QWidget):
         if not category:
             return
 
+        affected_keys = [self._row_key(row) for row in rows]
+        preferred_key = self._selected_key or (affected_keys[0] if affected_keys else None)
+        previous_visible_keys = [self._row_key(row) for row in self._visible_rows]
+        previous_scroll = self.grid_scroll.verticalScrollBar().value()
+        previous_render_count = max(len(self._rendered_keys), self._initial_render_count)
+
         for row in rows:
             photo = row.breakdown.photo
             previous = self._effective_category_for_photo(photo)
@@ -1115,13 +1148,111 @@ class AlbumReviewPage(QWidget):
             if card is not None:
                 card.refresh_from_row(thumbnail=self._get_cached_card_thumbnail(row))
 
-        selected = self._selected_row()
-        if selected is not None:
-            self._show_details(selected, force=True)
-
         self._show_user_saved_indicator("User category saved")
         self.review_state_changed.emit()
-        self._trigger_refresh(force=True)
+        self._refresh_after_category_change(
+            affected_keys=affected_keys,
+            preferred_key=preferred_key,
+            previous_visible_keys=previous_visible_keys,
+            previous_scroll=previous_scroll,
+            previous_render_count=previous_render_count,
+        )
+
+    def _refresh_after_category_change(
+        self,
+        affected_keys: list[str],
+        preferred_key: Optional[str],
+        previous_visible_keys: list[str],
+        previous_scroll: int,
+        previous_render_count: int,
+    ) -> None:
+        new_visible_rows = self._filtered_sorted_rows()
+        new_visible_keys = [self._row_key(row) for row in new_visible_rows]
+
+        if new_visible_keys == previous_visible_keys:
+            self._visible_rows = new_visible_rows
+            for key in affected_keys:
+                row = self._row_for_key(key)
+                card = self._cards_by_key.get(key)
+                if row is not None and card is not None:
+                    card.refresh_from_row(thumbnail=self._get_cached_card_thumbnail(row))
+                    card.set_selected(key in self._selected_keys)
+            selected = self._selected_row()
+            if selected is not None:
+                self._show_details(selected, force=True)
+            self._restore_scroll_position(previous_scroll)
+            self._update_selection_count()
+            return
+
+        selected_key = self._choose_selection_after_filter_change(
+            preferred_key=preferred_key,
+            previous_visible_keys=previous_visible_keys,
+            new_visible_keys=new_visible_keys,
+        )
+
+        visible_key_set = set(new_visible_keys)
+        self._selected_keys = {key for key in self._selected_keys if key in visible_key_set}
+        if selected_key:
+            self._selected_key = selected_key
+            self._selected_keys = {selected_key}
+            self._selection_anchor_key = selected_key
+        else:
+            self._selected_key = None
+            self._selection_anchor_key = None
+
+        self._visible_rows = new_visible_rows
+        self._rebuild_grid_preserving_scroll(previous_scroll, previous_render_count)
+
+        if selected_key:
+            row = self._row_for_key(selected_key)
+            if row is not None:
+                self._show_details(row, force=True)
+        else:
+            self._clear_details()
+        self._restore_scroll_position(previous_scroll)
+        self._update_selection_count()
+
+    def _choose_selection_after_filter_change(
+        self,
+        preferred_key: Optional[str],
+        previous_visible_keys: list[str],
+        new_visible_keys: list[str],
+    ) -> Optional[str]:
+        if not new_visible_keys:
+            return None
+        if preferred_key in new_visible_keys:
+            return preferred_key
+
+        previous_index = 0
+        if preferred_key in previous_visible_keys:
+            previous_index = previous_visible_keys.index(preferred_key)
+
+        return new_visible_keys[min(previous_index, len(new_visible_keys) - 1)]
+
+    def _rebuild_grid_preserving_scroll(self, scroll_value: int, render_count: int) -> None:
+        self._clear_grid()
+        self._cards_by_key = {}
+        self._rendered_keys = []
+        self._pending_render_index = 0
+        self._target_render_count = min(max(self._initial_render_count, int(render_count or 0)), len(self._visible_rows))
+        self._grid_columns = self._calculate_columns()
+        self._grid_rebuild_count += 1
+        self.results_label.setText(self._results_label_text())
+        self._add_next_batch()
+        self._restore_scroll_position(scroll_value)
+
+    def _restore_scroll_position(self, value: int) -> None:
+        scrollbar = self.grid_scroll.verticalScrollBar()
+        target = max(0, int(value or 0))
+
+        def apply_restore() -> None:
+            self.grid_content.adjustSize()
+            scrollbar.setValue(min(target, scrollbar.maximum()))
+
+        apply_restore()
+        QTimer.singleShot(0, apply_restore)
+        QTimer.singleShot(50, apply_restore)
+        QTimer.singleShot(100, apply_restore)
 
     def _show_user_saved_indicator(self, text: str) -> None:
         self.user_saved_label.setText(text)
@@ -1219,8 +1350,12 @@ class AlbumReviewPage(QWidget):
                 return datetime.fromisoformat(str(date_value).replace("Z", "+00:00"))
             except Exception:
                 pass
+            try:
+                return datetime.strptime(str(date_value), "%Y:%m:%d %H:%M:%S")
+            except Exception:
+                pass
 
-        return datetime.max
+        return datetime.min
 
     def _get_cached_card_thumbnail(self, row: AlbumReviewRow) -> Optional[QPixmap]:
         photo = row.breakdown.photo
@@ -1234,12 +1369,21 @@ class AlbumReviewPage(QWidget):
             return cached[1]
 
         pixmap = getattr(photo, "thumbnail", None)
-        if not isinstance(pixmap, QPixmap) or pixmap.isNull():
+        if isinstance(pixmap, QPixmap) and not pixmap.isNull():
+            self._thumbnail_source_by_key[file_path] = "photo_thumbnail"
+        else:
             pixmap = None
 
         thumbnail_path = str(getattr(photo, "thumbnail_path", "") or "")
         if pixmap is None and thumbnail_path and Path(thumbnail_path).exists():
             pixmap = load_display_thumbnail(thumbnail_path, QSize(140, 140))
+            if pixmap is not None and not pixmap.isNull():
+                self._thumbnail_source_by_key[file_path] = "thumbnail_path"
+
+        if pixmap is None and file_path and Path(file_path).exists():
+            pixmap = load_display_thumbnail(file_path, QSize(140, 140))
+            if pixmap is not None and not pixmap.isNull():
+                self._thumbnail_source_by_key[file_path] = "original_scaled"
 
         if pixmap is not None and not pixmap.isNull():
             self._thumbnail_cache[cache_key] = (self._file_mtime(file_path), pixmap)
@@ -1309,11 +1453,67 @@ class AlbumReviewPage(QWidget):
     def selected_count(self) -> int:
         return len(self._selected_keys)
 
+    def selected_file_paths(self) -> list[str]:
+        return sorted(self._selected_keys)
+
+    def grid_column_count(self) -> int:
+        return int(self._grid_columns)
+
+    def compact_card_size(self) -> tuple[int, int]:
+        if not self._cards_by_key:
+            return 0, 0
+        card = next(iter(self._cards_by_key.values()))
+        return card.width(), card.height()
+
+    def card_summary_for_filename(self, filename: str) -> Optional[dict[str, str]]:
+        for row in self._visible_rows:
+            if row.breakdown.photo.display_name() != filename:
+                continue
+            card = self._cards_by_key.get(self._row_key(row))
+            if card is None:
+                return None
+            self._get_cached_card_thumbnail(row)
+            return {
+                "score": card.score_badge.text(),
+                "category": card.category_label.text(),
+                "confidence": card.confidence_label.text(),
+                "decision": card.decision_label.text(),
+            }
+        return None
+
+    def category_selector_values(self) -> list[str]:
+        return [
+            str(self.category_selector.itemData(index) or "")
+            for index in range(self.category_selector.count())
+        ]
+
+    def category_filter_labels(self) -> list[str]:
+        return [
+            self.category_filter_combo.itemText(index)
+            for index in range(self.category_filter_combo.count())
+        ]
+
+    def thumbnail_source_for_filename(self, filename: str) -> str:
+        for row in self._all_rows:
+            photo = row.breakdown.photo
+            if photo.display_name() == filename:
+                return self._thumbnail_source_by_key.get(str(getattr(photo, "path", "") or ""), "")
+        return ""
+
     def set_selected_decision(self, decision: str) -> None:
         selected = self._selected_row()
         if selected is None:
             return
         self._apply_decision_to_rows([selected], decision, source="user")
+
+    def approve_selected(self) -> None:
+        self.set_selected_decision(UserDecision.ApproveForAlbum.value)
+
+    def reject_selected(self) -> None:
+        self.set_selected_decision(UserDecision.Reject.value)
+
+    def reset_selected(self) -> None:
+        self.set_selected_decision(UserDecision.Pending.value)
 
     def decision_for_filename(self, filename: str) -> str:
         for row in self._all_rows:
