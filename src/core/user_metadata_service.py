@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+from models.visual_feature_profile import VisualFeatureProfile
+
 
 @dataclass
 class UserMetadataLoadResult:
@@ -73,6 +75,7 @@ class UserMetadataService:
         face_detection_confidence = data.get("face_detection_confidence", 0.0)
         face_detection_detector = str(data.get("face_detection_detector", "") or "").strip()
         face_detection_explanation = data.get("face_detection_explanation", [])
+        visual_profile = VisualFeatureProfile.from_dict(data.get("visual_feature_profile"))
 
         if automatic:
             metadata["automatic_media_category"] = automatic
@@ -100,6 +103,8 @@ class UserMetadataService:
             metadata["face_detection_detector"] = face_detection_detector
         if isinstance(face_detection_explanation, list):
             metadata["face_detection_explanation"] = [str(item) for item in face_detection_explanation]
+        if visual_profile.extraction_status not in {"missing", "corrupted"} or data.get("visual_feature_profile") is not None:
+            metadata["visual_feature_profile"] = visual_profile.to_dict()
 
         if not identity_match:
             metadata["user_metadata_warning"] = "identity_mismatch"
@@ -114,6 +119,7 @@ class UserMetadataService:
         if user_decision:
             photo.user_decision = user_decision
         photo.sync_intelligence_from_metadata()
+        photo.sync_visual_features_from_metadata()
 
         return UserMetadataLoadResult(True, identity_match, not identity_match, sidecar_path)
 
@@ -170,6 +176,7 @@ class UserMetadataService:
             "face_detection_confidence": float(metadata.get("face_detection_confidence", 0.0) or 0.0),
             "face_detection_detector": str(metadata.get("face_detection_detector", "") or "").strip(),
             "face_detection_explanation": list(metadata.get("face_detection_explanation", []) or []),
+            "visual_feature_profile": VisualFeatureProfile.from_dict(metadata.get("visual_feature_profile")).to_dict(),
             "updated_at": datetime.now(timezone.utc).isoformat(),
             "app_version": app_version or self._app_version,
         }

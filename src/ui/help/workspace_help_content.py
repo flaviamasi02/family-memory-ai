@@ -134,7 +134,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                 _purpose_section(
                     why_this_workspace_exists="Memory Review is the core workspace for teaching which moments should contribute to family memories and future album quality.",
                     problem_it_solves="Raw imported photos contain noise, ambiguity, and mixed quality that must be resolved through guided category correction.",
-                    ai_automation="The system pre-scores candidates, predicts categories, and keeps explainable reasoning visible for each item.",
+                    ai_automation="The system pre-scores candidates, predicts categories, keeps explainable reasoning visible, and can use locally stored visual/content signals when those profiles are available.",
                     user_interaction="Correct Media Category values in small batches; every correction is captured for deterministic category and preference learning.",
                     expected_outcome="A cleaner, higher-confidence reviewed set that teaches future classification and recommendation behavior without mixing in album-decision editing.",
                 ),
@@ -153,7 +153,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                         "Review visually similar photos together to keep decisions consistent.",
                         "Use multi-selection for repeated patterns instead of editing one by one.",
                         "Correct category mistakes immediately when confidence is low.",
-                        "Use Learning Summary to see when rules and preference signals were learned.",
+                        "Use Learning Summary to see when rules and preference signals were learned, including visual/content evidence when available.",
                         "Do focused sessions of 15 to 30 minutes to reduce fatigue.",
                         "Aim for consistent category corrections, not album-decision editing, in each session.",
                     ]
@@ -166,7 +166,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                         ),
                         WorkspaceHelpTip(
                             title="Learning Tip",
-                            body="Learning Summary shows stored event dates and times so you can understand when the system learned each pattern.",
+                            body="Learning Summary shows stored event dates, times, and visual/content evidence when available so you can understand each learned pattern.",
                         ),
                     ]
                 ),
