@@ -1,5 +1,5 @@
 {
-  "total_events": 1024,
+  "total_events": 1037,
   "category_event_counts": {
     "advertisement": 81,
     "important_object": 40,
@@ -8,15 +8,17 @@
     "meme_or_graphic": 42,
     "avaloq": 84,
     "meme": 20,
-    "family_photo": 126,
-    "da_buttare": 115,
+    "family_photo": 127,
+    "da_buttare": 116,
     "document": 18,
     "unknown": 425,
-    "personal_photo": 2
+    "personal_photo": 2,
+    "screenshot": 2,
+    "oggetti": 9
   },
   "rules": [
     {
-      "id": "rule_unknown_587845863699",
+      "id": "rule_unknown_279987377858",
       "target_category": "unknown",
       "conditions": {
         "extension": ".jpg",
@@ -30,7 +32,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_unknown_593243211080",
+      "id": "rule_unknown_682154682096",
       "target_category": "unknown",
       "conditions": {
         "date_source": "filename",
@@ -43,7 +45,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_unknown_957128064394",
+      "id": "rule_unknown_191020580471",
       "target_category": "unknown",
       "conditions": {
         "contains_whatsapp": true,
@@ -56,7 +58,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_unknown_462718966947",
+      "id": "rule_unknown_780539277647",
       "target_category": "unknown",
       "conditions": {
         "contains_whatsapp": true,
@@ -69,7 +71,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_unknown_870548625977",
+      "id": "rule_unknown_735590275592",
       "target_category": "unknown",
       "conditions": {
         "contains_whatsapp": true,
@@ -82,7 +84,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_unknown_579060245968",
+      "id": "rule_unknown_192939497009",
       "target_category": "unknown",
       "conditions": {
         "contains_whatsapp": true,
@@ -100,33 +102,33 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_family_photo_494529866815",
+      "id": "rule_family_photo_744263444600",
       "target_category": "family_photo",
       "conditions": {
         "date_source": "filename",
         "extension": ".jpg"
       },
       "confidence_boost": 0.5,
-      "support_count": 103,
+      "support_count": 104,
       "explanation": "User often marks media with date source filename; extension .jpg as Family Photo.",
-      "first_learned_at": "",
-      "last_learned_at": ""
+      "first_learned_at": "2026-07-08T12:14:24.548215+00:00",
+      "last_learned_at": "2026-07-08T12:14:24.548215+00:00"
     },
     {
-      "id": "rule_da_buttare_548451861981",
+      "id": "rule_da_buttare_789783977306",
       "target_category": "da_buttare",
       "conditions": {
         "date_source": "filename",
         "extension": ".jpg"
       },
       "confidence_boost": 0.5,
-      "support_count": 97,
+      "support_count": 98,
       "explanation": "User often marks media with date source filename; extension .jpg as da buttare.",
-      "first_learned_at": "",
-      "last_learned_at": ""
+      "first_learned_at": "2026-07-08T12:14:22.806958+00:00",
+      "last_learned_at": "2026-07-08T12:14:22.806958+00:00"
     },
     {
-      "id": "rule_avaloq_815541510335",
+      "id": "rule_avaloq_141255880895",
       "target_category": "avaloq",
       "conditions": {
         "date_source": "filename",
@@ -139,7 +141,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_advertisement_211543006369",
+      "id": "rule_advertisement_269886992713",
       "target_category": "advertisement",
       "conditions": {
         "date_source": "unknown",
@@ -156,7 +158,7 @@
       "last_learned_at": "2026-07-07T20:28:45.533008+00:00"
     },
     {
-      "id": "rule_advertisement_440063884688",
+      "id": "rule_advertisement_663540321512",
       "target_category": "advertisement",
       "conditions": {
         "extension": ".jpg",
@@ -170,7 +172,7 @@
       "last_learned_at": "2026-07-07T20:28:45.533008+00:00"
     },
     {
-      "id": "rule_advertisement_335509908898",
+      "id": "rule_advertisement_809064390388",
       "target_category": "advertisement",
       "conditions": {
         "date_source": "unknown",
@@ -183,7 +185,7 @@
       "last_learned_at": "2026-07-07T20:28:45.533008+00:00"
     },
     {
-      "id": "rule_avaloq_179986643733",
+      "id": "rule_avaloq_649637058339",
       "target_category": "avaloq",
       "conditions": {
         "date_source": "filename",
@@ -200,7 +202,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_avaloq_294900856165",
+      "id": "rule_avaloq_769903351874",
       "target_category": "avaloq",
       "conditions": {
         "extension": ".jpg",
@@ -214,7 +216,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_da_buttare_140504155538",
+      "id": "rule_da_buttare_312765122849",
       "target_category": "da_buttare",
       "conditions": {
         "contains_whatsapp": true,
@@ -227,7 +229,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_family_photo_693575493873",
+      "id": "rule_family_photo_540350829060",
       "target_category": "family_photo",
       "conditions": {
         "date_source": "filename",
@@ -238,13 +240,27 @@
         "has_gps": false
       },
       "confidence_boost": 0.5,
-      "support_count": 51,
+      "support_count": 52,
       "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; large file size as Family Photo.",
-      "first_learned_at": "",
-      "last_learned_at": ""
+      "first_learned_at": "2026-07-08T12:14:24.548215+00:00",
+      "last_learned_at": "2026-07-08T12:14:24.548215+00:00"
     },
     {
-      "id": "rule_to_print_156183000459",
+      "id": "rule_family_photo_337337001028",
+      "target_category": "family_photo",
+      "conditions": {
+        "extension": ".jpg",
+        "file_size_bucket": "large",
+        "has_camera_metadata": false
+      },
+      "confidence_boost": 0.5,
+      "support_count": 52,
+      "explanation": "User often marks media with without camera metadata; extension .jpg; large file size as Family Photo.",
+      "first_learned_at": "2026-07-08T12:14:24.548215+00:00",
+      "last_learned_at": "2026-07-08T12:14:24.548215+00:00"
+    },
+    {
+      "id": "rule_to_print_652979588257",
       "target_category": "to_print",
       "conditions": {
         "extension": ".jpg",
@@ -258,21 +274,7 @@
       "last_learned_at": "2026-07-07T20:28:49.173727+00:00"
     },
     {
-      "id": "rule_family_photo_756715302440",
-      "target_category": "family_photo",
-      "conditions": {
-        "extension": ".jpg",
-        "file_size_bucket": "large",
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 51,
-      "explanation": "User often marks media with without camera metadata; extension .jpg; large file size as Family Photo.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_to_print_619390793127",
+      "id": "rule_to_print_437367654295",
       "target_category": "to_print",
       "conditions": {
         "date_source": "unknown",
@@ -285,7 +287,7 @@
       "last_learned_at": "2026-07-07T20:28:49.173727+00:00"
     },
     {
-      "id": "rule_family_photo_270400091601",
+      "id": "rule_family_photo_552408881835",
       "target_category": "family_photo",
       "conditions": {
         "date_source": "filename",
@@ -302,7 +304,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_family_photo_432194906559",
+      "id": "rule_family_photo_537707140693",
       "target_category": "family_photo",
       "conditions": {
         "extension": ".jpg",
@@ -316,7 +318,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_da_buttare_632637212798",
+      "id": "rule_da_buttare_927483701090",
       "target_category": "da_buttare",
       "conditions": {
         "extension": ".jpg",
@@ -330,7 +332,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_da_buttare_623851595067",
+      "id": "rule_da_buttare_524806677905",
       "target_category": "da_buttare",
       "conditions": {
         "contains_whatsapp": true,
@@ -348,7 +350,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_da_buttare_417927617848",
+      "id": "rule_da_buttare_407803529680",
       "target_category": "da_buttare",
       "conditions": {
         "contains_whatsapp": true,
@@ -361,7 +363,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_da_buttare_825757276878",
+      "id": "rule_da_buttare_362854527625",
       "target_category": "da_buttare",
       "conditions": {
         "contains_whatsapp": true,
@@ -374,7 +376,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_meme_or_graphic_417885923310",
+      "id": "rule_meme_or_graphic_401715011351",
       "target_category": "meme_or_graphic",
       "conditions": {
         "date_source": "unknown",
@@ -391,7 +393,7 @@
       "last_learned_at": "2026-07-07T20:28:50.287907+00:00"
     },
     {
-      "id": "rule_meme_or_graphic_613081392264",
+      "id": "rule_meme_or_graphic_863932400741",
       "target_category": "meme_or_graphic",
       "conditions": {
         "extension": ".jpg",
@@ -405,7 +407,7 @@
       "last_learned_at": "2026-07-07T20:28:50.287907+00:00"
     },
     {
-      "id": "rule_meme_or_graphic_183219692537",
+      "id": "rule_meme_or_graphic_398764234610",
       "target_category": "meme_or_graphic",
       "conditions": {
         "extension": ".jpg",
@@ -419,7 +421,7 @@
       "last_learned_at": "2026-07-07T20:28:50.287907+00:00"
     },
     {
-      "id": "rule_meme_or_graphic_895854959818",
+      "id": "rule_meme_or_graphic_491862705272",
       "target_category": "meme_or_graphic",
       "conditions": {
         "date_source": "unknown",
@@ -432,7 +434,7 @@
       "last_learned_at": "2026-07-07T20:28:50.287907+00:00"
     },
     {
-      "id": "rule_important_object_510803255503",
+      "id": "rule_important_object_643136243074",
       "target_category": "important_object",
       "conditions": {
         "date_source": "unknown",
@@ -449,7 +451,7 @@
       "last_learned_at": "2026-07-07T20:28:39.079322+00:00"
     },
     {
-      "id": "rule_important_object_722118115482",
+      "id": "rule_important_object_698018308030",
       "target_category": "important_object",
       "conditions": {
         "extension": ".jpg",
@@ -463,7 +465,7 @@
       "last_learned_at": "2026-07-07T20:28:39.079322+00:00"
     },
     {
-      "id": "rule_important_object_786818236599",
+      "id": "rule_important_object_630252265202",
       "target_category": "important_object",
       "conditions": {
         "date_source": "unknown",
@@ -476,7 +478,7 @@
       "last_learned_at": "2026-07-07T20:28:39.079322+00:00"
     },
     {
-      "id": "rule_da_buttare_349406234923",
+      "id": "rule_da_buttare_494830296353",
       "target_category": "da_buttare",
       "conditions": {
         "date_source": "filename",
@@ -487,13 +489,13 @@
         "has_gps": false
       },
       "confidence_boost": 0.5,
-      "support_count": 35,
+      "support_count": 36,
       "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; large file size as da buttare.",
-      "first_learned_at": "",
-      "last_learned_at": ""
+      "first_learned_at": "2026-07-08T12:14:22.806958+00:00",
+      "last_learned_at": "2026-07-08T12:14:22.806958+00:00"
     },
     {
-      "id": "rule_da_buttare_853805052151",
+      "id": "rule_da_buttare_291816468322",
       "target_category": "da_buttare",
       "conditions": {
         "extension": ".jpg",
@@ -501,13 +503,13 @@
         "has_camera_metadata": false
       },
       "confidence_boost": 0.5,
-      "support_count": 35,
+      "support_count": 36,
       "explanation": "User often marks media with without camera metadata; extension .jpg; large file size as da buttare.",
-      "first_learned_at": "",
-      "last_learned_at": ""
+      "first_learned_at": "2026-07-08T12:14:22.806958+00:00",
+      "last_learned_at": "2026-07-08T12:14:22.806958+00:00"
     },
     {
-      "id": "rule_to_print_470788375268",
+      "id": "rule_to_print_616923318945",
       "target_category": "to_print",
       "conditions": {
         "date_source": "unknown",
@@ -524,7 +526,7 @@
       "last_learned_at": "2026-07-07T20:28:49.173727+00:00"
     },
     {
-      "id": "rule_to_print_850811890751",
+      "id": "rule_to_print_613972542204",
       "target_category": "to_print",
       "conditions": {
         "extension": ".jpg",
@@ -538,7 +540,7 @@
       "last_learned_at": "2026-07-07T20:28:49.173727+00:00"
     },
     {
-      "id": "rule_family_photo_535547463087",
+      "id": "rule_family_photo_566334026047",
       "target_category": "family_photo",
       "conditions": {
         "extension": ".jpg",
@@ -552,7 +554,7 @@
       "last_learned_at": "2026-07-07T20:28:47.284262+00:00"
     },
     {
-      "id": "rule_family_photo_240026330499",
+      "id": "rule_family_photo_194264330578",
       "target_category": "family_photo",
       "conditions": {
         "date_source": "unknown",
@@ -565,7 +567,7 @@
       "last_learned_at": "2026-07-07T20:28:47.284262+00:00"
     },
     {
-      "id": "rule_meme_247567768752",
+      "id": "rule_meme_569675996102",
       "target_category": "meme",
       "conditions": {
         "date_source": "filename",
@@ -582,7 +584,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_meme_776889766620",
+      "id": "rule_meme_590464635030",
       "target_category": "meme",
       "conditions": {
         "extension": ".jpg",
@@ -596,7 +598,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_meme_326531304269",
+      "id": "rule_meme_768394053583",
       "target_category": "meme",
       "conditions": {
         "date_source": "filename",
@@ -609,7 +611,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_to_print_723378778602",
+      "id": "rule_to_print_568817815091",
       "target_category": "to_print",
       "conditions": {
         "date_source": "unknown",
@@ -626,7 +628,7 @@
       "last_learned_at": "2026-07-07T20:28:40.362106+00:00"
     },
     {
-      "id": "rule_document_or_scan_874707024660",
+      "id": "rule_document_or_scan_600013883612",
       "target_category": "document_or_scan",
       "conditions": {
         "date_source": "unknown",
@@ -643,7 +645,7 @@
       "last_learned_at": "2026-07-07T20:28:45.938956+00:00"
     },
     {
-      "id": "rule_document_or_scan_765602861727",
+      "id": "rule_document_or_scan_562439245987",
       "target_category": "document_or_scan",
       "conditions": {
         "extension": ".jpg",
@@ -657,7 +659,7 @@
       "last_learned_at": "2026-07-07T20:28:45.938956+00:00"
     },
     {
-      "id": "rule_document_or_scan_368861766862",
+      "id": "rule_document_or_scan_602964660353",
       "target_category": "document_or_scan",
       "conditions": {
         "extension": ".jpg",
@@ -671,7 +673,7 @@
       "last_learned_at": "2026-07-07T20:28:45.938956+00:00"
     },
     {
-      "id": "rule_document_or_scan_743333490354",
+      "id": "rule_document_or_scan_894972479381",
       "target_category": "document_or_scan",
       "conditions": {
         "date_source": "unknown",
@@ -684,7 +686,7 @@
       "last_learned_at": "2026-07-07T20:28:45.938956+00:00"
     },
     {
-      "id": "rule_document_693811382128",
+      "id": "rule_document_593888298582",
       "target_category": "document",
       "conditions": {
         "date_source": "filename",
@@ -697,7 +699,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_da_buttare_774652669413",
+      "id": "rule_da_buttare_106673514321",
       "target_category": "da_buttare",
       "conditions": {
         "date_source": "filename",
@@ -714,7 +716,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_document_612077244451",
+      "id": "rule_document_378020024809",
       "target_category": "document",
       "conditions": {
         "date_source": "filename",
@@ -731,7 +733,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_da_buttare_335105156848",
+      "id": "rule_da_buttare_121375255463",
       "target_category": "da_buttare",
       "conditions": {
         "extension": ".jpg",
@@ -745,7 +747,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_da_buttare_704298729326",
+      "id": "rule_da_buttare_162997290835",
       "target_category": "da_buttare",
       "conditions": {
         "contains_whatsapp": true,
@@ -758,7 +760,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_da_buttare_532971111329",
+      "id": "rule_da_buttare_862520350395",
       "target_category": "da_buttare",
       "conditions": {
         "date_source": "filename",
@@ -771,7 +773,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_document_232913391246",
+      "id": "rule_document_317270934187",
       "target_category": "document",
       "conditions": {
         "extension": ".jpg",
@@ -785,7 +787,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_family_photo_278159628708",
+      "id": "rule_family_photo_543952374955",
       "target_category": "family_photo",
       "conditions": {
         "date_source": "unknown",
@@ -802,7 +804,7 @@
       "last_learned_at": "2026-07-07T20:28:47.284262+00:00"
     },
     {
-      "id": "rule_family_photo_525573424516",
+      "id": "rule_family_photo_541001598214",
       "target_category": "family_photo",
       "conditions": {
         "extension": ".jpg",
@@ -816,7 +818,7 @@
       "last_learned_at": "2026-07-07T20:28:47.284262+00:00"
     },
     {
-      "id": "rule_da_buttare_438525182970",
+      "id": "rule_da_buttare_121512011342",
       "target_category": "da_buttare",
       "conditions": {
         "contains_whatsapp": true,
@@ -834,7 +836,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_da_buttare_175747710998",
+      "id": "rule_da_buttare_744358545163",
       "target_category": "da_buttare",
       "conditions": {
         "extension": ".jpeg",
@@ -848,7 +850,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_da_buttare_595293977026",
+      "id": "rule_da_buttare_144079629437",
       "target_category": "da_buttare",
       "conditions": {
         "contains_whatsapp": true,
@@ -861,7 +863,24 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_unknown_727506545803",
+      "id": "rule_oggetti_850704999677",
+      "target_category": "oggetti",
+      "conditions": {
+        "date_source": "filename",
+        "extension": ".jpg",
+        "file_size_bucket": "large",
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false
+      },
+      "confidence_boost": 0.43,
+      "support_count": 9,
+      "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; large file size as Oggetti.",
+      "first_learned_at": "2026-07-08T12:13:55.757480+00:00",
+      "last_learned_at": "2026-07-08T12:14:15.364702+00:00"
+    },
+    {
+      "id": "rule_unknown_523965929494",
       "target_category": "unknown",
       "conditions": {
         "date_source": "filename",
@@ -878,7 +897,34 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_avaloq_280599778091",
+      "id": "rule_oggetti_818179068272",
+      "target_category": "oggetti",
+      "conditions": {
+        "extension": ".jpg",
+        "file_size_bucket": "large",
+        "has_camera_metadata": false
+      },
+      "confidence_boost": 0.385,
+      "support_count": 9,
+      "explanation": "User often marks media with without camera metadata; extension .jpg; large file size as Oggetti.",
+      "first_learned_at": "2026-07-08T12:13:55.757480+00:00",
+      "last_learned_at": "2026-07-08T12:14:15.364702+00:00"
+    },
+    {
+      "id": "rule_oggetti_645130633678",
+      "target_category": "oggetti",
+      "conditions": {
+        "date_source": "filename",
+        "extension": ".jpg"
+      },
+      "confidence_boost": 0.37,
+      "support_count": 9,
+      "explanation": "User often marks media with date source filename; extension .jpg as Oggetti.",
+      "first_learned_at": "2026-07-08T12:13:55.757480+00:00",
+      "last_learned_at": "2026-07-08T12:14:15.364702+00:00"
+    },
+    {
+      "id": "rule_avaloq_701316014606",
       "target_category": "avaloq",
       "conditions": {
         "date_source": "filename",
@@ -895,7 +941,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_avaloq_789723960938",
+      "id": "rule_avaloq_199726913774",
       "target_category": "avaloq",
       "conditions": {
         "extension": ".jpg",
@@ -909,7 +955,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_family_photo_307026584768",
+      "id": "rule_family_photo_641788759081",
       "target_category": "family_photo",
       "conditions": {
         "date_source": "unknown",
@@ -926,7 +972,7 @@
       "last_learned_at": "2026-07-07T20:28:42.693459+00:00"
     },
     {
-      "id": "rule_avaloq_261209721190",
+      "id": "rule_avaloq_285397080924",
       "target_category": "avaloq",
       "conditions": {
         "date_source": "filename",
@@ -943,7 +989,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_avaloq_419477625261",
+      "id": "rule_avaloq_755124520713",
       "target_category": "avaloq",
       "conditions": {
         "extension": ".jpg",
@@ -957,7 +1003,7 @@
       "last_learned_at": ""
     },
     {
-      "id": "rule_da_buttare_682715196704",
+      "id": "rule_da_buttare_151230181527",
       "target_category": "da_buttare",
       "conditions": {
         "date_source": "filename",
@@ -30670,7 +30716,384 @@
         "extension": ".jpg",
         "file_size_bucket": "tiny"
       }
+    },
+    {
+      "corrected_category": "screenshot",
+      "source": "user",
+      "timestamp": "2026-07-08T12:13:36.703517+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "filename",
+        "extension": ".jpg",
+        "file_size_bucket": "large"
+      }
+    },
+    {
+      "corrected_category": "screenshot",
+      "source": "user",
+      "timestamp": "2026-07-08T12:13:44.141143+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "filename",
+        "extension": ".jpg",
+        "file_size_bucket": "large"
+      }
+    },
+    {
+      "corrected_category": "oggetti",
+      "source": "user_bulk",
+      "timestamp": "2026-07-08T12:13:55.757480+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "filename",
+        "extension": ".jpg",
+        "file_size_bucket": "large"
+      }
+    },
+    {
+      "corrected_category": "oggetti",
+      "source": "user_bulk",
+      "timestamp": "2026-07-08T12:13:55.794365+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "filename",
+        "extension": ".jpg",
+        "file_size_bucket": "large"
+      }
+    },
+    {
+      "corrected_category": "oggetti",
+      "source": "user_bulk",
+      "timestamp": "2026-07-08T12:13:55.829369+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "filename",
+        "extension": ".jpg",
+        "file_size_bucket": "large"
+      }
+    },
+    {
+      "corrected_category": "oggetti",
+      "source": "user_bulk",
+      "timestamp": "2026-07-08T12:13:55.852815+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "filename",
+        "extension": ".jpg",
+        "file_size_bucket": "large"
+      }
+    },
+    {
+      "corrected_category": "oggetti",
+      "source": "user_bulk",
+      "timestamp": "2026-07-08T12:13:55.880091+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "filename",
+        "extension": ".jpg",
+        "file_size_bucket": "large"
+      }
+    },
+    {
+      "corrected_category": "oggetti",
+      "source": "user_bulk",
+      "timestamp": "2026-07-08T12:13:55.911303+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "filename",
+        "extension": ".jpg",
+        "file_size_bucket": "large"
+      }
+    },
+    {
+      "corrected_category": "oggetti",
+      "source": "user_bulk",
+      "timestamp": "2026-07-08T12:14:06.541635+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "filename",
+        "extension": ".jpg",
+        "file_size_bucket": "large"
+      }
+    },
+    {
+      "corrected_category": "oggetti",
+      "source": "user_bulk",
+      "timestamp": "2026-07-08T12:14:06.570147+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "filename",
+        "extension": ".jpg",
+        "file_size_bucket": "large"
+      }
+    },
+    {
+      "corrected_category": "oggetti",
+      "source": "user",
+      "timestamp": "2026-07-08T12:14:15.364702+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "filename",
+        "extension": ".jpg",
+        "file_size_bucket": "large"
+      }
+    },
+    {
+      "corrected_category": "da_buttare",
+      "source": "user",
+      "timestamp": "2026-07-08T12:14:22.806958+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "filename",
+        "extension": ".jpg",
+        "file_size_bucket": "large"
+      }
+    },
+    {
+      "corrected_category": "family_photo",
+      "source": "user",
+      "timestamp": "2026-07-08T12:14:24.548215+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "filename",
+        "extension": ".jpg",
+        "file_size_bucket": "large"
+      }
     }
   ],
-  "updated_at": "2026-07-07T20:28:50.305351+00:00"
+  "updated_at": "2026-07-08T12:14:24.564309+00:00"
 }

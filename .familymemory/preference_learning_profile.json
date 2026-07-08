@@ -1,0 +1,366 @@
+{
+  "total_events": 13,
+  "signal_counts": {
+    "category_preference": 13,
+    "category_target_preference": 13
+  },
+  "signals": [
+    {
+      "id": "pref_2ca252e54ca9",
+      "signal_type": "category_target_preference",
+      "target": "oggetti",
+      "decision": "user_corrected_category",
+      "support_count": 8,
+      "strength": 0.95,
+      "explanation": "User category corrections repeatedly selected Oggetti as the authoritative category.",
+      "source_action": "user_bulk",
+      "first_learned_at": "2026-07-08T12:13:55.791111+00:00",
+      "last_learned_at": "2026-07-08T12:14:06.596625+00:00"
+    },
+    {
+      "id": "pref_818fcad90ccc",
+      "signal_type": "category_preference",
+      "target": "oggetti",
+      "decision": "corrected_to_oggetti",
+      "support_count": 8,
+      "strength": 0.95,
+      "explanation": "User corrected media to Oggetti 8 time(s) from user bulk actions.",
+      "source_action": "user_bulk",
+      "first_learned_at": "2026-07-08T12:13:55.791111+00:00",
+      "last_learned_at": "2026-07-08T12:14:06.596625+00:00"
+    },
+    {
+      "id": "pref_aac292466bef",
+      "signal_type": "category_target_preference",
+      "target": "screenshot",
+      "decision": "user_corrected_category",
+      "support_count": 2,
+      "strength": 0.55,
+      "explanation": "User category corrections repeatedly selected Screenshot as the authoritative category.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-08T12:13:36.732959+00:00",
+      "last_learned_at": "2026-07-08T12:13:44.164338+00:00"
+    },
+    {
+      "id": "pref_eae8515a5608",
+      "signal_type": "category_preference",
+      "target": "screenshot",
+      "decision": "corrected_to_screenshot",
+      "support_count": 2,
+      "strength": 0.55,
+      "explanation": "User corrected media to Screenshot 2 time(s) from user actions.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-08T12:13:36.732959+00:00",
+      "last_learned_at": "2026-07-08T12:13:44.164338+00:00"
+    },
+    {
+      "id": "pref_8e493ac2d925",
+      "signal_type": "category_target_preference",
+      "target": "oggetti",
+      "decision": "user_corrected_category",
+      "support_count": 1,
+      "strength": 0.45,
+      "explanation": "User category corrections repeatedly selected Oggetti as the authoritative category.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-08T12:14:15.391583+00:00",
+      "last_learned_at": "2026-07-08T12:14:15.391583+00:00"
+    },
+    {
+      "id": "pref_10dbcd3ac750",
+      "signal_type": "category_target_preference",
+      "target": "family_photo",
+      "decision": "user_corrected_category",
+      "support_count": 1,
+      "strength": 0.45,
+      "explanation": "User category corrections repeatedly selected Family Photo as the authoritative category.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-08T12:14:24.573342+00:00",
+      "last_learned_at": "2026-07-08T12:14:24.573342+00:00"
+    },
+    {
+      "id": "pref_6c8c2d613aaf",
+      "signal_type": "category_target_preference",
+      "target": "da_buttare",
+      "decision": "user_corrected_category",
+      "support_count": 1,
+      "strength": 0.45,
+      "explanation": "User category corrections repeatedly selected da buttare as the authoritative category.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-08T12:14:22.832465+00:00",
+      "last_learned_at": "2026-07-08T12:14:22.832465+00:00"
+    },
+    {
+      "id": "pref_632c56fc4814",
+      "signal_type": "category_preference",
+      "target": "oggetti",
+      "decision": "corrected_to_oggetti",
+      "support_count": 1,
+      "strength": 0.45,
+      "explanation": "User corrected media to Oggetti 1 time(s) from user actions.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-08T12:14:15.391583+00:00",
+      "last_learned_at": "2026-07-08T12:14:15.391583+00:00"
+    },
+    {
+      "id": "pref_047bef65f302",
+      "signal_type": "category_preference",
+      "target": "family_photo",
+      "decision": "corrected_to_family_photo",
+      "support_count": 1,
+      "strength": 0.45,
+      "explanation": "User corrected media to Family Photo 1 time(s) from user actions.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-08T12:14:24.573342+00:00",
+      "last_learned_at": "2026-07-08T12:14:24.573342+00:00"
+    },
+    {
+      "id": "pref_b0271230daad",
+      "signal_type": "category_preference",
+      "target": "da_buttare",
+      "decision": "corrected_to_da_buttare",
+      "support_count": 1,
+      "strength": 0.45,
+      "explanation": "User corrected media to da buttare 1 time(s) from user actions.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-08T12:14:22.832465+00:00",
+      "last_learned_at": "2026-07-08T12:14:22.832465+00:00"
+    }
+  ],
+  "event_summaries": [
+    {
+      "file_path": "C:\\Projects\\Fotos Flavia 2021\\foto2021\\20210323_140901.jpg",
+      "event_type": "category_correction",
+      "target": "screenshot",
+      "decision": "corrected_to_screenshot",
+      "previous_value": "family_photo",
+      "new_value": "screenshot",
+      "source_action": "user",
+      "timestamp": "2026-07-08T12:13:36.732959+00:00",
+      "context": {
+        "effective_media_category": "screenshot",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "screenshot",
+        "classification_confidence": 0.99,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "C:\\Projects\\Fotos Flavia 2021\\foto2021\\20210323_140916.jpg",
+      "event_type": "category_correction",
+      "target": "screenshot",
+      "decision": "corrected_to_screenshot",
+      "previous_value": "family_photo",
+      "new_value": "screenshot",
+      "source_action": "user",
+      "timestamp": "2026-07-08T12:13:44.164338+00:00",
+      "context": {
+        "effective_media_category": "screenshot",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "screenshot",
+        "classification_confidence": 0.99,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "C:\\Projects\\Fotos Flavia 2021\\foto2021\\20210323_180639.jpg",
+      "event_type": "category_correction",
+      "target": "oggetti",
+      "decision": "corrected_to_oggetti",
+      "previous_value": "family_photo",
+      "new_value": "oggetti",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-08T12:13:55.791111+00:00",
+      "context": {
+        "effective_media_category": "oggetti",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "oggetti",
+        "classification_confidence": 0.99,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "C:\\Projects\\Fotos Flavia 2021\\foto2021\\20210323_180743.jpg",
+      "event_type": "category_correction",
+      "target": "oggetti",
+      "decision": "corrected_to_oggetti",
+      "previous_value": "family_photo",
+      "new_value": "oggetti",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-08T12:13:55.827003+00:00",
+      "context": {
+        "effective_media_category": "oggetti",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "oggetti",
+        "classification_confidence": 0.99,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "C:\\Projects\\Fotos Flavia 2021\\foto2021\\20210323_180725.jpg",
+      "event_type": "category_correction",
+      "target": "oggetti",
+      "decision": "corrected_to_oggetti",
+      "previous_value": "family_photo",
+      "new_value": "oggetti",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-08T12:13:55.851015+00:00",
+      "context": {
+        "effective_media_category": "oggetti",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "oggetti",
+        "classification_confidence": 0.99,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "C:\\Projects\\Fotos Flavia 2021\\foto2021\\20210323_180649.jpg",
+      "event_type": "category_correction",
+      "target": "oggetti",
+      "decision": "corrected_to_oggetti",
+      "previous_value": "family_photo",
+      "new_value": "oggetti",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-08T12:13:55.878442+00:00",
+      "context": {
+        "effective_media_category": "oggetti",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "oggetti",
+        "classification_confidence": 0.99,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "C:\\Projects\\Fotos Flavia 2021\\foto2021\\20210323_180806.jpg",
+      "event_type": "category_correction",
+      "target": "oggetti",
+      "decision": "corrected_to_oggetti",
+      "previous_value": "family_photo",
+      "new_value": "oggetti",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-08T12:13:55.909418+00:00",
+      "context": {
+        "effective_media_category": "oggetti",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "oggetti",
+        "classification_confidence": 0.99,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "C:\\Projects\\Fotos Flavia 2021\\foto2021\\20210323_180752.jpg",
+      "event_type": "category_correction",
+      "target": "oggetti",
+      "decision": "corrected_to_oggetti",
+      "previous_value": "family_photo",
+      "new_value": "oggetti",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-08T12:13:55.937845+00:00",
+      "context": {
+        "effective_media_category": "oggetti",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "oggetti",
+        "classification_confidence": 0.99,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "C:\\Projects\\Fotos Flavia 2021\\foto2021\\20210323_181007.jpg",
+      "event_type": "category_correction",
+      "target": "oggetti",
+      "decision": "corrected_to_oggetti",
+      "previous_value": "family_photo",
+      "new_value": "oggetti",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-08T12:14:06.567542+00:00",
+      "context": {
+        "effective_media_category": "oggetti",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "oggetti",
+        "classification_confidence": 0.99,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "C:\\Projects\\Fotos Flavia 2021\\foto2021\\20210323_181023.jpg",
+      "event_type": "category_correction",
+      "target": "oggetti",
+      "decision": "corrected_to_oggetti",
+      "previous_value": "family_photo",
+      "new_value": "oggetti",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-08T12:14:06.596625+00:00",
+      "context": {
+        "effective_media_category": "oggetti",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "oggetti",
+        "classification_confidence": 0.99,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "C:\\Projects\\Fotos Flavia 2021\\foto2021\\20210325_152840.jpg",
+      "event_type": "category_correction",
+      "target": "oggetti",
+      "decision": "corrected_to_oggetti",
+      "previous_value": "family_photo",
+      "new_value": "oggetti",
+      "source_action": "user",
+      "timestamp": "2026-07-08T12:14:15.391583+00:00",
+      "context": {
+        "effective_media_category": "oggetti",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "oggetti",
+        "classification_confidence": 0.99,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "C:\\Projects\\Fotos Flavia 2021\\foto2021\\20210325_171202.jpg",
+      "event_type": "category_correction",
+      "target": "da_buttare",
+      "decision": "corrected_to_da_buttare",
+      "previous_value": "family_photo",
+      "new_value": "da_buttare",
+      "source_action": "user",
+      "timestamp": "2026-07-08T12:14:22.832465+00:00",
+      "context": {
+        "effective_media_category": "da_buttare",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "da_buttare",
+        "classification_confidence": 0.99,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "C:\\Projects\\Fotos Flavia 2021\\foto2021\\20210329_073542.jpg",
+      "event_type": "category_correction",
+      "target": "family_photo",
+      "decision": "corrected_to_family_photo",
+      "previous_value": "family_photo",
+      "new_value": "family_photo",
+      "source_action": "user",
+      "timestamp": "2026-07-08T12:14:24.573342+00:00",
+      "context": {
+        "effective_media_category": "family_photo",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "family_photo",
+        "classification_confidence": 0.99,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    }
+  ],
+  "last_updated_at": "2026-07-08T12:14:24.573342+00:00"
+}

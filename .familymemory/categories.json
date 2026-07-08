@@ -1,5 +1,19 @@
 {
-  "system_overrides": [],
+  "system_overrides": [
+    {
+      "id": "family_photo",
+      "display_name": "Family Photo",
+      "description": "Default family memory candidate.",
+      "ai_description": "",
+      "color": "",
+      "icon": "",
+      "is_system": true,
+      "is_cleanup_category": true,
+      "is_album_candidate": false,
+      "created_at": "2026-07-08T12:09:35.149613+00:00",
+      "updated_at": "2026-07-08T12:13:04.820143+00:00"
+    }
+  ],
   "categories": [
     {
       "id": "avaloq",
@@ -26,6 +40,19 @@
       "is_album_candidate": false,
       "created_at": "2026-07-05T20:04:16.623357+00:00",
       "updated_at": "2026-07-05T20:04:16.623357+00:00"
+    },
+    {
+      "id": "oggetti",
+      "display_name": "Oggetti",
+      "description": "",
+      "ai_description": "",
+      "color": "",
+      "icon": "",
+      "is_system": false,
+      "is_cleanup_category": true,
+      "is_album_candidate": false,
+      "created_at": "2026-07-08T12:12:50.552824+00:00",
+      "updated_at": "2026-07-08T12:12:50.552824+00:00"
     }
   ]
 }
