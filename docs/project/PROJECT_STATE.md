@@ -6,11 +6,13 @@
 
 ## Current Sprint
 
-- Sprint UX-001/UX-002/UX-003 (Memory Review usability and Learning Summary timestamps) - Completed
+- TEST-001 (PySide6 test environment setup) - Completed
 
 ## Project Status
 
 - Status: In Development
+- Repository state: Clean and ready for the next sprint
+- Latest repository workflow: PR #7 merged successfully after passing GitHub Actions; obsolete PR #4 closed; temporary branches deleted
 
 ## Last Updated
 
@@ -858,4 +860,6 @@ Status: Completed
 Summary:
 - Pytest now discovers tests from `tests/` with `src/` on the import path.
 - Shared pytest configuration sets `QT_QPA_PLATFORM=offscreen` before Qt widget tests import PySide6.
-- CI installs the native Qt/OpenGL runtime libraries required for PySide6 collection and headless widget tests on Ubuntu runners.
+- CI installs pytest plus the native Qt/OpenGL runtime libraries required for PySide6 collection and headless widget tests on Ubuntu runners.
+- GitHub Actions runs Python source compilation, pytest collection, and the full pytest suite.
+- GitHub Actions checks passed before PR #7 was merged; obsolete PR #4 and temporary branches were closed/deleted.

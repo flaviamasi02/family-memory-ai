@@ -274,12 +274,13 @@ Scope examples:
 
 - LEARN-002 Preference Learning and Aggregation Foundations (completed)
 
-## Recently Completed Domains
+## Recently Completed Domains and Infrastructure
 
 - FOUNDATION
 - MEM (review UX and decision ergonomics foundation)
 - CLEAN (deterministic classification and cleanup-review UX foundation)
 - LEARN-002 Preference Learning and Aggregation Foundations
+- TEST-001 PySide6 test environment and GitHub Actions test workflow setup
 
 ## Strategic Priority Order
 

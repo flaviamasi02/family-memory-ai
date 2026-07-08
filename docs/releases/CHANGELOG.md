@@ -347,8 +347,10 @@
 - Updated category learning so learned rules can consume visual feature profiles and avoid generalizing from metadata-only correction evidence.
 - Kept visual extraction out of synchronous import/UI refresh paths; background batch scheduling remains future work.
 
-## TEST-001 — PySide6 test environment setup
+### TEST-001 — PySide6 test environment setup
 
 - Added pytest configuration for deterministic test discovery and source imports.
 - Added shared pytest setup for headless Qt execution via `QT_QPA_PLATFORM=offscreen`.
 - Added a GitHub Actions test workflow that installs the Linux Qt/OpenGL packages required by PySide6 before collecting and running tests.
+- CI now installs pytest, compiles Python sources, collects tests, and runs the full pytest suite.
+- Completed TEST-001 after GitHub Actions passed on PR #7; obsolete PR #4 was closed and temporary branches were deleted.
