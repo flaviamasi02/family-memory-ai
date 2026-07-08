@@ -11,7 +11,7 @@ def get_thumbnail_cache_path(photo_path: str) -> Path:
     """Return the on-disk cache path for a thumbnail derived from *photo_path*.
 
     Thumbnails are stored in a ``.familymemory/thumbnails/`` directory that
-    sits alongside the photo's parent folder.  A SHA-256 digest of the
+    is created inside the photo's parent directory.  A SHA-256 digest of the
     resolved absolute path is used as the filename so each source image maps
     to a unique, stable cache entry regardless of filename collisions.
 
