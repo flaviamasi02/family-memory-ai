@@ -298,3 +298,14 @@ Scope examples:
 - EVENT
 - MEMORY
 - OUTPUT
+
+### LEARN-003.1 Visual Feature Extraction Foundation
+
+Status: completed
+
+Outcome:
+- Introduced reusable local visual feature profiles for content-first learning evidence.
+- Added deterministic visual feature extraction without cloud AI or black-box ML.
+- Persisted visual feature profiles through backward-compatible sidecar metadata.
+- Connected category learning to visual/content evidence while keeping metadata-only corrections non-generalized.
+- Preserved app responsiveness by keeping extraction behind an explicit service boundary for future background batching.
