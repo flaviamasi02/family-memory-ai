@@ -127,9 +127,11 @@ class DateExtractionPipelineTests(unittest.TestCase):
             for _ in range(10):
                 self._app.processEvents()
 
+            results_text = review_page.results_label.text()
             self.assertGreater(len(review_page.visible_filenames()), 0)
-            self.assertIn("Selected:", review_page.results_label.text())
-            self.assertIn("Reasons:", review_page.results_label.text())
+            self.assertIn("Selected:", results_text)
+            self.assertIn("Rejected: 0", results_text)
+            self.assertNotIn("Reasons:", results_text)
 
 
 if __name__ == "__main__":

@@ -346,3 +346,9 @@
 - Extended sidecar metadata persistence with backward-compatible visual feature profile storage and safe missing/corrupted fallback behavior.
 - Updated category learning so learned rules can consume visual feature profiles and avoid generalizing from metadata-only correction evidence.
 - Kept visual extraction out of synchronous import/UI refresh paths; background batch scheduling remains future work.
+
+## TEST-001 — PySide6 test environment setup
+
+- Added pytest configuration for deterministic test discovery and source imports.
+- Added shared pytest setup for headless Qt execution via `QT_QPA_PLATFORM=offscreen`.
+- Added a GitHub Actions test workflow that installs the Linux Qt/OpenGL packages required by PySide6 before collecting and running tests.
