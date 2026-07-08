@@ -826,3 +826,12 @@ PROJECT_STATE.md is the operational memory of Family Memory AI. Every AI assista
 ## LEARN-003.1 Update
 
 LEARN-003.1 added the foundation for reusable local visual feature extraction. The app now has a small `VisualFeatureProfile` model and a central `VisualFeatureExtractionService` that derives deterministic image-content signals from pixels, reuses existing face evidence when available, and stores the resulting profile in existing sidecar metadata without modifying original images. Category learning can consume these visual/content features and continues to avoid strong learned rules from metadata-only corrections. Visual extraction remains a service boundary for future background batches and is not run synchronously during import or UI refresh.
+
+## TEST-001 Update
+
+TEST-001 improved the local and CI test environment for PySide6-backed tests. Pytest now has repository-owned configuration that adds `src/` to the Python import path and a shared test `conftest.py` that defaults Qt to the offscreen platform for headless runs. A GitHub Actions test workflow now installs the Linux Qt/PySide6 native libraries required by PySide6 imports, including the package that provides `libGL.so.1`, before running source compilation, pytest collection, and the full pytest suite.
+
+Current testing note:
+
+- Linux environments that run PySide6 tests must install the documented Qt/PySide6 runtime libraries before collection.
+- In restricted Codex environments where apt repositories are blocked, local pytest collection can still fail before those libraries are installed; GitHub Actions documents and performs the required setup.
