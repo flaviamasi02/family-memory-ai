@@ -826,3 +826,12 @@ PROJECT_STATE.md is the operational memory of Family Memory AI. Every AI assista
 ## LEARN-003.1 Update
 
 LEARN-003.1 added the foundation for reusable local visual feature extraction. The app now has a small `VisualFeatureProfile` model and a central `VisualFeatureExtractionService` that derives deterministic image-content signals from pixels, reuses existing face evidence when available, and stores the resulting profile in existing sidecar metadata without modifying original images. Category learning can consume these visual/content features and continues to avoid strong learned rules from metadata-only corrections. Visual extraction remains a service boundary for future background batches and is not run synchronously during import or UI refresh.
+
+## TEST-001 — PySide6 test environment setup
+
+Status: Completed
+
+Summary:
+- Pytest now discovers tests from `tests/` with `src/` on the import path.
+- Shared pytest configuration sets `QT_QPA_PLATFORM=offscreen` before Qt widget tests import PySide6.
+- CI installs the native Qt/OpenGL runtime libraries required for PySide6 collection and headless widget tests on Ubuntu runners.
