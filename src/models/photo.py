@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 from PySide6.QtGui import QPixmap
 
 from models.photo_intelligence import PhotoIntelligence
+from models.visual_feature_profile import VisualFeatureProfile
 
 
 @dataclass
@@ -27,6 +28,7 @@ class Photo:
     people: List[str] = field(default_factory=list)
     ai_tags: List[str] = field(default_factory=list)
     intelligence: Optional[PhotoIntelligence] = None
+    visual_features: VisualFeatureProfile = field(default_factory=VisualFeatureProfile)
     relevance_category: str = "unknown"
     relevance_reason: str = ""
     is_album_relevant_candidate: bool = True
@@ -43,6 +45,7 @@ class Photo:
             self.intelligence = PhotoIntelligence()
 
         self.sync_intelligence_from_metadata()
+        self.sync_visual_features_from_metadata()
 
     @classmethod
     def from_path(cls, path: Path) -> "Photo":
@@ -66,6 +69,7 @@ class Photo:
             people=[],
             ai_tags=[],
             intelligence=PhotoIntelligence(),
+            visual_features=VisualFeatureProfile(),
         )
 
     def display_name(self) -> str:
@@ -85,6 +89,10 @@ class Photo:
             score is not None
             for score in (self.technical_score, self.memory_score, self.rarity_score)
         )
+
+    def sync_visual_features_from_metadata(self) -> None:
+        metadata = self.metadata or {}
+        self.visual_features = VisualFeatureProfile.from_dict(metadata.get("visual_feature_profile"))
 
     def sync_intelligence_from_metadata(self) -> None:
         if self.intelligence is None:

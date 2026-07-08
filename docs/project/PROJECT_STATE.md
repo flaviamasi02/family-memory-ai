@@ -822,3 +822,7 @@ This document must be updated after every completed Sprint.
 It should never be left outdated, because it is the operational memory of the project.
 
 PROJECT_STATE.md is the operational memory of Family Memory AI. Every AI assistant should read this file before proposing changes to the project.
+
+## LEARN-003.1 Update
+
+LEARN-003.1 added the foundation for reusable local visual feature extraction. The app now has a small `VisualFeatureProfile` model and a central `VisualFeatureExtractionService` that derives deterministic image-content signals from pixels, reuses existing face evidence when available, and stores the resulting profile in existing sidecar metadata without modifying original images. Category learning can consume these visual/content features and continues to avoid strong learned rules from metadata-only corrections. Visual extraction remains a service boundary for future background batches and is not run synchronously during import or UI refresh.

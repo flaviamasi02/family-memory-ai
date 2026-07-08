@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from core.category_registry import get_category_registry
+from models.visual_feature_profile import VisualFeatureProfile
 
 
 @dataclass
@@ -82,6 +83,7 @@ class CategoryLearningEngine:
         self,
         file_path: str | Path,
         metadata: Optional[dict[str, Any]] = None,
+        visual_profile: Optional[VisualFeatureProfile | dict[str, Any]] = None,
     ) -> dict[str, str | int | float | bool]:
         path = Path(file_path)
         metadata_dict = dict(metadata or {})
@@ -120,6 +122,8 @@ class CategoryLearningEngine:
             except Exception:
                 file_size = 0
 
+        profile = _visual_profile_from_inputs(metadata_dict, visual_profile)
+
         signals: dict[str, str | int | float | bool] = {
             "contains_whatsapp": "whatsapp" in filename_lower or "-wa" in filename_lower,
             "contains_screenshot": "screenshot" in filename_lower or "schermata" in filename_lower,
@@ -154,6 +158,7 @@ class CategoryLearningEngine:
             "extension": path.suffix.lower(),
             "file_size_bucket": _size_bucket(int(file_size or 0)),
         }
+        signals.update(_visual_profile_signals(profile))
         return signals
 
     def record_category_correction(
@@ -167,7 +172,7 @@ class CategoryLearningEngine:
         if "file_size" not in metadata:
             metadata["file_size"] = int(getattr(photo, "file_size", 0) or 0)
 
-        signals = self.extract_signals(getattr(photo, "path", ""), metadata)
+        signals = self.extract_signals(getattr(photo, "path", ""), metadata, getattr(photo, "visual_features", None))
         event = CategoryLearningEvent(
             file_path=str(getattr(photo, "path", "")),
             previous_category=str(previous_category or "").strip().lower(),
@@ -267,7 +272,7 @@ class CategoryLearningEngine:
             # "WhatsApp + small image + no camera metadata => Meme"
             # even when the images have different sizes or filenames.
             for conditions in _candidate_rule_condition_sets(signals):
-                if len(conditions) < 2:
+                if len(conditions) < 1:
                     continue
                 signature = (category, tuple(sorted(conditions.items())))
                 grouped_signatures[signature] = grouped_signatures.get(signature, 0) + 1
@@ -379,92 +384,61 @@ class CategoryLearningEngine:
 
 
 def _candidate_rule_condition_sets(signals: dict[str, Any]) -> list[dict[str, Any]]:
-    base = _build_rule_conditions(signals)
     candidates: list[dict[str, Any]] = []
 
     def add(condition: dict[str, Any]) -> None:
-        cleaned = {k: v for k, v in condition.items() if v not in (None, "")}
-        if len(cleaned) >= 2 and cleaned not in candidates:
+        cleaned = {k: v for k, v in condition.items() if v not in (None, "", False)}
+        if len(cleaned) >= 1 and cleaned not in candidates:
             candidates.append(cleaned)
 
-    # Keep the original comprehensive condition set.
-    add(base)
-
-    extension = base.get("extension")
-    file_size_bucket = base.get("file_size_bucket")
-
-    filename_markers = [
-        "contains_whatsapp",
-        "contains_screenshot",
-        "contains_download",
-        "contains_forwarded",
-        "contains_giphy",
-        "contains_tenor",
-        "contains_meme",
-        "contains_buongiorno",
-        "contains_auguri",
+    visual_bool_keys = [
+        "visual_has_faces",
+        "visual_has_text_like_regions",
+        "visual_looks_like_document",
+        "visual_looks_like_screenshot",
+        "visual_looks_like_graphic_or_meme",
     ]
-    geometry_markers = [
-        "is_small_image",
-        "is_square",
-        "is_very_wide",
-        "is_very_tall",
-    ]
+    active = [key for key in visual_bool_keys if signals.get(key) is True]
+    for key in active:
+        add({key: True})
 
-    # Filename + missing camera metadata is a useful family of explainable rules.
-    for marker in filename_markers:
-        if base.get(marker) is True:
-            add({marker: True, "has_camera_metadata": False})
+    tags = str(signals.get("visual_tags", "") or "")
+    for tag in [item.strip() for item in tags.split(",") if item.strip()]:
+        add({"visual_tag": tag})
 
-            if extension:
-                add({marker: True, "extension": extension})
+    orientation = str(signals.get("visual_orientation", "") or "").strip()
+    for key in active:
+        if orientation and orientation != "unknown":
+            add({key: True, "visual_orientation": orientation})
 
-            if file_size_bucket:
-                add({marker: True, "file_size_bucket": file_size_bucket})
-
-            for geometry in geometry_markers:
-                if base.get(geometry) is True:
-                    add({marker: True, geometry: True, "has_camera_metadata": False})
-                    if extension:
-                        add({marker: True, geometry: True, "extension": extension})
-
-    # Geometry + lack of metadata catches many memes, screenshots, and scans.
-    for geometry in geometry_markers:
-        if base.get(geometry) is True:
-            add({geometry: True, "has_camera_metadata": False, "has_exif_date": False})
-
-            if extension:
-                add({geometry: True, "extension": extension, "has_camera_metadata": False})
-
-            if file_size_bucket:
-                add({geometry: True, "file_size_bucket": file_size_bucket})
-
-    # Extension / size / metadata patterns are weaker but useful after repeated corrections.
-    if extension and file_size_bucket and base.get("has_camera_metadata") is False:
-        add(
-            {
-                "extension": extension,
-                "file_size_bucket": file_size_bucket,
-                "has_camera_metadata": False,
-            }
-        )
-
-    if base.get("has_camera_metadata") is False and base.get("has_exif_date") is False and extension:
-        add(
-            {
-                "has_camera_metadata": False,
-                "has_exif_date": False,
-                "extension": extension,
-            }
-        )
-
-    # Date source is useful for distinguishing EXIF photos from filename-only media.
-    date_source = base.get("date_source")
-    if date_source and extension:
-        add({"date_source": date_source, "extension": extension})
+    if len(active) >= 2:
+        add({key: True for key in active[:3]})
 
     return candidates
 
+
+def _visual_profile_from_inputs(metadata: dict[str, Any], visual_profile: Optional[VisualFeatureProfile | dict[str, Any]]) -> VisualFeatureProfile:
+    if isinstance(visual_profile, VisualFeatureProfile):
+        return visual_profile
+    if isinstance(visual_profile, dict):
+        return VisualFeatureProfile.from_dict(visual_profile)
+    return VisualFeatureProfile.from_dict(metadata.get("visual_feature_profile"))
+
+
+def _visual_profile_signals(profile: VisualFeatureProfile) -> dict[str, str | int | float | bool]:
+    if profile.extraction_status in {"missing", "corrupted", "unavailable", "failed", "timeout"} and not profile.has_content_evidence():
+        return {"visual_features_available": False}
+    return {
+        "visual_features_available": True,
+        "visual_has_faces": bool(profile.has_faces),
+        "visual_face_count": int(profile.face_count),
+        "visual_has_text_like_regions": bool(profile.has_text_like_regions),
+        "visual_looks_like_document": bool(profile.looks_like_document),
+        "visual_looks_like_screenshot": bool(profile.looks_like_screenshot),
+        "visual_looks_like_graphic_or_meme": bool(profile.looks_like_graphic_or_meme),
+        "visual_orientation": str(profile.dominant_orientation or "unknown"),
+        "visual_tags": ",".join(sorted(set(profile.visual_tags))),
+    }
 
 def _matches_rule(rule: CategoryLearningRule, signals: dict[str, Any]) -> bool:
     for key, value in (rule.conditions or {}).items():
@@ -505,6 +479,18 @@ def _rule_id(target_category: str, conditions: dict[str, Any]) -> str:
 def _rule_explanation(target_category: str, conditions: dict[str, Any]) -> str:
     phrases: list[str] = []
 
+    if conditions.get("visual_has_faces") is True:
+        phrases.append("detected faces")
+    if conditions.get("visual_has_text_like_regions") is True:
+        phrases.append("text-like visual regions")
+    if conditions.get("visual_looks_like_document") is True:
+        phrases.append("document-like visual evidence")
+    if conditions.get("visual_looks_like_screenshot") is True:
+        phrases.append("screenshot-like visual evidence")
+    if conditions.get("visual_looks_like_graphic_or_meme") is True:
+        phrases.append("graphic/meme-like visual evidence")
+    if conditions.get("visual_tag"):
+        phrases.append(f"visual tag: {conditions.get('visual_tag')}")
     if conditions.get("contains_whatsapp") is True:
         phrases.append("WhatsApp-like filename")
     if conditions.get("contains_screenshot") is True:

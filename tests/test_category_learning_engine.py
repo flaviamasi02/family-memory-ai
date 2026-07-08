@@ -12,6 +12,7 @@ from learning.category_learning_engine import (
     reset_category_learning_engine,
 )
 from models.photo import Photo
+from models.visual_feature_profile import VisualFeatureProfile
 
 
 class CategoryLearningEngineTests(unittest.TestCase):
@@ -148,6 +149,12 @@ class CategoryLearningEngineTests(unittest.TestCase):
                         "date_source": "Unknown",
                     },
                 )
+                photo.metadata["visual_feature_profile"] = VisualFeatureProfile(
+                    looks_like_graphic_or_meme=True,
+                    visual_tags=["graphic-like"],
+                    extraction_status="extracted",
+                ).to_dict()
+                photo.sync_visual_features_from_metadata()
                 engine.record_category_correction(photo, "unknown", "meme", "user")
 
             self.assertGreaterEqual(len(engine.profile.rules), 1)
@@ -175,6 +182,12 @@ class CategoryLearningEngineTests(unittest.TestCase):
                         "date_source": "Unknown",
                     },
                 )
+                photo.metadata["visual_feature_profile"] = VisualFeatureProfile(
+                    looks_like_graphic_or_meme=True,
+                    visual_tags=["graphic-like"],
+                    extraction_status="extracted",
+                ).to_dict()
+                photo.sync_visual_features_from_metadata()
                 engine.record_category_correction(photo, "unknown", "meme", "user")
 
             classifier = MediaClassifier()
@@ -191,6 +204,13 @@ class CategoryLearningEngineTests(unittest.TestCase):
                     "date_source": "Unknown",
                 },
             )
+
+            target_photo.metadata["visual_feature_profile"] = VisualFeatureProfile(
+                looks_like_graphic_or_meme=True,
+                visual_tags=["graphic-like"],
+                extraction_status="extracted",
+            ).to_dict()
+            target_photo.sync_visual_features_from_metadata()
 
             classification = classifier.classify_photo(target_photo)
 
@@ -218,6 +238,12 @@ class CategoryLearningEngineTests(unittest.TestCase):
                         "date_source": "Unknown",
                     },
                 )
+                photo.metadata["visual_feature_profile"] = VisualFeatureProfile(
+                    looks_like_graphic_or_meme=True,
+                    visual_tags=["graphic-like"],
+                    extraction_status="extracted",
+                ).to_dict()
+                photo.sync_visual_features_from_metadata()
                 engine.record_category_correction(photo, "unknown", "meme", "user")
 
             storage = engine.storage_path
@@ -280,6 +306,13 @@ class CategoryLearningEngineTests(unittest.TestCase):
                         "date_source": "EXIF",
                     },
                 )
+                photo.metadata["visual_feature_profile"] = VisualFeatureProfile(
+                    has_faces=True,
+                    face_count=2,
+                    visual_tags=["faces"],
+                    extraction_status="extracted",
+                ).to_dict()
+                photo.sync_visual_features_from_metadata()
                 engine.record_category_correction(photo, "family_photo", "travel", "user")
 
             self.assertEqual(engine.profile.total_events, 3)

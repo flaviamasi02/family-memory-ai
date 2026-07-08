@@ -333,3 +333,10 @@
 ### Notes
 - The current UI now uses a custom card grid as the first step toward a more reliable custom photo browser.
 - True virtual scrolling remains pending for very large photo libraries.
+
+### LEARN-003.1 - Visual Feature Extraction Foundation
+- Added reusable `VisualFeatureProfile` data for local, content-derived visual signals such as face evidence, text-like regions, document-like layouts, screenshot-like layouts, graphic/meme-like layouts, orientation, visual tags, evidence summaries, extraction status, and extractor version.
+- Added `VisualFeatureExtractionService` as a deterministic local service boundary that reads image pixels, can reuse existing face-detection evidence, never modifies originals, and does not use filename, extension, EXIF, date source, file size, or camera metadata as visual evidence.
+- Extended sidecar metadata persistence with backward-compatible visual feature profile storage and safe missing/corrupted fallback behavior.
+- Updated category learning so learned rules can consume visual feature profiles and avoid generalizing from metadata-only correction evidence.
+- Kept visual extraction out of synchronous import/UI refresh paths; background batch scheduling remains future work.
