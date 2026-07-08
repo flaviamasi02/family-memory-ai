@@ -14,11 +14,35 @@
 
 ## Last Updated
 
-- 2026-07-07
+- 2026-07-08
 
 ## Overall Completion
 
 - Estimate: Early prototype with a growing architecture foundation
+
+---
+
+# Documentation Governance Update (AI Collaboration Workflow)
+
+The official AI collaboration workflow has been formalized as a permanent project method.
+
+Canonical workflow:
+
+Product Owner -> ChatGPT -> Implementation Prompt -> Codex -> Pull Request -> GitHub Actions -> ChatGPT Technical Review -> Product Owner Approval -> Merge.
+
+Current documentation state:
+
+- docs/development/AI_PROJECT_PLAYBOOK.md owns the collaboration workflow, repository health first rule, pull request lifecycle, GitHub Actions policy, human interaction policy, Codex Cloud limitation policy, and continuous workflow improvement rule.
+- docs/development/PROMPT_TEMPLATE.md owns the implementation prompt standard, Definition of Done prompt requirements, and User Action Rule.
+- docs/development/DECISIONS.md records the workflow adoption as DEC-0036.
+- docs/releases/CHANGELOG.md records this documentation update.
+
+Operational impact:
+
+- repository health must be checked before implementation sprints;
+- failed GitHub Actions must be inspected and fixed at root cause in the same pull request whenever possible;
+- AI assistants must use available repository, GitHub, pull request, and workflow capabilities before asking the Product Owner for inaccessible information;
+- implementation discussions must end with a clear NEXT ACTION when Product Owner action is required.
 
 ---
 
