@@ -1,6 +1,12 @@
 # Changelog
 
 ## Unreleased
+### DOCSYNC - Official AI collaboration workflow
+- Formalized the official Product Owner -> ChatGPT -> Implementation Prompt -> Codex -> Pull Request -> GitHub Actions -> ChatGPT Technical Review -> Product Owner Approval -> Merge workflow.
+- Added permanent repository health first, pull request lifecycle, GitHub Actions root-cause, human interaction, Codex Cloud limitation, and continuous workflow improvement policies.
+- Extended the official prompt template with required implementation prompt sections, Definition of Done expectations, and the User Action Rule.
+- Recorded DEC-0036 and updated project state for the documentation governance improvement.
+
 ### DOCSYNC - Product decision synchronization and prompt standard refresh
 - Updated implementation prompt standards to require Why We Test, Manual Test Plan, and Acceptance Checklist sections.
 - Documented Memory Review as the AI-teaching surface with learning visibility, content-first learning, and future Learning Inspector direction.

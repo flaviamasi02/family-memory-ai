@@ -417,3 +417,37 @@ Testing feedback is product design input and UX observations made during testing
 
 **Impacted Sprints:**
 All future implementation cycles.
+
+### DEC-0036
+Official AI Collaboration Workflow
+
+**Value:** Method
+**Impact:** High
+
+Family Memory AI adopts the following official AI-assisted development workflow:
+
+Product Owner -> ChatGPT -> Implementation Prompt -> Codex -> Pull Request -> GitHub Actions -> ChatGPT Technical Review -> Product Owner Approval -> Merge.
+
+This workflow formalizes repository health checks before implementation, focused pull request lifecycle rules, GitHub Actions root-cause analysis, human interaction expectations, Codex Cloud limitation handling, implementation prompt standards, Definition of Done requirements, user action guidance, and continuous workflow improvement.
+
+Permanent rules:
+
+- repository health comes before new implementation work;
+- one implementation should map to one pull request;
+- existing pull requests should be updated whenever possible;
+- failed GitHub Actions must be inspected, root-caused, fixed, and re-run on the same pull request;
+- AI assistants should use available repository, GitHub, pull request, and workflow capabilities before asking the Product Owner for logs or screenshots;
+- Codex Cloud limitations must be stated honestly when remote git or GitHub verification is inaccessible;
+- implementation prompts must follow the official prompt template;
+- implementation is not complete until applicable Definition of Done conditions are satisfied;
+- operational guidance to the Product Owner must end with a clear NEXT ACTION block;
+- approved workflow improvements must be added to canonical documentation instead of scattered notes.
+
+**Impacted documents:**
+- docs/development/AI_PROJECT_PLAYBOOK.md
+- docs/development/PROMPT_TEMPLATE.md
+- docs/project/PROJECT_STATE.md
+- docs/releases/CHANGELOG.md
+
+**Impacted Sprints:**
+All future implementation and documentation cycles.
