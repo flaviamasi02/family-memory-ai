@@ -16,7 +16,7 @@ class ThumbnailWorker(QObject):
     finished = Signal()
 
 
-    def __init__(self, photos, thumbnail_size=160, batch_size=12, delay_ms=0):
+    def __init__(self, photos, thumbnail_size=160, batch_size=20, delay_ms=0):
         super().__init__()
         self.photos = photos
         self.thumbnail_size = thumbnail_size

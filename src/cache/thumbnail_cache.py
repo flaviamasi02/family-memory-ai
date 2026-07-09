@@ -13,7 +13,10 @@ def get_thumbnail_cache_path(photo_path: str) -> Path:
         stat = file.stat()
         cache_key = f"{DISPLAY_THUMBNAIL_VERSION}_{file.resolve()}_{stat.st_mtime_ns}_{stat.st_size}"
     except OSError:
-        cache_key = f"{DISPLAY_THUMBNAIL_VERSION}_{file.resolve()}_0_0"
+        # Fall back to a path-only key so missing/unreadable files still get a
+        # stable (though less precise) entry rather than silently colliding.
+        resolved = str(file.resolve())
+        cache_key = f"{DISPLAY_THUMBNAIL_VERSION}_{resolved}_unavailable"
     filename = hashlib.md5(cache_key.encode("utf-8")).hexdigest() + ".jpg"
 
     return cache_dir / filename

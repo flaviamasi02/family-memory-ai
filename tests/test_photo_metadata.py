@@ -204,8 +204,9 @@ class PhotoMetadataTests(unittest.TestCase):
             old_cwd = os.getcwd()
             os.chdir(tmpdir)
             try:
+                # Use the same corrupted-JPEG byte pattern as the other test.
                 source_path = Path(tmpdir) / "skip_me.jpg"
-                source_path.write_bytes(b"\xff\xd8\xff garbage")
+                source_path.write_bytes(b"\xff\xd8\xff\xe0garbage invalid jpeg content")
                 photo = Photo.from_path(source_path)
 
                 # Pre-populate the failed set so the worker should skip immediately.
