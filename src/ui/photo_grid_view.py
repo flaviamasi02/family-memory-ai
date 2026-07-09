@@ -36,5 +36,4 @@ class PhotoGridView(QListView):
             photo = None
 
         if photo is not None:
-            print(f"PhotoGridView clicked photo: {photo.display_name()}")
             self.selected_photo_changed.emit(photo)

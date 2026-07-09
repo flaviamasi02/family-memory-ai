@@ -33,67 +33,76 @@ class ThumbnailWorker(QObject):
         _corrupt_skipped = 0
         _gen_ms = 0.0
 
-        for start in range(0, len(self.photos), self.batch_size):
-            batch = self.photos[start : start + self.batch_size]
+        try:
+            for start in range(0, len(self.photos), self.batch_size):
+                batch = self.photos[start : start + self.batch_size]
 
-            for photo in batch:
-                path = Path(photo.path)
-                if path.suffix.lower() not in THUMBNAIL_IMAGE_EXTENSIONS:
-                    continue
+                for photo in batch:
+                    try:
+                        path = Path(photo.path)
+                        if path.suffix.lower() not in THUMBNAIL_IMAGE_EXTENSIONS:
+                            continue
 
-                # Skip files already known to be corrupted this session.
-                if is_decode_failed(str(path)):
-                    _corrupt_skipped += 1
-                    photo.set_status("error")
-                    self.thumbnail_status_updated.emit(photo)
-                    continue
+                        # Skip files already known to be corrupted this session.
+                        if is_decode_failed(str(path)):
+                            _corrupt_skipped += 1
+                            photo.set_status("error")
+                            self.thumbnail_status_updated.emit(photo)
+                            continue
 
-                cache_path = get_thumbnail_cache_path(str(photo.path))
-                cached_image = self._load_cached_thumbnail(cache_path)
-                if cached_image is not None:
-                    _cache_hits += 1
-                    self._mark_thumbnail_ready(photo, cache_path)
-                    self.thumbnail_status_updated.emit(photo)
-                    self.thumbnail_ready.emit(photo, cached_image)
-                    continue
+                        cache_path = get_thumbnail_cache_path(str(photo.path))
+                        cached_image = self._load_cached_thumbnail(cache_path)
+                        if cached_image is not None:
+                            _cache_hits += 1
+                            self._mark_thumbnail_ready(photo, cache_path)
+                            self.thumbnail_status_updated.emit(photo)
+                            self.thumbnail_ready.emit(photo, cached_image)
+                            continue
 
-                _cache_misses += 1
-                photo.set_status("thumbnail_loading")
-                self.thumbnail_status_updated.emit(photo)
+                        _cache_misses += 1
+                        photo.set_status("thumbnail_loading")
+                        self.thumbnail_status_updated.emit(photo)
 
-                t_gen = time.perf_counter()
-                image = self._load_thumbnail_image(photo.path)
-                _gen_ms += (time.perf_counter() - t_gen) * 1000
+                        t_gen = time.perf_counter()
+                        image = self._load_thumbnail_image(photo.path)
+                        _gen_ms += (time.perf_counter() - t_gen) * 1000
 
-                if image is None or image.isNull():
-                    _corrupt_skipped += 1
-                    photo.set_status("error")
-                    self.thumbnail_status_updated.emit(photo)
-                    continue
+                        if image is None or image.isNull():
+                            _corrupt_skipped += 1
+                            photo.set_status("error")
+                            self.thumbnail_status_updated.emit(photo)
+                            continue
 
-                _generated += 1
-                try:
-                    image.save(str(cache_path), "JPG", quality=85)
-                except Exception as exc:
-                    print(f"Failed to cache thumbnail for {photo.path}: {exc}")
+                        _generated += 1
+                        try:
+                            image.save(str(cache_path), "JPG", quality=85)
+                        except Exception as exc:
+                            print(f"Failed to cache thumbnail for {photo.path}: {exc}")
 
-                self._mark_thumbnail_ready(photo, cache_path)
+                        self._mark_thumbnail_ready(photo, cache_path)
 
-                self.thumbnail_status_updated.emit(photo)
-                self.thumbnail_ready.emit(photo, image)
+                        self.thumbnail_status_updated.emit(photo)
+                        self.thumbnail_ready.emit(photo, image)
 
-            if self.delay_ms > 0:
-                QThread.msleep(self.delay_ms)
+                    except Exception as exc:  # noqa: BLE001
+                        # Log the error but continue so one bad file never stalls the queue.
+                        print(f"[ThumbnailWorker] Unexpected error for {getattr(photo, 'path', '?')}: {exc}")
 
-        # Accumulate aggregate worker counters into session stats.
-        stats.inc("thumbnail_cache_hits", _cache_hits)
-        stats.inc("thumbnail_cache_misses", _cache_misses)
-        stats.inc("thumbnails_generated", _generated)
-        stats.inc("corrupt_unsupported_skipped", _corrupt_skipped)
-        if _gen_ms > 0:
-            stats.record("thumbnail_generation [BG]", _gen_ms)
+                if self.delay_ms > 0:
+                    QThread.msleep(self.delay_ms)
 
-        self.finished.emit()
+            # Accumulate aggregate worker counters into session stats.
+            stats.inc("thumbnail_cache_hits", _cache_hits)
+            stats.inc("thumbnail_cache_misses", _cache_misses)
+            stats.inc("thumbnails_generated", _generated)
+            stats.inc("corrupt_unsupported_skipped", _corrupt_skipped)
+            if _gen_ms > 0:
+                stats.record("thumbnail_generation [BG]", _gen_ms)
+
+        except Exception as exc:  # noqa: BLE001
+            print(f"[ThumbnailWorker] Fatal error in run(): {exc}")
+        finally:
+            self.finished.emit()
 
     def _load_thumbnail_image(self, image_path):
         path = Path(image_path)

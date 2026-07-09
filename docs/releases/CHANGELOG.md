@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+### PERF-003 (pass 2) — Worker robustness, Qt warning suppression, and instrumentation verification
+
+**Root cause identified — summary never printed:**
+- `ThumbnailWorker.run()` had no `try/finally` guard.  If any unhandled exception
+  occurred inside the processing loop (e.g. a permission error creating the cache
+  directory, or an unexpected photo attribute value), `self.finished.emit()` was
+  never reached.  `_on_thumbnail_worker_finished` therefore never fired, so the
+  `[Perf] Import session summary` was silently dropped.
+- Fixed by wrapping the entire loop in `try/except/finally` that always emits
+  `finished`, logs per-photo errors to stderr, and catches any fatal error in the
+  outer `try` so the worker never silently stalls the UI.
+
+**Qt JPEG warning suppression:**
+- `qt.gui.imageio.jpeg: Invalid SOS parameters for sequential JPEG` was emitted
+  by Qt's C++ codec layer and could not be caught as a Python exception.
+- Added `QLoggingCategory.setFilterRules("qt.gui.imageio=false\n")` in `main.py`
+  immediately after `QApplication` creation; this disables Qt's image-codec log
+  category before any image I/O can occur.
+
+**Removed debug noise:**
+- Removed a leftover `print(f"PhotoGridView clicked photo: ...")` statement in
+  `photo_grid_view.py` that fired on every thumbnail click.
+
+**Repository hygiene:**
+- Removed the stale compiled `src/ui/__pycache__/main_window.cpython-314.pyc`
+  from git tracking; the file was already excluded by `.gitignore` but had been
+  committed in a previous bulk-add.
+
 ### PERF-002 - Faster Thumbnail Loading and Photo Grid Responsiveness (pass 2)
 
 **Corrupted JPEG handling:**

@@ -47,7 +47,24 @@
 - `src/ui/photo_grid_widget.py` — initial render timing instrumentation
 - `src/ui/main_window.py` — uses ScanWorker; tracks first-thumbnail and total wall-clock; prints summary
 
----
+## PERF-003 (pass 2) — Worker robustness and instrumentation pipeline verification
+
+**Root cause — `[Perf] Import session summary` never printed:**
+`ThumbnailWorker.run()` lacked a `try/finally` guard.  Any unhandled exception
+in the processing loop (e.g. a permission error creating the cache directory)
+prevented `self.finished.emit()` from being called, which in turn prevented
+`_on_thumbnail_worker_finished` from running, so the perf summary was silently
+dropped.
+
+**Fix applied:**
+- Entire `run()` body wrapped in `try/except/finally`; `finished` is now always
+  emitted regardless of errors.  Per-photo exceptions are logged and skipped so
+  one bad file cannot stall the worker.
+- `QLoggingCategory.setFilterRules("qt.gui.imageio=false\n")` added to `main.py`
+  to suppress Qt's low-level JPEG codec warnings before any image I/O starts.
+- Removed stale `src/ui/__pycache__/main_window.cpython-314.pyc` from git
+  tracking; removed leftover `print()` in `photo_grid_view.py`.
+
 
 # Documentation Governance Update (AI Collaboration Workflow)
 
