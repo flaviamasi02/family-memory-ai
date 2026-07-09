@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QApplication
 
+from core.image_display_loader import _decode_failed_paths, is_decode_failed
 from core.metadata_extractor import extract_basic_metadata
 from core.photo_scanner import find_photos
 from models.photo import Photo
@@ -168,3 +169,85 @@ class PhotoMetadataTests(unittest.TestCase):
                 self.assertFalse(emitted[0][1].isNull())
             finally:
                 os.chdir(old_cwd)
+
+    def test_corrupted_jpeg_is_skipped_after_first_failure(self):
+        """Worker marks corrupted files as error and does not retry them this session."""
+        app = QApplication.instance() or QApplication([])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            old_cwd = os.getcwd()
+            os.chdir(tmpdir)
+            try:
+                # Write a file that looks like a JPEG but contains garbage data.
+                corrupted_path = Path(tmpdir) / "corrupted.jpg"
+                corrupted_path.write_bytes(b"\xff\xd8\xff\xe0garbage invalid jpeg content")
+                photo = Photo.from_path(corrupted_path)
+
+                worker = ThumbnailWorker([photo], delay_ms=0)
+                status_updates = []
+                worker.thumbnail_status_updated.connect(lambda p: status_updates.append(p.status))
+
+                worker.run()
+                app.processEvents()
+
+                self.assertEqual(photo.status, "error")
+                # The path must now be recorded so subsequent workers skip it immediately.
+                self.assertTrue(is_decode_failed(str(corrupted_path)))
+            finally:
+                os.chdir(old_cwd)
+
+    def test_worker_skips_known_failed_path_without_decoding(self):
+        """Worker skips decode for paths already in the failed-path set."""
+        app = QApplication.instance() or QApplication([])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            old_cwd = os.getcwd()
+            os.chdir(tmpdir)
+            try:
+                source_path = Path(tmpdir) / "skip_me.jpg"
+                source_path.write_bytes(b"\xff\xd8\xff garbage")
+                photo = Photo.from_path(source_path)
+
+                # Pre-populate the failed set so the worker should skip immediately.
+                _decode_failed_paths.add(str(source_path))
+                try:
+                    worker = ThumbnailWorker([photo], delay_ms=0)
+                    emitted = []
+                    worker.thumbnail_ready.connect(lambda p, img: emitted.append(p))
+
+                    with patch.object(worker, "_load_thumbnail_image", side_effect=AssertionError("should not decode")):
+                        worker.run()
+                    app.processEvents()
+
+                    self.assertEqual(photo.status, "error")
+                    self.assertEqual(len(emitted), 0)
+                finally:
+                    _decode_failed_paths.discard(str(source_path))
+            finally:
+                os.chdir(old_cwd)
+
+    def test_photo_card_widget_shows_placeholder_before_thumbnail(self):
+        """PhotoCardWidget shows a non-null placeholder pixmap before any thumbnail is set."""
+        app = QApplication.instance() or QApplication([])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "placeholder_test.jpg"
+            path.write_bytes(b"fake jpg")
+            photo = Photo.from_path(path)
+
+            from ui.photo_card_widget import PhotoCardWidget
+            card = PhotoCardWidget(photo)
+
+            # Before any thumbnail is loaded the label should already show the
+            # grey placeholder pixmap (not an empty / null pixmap).
+            self.assertFalse(card.thumbnail_label.pixmap().isNull())
+
+    def test_photo_grid_dynamic_columns_adapt_to_width(self):
+        """PhotoGridWidget adjusts column count based on viewport width."""
+        app = QApplication.instance() or QApplication([])
+
+        grid = PhotoGridWidget()
+        # Force the viewport to a known width so we can verify column calculation.
+        grid.scroll_area.viewport().resize(600, 400)
+        expected_columns = max(1, 600 // 192)
+        self.assertEqual(grid._calculate_grid_columns(), expected_columns)

@@ -294,18 +294,23 @@ class SharedThumbnailGrid(QWidget):
             return
 
         batch_end = min(self._pending_render_index + self._render_batch_size, render_limit)
-        for index in range(self._pending_render_index, batch_end):
-            item = self._items[index]
-            card = SharedThumbnailCard(item=item)
-            card.clicked.connect(self._on_card_clicked)
-            card.double_clicked.connect(self._on_card_double_clicked)
-            self._cards_by_key[item.key] = card
-            self._rendered_keys.append(item.key)
 
-            card_index = len(self._rendered_keys) - 1
-            grid_row = card_index // self._grid_columns
-            grid_column = card_index % self._grid_columns
-            self.grid_layout.addWidget(card, grid_row, grid_column)
+        self.content_widget.setUpdatesEnabled(False)
+        try:
+            for index in range(self._pending_render_index, batch_end):
+                item = self._items[index]
+                card = SharedThumbnailCard(item=item)
+                card.clicked.connect(self._on_card_clicked)
+                card.double_clicked.connect(self._on_card_double_clicked)
+                self._cards_by_key[item.key] = card
+                self._rendered_keys.append(item.key)
+
+                card_index = len(self._rendered_keys) - 1
+                grid_row = card_index // self._grid_columns
+                grid_column = card_index % self._grid_columns
+                self.grid_layout.addWidget(card, grid_row, grid_column)
+        finally:
+            self.content_widget.setUpdatesEnabled(True)
 
         self._pending_render_index = batch_end
         self._refresh_card_selection()

@@ -441,7 +441,7 @@ class MainWindow(QMainWindow):
 
     def start_thumbnail_loading(self, photos):
         self.thumbnail_thread = QThread()
-        self.thumbnail_worker = ThumbnailWorker(photos, batch_size=12, delay_ms=10)
+        self.thumbnail_worker = ThumbnailWorker(photos, batch_size=20, delay_ms=0)
 
         self.thumbnail_worker.moveToThread(self.thumbnail_thread)
 

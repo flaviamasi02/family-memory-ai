@@ -4,7 +4,7 @@ from PySide6.QtCore import QObject, QThread, QSize, Signal
 from PySide6.QtGui import QImage
 
 from cache.thumbnail_cache import get_thumbnail_cache_path
-from core.image_display_loader import load_display_thumbnail_image
+from core.image_display_loader import load_display_thumbnail_image, is_decode_failed
 
 
 THUMBNAIL_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic"}
@@ -16,7 +16,7 @@ class ThumbnailWorker(QObject):
     finished = Signal()
 
 
-    def __init__(self, photos, thumbnail_size=160, batch_size=12, delay_ms=10):
+    def __init__(self, photos, thumbnail_size=160, batch_size=12, delay_ms=0):
         super().__init__()
         self.photos = photos
         self.thumbnail_size = thumbnail_size
@@ -28,7 +28,14 @@ class ThumbnailWorker(QObject):
             batch = self.photos[start : start + self.batch_size]
 
             for photo in batch:
-                if Path(photo.path).suffix.lower() not in THUMBNAIL_IMAGE_EXTENSIONS:
+                path = Path(photo.path)
+                if path.suffix.lower() not in THUMBNAIL_IMAGE_EXTENSIONS:
+                    continue
+
+                # Skip files that are already known to be corrupted this session.
+                if is_decode_failed(str(path)):
+                    photo.set_status("error")
+                    self.thumbnail_status_updated.emit(photo)
                     continue
 
                 cache_path = get_thumbnail_cache_path(str(photo.path))
