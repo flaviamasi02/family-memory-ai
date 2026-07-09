@@ -863,3 +863,15 @@ Summary:
 - CI installs pytest plus the native Qt/OpenGL runtime libraries required for PySide6 collection and headless widget tests on Ubuntu runners.
 - GitHub Actions runs Python source compilation, pytest collection, and the full pytest suite.
 - GitHub Actions checks passed before PR #7 was merged; obsolete PR #4 and temporary branches were closed/deleted.
+
+
+## PERF-002 — Faster Thumbnail Loading and Photo Grid Responsiveness
+
+Status: Completed
+
+Summary:
+- The thumbnail worker now checks the existing versioned disk thumbnail cache before decoding and regenerating a thumbnail.
+- Cached thumbnails are emitted through the same UI update path as newly generated thumbnails so visible cards can update quickly while missing thumbnails continue generating in the background.
+- Photo Browser card creation is batched: the first visible set renders first, and additional cards are added as scrolling approaches the bottom of the grid.
+- Debug print noise and forced repaint calls were reduced in thumbnail/grid update paths to avoid unnecessary UI work.
+- Memory Review and Cleanup Review shared thumbnail grids retain their existing progressive behavior while using queued updates instead of forced repaints.

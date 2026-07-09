@@ -60,7 +60,6 @@ def load_display_thumbnail(file_path: str | Path, target_size) -> Optional[QPixm
                 Qt.TransformationMode.SmoothTransformation,
             )
         else:
-            print(f"load_display_thumbnail null: {path}")
             return None
 
     if pixmap.width() > size.width() or pixmap.height() > size.height():
@@ -99,7 +98,6 @@ def load_display_thumbnail_image(file_path: str | Path, target_size) -> Optional
                 Qt.TransformationMode.SmoothTransformation,
             )
         else:
-            print(f"load_display_thumbnail_image null: {path}")
             return None
 
     if image.width() > size.width() or image.height() > size.height():

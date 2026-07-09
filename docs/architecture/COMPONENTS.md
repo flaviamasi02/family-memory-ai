@@ -38,12 +38,12 @@ This document describes component responsibilities and interactions.
 
 - MainWindow: Application shell and workflow orchestration.
 - AlbumReviewPage: Current hybrid review UI (toolbar + grid + details), in-memory review status actions, and large-library optimizations. Long-term direction: Memory Review.
-- PhotoGridWidget / PhotoCardWidget: Card-based photo browsing and selection surface.
+- PhotoGridWidget / PhotoCardWidget: Card-based photo browsing and selection surface with batched initial rendering and scroll-triggered continuation for large folders.
 - PhotoDetailsPanel: Selected-photo metadata and context presentation.
 
 ### Background and Performance Components
 
-- ThumbnailWorker: Background thumbnail generation and update signaling.
+- ThumbnailWorker: Cache-first background thumbnail loading, generation, caching, and update signaling.
 - ThumbnailCache: Reusable thumbnail storage to avoid repeated rendering cost.
 
 ## Long-Term Pipeline Responsibilities

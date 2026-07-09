@@ -102,9 +102,7 @@ class SharedThumbnailCard(QFrame):
         self.badge_two.setText(item.badge_two)
         self.badge_three.setText(item.badge_three)
         self.thumbnail_label.update()
-        self.thumbnail_label.repaint()
         self.update()
-        self.repaint()
 
     def set_selected(self, selected: bool) -> None:
         if selected:
@@ -200,7 +198,6 @@ class SharedThumbnailGrid(QWidget):
         return len(self._cards_by_key)
 
     def update_item(self, item: SharedGridItem) -> None:
-        print(f"SharedThumbnailGrid.update_item {item.key}")
         self._items_by_key[item.key] = item
         for index, existing in enumerate(self._items):
             if existing.key == item.key:
@@ -212,7 +209,6 @@ class SharedThumbnailGrid(QWidget):
             card.refresh(item)
             card.set_selected(item.key in self._selected_keys)
             card.update()
-            card.repaint()
 
     def visible_keys(self) -> list[str]:
         return [item.key for item in self._items]
@@ -297,9 +293,6 @@ class SharedThumbnailGrid(QWidget):
             self.selection_changed.emit(set(self._selected_keys), self._selected_key)
             return
 
-        if self._pending_render_index == 0:
-            print("SharedThumbnailGrid first batch start")
-
         batch_end = min(self._pending_render_index + self._render_batch_size, render_limit)
         for index in range(self._pending_render_index, batch_end):
             item = self._items[index]
@@ -316,9 +309,6 @@ class SharedThumbnailGrid(QWidget):
 
         self._pending_render_index = batch_end
         self._refresh_card_selection()
-
-        if self._pending_render_index >= render_limit:
-            print("SharedThumbnailGrid first batch complete")
 
         if self._pending_render_index >= render_limit:
             self.selection_changed.emit(set(self._selected_keys), self._selected_key)

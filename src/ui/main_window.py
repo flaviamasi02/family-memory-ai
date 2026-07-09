@@ -440,7 +440,6 @@ class MainWindow(QMainWindow):
         )
 
     def start_thumbnail_loading(self, photos):
-        print("thumbnail worker started")
         self.thumbnail_thread = QThread()
         self.thumbnail_worker = ThumbnailWorker(photos, batch_size=12, delay_ms=10)
 
@@ -448,7 +447,6 @@ class MainWindow(QMainWindow):
 
         self.thumbnail_thread.started.connect(self.thumbnail_worker.run)
         self.thumbnail_worker.thumbnail_ready.connect(self.update_thumbnail)
-        print("thumbnail_ready connected")
         self.thumbnail_worker.finished.connect(self.thumbnail_thread.quit)
         self.thumbnail_worker.finished.connect(self.thumbnail_worker.deleteLater)
         self.thumbnail_thread.finished.connect(self.thumbnail_thread.deleteLater)
@@ -456,15 +454,6 @@ class MainWindow(QMainWindow):
         self.thumbnail_thread.start()
 
     def update_thumbnail(self, photo, image_or_pixmap):
-        print(f"thumbnail signal received: {getattr(photo, 'path', None)}")
-        print("Thumbnail received", getattr(photo, "path", None))
-        if isinstance(image_or_pixmap, QImage):
-            print(f"thumbnail received image null={image_or_pixmap.isNull()}")
-        elif isinstance(image_or_pixmap, QPixmap):
-            print(f"thumbnail received pixmap null={image_or_pixmap.isNull()}")
-        else:
-            print(f"thumbnail received type={type(image_or_pixmap).__name__}")
-
         if isinstance(image_or_pixmap, QImage):
             pixmap = QPixmap.fromImage(image_or_pixmap)
         else:
@@ -486,9 +475,5 @@ class MainWindow(QMainWindow):
             self.details_panel.set_photo(self.selected_photo)
 
     def _handle_photo_selection(self, photo):
-        if photo is not None:
-            print(f"MainWindow received selected photo: {photo.display_name()}")
-        else:
-            print("MainWindow received selected photo: None")
         self.selected_photo = photo
         self.details_panel.set_photo(photo)

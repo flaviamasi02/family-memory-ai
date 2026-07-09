@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -11,6 +12,8 @@ from core.metadata_extractor import extract_basic_metadata
 from core.photo_scanner import find_photos
 from models.photo import Photo
 from ui.photo_grid_widget import PhotoGridWidget
+from workers.thumbnail_worker import ThumbnailWorker
+from cache.thumbnail_cache import get_thumbnail_cache_path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -113,3 +116,55 @@ class PhotoMetadataTests(unittest.TestCase):
 
             self.assertEqual(len(grid._cards), 1)
             self.assertFalse(grid._cards[0].thumbnail_label.pixmap().isNull())
+
+    def test_photo_grid_batches_initial_render_for_large_collections(self):
+        app = QApplication.instance() or QApplication([])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            photos = []
+            for index in range(90):
+                path = Path(tmpdir) / f"card_{index}.jpg"
+                path.write_bytes(b"fake jpg")
+                photos.append(Photo.from_path(path))
+
+            grid = PhotoGridWidget()
+            grid.set_photos(photos)
+            for _ in range(10):
+                app.processEvents()
+
+            self.assertEqual(grid.rendered_card_count(), grid._initial_render_count)
+            self.assertLess(grid.rendered_card_count(), len(photos))
+
+    def test_thumbnail_worker_reuses_existing_cache_before_generating(self):
+        app = QApplication.instance() or QApplication([])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            old_cwd = os.getcwd()
+            os.chdir(tmpdir)
+            try:
+                source_path = Path(tmpdir) / "cached.jpg"
+                source_image = QImage(32, 32, QImage.Format.Format_RGB32)
+                source_image.fill(Qt.GlobalColor.blue)
+                self.assertTrue(source_image.save(str(source_path), "JPG"))
+                photo = Photo.from_path(source_path)
+
+                cache_path = get_thumbnail_cache_path(str(source_path))
+                cached_image = QImage(16, 16, QImage.Format.Format_RGB32)
+                cached_image.fill(Qt.GlobalColor.red)
+                self.assertTrue(cached_image.save(str(cache_path), "JPG"))
+
+                worker = ThumbnailWorker([photo], delay_ms=0)
+                emitted = []
+                worker.thumbnail_ready.connect(lambda ready_photo, image: emitted.append((ready_photo, image)))
+
+                with patch.object(worker, "_load_thumbnail_image", side_effect=AssertionError("regenerated cached thumbnail")):
+                    worker.run()
+                app.processEvents()
+
+                self.assertEqual(photo.status, "thumbnail_ready")
+                self.assertEqual(photo.thumbnail_path, str(cache_path))
+                self.assertEqual(photo.metadata.get("thumbnail_path"), str(cache_path))
+                self.assertEqual(len(emitted), 1)
+                self.assertFalse(emitted[0][1].isNull())
+            finally:
+                os.chdir(old_cwd)

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from PySide6.QtCore import QObject, Qt, QThread, QSize, Signal
+from PySide6.QtCore import QObject, QThread, QSize, Signal
 from PySide6.QtGui import QImage
 
 from cache.thumbnail_cache import get_thumbnail_cache_path
@@ -24,7 +24,6 @@ class ThumbnailWorker(QObject):
         self.delay_ms = delay_ms
 
     def run(self):
-        print("thumbnail worker started")
         for start in range(0, len(self.photos), self.batch_size):
             batch = self.photos[start : start + self.batch_size]
 
@@ -32,32 +31,31 @@ class ThumbnailWorker(QObject):
                 if Path(photo.path).suffix.lower() not in THUMBNAIL_IMAGE_EXTENSIONS:
                     continue
 
-                print(f"generating thumbnail: {photo.path}")
+                cache_path = get_thumbnail_cache_path(str(photo.path))
+                cached_image = self._load_cached_thumbnail(cache_path)
+                if cached_image is not None:
+                    self._mark_thumbnail_ready(photo, cache_path)
+                    self.thumbnail_status_updated.emit(photo)
+                    self.thumbnail_ready.emit(photo, cached_image)
+                    continue
+
                 photo.set_status("thumbnail_loading")
                 self.thumbnail_status_updated.emit(photo)
-                cache_path = get_thumbnail_cache_path(str(photo.path))
                 image = self._load_thumbnail_image(photo.path)
                 if image is None or image.isNull():
                     photo.set_status("error")
                     self.thumbnail_status_updated.emit(photo)
-                    print(f"Skipping thumbnail for {photo.path}")
                     continue
 
-                print(f"thumbnail qimage null before emit: {image.isNull()}")
                 try:
                     image.save(str(cache_path), "JPG", quality=85)
                 except Exception as exc:
                     print(f"Failed to cache thumbnail for {photo.path}: {exc}")
 
-                photo.thumbnail_path = str(cache_path)
-                metadata = dict(getattr(photo, "metadata", {}) or {})
-                metadata["thumbnail_path"] = str(cache_path)
-                photo.metadata = metadata
+                self._mark_thumbnail_ready(photo, cache_path)
 
-                photo.set_status("thumbnail_ready")
                 self.thumbnail_status_updated.emit(photo)
                 self.thumbnail_ready.emit(photo, image)
-                print(f"thumbnail signal emitted: {photo.path}")
 
             if self.delay_ms > 0:
                 QThread.msleep(self.delay_ms)
@@ -71,7 +69,22 @@ class ThumbnailWorker(QObject):
 
         image = load_display_thumbnail_image(path, QSize(self.thumbnail_size, self.thumbnail_size))
         if not isinstance(image, QImage) or image.isNull():
-            print(f"Thumbnail decode error for {path}: unsupported/corrupt image")
             return None
-        print(f"thumbnail generated: {path} null={image.isNull()}")
         return image
+
+    def _load_cached_thumbnail(self, cache_path):
+        path = Path(cache_path)
+        if not path.exists() or not path.is_file():
+            return None
+
+        image = QImage(str(path))
+        if not isinstance(image, QImage) or image.isNull():
+            return None
+        return image
+
+    def _mark_thumbnail_ready(self, photo, cache_path):
+        photo.thumbnail_path = str(cache_path)
+        metadata = dict(getattr(photo, "metadata", {}) or {})
+        metadata["thumbnail_path"] = str(cache_path)
+        photo.metadata = metadata
+        photo.set_status("thumbnail_ready")

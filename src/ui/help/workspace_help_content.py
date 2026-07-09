@@ -114,7 +114,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                         ),
                         WorkspaceHelpTip(
                             title="Efficiency Tip",
-                            body="If thumbnails are still loading, begin with folders that already rendered to keep momentum.",
+                            body="Previously rendered folders can show cached thumbnails first while missing thumbnails continue loading in the background.",
                         ),
                     ]
                 ),

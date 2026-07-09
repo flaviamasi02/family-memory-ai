@@ -1,6 +1,13 @@
 # Changelog
 
 ## Unreleased
+
+### PERF-002 - Faster Thumbnail Loading and Photo Grid Responsiveness
+- Reused valid on-disk thumbnail cache entries before regenerating thumbnails in the background worker.
+- Kept thumbnail generation on the worker thread while emitting cached thumbnails immediately to the UI update path.
+- Reduced thumbnail/grid debug console output and replaced forced repaint calls with normal queued updates.
+- Batched the Photo Browser's initial card creation so large folders render visible cards first and add more cards as the user scrolls.
+- Added regression coverage for cache-first worker behavior and Photo Browser initial render batching.
 ### DOCSYNC - Official AI collaboration workflow
 - Formalized the official Product Owner -> ChatGPT -> Implementation Prompt -> Codex -> Pull Request -> GitHub Actions -> ChatGPT Technical Review -> Product Owner Approval -> Merge workflow.
 - Added permanent repository health first, pull request lifecycle, GitHub Actions root-cause, human interaction, Codex Cloud limitation, and continuous workflow improvement policies.

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from PySide6.QtCore import QTimer, Qt, Signal
+from PySide6.QtCore import QEvent, QTimer, Qt, Signal
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QGridLayout, QScrollArea, QSizePolicy, QWidget
 
@@ -17,7 +17,9 @@ class PhotoGridWidget(QWidget):
         self._cards_by_key = {}
         self._photos = []
         self._pending_photo_index = 0
-        self._batch_size = 50
+        self._target_render_count = 0
+        self._initial_render_count = 60
+        self._batch_size = 30
         self._pending_thumbnail_updates = {}
         self._selected_photo_key = None
 
@@ -30,6 +32,8 @@ class PhotoGridWidget(QWidget):
         self.grid_layout.setContentsMargins(12, 12, 12, 12)
         self.grid_layout.setSpacing(12)
         self.scroll_area.setWidget(self.content_widget)
+        self.scroll_area.viewport().installEventFilter(self)
+        self.scroll_area.verticalScrollBar().valueChanged.connect(self._on_scroll_changed)
 
         layout = QGridLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -43,6 +47,7 @@ class PhotoGridWidget(QWidget):
         self._cards_by_key = {}
         self._photos = list(photos or [])
         self._pending_photo_index = 0
+        self._target_render_count = min(self._initial_render_count, len(self._photos))
         self._selected_photo_key = None
 
         valid_keys = {self._photo_key(photo) for photo in self._photos}
@@ -54,22 +59,17 @@ class PhotoGridWidget(QWidget):
 
     def update_thumbnail(self, photo, pixmap):
         key = self._photo_key(photo)
-        print(f"photo grid update thumbnail: {key}")
         card = self._cards_by_key.get(key)
-        print(f"photo grid card found: {card is not None}")
 
         if isinstance(pixmap, QImage):
             pixmap = QPixmap.fromImage(pixmap)
 
         if not isinstance(pixmap, QPixmap) or pixmap.isNull():
-            print(f"photo grid thumbnail null: {key}")
             return
 
         if card is not None:
             card.set_thumbnail(pixmap)
             card.update()
-            card.repaint()
-            print(f"card pixmap set: {key}")
             return
 
         self._pending_thumbnail_updates[key] = pixmap
@@ -113,14 +113,26 @@ class PhotoGridWidget(QWidget):
         except Exception:
             return str(path)
 
+    def eventFilter(self, watched, event):
+        if watched is self.scroll_area.viewport() and event.type() == QEvent.Type.Resize:
+            self._sync_content_width()
+        return super().eventFilter(watched, event)
+
+    def rendered_card_count(self) -> int:
+        return len(self._cards)
+
     def _schedule_batch_add(self):
+        if self._target_render_count <= 0 and self._photos:
+            self._target_render_count = min(self._initial_render_count, len(self._photos))
+        self._sync_content_width()
         QTimer.singleShot(0, self._add_next_batch)
 
     def _add_next_batch(self):
-        if self._pending_photo_index >= len(self._photos):
+        render_limit = min(self._target_render_count, len(self._photos))
+        if self._pending_photo_index >= render_limit:
             return
 
-        batch_end = min(self._pending_photo_index + self._batch_size, len(self._photos))
+        batch_end = min(self._pending_photo_index + self._batch_size, render_limit)
         for index in range(self._pending_photo_index, batch_end):
             photo = self._photos[index]
             key = self._photo_key(photo)
@@ -142,5 +154,25 @@ class PhotoGridWidget(QWidget):
 
         self._pending_photo_index = batch_end
 
-        if self._pending_photo_index < len(self._photos):
+        if self._pending_photo_index < render_limit:
             QTimer.singleShot(0, self._add_next_batch)
+
+    def _on_scroll_changed(self, value: int):
+        scrollbar = self.scroll_area.verticalScrollBar()
+        if scrollbar.maximum() <= 0:
+            return
+        if value < scrollbar.maximum() - 220:
+            return
+        if self._target_render_count >= len(self._photos):
+            return
+
+        self._target_render_count = min(
+            self._target_render_count + self._batch_size,
+            len(self._photos),
+        )
+        QTimer.singleShot(0, self._add_next_batch)
+
+    def _sync_content_width(self):
+        viewport_width = self.scroll_area.viewport().width()
+        if viewport_width > 0:
+            self.content_widget.setMinimumWidth(viewport_width)
