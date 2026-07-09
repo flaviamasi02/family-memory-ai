@@ -6,13 +6,16 @@
 
 ## Current Sprint
 
-- PERF-003 (Performance instrumentation and background scan) - In Progress
+- PERF-002 (Thumbnail loading speed and responsiveness) - In Review
 
 ## Project Status
 
 - Status: In Development
-- Repository state: Performance improvements active in PR #9
-- Latest repository workflow: PR #7 merged successfully after passing GitHub Actions; obsolete PR #4 closed; temporary branches deleted
+- Repository state: PR #9 remains open and is not approved for merge
+- Active branch: `codex/improve-thumbnail-loading-speed-and-responsiveness`
+- Manual Windows testing: Completed for the current PERF-002 implementation
+- Current conclusion: Thumbnail loading optimizations have been implemented, but manual testing still indicates that overall loading performance is not yet satisfactory.
+- Merge status: Merge approval is postponed; the performance investigation must continue before PR #9 can be approved.
 
 ## Last Updated
 
@@ -24,7 +27,21 @@
 
 ---
 
-# PERF-003 — Performance Instrumentation and Background Scan
+# PERF-002 - Thumbnail Loading Speed and Responsiveness Review
+
+PR #9 remains open on branch `codex/improve-thumbnail-loading-speed-and-responsiveness`.
+
+Manual Windows testing has been completed for the current PERF-002 implementation.
+
+Current review conclusion:
+
+- Thumbnail loading optimizations have been implemented.
+- User-perceived overall loading performance is still not satisfactory.
+- PR #9 is not approved for merge.
+- Merge is postponed until the actual runtime bottleneck is identified and addressed.
+- The next performance sprint should investigate measured runtime behavior before introducing further optimizations.
+
+## PERF-003 draft investigation notes - not current merge approval state
 
 **Bottleneck identified:** Folder scan + EXIF metadata extraction ran synchronously on the UI thread, blocking the application for seconds on large libraries.
 
@@ -909,7 +926,7 @@ Summary:
 
 ## PERF-002 — Faster Thumbnail Loading and Photo Grid Responsiveness
 
-Status: Completed
+Status: In Review
 
 Summary:
 - The thumbnail worker now checks the existing versioned disk thumbnail cache before decoding and regenerating a thumbnail.
@@ -917,3 +934,5 @@ Summary:
 - Photo Browser card creation is batched: the first visible set renders first, and additional cards are added as scrolling approaches the bottom of the grid.
 - Debug print noise and forced repaint calls were reduced in thumbnail/grid update paths to avoid unnecessary UI work.
 - Memory Review and Cleanup Review shared thumbnail grids retain their existing progressive behavior while using queued updates instead of forced repaints.
+- Manual Windows testing completed after these changes still found overall user-perceived loading performance insufficient.
+- PR #9 remains open and not approved; performance investigation must continue before merge.

@@ -49,8 +49,8 @@ Allowed execution environment labels:
 Usage rules:
 
 - Use 🌐 Codex Cloud for new sprints, new implementation work, and larger focused repository changes.
-- Use 💻 Codex Local (VS Code) when the work must run against the Product Owner's local Windows development environment.
-- Use 🤖 GitHub Copilot (PR Comment) for follow-up improvements, review feedback, and refinements to an existing Pull Request.
+- Use 💻 Codex Local (VS Code) for local development/debug, Windows-specific reproduction, manual local verification, and work that must run against the Product Owner's local development environment.
+- Use 🤖 GitHub Copilot (PR Comment) for follow-up improvements, review feedback, check-fix refinements, and other changes to an existing Pull Request.
 
 ChatGPT must never provide an implementation prompt without an Execution Environment section.
 

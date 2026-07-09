@@ -28,7 +28,7 @@ It allows any future AI to immediately understand how the project is managed.
 
 The canonical prompt structure is owned by docs/development/PROMPT_TEMPLATE.md. ChatGPT must use that template when preparing implementation prompts for Codex.
 
-Every implementation prompt must include Execution Environment, Estimated Task Size, Purpose, Expected Outcome, Repository, Definition of Done, Manual Test Plan, Acceptance Checklist, and Suggested Commit Message.
+Every implementation prompt must include Execution Environment, Target, Estimated Task Size, Purpose, Expected Outcome, Repository, Definition of Done, Manual Test Plan, Acceptance Checklist, and Suggested Commit Message.
 
 Every implementation prompt should make the testing purpose explicit before the first code change is requested and end with the Acceptance Checklist.
 
@@ -122,6 +122,39 @@ ChatGPT Technical Review:
 Merge:
 
 - happens only after review, required checks, mergeability confirmation, and Product Owner approval.
+
+## Execution Environment Routing
+
+Family Memory AI uses explicit AI execution routing:
+
+- New implementation -> Codex Cloud
+- Local development/debug -> Codex Local (VS Code)
+- Existing Pull Request improvements -> GitHub Copilot (PR Comment)
+
+Implementation prompts must state the intended Execution Environment and Target before task details.
+
+New implementation work should normally go to Codex Cloud.
+
+Local Windows debugging, manual reproduction, environment-specific testing, and local-only repository work should use Codex Local (VS Code).
+
+Follow-up changes to an existing Pull Request, including review feedback and check-fix refinements, should use GitHub Copilot through a Pull Request comment whenever practical.
+
+Existing Pull Request improvement prompts must name the Pull Request and branch when known, and must explicitly say not to create a new Pull Request unless the Product Owner approves one.
+
+---
+
+# Repository Documentation as Permanent Project Memory
+
+Repository documentation is the permanent project memory for Family Memory AI.
+
+ChatGPT may directly update repository documentation only after explicit Product Owner approval.
+
+When ChatGPT updates documentation directly:
+
+- the update must stay within the approved documentation scope;
+- canonical ownership boundaries must be preserved;
+- application source code and tests must not be modified unless explicitly approved;
+- the resulting change should be committed as documentation-only work.
 
 ---
 

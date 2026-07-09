@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### DOCSYNC PC FULL - PERF-002 review and workflow governance
+- Updated project state and handover documentation to record that PR #9 remains open, is not approved for merge, and targets branch `codex/improve-thumbnail-loading-speed-and-responsiveness`.
+- Recorded that manual Windows testing was completed for PERF-002 and that user-perceived loading performance remains insufficient despite the current thumbnail loading optimizations.
+- Documented that PERF-002 performance work is still under review and is not considered complete; the performance investigation must continue before merge approval.
+- Added the permanent AI execution workflow routing: new implementation uses Codex Cloud, local development/debug uses Codex Local (VS Code), and existing Pull Request improvements use GitHub Copilot PR comments.
+- Strengthened prompt standards around explicit Execution Environment and Target fields.
+- Documented the approved rule that ChatGPT may directly update repository documentation only after explicit Product Owner approval.
+- Reaffirmed repository documentation as the permanent project memory.
+
 ### PERF-003 (pass 2) — Worker robustness, Qt warning suppression, and instrumentation verification
 
 **Root cause identified — summary never printed:**

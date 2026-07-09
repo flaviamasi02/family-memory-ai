@@ -134,6 +134,19 @@ Current active domain and current milestone are defined in docs/project/PROJECT_
 
 For detailed operational status, always refer to docs/project/PROJECT_STATE.md.
 
+Current status:
+
+- PR #9 is still open.
+- PR #9 is not approved.
+- Merge is postponed.
+- Active branch: `codex/improve-thumbnail-loading-speed-and-responsiveness`.
+- Current active sprint: PERF-002.
+- Manual Windows testing proved that user-perceived performance is still insufficient despite the current thumbnail loading optimizations.
+
+Next task:
+
+Continue the performance investigation. The next performance sprint should identify the actual runtime bottleneck before introducing further optimizations.
+
 ---
 
 ## First Actions for a New AI
