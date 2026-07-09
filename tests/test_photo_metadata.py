@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QApplication
 
 from core.image_display_loader import _decode_failed_paths, is_decode_failed
 from core.metadata_extractor import extract_basic_metadata
+from core.perf_stats import PerfStats, get_session_stats, reset_session_stats
 from core.photo_scanner import find_photos
 from models.photo import Photo
 from ui.photo_grid_widget import PhotoGridWidget
@@ -252,3 +253,155 @@ class PhotoMetadataTests(unittest.TestCase):
         grid.scroll_area.viewport().resize(600, 400)
         expected_columns = max(1, 600 // 192)
         self.assertEqual(grid._calculate_grid_columns(), expected_columns)
+
+
+class PerfStatsTests(unittest.TestCase):
+    def setUp(self):
+        self._stats = PerfStats()
+
+    def test_record_and_summary_contains_label(self):
+        self._stats.record("test_phase", 123.4)
+        summary = self._stats.summary()
+        self.assertIn("test_phase", summary)
+        self.assertIn("123", summary)
+
+    def test_start_stop_records_elapsed(self):
+        self._stats.start("my_phase")
+        elapsed = self._stats.stop("my_phase")
+        self.assertGreaterEqual(elapsed, 0)
+        summary = self._stats.summary()
+        self.assertIn("my_phase", summary)
+
+    def test_inc_and_get_counter(self):
+        self._stats.inc("cache_hits", 5)
+        self._stats.inc("cache_hits", 3)
+        self.assertEqual(self._stats.get_counter("cache_hits"), 8)
+
+    def test_identify_bottleneck_returns_slowest(self):
+        self._stats.record("fast_phase", 10.0)
+        self._stats.record("slow_phase", 500.0)
+        self._stats.record("medium_phase", 50.0)
+        self.assertEqual(self._stats.identify_bottleneck(), "slow_phase")
+
+    def test_reset_clears_all_data(self):
+        self._stats.record("phase", 99.9)
+        self._stats.inc("count", 7)
+        self._stats.reset()
+        self.assertNotIn("phase", self._stats.summary())
+        self.assertEqual(self._stats.get_counter("count"), 0)
+
+    def test_bottleneck_marked_in_summary(self):
+        self._stats.record("phase_a", 50.0)
+        self._stats.record("phase_b", 200.0)
+        summary = self._stats.summary()
+        self.assertIn("BOTTLENECK", summary)
+        # The bottleneck label should appear near the marker.
+        self.assertIn("phase_b", summary)
+
+    def test_session_stats_singleton_reset(self):
+        reset_session_stats()
+        stats = get_session_stats()
+        stats.record("singleton_test", 42.0)
+        summary = stats.summary()
+        self.assertIn("singleton_test", summary)
+        reset_session_stats()
+        summary_after = get_session_stats().summary()
+        self.assertNotIn("singleton_test", summary_after)
+
+
+class PhotoScannerPerfInstrumentationTests(unittest.TestCase):
+    def test_find_photos_records_scan_and_metadata_timings(self):
+        """find_photos() must record folder_scan and metadata_extraction into session stats."""
+        reset_session_stats()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "test.jpg"
+            path.write_bytes(b"fake jpg data")
+            find_photos(tmpdir)
+
+        stats = get_session_stats()
+        summary = stats.summary()
+        self.assertIn("folder_scan", summary)
+        self.assertIn("metadata_extraction", summary)
+        self.assertGreater(stats.get_counter("files_scanned"), 0)
+
+
+class ThumbnailWorkerPerfInstrumentationTests(unittest.TestCase):
+    def test_worker_records_cache_hits_in_session_stats(self):
+        """ThumbnailWorker increments thumbnail_cache_hits for cached thumbnails."""
+        app = QApplication.instance() or QApplication([])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            old_cwd = os.getcwd()
+            os.chdir(tmpdir)
+            try:
+                reset_session_stats()
+                source_path = Path(tmpdir) / "img.jpg"
+                img = QImage(16, 16, QImage.Format.Format_RGB32)
+                img.fill(Qt.GlobalColor.blue)
+                img.save(str(source_path), "JPG")
+                photo = Photo.from_path(source_path)
+
+                cache_path = get_thumbnail_cache_path(str(source_path))
+                cached = QImage(8, 8, QImage.Format.Format_RGB32)
+                cached.fill(Qt.GlobalColor.red)
+                cached.save(str(cache_path), "JPG")
+
+                worker = ThumbnailWorker([photo], delay_ms=0)
+                with patch.object(worker, "_load_thumbnail_image",
+                                  side_effect=AssertionError("should not generate")):
+                    worker.run()
+
+                stats = get_session_stats()
+                self.assertEqual(stats.get_counter("thumbnail_cache_hits"), 1)
+                self.assertEqual(stats.get_counter("thumbnail_cache_misses"), 0)
+            finally:
+                os.chdir(old_cwd)
+
+    def test_worker_records_cache_miss_and_generation_stats(self):
+        """ThumbnailWorker increments thumbnails_generated for new thumbnails."""
+        app = QApplication.instance() or QApplication([])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            old_cwd = os.getcwd()
+            os.chdir(tmpdir)
+            try:
+                reset_session_stats()
+                source_path = Path(tmpdir) / "gen.jpg"
+                img = QImage(32, 32, QImage.Format.Format_RGB32)
+                img.fill(Qt.GlobalColor.green)
+                img.save(str(source_path), "JPG")
+                photo = Photo.from_path(source_path)
+
+                worker = ThumbnailWorker([photo], delay_ms=0)
+                worker.run()
+
+                stats = get_session_stats()
+                self.assertEqual(stats.get_counter("thumbnail_cache_misses"), 1)
+                self.assertEqual(stats.get_counter("thumbnails_generated"), 1)
+                self.assertEqual(stats.get_counter("thumbnail_cache_hits"), 0)
+            finally:
+                os.chdir(old_cwd)
+
+
+class GridInitialRenderPerfTests(unittest.TestCase):
+    def test_grid_records_initial_render_stats(self):
+        """PhotoGridWidget must record grid_initial_render timing and card count."""
+        app = QApplication.instance() or QApplication([])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            reset_session_stats()
+            photos = []
+            for i in range(10):
+                p = Path(tmpdir) / f"img_{i}.jpg"
+                p.write_bytes(b"fake")
+                photos.append(Photo.from_path(p))
+
+            grid = PhotoGridWidget()
+            grid.set_photos(photos)
+            for _ in range(20):
+                app.processEvents()
+
+            stats = get_session_stats()
+            summary = stats.summary()
+            self.assertIn("grid_initial_render", summary)
+            self.assertGreater(stats.get_counter("grid_initial_cards_created"), 0)

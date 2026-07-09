@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread
@@ -20,7 +21,7 @@ from album.album_draft_builder import AlbumDraftBuilder
 from album.annual_album import AnnualAlbum
 from album.album_scoring_engine import AlbumScoringEngine
 from album.candidate_selection_engine import CandidateSelectionEngine
-from core.photo_scanner import find_photos
+from core.perf_stats import get_session_stats, reset_session_stats
 from core.safe_file_move_service import CLEANUP_REVIEW_FOLDER_NAME
 from models.photo_model import PhotoModel
 from ui.album_draft_page import AlbumDraftPage
@@ -33,6 +34,7 @@ from ui.irrelevant_media_page import IrrelevantMediaPage
 from ui.photo_details_panel import PhotoDetailsPanel
 from ui.photo_grid_widget import PhotoGridWidget
 from ui.settings_page import SettingsPage
+from workers.scan_worker import ScanWorker
 from workers.thumbnail_worker import ThumbnailWorker
 
 
@@ -56,6 +58,8 @@ class MainWindow(QMainWindow):
 
         self.thumbnail_thread = None
         self.thumbnail_worker = None
+        self.scan_thread = None
+        self.scan_worker = None
         self.selected_photo = None
         self._review_cache_signature = None
         self._review_cache_payload = None
@@ -63,6 +67,8 @@ class MainWindow(QMainWindow):
         self._current_scored_photos = []
         self._all_photos = []
         self._imported_folder = None
+        self._import_wall_t0: float = 0.0
+        self._first_thumbnail_logged: bool = False
         self._workspace_help_registry = WorkspaceHelpRegistry()
         self._tab_workspace_ids: list[str] = []
 
@@ -217,15 +223,45 @@ class MainWindow(QMainWindow):
             self.status_label.setText("No folder selected.")
             return
 
+        # Reset per-session stats and start the wall-clock timer.
+        reset_session_stats()
+        self._import_wall_t0 = time.perf_counter()
+        self._first_thumbnail_logged = False
+
         self._imported_folder = folder_path
-        photos = find_photos(folder_path)
+        self.status_label.setText("Scanning folder…")
 
+        self._start_scan(folder_path)
+
+    def _start_scan(self, folder_path: str) -> None:
+        """Launch folder scanning on a background thread via ScanWorker."""
+        # Stop any in-progress scan before starting a new one.
+        if self.scan_thread is not None and self.scan_thread.isRunning():
+            self.scan_thread.quit()
+            self.scan_thread.wait(2000)
+
+        self.scan_thread = QThread()
+        self.scan_worker = ScanWorker(folder_path)
+        self.scan_worker.moveToThread(self.scan_thread)
+
+        self.scan_thread.started.connect(self.scan_worker.run)
+        self.scan_worker.scan_complete.connect(self._on_scan_complete)
+        self.scan_worker.scan_error.connect(self._on_scan_error)
+        self.scan_worker.finished.connect(self.scan_thread.quit)
+        self.scan_worker.finished.connect(self.scan_worker.deleteLater)
+        self.scan_thread.finished.connect(self.scan_thread.deleteLater)
+
+        self.scan_thread.start()
+
+    def _on_scan_complete(self, photos: list) -> None:
         self.status_label.setText(
-            f"Found {len(photos)} files. Loading thumbnails progressively in background..."
+            f"Found {len(photos)} files. Loading thumbnails progressively in background…"
         )
-
         self.load_photos(photos)
         self.start_thumbnail_loading(photos)
+
+    def _on_scan_error(self, error_message: str) -> None:
+        self.status_label.setText(f"Scan error: {error_message}")
 
     def load_photos(self, photos):
         self._all_photos = list(photos or [])
@@ -447,13 +483,28 @@ class MainWindow(QMainWindow):
 
         self.thumbnail_thread.started.connect(self.thumbnail_worker.run)
         self.thumbnail_worker.thumbnail_ready.connect(self.update_thumbnail)
+        self.thumbnail_worker.finished.connect(self._on_thumbnail_worker_finished)
         self.thumbnail_worker.finished.connect(self.thumbnail_thread.quit)
         self.thumbnail_worker.finished.connect(self.thumbnail_worker.deleteLater)
         self.thumbnail_thread.finished.connect(self.thumbnail_thread.deleteLater)
 
         self.thumbnail_thread.start()
 
+    def _on_thumbnail_worker_finished(self) -> None:
+        """Called on the UI thread when the thumbnail worker has processed all photos."""
+        if self._import_wall_t0 > 0:
+            elapsed_ms = (time.perf_counter() - self._import_wall_t0) * 1000
+            get_session_stats().record("total_import_wall_clock [UI]", elapsed_ms)
+            self._import_wall_t0 = 0.0
+            get_session_stats().print_summary()
+
     def update_thumbnail(self, photo, image_or_pixmap):
+        # Record the first thumbnail arrival time once per session.
+        if not self._first_thumbnail_logged and self._import_wall_t0 > 0:
+            elapsed_ms = (time.perf_counter() - self._import_wall_t0) * 1000
+            get_session_stats().record("time_to_first_thumbnail [UI]", elapsed_ms)
+            self._first_thumbnail_logged = True
+
         if isinstance(image_or_pixmap, QImage):
             pixmap = QPixmap.fromImage(image_or_pixmap)
         else:

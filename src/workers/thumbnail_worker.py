@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QThread, QSize, Signal
@@ -5,6 +6,7 @@ from PySide6.QtGui import QImage
 
 from cache.thumbnail_cache import get_thumbnail_cache_path
 from core.image_display_loader import load_display_thumbnail_image, is_decode_failed
+from core.perf_stats import get_session_stats
 
 
 THUMBNAIL_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic"}
@@ -24,6 +26,13 @@ class ThumbnailWorker(QObject):
         self.delay_ms = delay_ms
 
     def run(self):
+        stats = get_session_stats()
+        _cache_hits = 0
+        _cache_misses = 0
+        _generated = 0
+        _corrupt_skipped = 0
+        _gen_ms = 0.0
+
         for start in range(0, len(self.photos), self.batch_size):
             batch = self.photos[start : start + self.batch_size]
 
@@ -32,8 +41,9 @@ class ThumbnailWorker(QObject):
                 if path.suffix.lower() not in THUMBNAIL_IMAGE_EXTENSIONS:
                     continue
 
-                # Skip files that are already known to be corrupted this session.
+                # Skip files already known to be corrupted this session.
                 if is_decode_failed(str(path)):
+                    _corrupt_skipped += 1
                     photo.set_status("error")
                     self.thumbnail_status_updated.emit(photo)
                     continue
@@ -41,19 +51,27 @@ class ThumbnailWorker(QObject):
                 cache_path = get_thumbnail_cache_path(str(photo.path))
                 cached_image = self._load_cached_thumbnail(cache_path)
                 if cached_image is not None:
+                    _cache_hits += 1
                     self._mark_thumbnail_ready(photo, cache_path)
                     self.thumbnail_status_updated.emit(photo)
                     self.thumbnail_ready.emit(photo, cached_image)
                     continue
 
+                _cache_misses += 1
                 photo.set_status("thumbnail_loading")
                 self.thumbnail_status_updated.emit(photo)
+
+                t_gen = time.perf_counter()
                 image = self._load_thumbnail_image(photo.path)
+                _gen_ms += (time.perf_counter() - t_gen) * 1000
+
                 if image is None or image.isNull():
+                    _corrupt_skipped += 1
                     photo.set_status("error")
                     self.thumbnail_status_updated.emit(photo)
                     continue
 
+                _generated += 1
                 try:
                     image.save(str(cache_path), "JPG", quality=85)
                 except Exception as exc:
@@ -66,6 +84,14 @@ class ThumbnailWorker(QObject):
 
             if self.delay_ms > 0:
                 QThread.msleep(self.delay_ms)
+
+        # Accumulate aggregate worker counters into session stats.
+        stats.inc("thumbnail_cache_hits", _cache_hits)
+        stats.inc("thumbnail_cache_misses", _cache_misses)
+        stats.inc("thumbnails_generated", _generated)
+        stats.inc("corrupt_unsupported_skipped", _corrupt_skipped)
+        if _gen_ms > 0:
+            stats.record("thumbnail_generation [BG]", _gen_ms)
 
         self.finished.emit()
 

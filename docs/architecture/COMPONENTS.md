@@ -43,8 +43,10 @@ This document describes component responsibilities and interactions.
 
 ### Background and Performance Components
 
-- ThumbnailWorker: Cache-first background thumbnail loading, generation, caching, and update signaling.
+- ThumbnailWorker: Cache-first background thumbnail loading, generation, caching, update signaling, and aggregate performance counter accumulation (cache hits/misses, generation time, corrupt-file count).
+- ScanWorker: Background worker that runs folder scanning and metadata extraction (find_photos) off the UI thread, keeping the main window responsive during import. Emits scan_complete, scan_error, and finished signals.
 - ThumbnailCache: Reusable thumbnail storage to avoid repeated rendering cost.
+- PerfStats: Lightweight session-scoped aggregate performance stats collector. Records named timing spans and counters across the import pipeline and prints a single human-readable summary with automatic bottleneck identification at the end of each import session.
 
 ## Long-Term Pipeline Responsibilities
 

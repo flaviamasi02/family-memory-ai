@@ -1,9 +1,11 @@
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QTimer, Qt, Signal
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QGridLayout, QScrollArea, QSizePolicy, QWidget
 
+from core.perf_stats import get_session_stats
 from ui.photo_card_widget import PhotoCardWidget
 
 # Approximate rendered width of each card (fixed 180px + 12px spacing).
@@ -26,6 +28,8 @@ class PhotoGridWidget(QWidget):
         self._pending_thumbnail_updates = {}
         self._selected_photo_key = None
         self._grid_columns = 3
+        self._initial_render_t0: float = 0.0
+        self._initial_render_logged: bool = False
 
         self.scroll_area = QScrollArea(self)
         self.scroll_area.setWidgetResizable(True)
@@ -60,6 +64,8 @@ class PhotoGridWidget(QWidget):
             key: pixmap for key, pixmap in existing_pending.items() if key in valid_keys
         }
 
+        self._initial_render_t0 = time.perf_counter()
+        self._initial_render_logged = False
         self._schedule_batch_add()
 
     def update_thumbnail(self, photo, pixmap):
@@ -165,6 +171,13 @@ class PhotoGridWidget(QWidget):
     def _add_next_batch(self):
         render_limit = min(self._target_render_count, len(self._photos))
         if self._pending_photo_index >= render_limit:
+            # Log initial render completion once (fired when the first target is done).
+            if not self._initial_render_logged and self._initial_render_t0 > 0:
+                elapsed_ms = (time.perf_counter() - self._initial_render_t0) * 1000
+                stats = get_session_stats()
+                stats.record("grid_initial_render [UI]", elapsed_ms)
+                stats.inc("grid_initial_cards_created", self._pending_photo_index)
+                self._initial_render_logged = True
             return
 
         batch_end = min(self._pending_photo_index + self._batch_size, render_limit)
@@ -196,6 +209,14 @@ class PhotoGridWidget(QWidget):
 
         if self._pending_photo_index < render_limit:
             QTimer.singleShot(0, self._add_next_batch)
+        else:
+            # All cards for the current target have been rendered.
+            if not self._initial_render_logged and self._initial_render_t0 > 0:
+                elapsed_ms = (time.perf_counter() - self._initial_render_t0) * 1000
+                stats = get_session_stats()
+                stats.record("grid_initial_render [UI]", elapsed_ms)
+                stats.inc("grid_initial_cards_created", self._pending_photo_index)
+                self._initial_render_logged = True
 
     def _on_scroll_changed(self, value: int):
         scrollbar = self.scroll_area.verticalScrollBar()

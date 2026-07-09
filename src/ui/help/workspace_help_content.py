@@ -114,7 +114,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                         ),
                         WorkspaceHelpTip(
                             title="Efficiency Tip",
-                            body="Previously rendered folders can show cached thumbnails first while missing thumbnails continue loading in the background.",
+                            body="Folder scanning and EXIF extraction run in the background — the application stays responsive while your library loads. Cached thumbnails appear first; newly generated ones follow automatically.",
                         ),
                     ]
                 ),

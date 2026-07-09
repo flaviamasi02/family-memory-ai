@@ -6,21 +6,46 @@
 
 ## Current Sprint
 
-- TEST-001 (PySide6 test environment setup) - Completed
+- PERF-003 (Performance instrumentation and background scan) - In Progress
 
 ## Project Status
 
 - Status: In Development
-- Repository state: Clean and ready for the next sprint
+- Repository state: Performance improvements active in PR #9
 - Latest repository workflow: PR #7 merged successfully after passing GitHub Actions; obsolete PR #4 closed; temporary branches deleted
 
 ## Last Updated
 
-- 2026-07-08
+- 2026-07-09
 
 ## Overall Completion
 
 - Estimate: Early prototype with a growing architecture foundation
+
+---
+
+# PERF-003 — Performance Instrumentation and Background Scan
+
+**Bottleneck identified:** Folder scan + EXIF metadata extraction ran synchronously on the UI thread, blocking the application for seconds on large libraries.
+
+**Optimization implemented:** Moved `find_photos()` to a dedicated background `QThread` via the new `ScanWorker`. The UI shows "Scanning folder…" immediately after the user selects a folder and stays fully interactive while scanning proceeds.
+
+**Instrumentation added:** Lightweight aggregate performance stats are printed to stdout at the end of every import:
+- `folder_scan [BG]` — file-walk duration (background thread)
+- `metadata_extraction [BG]` — PIL/EXIF extraction duration (background thread)
+- `grid_initial_render [UI]` — time to create the first batch of cards (UI thread)
+- `thumbnail_generation [BG]` — cumulative decode+save time for cache misses (background thread)
+- `time_to_first_thumbnail [UI]` — wall-clock from import click to first visible thumbnail
+- `total_import_wall_clock [UI]` — full wall-clock for the complete import session
+- Counters: `files_scanned`, `thumbnail_cache_hits`, `thumbnail_cache_misses`, `thumbnails_generated`, `corrupt_unsupported_skipped`, `grid_initial_cards_created`
+
+**Key files added/modified:**
+- `src/core/perf_stats.py` (new) — session-scoped stats collector with bottleneck identification
+- `src/workers/scan_worker.py` (new) — background folder scan worker
+- `src/core/photo_scanner.py` — phase timing instrumentation
+- `src/workers/thumbnail_worker.py` — cache/generation counter instrumentation
+- `src/ui/photo_grid_widget.py` — initial render timing instrumentation
+- `src/ui/main_window.py` — uses ScanWorker; tracks first-thumbnail and total wall-clock; prints summary
 
 ---
 
