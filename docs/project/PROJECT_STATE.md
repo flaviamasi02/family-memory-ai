@@ -47,23 +47,29 @@
 - `src/ui/photo_grid_widget.py` — initial render timing instrumentation
 - `src/ui/main_window.py` — uses ScanWorker; tracks first-thumbnail and total wall-clock; prints summary
 
-## PERF-003 (pass 2) — Worker robustness and instrumentation pipeline verification
+## PERF-003 (pass 3) — Root-cause fixes for JPEG suppression, summary visibility, and thumbnail performance
 
-**Root cause — `[Perf] Import session summary` never printed:**
-`ThumbnailWorker.run()` lacked a `try/finally` guard.  Any unhandled exception
-in the processing loop (e.g. a permission error creating the cache directory)
-prevented `self.finished.emit()` from being called, which in turn prevented
-`_on_thumbnail_worker_finished` from running, so the perf summary was silently
-dropped.
+**JPEG warning suppression root-cause fix:**
+- Previous fix only suppressed the exact category `qt.gui.imageio`; the actual
+  runtime messages are emitted under the sub-category `qt.gui.imageio.jpeg`, which
+  requires a wildcard rule.  Changed to `qt.gui.imageio*=false` and also set
+  `QT_LOGGING_RULES` via `os.environ` *before* `QApplication` creation for
+  full Qt-initialization coverage.
 
-**Fix applied:**
-- Entire `run()` body wrapped in `try/except/finally`; `finished` is now always
-  emitted regardless of errors.  Per-photo exceptions are logged and skipped so
-  one bad file cannot stall the worker.
-- `QLoggingCategory.setFilterRules("qt.gui.imageio=false\n")` added to `main.py`
-  to suppress Qt's low-level JPEG codec warnings before any image I/O starts.
-- Removed stale `src/ui/__pycache__/main_window.cpython-314.pyc` from git
-  tracking; removed leftover `print()` in `photo_grid_view.py`.
+**Perf summary visibility root-cause fix:**
+- `print_summary()` wrote only to stdout; on Windows without a console window
+  (e.g. `pythonw.exe`) stdout is discarded, while Qt's own messages appear on
+  stderr.  `print_summary()` now writes to both stdout and stderr with `flush=True`.
+- `_on_scan_complete` now guards `load_photos()` with `try/except/finally` so
+  `start_thumbnail_loading()` is always called even if album-review building
+  raises an unexpected exception.  `load_photos_ui [UI]` timing is now recorded.
+
+**Thumbnail update performance:**
+- `PhotoCardWidget.set_thumbnail()` now skips redundant `pixmap.scaled()` calls
+  when the incoming pixmap already fits within 160×160 (the common case, since the
+  worker pre-scales before emitting).
+- `PhotoGridWidget._normalize_path_key()` now memoises resolved path strings to
+  eliminate repeated `Path.resolve()` filesystem calls during per-thumbnail updates.
 
 
 # Documentation Governance Update (AI Collaboration Workflow)

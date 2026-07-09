@@ -1,3 +1,4 @@
+import sys
 import time
 from pathlib import Path
 
@@ -257,7 +258,19 @@ class MainWindow(QMainWindow):
         self.status_label.setText(
             f"Found {len(photos)} files. Loading thumbnails progressively in background…"
         )
-        self.load_photos(photos)
+        # Time the UI-thread work (grid setup + album review build) and always
+        # start thumbnail loading afterwards — even if load_photos raises so
+        # that the ThumbnailWorker.finished signal is always emitted and the
+        # perf summary is always printed.
+        t_ui = time.perf_counter()
+        try:
+            self.load_photos(photos)
+        except Exception as exc:  # noqa: BLE001 — catches only Exception subclasses; KeyboardInterrupt/SystemExit inherit from BaseException and are not caught
+            print(f"[MainWindow] load_photos error: {exc}", file=sys.stderr, flush=True)
+        finally:
+            get_session_stats().record(
+                "load_photos_ui [UI]", (time.perf_counter() - t_ui) * 1000
+            )
         self.start_thumbnail_loading(photos)
 
     def _on_scan_error(self, error_message: str) -> None:

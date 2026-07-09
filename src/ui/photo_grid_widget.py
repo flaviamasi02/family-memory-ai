@@ -114,15 +114,31 @@ class PhotoGridWidget(QWidget):
         raw_path = getattr(photo, "path", photo)
         return self._normalize_path_key(raw_path)
 
+    # Cache for resolved path strings: avoids repeated filesystem calls to
+    # Path.resolve() when the same photo path is looked up many times (e.g.
+    # during per-thumbnail UI updates for large libraries).
+    # Thread safety: PhotoGridWidget is a Qt widget and must only be accessed
+    # from the main (UI) thread; all callers of _normalize_path_key are on the
+    # UI thread, so no locking is required.
+    _path_key_cache: dict[str, str] = {}
+
     def _normalize_path_key(self, value) -> str:
         if value is None:
             return ""
 
-        path = Path(str(value))
+        raw = str(value)
+        cached = PhotoGridWidget._path_key_cache.get(raw)
+        if cached is not None:
+            return cached
+
+        path = Path(raw)
         try:
-            return str(path.resolve())
+            resolved = str(path.resolve())
         except Exception:
-            return str(path)
+            resolved = raw
+
+        PhotoGridWidget._path_key_cache[raw] = resolved
+        return resolved
 
     def eventFilter(self, watched, event):
         if watched is self.scroll_area.viewport() and event.type() == QEvent.Type.Resize:

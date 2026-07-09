@@ -10,6 +10,7 @@ and safe for concurrent access from the background scan/thumbnail workers.
 """
 from __future__ import annotations
 
+import sys
 import time
 from typing import Optional
 
@@ -78,8 +79,21 @@ class PerfStats:
         return "\n".join(lines)
 
     def print_summary(self) -> None:
-        """Print the summary to stdout."""
-        print(self.summary())
+        """Write the summary to stderr (and stdout) with immediate flush.
+
+        stderr is used so the output appears alongside Qt's own diagnostic
+        messages on Windows, where stdout may be buffered or invisible when
+        the process is launched without a console window.
+        """
+        text = self.summary()
+        try:
+            print(text, flush=True)
+        except Exception:
+            pass
+        try:
+            print(text, file=sys.stderr, flush=True)
+        except Exception:
+            pass
 
     def reset(self) -> None:
         """Clear all accumulated data (call at the start of a new import)."""

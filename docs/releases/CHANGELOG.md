@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+### PERF-003 (pass 3) — Root-cause fixes: JPEG suppression, summary visibility, UI-thread timing
+
+**JPEG warning suppression (root-cause fix):**
+- The previous fix used `QLoggingCategory.setFilterRules("qt.gui.imageio=false\n")`, which
+  only suppresses the exact category `qt.gui.imageio`.  The actual runtime messages are emitted
+  under the *sub-category* `qt.gui.imageio.jpeg`, which is not matched without a wildcard.
+- Fixed by changing the rule to `qt.gui.imageio*=false` (wildcard covers all sub-categories).
+- Also set `QT_LOGGING_RULES=qt.gui.imageio*=false` via `os.environ` **before** `QApplication`
+  is created so the filter is in effect during Qt library initialisation; the API call after
+  `QApplication` is retained as belt-and-suspenders.
+
+**Perf summary visibility (root-cause fix):**
+- `print_summary()` wrote only to stdout.  On Windows, when the application is launched
+  without a console window (e.g. from Explorer via `pythonw.exe`), stdout may be NULL or
+  silently discarded.  Qt's own diagnostic messages go to stderr.
+- `print_summary()` now writes to **both** stdout and stderr with `flush=True` so the summary
+  appears wherever Qt's messages are visible.
+- `_on_scan_complete` now wraps `load_photos()` in `try/except/finally`:
+  - Timing for UI-thread album-review construction is recorded as `load_photos_ui [UI]`.
+  - If `load_photos()` raises, the error is logged to stderr and `start_thumbnail_loading()`
+    is still called, ensuring `ThumbnailWorker.finished` is always emitted and the summary
+    is always printed.
+
+**Thumbnail update performance:**
+- `PhotoCardWidget.set_thumbnail()` previously called `pixmap.scaled()` unconditionally.
+  The thumbnail worker already scales images to ≤160×160 before emitting them, so the
+  re-scale was a no-op in the common case but still incurred the cost.  The call is now
+  skipped when the incoming pixmap already fits within the target bounds.
+- `PhotoGridWidget._normalize_path_key()` called `Path.resolve()` (a filesystem syscall)
+  on every per-thumbnail update for every card lookup.  For a 1 000-photo import, this
+  produced ~5 000 redundant syscalls.  Resolved paths are now memoised in a class-level
+  dict so each unique path is resolved at most once per process lifetime.
+
 ### PERF-003 (pass 2) — Worker robustness, Qt warning suppression, and instrumentation verification
 
 **Root cause identified — summary never printed:**
