@@ -171,13 +171,7 @@ class PhotoGridWidget(QWidget):
     def _add_next_batch(self):
         render_limit = min(self._target_render_count, len(self._photos))
         if self._pending_photo_index >= render_limit:
-            # Log initial render completion once (fired when the first target is done).
-            if not self._initial_render_logged and self._initial_render_t0 > 0:
-                elapsed_ms = (time.perf_counter() - self._initial_render_t0) * 1000
-                stats = get_session_stats()
-                stats.record("grid_initial_render [UI]", elapsed_ms)
-                stats.inc("grid_initial_cards_created", self._pending_photo_index)
-                self._initial_render_logged = True
+            self._log_initial_render_complete()
             return
 
         batch_end = min(self._pending_photo_index + self._batch_size, render_limit)
@@ -210,13 +204,17 @@ class PhotoGridWidget(QWidget):
         if self._pending_photo_index < render_limit:
             QTimer.singleShot(0, self._add_next_batch)
         else:
-            # All cards for the current target have been rendered.
-            if not self._initial_render_logged and self._initial_render_t0 > 0:
-                elapsed_ms = (time.perf_counter() - self._initial_render_t0) * 1000
-                stats = get_session_stats()
-                stats.record("grid_initial_render [UI]", elapsed_ms)
-                stats.inc("grid_initial_cards_created", self._pending_photo_index)
-                self._initial_render_logged = True
+            self._log_initial_render_complete()
+
+    def _log_initial_render_complete(self) -> None:
+        """Record initial-render timing and card count into session stats, once per set_photos() call."""
+        if self._initial_render_logged or self._initial_render_t0 <= 0:
+            return
+        elapsed_ms = (time.perf_counter() - self._initial_render_t0) * 1000
+        stats = get_session_stats()
+        stats.record("grid_initial_render [UI]", elapsed_ms)
+        stats.inc("grid_initial_cards_created", self._pending_photo_index)
+        self._initial_render_logged = True
 
     def _on_scroll_changed(self, value: int):
         scrollbar = self.scroll_area.verticalScrollBar()
