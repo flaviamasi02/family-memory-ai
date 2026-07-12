@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import tempfile
+import threading
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -82,7 +83,9 @@ class CategoryLearningEngine:
         self._event_summaries: list[dict[str, Any]] = []
         self._learned_event_ids: set[str] = set()
         self.profile = CategoryLearningProfile()
-        self.diagnostics = {"corrections_received": 0, "visual_profiles_reused": 0, "visual_profiles_queued": 0, "visual_profiles_completed": 0, "category_profiles_updated": 0, "recommendations_with_visual_match": 0, "recommendations_unknown": 0}
+        self.diagnostics = {"corrections_received": 0, "visual_profiles_reused": 0, "visual_profiles_queued": 0, "visual_profiles_completed": 0, "category_profiles_updated": 0, "recommendations_with_visual_match": 0, "recommendations_unknown": 0, "visual_analysis_workers_started": 0, "visual_analysis_workers_finished": 0}
+        self._visual_analysis_thread: threading.Thread | None = None
+        self._visual_analysis_lock = threading.Lock()
         self._load_profile()
 
     @property
@@ -160,6 +163,43 @@ class CategoryLearningEngine:
                 except Exception: pass
             if self.record_completed_visual_analysis(event_id, profile): done += 1
         return done
+
+    def start_pending_visual_analysis_worker(self, limit: int = 10, extractor: Any | None = None) -> bool:
+        """Start one bounded background pass over queued visual analyses.
+
+        Returns True when this call started a worker and False when there was
+        nothing to process or another worker is already active.
+        """
+        if not self.profile.pending_visual_analyses:
+            return False
+        with self._visual_analysis_lock:
+            if self._visual_analysis_thread is not None and self._visual_analysis_thread.is_alive():
+                return False
+
+            def _run() -> None:
+                try:
+                    while self.profile.pending_visual_analyses:
+                        pending_before = len(self.profile.pending_visual_analyses)
+                        processed = self.process_pending_visual_analyses(limit=limit, extractor=extractor)
+                        pending_after = len(self.profile.pending_visual_analyses)
+                        if processed <= 0 and pending_after >= pending_before:
+                            break
+                finally:
+                    self.diagnostics["visual_analysis_workers_finished"] += 1
+                    with self._visual_analysis_lock:
+                        self._visual_analysis_thread = None
+
+            self.diagnostics["visual_analysis_workers_started"] += 1
+            self._visual_analysis_thread = threading.Thread(target=_run, name="ContentLearningVisualAnalysis", daemon=True)
+            self._visual_analysis_thread.start()
+            return True
+
+    def wait_for_pending_visual_analysis(self, timeout: float | None = None) -> bool:
+        thread = self._visual_analysis_thread
+        if thread is None:
+            return True
+        thread.join(timeout)
+        return not thread.is_alive()
 
     def apply_learning(self, file_path: str | Path, metadata: Optional[dict[str, Any]], base_category: str, base_confidence: float, base_reason: str, visual_profile: Optional[VisualFeatureProfile | dict[str, Any]] = None) -> tuple[str, float, str, Optional[CategoryLearningRule]]:
         signals = self.extract_signals(file_path, metadata, visual_profile)

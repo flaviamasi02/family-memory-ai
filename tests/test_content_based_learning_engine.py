@@ -52,6 +52,43 @@ class ContentBasedLearningEngineTests(unittest.TestCase):
             self.assertEqual(summary["pending_visual_analyses"], 0)
             self.assertEqual(summary["visual_profiles"]["document"]["visual_examples"], 1)
 
+
+    def test_background_worker_executes_queue_and_refreshes_summary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); os.environ["FAMILY_MEMORY_LEARNING_ROOT"] = str(root); os.environ["FAMILY_MEMORY_CATEGORIES_ROOT"] = str(root)
+            engine = CategoryLearningEngine(root)
+
+            class Extractor:
+                def __init__(self):
+                    self.calls = []
+                def extract(self, path):
+                    self.calls.append(Path(path).name)
+                    return VisualFeatureProfile(has_text_like_regions=True, looks_like_document=True, dominant_orientation="portrait", visual_tags=["document-like"], extraction_status="extracted")
+                def apply_profile_to_photo(self, photo, profile):
+                    photo.visual_features = profile
+                    photo.metadata["visual_feature_profile"] = profile.to_dict()
+
+            extractor = Extractor()
+            for i in range(3):
+                engine.record_category_correction(self._photo(root, f"doc_worker_{i}.jpg"), "unknown", "document", f"user_{i}")
+
+            self.assertEqual(engine.learning_summary()["pending_visual_analyses"], 3)
+            self.assertTrue(engine.start_pending_visual_analysis_worker(limit=2, extractor=extractor))
+            self.assertTrue(engine.wait_for_pending_visual_analysis(timeout=5.0))
+
+            summary = engine.learning_summary()
+            self.assertEqual(len(extractor.calls), 3)
+            self.assertEqual(summary["pending_visual_analyses"], 0)
+            self.assertEqual(summary["visual_profiles"]["document"]["visual_examples"], 3)
+            self.assertIn("document-like page structure", summary["visual_profiles"]["document"]["explanation_summaries"])
+            self.assertGreaterEqual(summary["diagnostics"]["visual_analysis_workers_started"], 1)
+            self.assertGreaterEqual(summary["diagnostics"]["visual_profiles_completed"], 3)
+
+            reloaded = CategoryLearningEngine(root)
+            reloaded_summary = reloaded.learning_summary()
+            self.assertEqual(reloaded_summary["pending_visual_analyses"], 0)
+            self.assertEqual(reloaded_summary["visual_profiles"]["document"]["visual_examples"], 3)
+
     def test_repeated_same_correction_is_idempotent_and_persists(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); os.environ["FAMILY_MEMORY_LEARNING_ROOT"] = str(root); os.environ["FAMILY_MEMORY_CATEGORIES_ROOT"] = str(root)
