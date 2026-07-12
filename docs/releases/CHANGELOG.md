@@ -555,3 +555,10 @@
 - Added a GitHub Actions test workflow that installs the Linux Qt/OpenGL packages required by PySide6 before collecting and running tests.
 - CI now installs pytest, compiles Python sources, collects tests, and runs the full pytest suite.
 - Completed TEST-001 after GitHub Actions passed on PR #7; obsolete PR #4 was closed and temporary branches were deleted.
+
+### LEARN-003.2 - Content-Based Learning Engine
+- Category corrections now feed a versioned local content-learning profile that separates activity counts, preference signals, and visual-content learning.
+- Corrected content categories aggregate deterministic `VisualFeatureProfile` evidence into explainable category visual profiles with conservative support/confidence thresholds.
+- Missing visual profiles are queued for bounded background enrichment instead of blocking category-correction UI; completed analyses can update pending learning records idempotently.
+- Recommendation learning now uses learned visual-content matches conservatively and reports matched visual signals/support while filename and metadata remain secondary evidence only.
+- Learning Summary now separates Overview, Category Visual Learning, Activity, Learned Rules, Preference Signals, and Recent Learning Activity.

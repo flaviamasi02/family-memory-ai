@@ -790,3 +790,7 @@ The architecture should follow a small set of clear principles.
 - View displays data
 
 Architecture should always optimize maintainability before complexity.
+
+## Content-Based Learning Architecture
+
+LEARN-003.2 keeps learning responsibilities separated. UI review pages record authoritative user corrections and return immediately. `CategoryLearningEngine` owns persistent category visual profiles, idempotent correction event handling, conservative thresholds, pending visual-analysis records, and explainable visual-content rules. `VisualFeatureExtractionService` remains the deterministic local pixel-analysis boundary and persists completed profiles through existing sidecar metadata rather than original photo files. Recommendation integration combines deterministic classifier output with learned visual profile matches conservatively; filename and metadata evidence are secondary and cannot create high-confidence visual rules alone.

@@ -557,6 +557,7 @@ class MediaClassifier:
             base_category=classification.media_category.value,
             base_confidence=classification.classification_confidence,
             base_reason=classification.classification_reason,
+            visual_profile=metadata.get("visual_feature_profile"),
         )
 
         face_context = self._face_detection_context(metadata)

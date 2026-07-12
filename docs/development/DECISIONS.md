@@ -652,3 +652,8 @@ Implementation -> Product Owner Manual Test -> ChatGPT Review -> Commit -> Push 
 
 **Impacted Sprints:**
 All future implementation and documentation cycles.
+
+### DEC-LEARN-0032
+Content-first category learning is approved for LEARN-003.2. Visual evidence from local deterministic feature extraction is the primary learning evidence for category profiles. Metadata and filenames may support explanations but must not create strong learned visual rules on their own. Learning profiles use explicit schema versioning and local persistence; no cloud upload or black-box model training is introduced.
+
+Approved.
