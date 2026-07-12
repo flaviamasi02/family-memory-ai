@@ -2,7 +2,7 @@ import sys
 import time
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QThread
+from PySide6.QtCore import Qt, QThread, QTimer
 from PySide6.QtGui import QGuiApplication, QImage, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
@@ -255,23 +255,61 @@ class MainWindow(QMainWindow):
         self.scan_thread.start()
 
     def _on_scan_complete(self, photos: list) -> None:
+        stats = get_session_stats()
+        n = len(photos or [])
+
+        # ── Phase 1 (synchronous, UI thread) ─────────────────────────────────
+        # Populate the Photo Browser with placeholder cards.  set_photos() only
+        # creates card widgets — no image decoding occurs here — so this is fast
+        # regardless of library size.
+        t0 = time.perf_counter()
+        self._all_photos = list(photos or [])
+        self.photo_model.set_photos(photos)
+        self._apply_browser_filter()
+        stats.record("photo_browser_setup [UI]", (time.perf_counter() - t0) * 1000)
+
         self.status_label.setText(
-            f"Found {len(photos)} files. Loading thumbnails progressively in background…"
+            f"Scan complete — showing {n} photos. Loading thumbnails…"
         )
-        # Time the UI-thread work (grid setup + album review build) and always
-        # start thumbnail loading afterwards — even if load_photos raises so
-        # that the ThumbnailWorker.finished signal is always emitted and the
-        # perf summary is always printed.
-        t_ui = time.perf_counter()
+
+        # Start the thumbnail worker *immediately* so thumbnails begin arriving
+        # in the browser before Cleanup Review and Memory Review are prepared.
+        self.start_thumbnail_loading(photos)
+
+        # ── Phase 2 & 3 (deferred) ────────────────────────────────────────────
+        # Let Qt process the browser repaint first, then set up the secondary
+        # views.  Each phase defers the next one the same way so the event loop
+        # remains responsive throughout.
+        QTimer.singleShot(0, self._deferred_setup_cleanup_review)
+
+    def _deferred_setup_cleanup_review(self) -> None:
+        """Populate Cleanup Review — deferred from _on_scan_complete."""
+        self.status_label.setText("Preparing Cleanup Review in background…")
+        t0 = time.perf_counter()
         try:
-            self.load_photos(photos)
-        except Exception as exc:  # noqa: BLE001 — catches only Exception subclasses; KeyboardInterrupt/SystemExit inherit from BaseException and are not caught
-            print(f"[MainWindow] load_photos error: {exc}", file=sys.stderr, flush=True)
+            self._load_irrelevant_media_data(self._all_photos)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[MainWindow] Cleanup Review setup error: {exc}", file=sys.stderr, flush=True)
         finally:
             get_session_stats().record(
-                "load_photos_ui [UI]", (time.perf_counter() - t_ui) * 1000
+                "cleanup_review_setup [UI]", (time.perf_counter() - t0) * 1000
             )
-        self.start_thumbnail_loading(photos)
+        QTimer.singleShot(0, self._deferred_setup_memory_review)
+
+    def _deferred_setup_memory_review(self) -> None:
+        """Populate Memory Review and Album Draft — deferred from _deferred_setup_cleanup_review."""
+        self.status_label.setText("Preparing Memory Review…")
+        relevant = [p for p in self._all_photos if self._is_album_relevant(p)]
+        t0 = time.perf_counter()
+        try:
+            self._load_album_review_data(relevant)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[MainWindow] Memory Review setup error: {exc}", file=sys.stderr, flush=True)
+            self.status_label.setText("Memory Review preparation encountered an error.")
+        finally:
+            get_session_stats().record(
+                "memory_review_setup [UI]", (time.perf_counter() - t0) * 1000
+            )
 
     def _on_scan_error(self, error_message: str) -> None:
         self.status_label.setText(f"Scan error: {error_message}")

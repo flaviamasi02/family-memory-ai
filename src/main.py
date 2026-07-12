@@ -19,13 +19,20 @@ def main():
     # (*) is required: "qt.gui.imageio" only disables the exact category; the
     # actual JPEG messages are emitted under the sub-category
     # "qt.gui.imageio.jpeg", which needs the wildcard to be covered.
-    os.environ.setdefault("QT_LOGGING_RULES", "qt.gui.imageio*=false")
+    #
+    # We always append our rule rather than overwriting any existing user config,
+    # so that legitimate debug rules set by the user remain active.
+    _existing = os.environ.get("QT_LOGGING_RULES", "")
+    _jpeg_rule = "qt.gui.imageio*=false"
+    if _jpeg_rule not in _existing:
+        os.environ["QT_LOGGING_RULES"] = (_existing.rstrip("\n") + "\n" + _jpeg_rule).lstrip("\n")
 
     app = QApplication(sys.argv)
 
     # Belt-and-suspenders: also apply via the runtime API after QApplication is
-    # created, in case the env var was already set to something else.
-    QLoggingCategory.setFilterRules("qt.gui.imageio*=false\n")
+    # created, in case the env var was already set to something else or the
+    # platform ignored the env var during initialisation.
+    QLoggingCategory.setFilterRules(_jpeg_rule + "\n")
 
     window = MainWindow()
     window.show()

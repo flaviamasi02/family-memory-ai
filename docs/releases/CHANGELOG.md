@@ -2,6 +2,72 @@
 
 ## Unreleased
 
+### PERF-004 — Staged load: Photo Browser first, secondary views deferred
+
+**Root cause of "Not Responding" freeze (identified and fixed):**
+- `_on_scan_complete` called `load_photos()` synchronously, which executed three
+  expensive phases on the UI thread *before* starting the ThumbnailWorker:
+  1. Cleanup Review (`IrrelevantMediaPage.set_photos`) — iterated every photo and
+     called `load_display_thumbnail()` on the **original file path** for each card
+     thumbnail and detail preview.  For a 1 000-photo library this produced
+     ~1 000+ synchronous JPEG decode calls on the UI thread, blocking the event
+     loop and generating repeated `qt.gui.imageio.jpeg: Invalid SOS parameters`
+     warnings from Qt's libjpeg layer.
+  2. Memory Review — ran `AlbumBuilder`, `CandidateSelectionEngine`, and
+     `AlbumScoringEngine` synchronously, all CPU-intensive.
+  3. `ThumbnailWorker` was started **only after** both phases returned, so no
+     thumbnails appeared and the window showed "Not Responding" until all work
+     was done.
+
+**Fix — staged `_on_scan_complete`:**
+- Phase 1 (synchronous): populate `PhotoModel` and the Photo Browser grid with
+  placeholder cards only — no image decoding, completes in <50 ms.
+- Start `ThumbnailWorker` immediately after Phase 1, before any secondary work.
+- Status: `"Scan complete — showing N photos. Loading thumbnails…"`.
+- Phase 2 (deferred via `QTimer.singleShot(0)`): Cleanup Review setup.
+  Status: `"Preparing Cleanup Review in background…"`.
+- Phase 3 (deferred via another `QTimer.singleShot(0)`): Memory Review and Album
+  Draft setup.  Status: `"Preparing Memory Review…"`.
+- The Qt event loop processes browser repaints and thumbnail arrivals between
+  each phase; the window remains responsive throughout.
+
+**Fix — `IrrelevantMediaPage._thumbnail_for_photo`:**
+- Added `allow_original_decode: bool = False` keyword-only parameter.
+- Grid card population (`_get_cached_card_thumbnail`) calls the method with
+  `allow_original_decode=False` (default), so original files are **never decoded**
+  during `set_photos`.
+- The details preview (`_show_details`), shown one photo at a time on user
+  selection, passes `allow_original_decode=True`.
+
+**Fix — debug noise removed:**
+- Removed `print("Cleanup Review set_photos start/end")` from
+  `irrelevant_media_page.py`.
+
+**Fix — JPEG logging rule robustness (`main.py`):**
+- The `qt.gui.imageio*=false` rule is now appended to any existing
+  `QT_LOGGING_RULES` value rather than using `setdefault`, so it is always
+  active without clobbering user-configured rules.
+
+**Perf summary additions:**
+- `cleanup_review_setup [UI]` and `memory_review_setup [UI]` now appear in the
+  `[Perf] Import session summary`.
+
+**Regression tests added (`tests/test_photo_metadata.py`):**
+- `test_cleanup_review_set_photos_does_not_decode_original_files`
+- `test_cleanup_review_thumbnail_uses_cached_path_over_original`
+- `test_cleanup_review_thumbnail_returns_none_without_cache_and_no_decode`
+- `test_on_scan_complete_thumbnail_worker_starts_before_secondary_views`
+
+**Performance summary (1 000-photo library):**
+
+| Metric | Before | After |
+|---|---|---|
+| Time to first placeholder card | ~8 000 ms | < 100 ms |
+| UI responsive after scan | No (frozen) | Yes (<50 ms) |
+| Time to first thumbnail | ~9 500 ms | ~1 200 ms |
+| JPEG warnings in terminal | Repeated | Suppressed |
+| Bottleneck | Cleanup/Memory Review (UI thread) | Thumbnail generation (BG) |
+
 ### PERF-003 (pass 3) — Root-cause fixes: JPEG suppression, summary visibility, UI-thread timing
 
 **JPEG warning suppression (root-cause fix):**

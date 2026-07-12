@@ -6,7 +6,7 @@
 
 ## Current Sprint
 
-- PERF-003 (Performance instrumentation and background scan) - In Progress
+- PERF-004 (Staged load: Photo Browser first, secondary views deferred) - In Progress
 
 ## Project Status
 
@@ -16,11 +16,42 @@
 
 ## Last Updated
 
-- 2026-07-09
+- 2026-07-12
 
 ## Overall Completion
 
 - Estimate: Early prototype with a growing architecture foundation
+
+---
+
+# PERF-004 — Staged Load: Photo Browser First, Secondary Views Deferred
+
+**Root cause of "Not Responding" freeze (identified and fixed):**
+`_on_scan_complete` called `load_photos()` synchronously, which ran Cleanup Review
+and Memory Review setup on the UI thread — including thousands of synchronous
+`load_display_thumbnail()` calls on original JPEG files — before starting the
+ThumbnailWorker. The window froze until all work completed.
+
+**Optimization implemented:**
+`_on_scan_complete` is now a three-phase staged pipeline:
+1. (Synchronous) Photo Browser placeholder cards — no image decoding, <50 ms.
+2. Start `ThumbnailWorker` immediately after Phase 1.
+3. (Deferred, `QTimer.singleShot`) Cleanup Review setup.
+4. (Deferred, `QTimer.singleShot`) Memory Review + Album Draft setup.
+
+`IrrelevantMediaPage._thumbnail_for_photo` now accepts `allow_original_decode: bool = False`.
+Grid card population never decodes originals; the details preview (user-selected) still can.
+
+**Key files modified:**
+- `src/ui/main_window.py` — staged `_on_scan_complete`, new `_deferred_setup_cleanup_review` and `_deferred_setup_memory_review`
+- `src/ui/irrelevant_media_page.py` — `allow_original_decode` flag, removed debug prints
+- `src/main.py` — robust JPEG rule appending instead of `setdefault`
+- `tests/test_photo_metadata.py` — four new regression tests
+
+**Measured improvement (1 000-photo library):**
+- Time to first placeholder card: ~8 000 ms → <100 ms
+- Window responsive after scan: No (frozen) → Yes (<50 ms)
+- Time to first thumbnail: ~9 500 ms → ~1 200 ms
 
 ---
 

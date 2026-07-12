@@ -405,3 +405,178 @@ class GridInitialRenderPerfTests(unittest.TestCase):
             summary = stats.summary()
             self.assertIn("grid_initial_render", summary)
             self.assertGreater(stats.get_counter("grid_initial_cards_created"), 0)
+
+
+class StagedLoadRegressionTests(unittest.TestCase):
+    """Regression tests for the staged on_scan_complete fix (PERF-004).
+
+    These tests verify that the Photo Browser is usable immediately after scan
+    completion and that Cleanup Review / Memory Review setup is deferred so that
+    the UI thread is not blocked before the first thumbnails appear.
+    """
+
+    def test_cleanup_review_set_photos_does_not_decode_original_files(self):
+        """IrrelevantMediaPage.set_photos() must not call load_display_thumbnail
+        on the original image paths — only on pre-existing cached thumbnail paths.
+
+        Decoding originals on the UI thread for every photo in a large library
+        was the root cause of the 'Not Responding' freeze and repeated JPEG
+        warnings reported in PR #9.
+        """
+        from unittest.mock import patch, MagicMock
+        from ui.irrelevant_media_page import IrrelevantMediaPage
+
+        app = QApplication.instance() or QApplication([])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create fake photo objects — no real image content needed.
+            photos = []
+            original_paths = set()
+            for i in range(5):
+                path = Path(tmpdir) / f"orig_{i}.jpg"
+                path.write_bytes(b"\xff\xd8\xff fake jpeg content")
+                photo = Photo.from_path(path)
+                photos.append(photo)
+                original_paths.add(str(path))
+
+            decoded_paths: list[str] = []
+
+            import core.image_display_loader as idl
+
+            original_fn = idl.load_display_thumbnail
+
+            def spy_load(file_path, target_size):
+                decoded_paths.append(str(file_path))
+                return original_fn(file_path, target_size)
+
+            page = IrrelevantMediaPage()
+            with patch.object(idl, "load_display_thumbnail", side_effect=spy_load):
+                page.set_photos(photos, tmpdir, total_imported_count=len(photos))
+                for _ in range(10):
+                    app.processEvents()
+
+            # No original file path should have been decoded during set_photos.
+            decoded_originals = [p for p in decoded_paths if p in original_paths]
+            self.assertEqual(
+                decoded_originals,
+                [],
+                msg=(
+                    "set_photos() decoded original image files on the UI thread: "
+                    + ", ".join(decoded_originals)
+                ),
+            )
+
+    def test_cleanup_review_thumbnail_uses_cached_path_over_original(self):
+        """_thumbnail_for_photo must prefer an existing cached thumbnail over the
+        original file path, and must not decode the original when allow_original_decode
+        is False (the default used during grid population).
+        """
+        from unittest.mock import MagicMock
+        from ui.irrelevant_media_page import IrrelevantMediaPage, CleanupReviewRow
+
+        app = QApplication.instance() or QApplication([])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Build a minimal photo with a valid cached thumbnail.
+            path = Path(tmpdir) / "photo.jpg"
+            path.write_bytes(b"\xff\xd8\xff fake")
+            thumb_path = Path(tmpdir) / "thumb.jpg"
+
+            # Write a tiny but valid JPEG thumbnail using QImage.
+            from PySide6.QtGui import QImage
+            img = QImage(8, 8, QImage.Format.Format_RGB32)
+            img.fill(Qt.GlobalColor.green)
+            img.save(str(thumb_path), "JPG")
+
+            photo = Photo.from_path(path)
+            photo.thumbnail_path = str(thumb_path)
+
+            page = IrrelevantMediaPage()
+            # allow_original_decode=False: must return the cached thumb, not None.
+            pixmap = page._thumbnail_for_photo(photo, (140, 140), allow_original_decode=False)
+
+            self.assertIsNotNone(pixmap, "Expected cached thumbnail to be returned")
+            self.assertFalse(pixmap.isNull(), "Returned pixmap must not be null")
+
+    def test_cleanup_review_thumbnail_returns_none_without_cache_and_no_decode(self):
+        """When no thumbnail is cached and allow_original_decode is False,
+        _thumbnail_for_photo must return None rather than decoding the original.
+        """
+        from ui.irrelevant_media_page import IrrelevantMediaPage
+
+        app = QApplication.instance() or QApplication([])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "nocache.jpg"
+            path.write_bytes(b"\xff\xd8\xff fake")
+            photo = Photo.from_path(path)
+            # No thumbnail_path set — only original file available.
+
+            page = IrrelevantMediaPage()
+            pixmap = page._thumbnail_for_photo(photo, (140, 140), allow_original_decode=False)
+
+            self.assertIsNone(
+                pixmap,
+                "Expected None when no cache exists and original decode is not allowed",
+            )
+
+    def test_on_scan_complete_thumbnail_worker_starts_before_secondary_views(self):
+        """After _on_scan_complete the thumbnail worker must be running before
+        Cleanup Review and Memory Review are fully populated.
+
+        We verify this by patching start_thumbnail_loading and the secondary
+        setup methods, then confirming call order: thumbnail loading starts
+        first, secondary setup is deferred (called after processEvents).
+        """
+        from unittest.mock import MagicMock, call, patch
+        from ui.main_window import MainWindow
+
+        app = QApplication.instance() or QApplication([])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            photos = []
+            for i in range(3):
+                p = Path(tmpdir) / f"t_{i}.jpg"
+                p.write_bytes(b"fake")
+                photos.append(Photo.from_path(p))
+
+            window = MainWindow()
+            call_log: list[str] = []
+
+            original_start = window.start_thumbnail_loading
+            original_cleanup = window._load_irrelevant_media_data
+            original_review = window._load_album_review_data
+
+            def fake_start(ph):
+                call_log.append("thumbnails_started")
+
+            def fake_cleanup(ph):
+                call_log.append("cleanup_setup")
+
+            def fake_review(ph):
+                call_log.append("memory_review_setup")
+
+            window.start_thumbnail_loading = fake_start
+            window._load_irrelevant_media_data = fake_cleanup
+            window._load_album_review_data = fake_review
+
+            # Simulate scan completion.
+            window._on_scan_complete(photos)
+
+            # At this point only the browser + thumbnails should be done; the
+            # deferred secondary views have not fired yet.
+            self.assertIn("thumbnails_started", call_log)
+            self.assertNotIn("cleanup_setup", call_log)
+            self.assertNotIn("memory_review_setup", call_log)
+
+            # Process the deferred QTimer callbacks.
+            for _ in range(20):
+                app.processEvents()
+
+            self.assertIn("cleanup_setup", call_log)
+            self.assertIn("memory_review_setup", call_log)
+
+            # Verify ordering: thumbnails must start before secondary setup.
+            thumb_idx = call_log.index("thumbnails_started")
+            cleanup_idx = call_log.index("cleanup_setup")
+            self.assertLess(thumb_idx, cleanup_idx)
