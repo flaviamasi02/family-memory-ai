@@ -28,6 +28,8 @@ from models.photo_model import PhotoModel
 from ui.album_draft_page import AlbumDraftPage
 from ui.album_review_page import AlbumReviewPage
 from ui.components.workspace_header import WorkspaceHeader
+from ui.components.workspace_info_content import WORKSPACE_INFO_CONTENT
+from ui.components.workspace_info_panel import WorkspaceInfoPanel
 from ui.components.workspace_help_panel import WorkspaceHelpPanel
 from ui.help.workspace_help_content import PHOTO_BROWSER_WORKSPACE
 from ui.help.workspace_help_registry import WorkspaceHelpRegistry
@@ -125,7 +127,18 @@ class MainWindow(QMainWindow):
         browser_layout = QVBoxLayout(browser_page)
         browser_header = WorkspaceHeader("Photo Browser")
         browser_header.help_clicked.connect(lambda: self._on_workspace_help_requested(PHOTO_BROWSER_WORKSPACE))
+        browser_info = WORKSPACE_INFO_CONTENT[PHOTO_BROWSER_WORKSPACE]
+        self.browser_info_panel = WorkspaceInfoPanel(
+            workspace_id=PHOTO_BROWSER_WORKSPACE,
+            title=browser_info.title,
+            purpose=browser_info.purpose,
+            purpose_details=browser_info.purpose_details,
+            typical_actions=browser_info.typical_actions,
+            tip=browser_info.tip,
+            collapsed_label=browser_info.collapsed_label,
+        )
         browser_layout.addWidget(browser_header)
+        browser_layout.addWidget(self.browser_info_panel)
         filter_layout = QHBoxLayout()
         filter_layout.addWidget(QLabel("Relevance:"))
         filter_layout.addWidget(self.browser_filter_combo)
@@ -302,7 +315,7 @@ class MainWindow(QMainWindow):
         relevant = [p for p in self._all_photos if self._is_album_relevant(p)]
         t0 = time.perf_counter()
         try:
-            self._load_album_review_data(relevant)
+            self._load_album_review_data(relevant_photos=relevant, imported_photos=self._all_photos)
         except Exception as exc:  # noqa: BLE001
             print(f"[MainWindow] Memory Review setup error: {exc}", file=sys.stderr, flush=True)
             self.status_label.setText("Memory Review preparation encountered an error.")
@@ -320,7 +333,7 @@ class MainWindow(QMainWindow):
         self._apply_browser_filter()
         self._load_irrelevant_media_data(self._all_photos)
         relevant_photos = [photo for photo in self._all_photos if self._is_album_relevant(photo)]
-        self._load_album_review_data(relevant_photos)
+        self._load_album_review_data(relevant_photos=relevant_photos, imported_photos=self._all_photos)
 
     def _load_irrelevant_media_data(self, photos):
         irrelevant = [photo for photo in photos or [] if not self._is_album_relevant(photo)]
@@ -376,9 +389,19 @@ class MainWindow(QMainWindow):
             return str(getattr(intelligence, "relevance_category", "unknown") or "unknown")
         return str(getattr(photo, "relevance_category", "unknown") or "unknown")
 
-    def _load_album_review_data(self, photos):
-        self._review_cache_signature = None if not photos else self._review_cache_signature
-        signature = self._build_review_signature(photos)
+    def _load_album_review_data(self, relevant_photos, imported_photos=None):
+        imported = list(imported_photos or relevant_photos or [])
+        relevant = list(relevant_photos or [])
+        imported_count = len(imported)
+        relevant_count = len(relevant)
+
+        # If classification marks every item as non-relevant, keep Memory Review usable
+        # by falling back to the imported set and reporting this in diagnostics.
+        review_input = relevant if relevant else list(imported)
+        fallback_to_imported = bool(imported_count and not relevant_count)
+
+        self._review_cache_signature = None if not review_input else self._review_cache_signature
+        signature = self._build_review_signature(review_input)
         if signature == self._review_cache_signature and self._review_cache_payload is not None:
             payload = self._review_cache_payload
             self.review_page.set_pipeline_data(
@@ -393,18 +416,48 @@ class MainWindow(QMainWindow):
             self._current_scored_photos = list(payload["scored_photos"])
             self._refresh_album_draft()
             self.status_label.setText(payload["status_text"])
+            self._log_memory_review_diagnostics(
+                imported=imported_count,
+                relevant=relevant_count,
+                year_buckets=len(payload.get("by_year", {})),
+                chosen_year=payload.get("chosen_year"),
+                candidates=len(payload["candidate_photos"]),
+                selected=len(payload["selected_photos"]),
+                scored=len(payload["scored_photos"]),
+                fallback_to_imported=fallback_to_imported,
+            )
             return
 
         builder = AlbumBuilder()
-        by_year = builder.group_photos_by_year(photos)
+        by_year = builder.group_photos_by_year(review_input)
 
         if not by_year:
             self.review_page.set_scored_photos([])
+            missing_date_count = 0
+            for photo in review_input:
+                intelligence = getattr(photo, "intelligence", None)
+                has_year = isinstance(getattr(intelligence, "year", None), int)
+                if not has_year:
+                    missing_date_count += 1
+
+            empty_reason = (
+                "Memory Review is empty: no photos with usable dates "
+                f"(imported={imported_count}, relevant={relevant_count}, missing_year={missing_date_count})."
+            )
+            self.review_page.set_empty_reason(empty_reason)
             self._current_review_year = None
             self._current_scored_photos = []
             self.draft_page.set_draft_result(None)
-            self.status_label.setText(
-                "Files loaded. Album Review needs relevant family photos with usable dates to build a scored list."
+            self.status_label.setText(empty_reason)
+            self._log_memory_review_diagnostics(
+                imported=imported_count,
+                relevant=relevant_count,
+                year_buckets=0,
+                chosen_year=None,
+                candidates=0,
+                selected=0,
+                scored=0,
+                fallback_to_imported=fallback_to_imported,
             )
             return
 
@@ -412,8 +465,8 @@ class MainWindow(QMainWindow):
         chosen_year = max(sorted(by_year.keys()), key=lambda year: len(by_year[year]))
         album = AnnualAlbum(
             year=chosen_year,
-            photos=list(photos),
-            candidate_photos=list(photos),
+            photos=list(review_input),
+            candidate_photos=list(review_input),
             selected_photos=[],
             rejected_photos=[],
             status="candidate_selection",
@@ -426,7 +479,7 @@ class MainWindow(QMainWindow):
             str(getattr(item.photo, "path", "")): item for item in scoring_result.scored_photos
         }
         self.review_page.set_pipeline_data(
-            imported_photos=photos,
+            imported_photos=review_input,
             candidate_photos=album.candidate_photos,
             selected_photos=album.selected_photos,
             rejected_photos=album.rejected_photos,
@@ -447,16 +500,28 @@ class MainWindow(QMainWindow):
 
         self.status_label.setText(
             (
-                f"Found {len(photos)} photos. Review loaded with "
+                f"Found {len(review_input)} review photos (imported={imported_count}, relevant={relevant_count}). "
+                f"Review loaded with "
                 f"{scoring_result.scored_count} scored selected candidates for year {chosen_year}; "
                 f"selected={len(album.selected_photos)}, rejected={len(album.rejected_photos)}."
                 f"{rejected_reasons_text}"
             )
         )
 
+        self._log_memory_review_diagnostics(
+            imported=imported_count,
+            relevant=relevant_count,
+            year_buckets=len(by_year),
+            chosen_year=chosen_year,
+            candidates=len(album.candidate_photos),
+            selected=len(album.selected_photos),
+            scored=scoring_result.scored_count,
+            fallback_to_imported=fallback_to_imported,
+        )
+
         self._review_cache_signature = signature
         self._review_cache_payload = {
-            "imported_photos": photos,
+            "imported_photos": review_input,
             "candidate_photos": album.candidate_photos,
             "selected_photos": album.selected_photos,
             "rejected_photos": album.rejected_photos,
@@ -464,8 +529,38 @@ class MainWindow(QMainWindow):
             "scored_photos": list(scoring_result.scored_photos),
             "rejection_reasons": selection_result.rejection_reasons,
             "chosen_year": chosen_year,
+            "by_year": by_year,
             "status_text": self.status_label.text(),
         }
+
+    def _log_memory_review_diagnostics(
+        self,
+        *,
+        imported: int,
+        relevant: int,
+        year_buckets: int,
+        chosen_year,
+        candidates: int,
+        selected: int,
+        scored: int,
+        fallback_to_imported: bool,
+    ) -> None:
+        diagnostics = (
+            "[MemoryReview Diagnostics]\n"
+            f"imported={int(imported)}\n"
+            f"relevant={int(relevant)}\n"
+            f"year_buckets={int(year_buckets)}\n"
+            f"chosen_year={chosen_year if chosen_year is not None else '-'}\n"
+            f"candidates={int(candidates)}\n"
+            f"selected={int(selected)}\n"
+            f"scored={int(scored)}\n"
+            f"all_rows={self.review_page.all_row_count()}\n"
+            f"visible_rows={self.review_page.visible_row_count()}\n"
+            f"rendered_cards={self.review_page.rendered_card_count()}\n"
+            f"thumbnail_cache={self.review_page.retained_thumbnail_count()}\n"
+            f"fallback_to_imported={str(bool(fallback_to_imported)).lower()}"
+        )
+        print(diagnostics, file=sys.stderr, flush=True)
 
     def _handle_irrelevant_media_moved(self, moved_photos):
         moved_paths = {str(getattr(photo, "path", "")) for photo in moved_photos or []}

@@ -553,7 +553,7 @@ class StagedLoadRegressionTests(unittest.TestCase):
             def fake_cleanup(ph):
                 call_log.append("cleanup_setup")
 
-            def fake_review(ph):
+            def fake_review(*_args, **_kwargs):
                 call_log.append("memory_review_setup")
 
             window.start_thumbnail_loading = fake_start

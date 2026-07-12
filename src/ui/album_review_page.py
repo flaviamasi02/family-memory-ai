@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -41,6 +42,8 @@ from learning.category_learning_engine import get_category_learning_engine
 from learning.preference_learning_engine import get_preference_learning_engine
 from ui.category_management_dialog import CategoryManagementDialog
 from ui.components.workspace_header import WorkspaceHeader
+from ui.components.workspace_info_content import WORKSPACE_INFO_CONTENT
+from ui.components.workspace_info_panel import WorkspaceInfoPanel
 from ui.image_preview_dialog import ImagePreviewDialog
 from ui.learning_summary_dialog import LearningSummaryDialog
 from ui.help.workspace_help_content import MEMORY_REVIEW_WORKSPACE
@@ -210,9 +213,10 @@ class AlbumReviewPage(QWidget):
         self._candidate_count = 0
         self._rejection_reasons_summary: Dict[str, int] = {}
         self._thumbnail_cache: Dict[str, tuple[int, QPixmap]] = {}
+        self._retained_thumbnail_by_key: Dict[str, QPixmap] = {}
         self._thumbnail_source_by_key: Dict[str, str] = {}
-        self._scaled_thumbnail_path_cache: Dict[str, tuple[str, QPixmap]] = {}
         self._preview_cache: Dict[str, tuple[int, QPixmap]] = {}
+        self._empty_reason_text: str = ""
         self._last_view_signature: Optional[tuple[str, str, str]] = None
         self._last_visible_key_order: List[str] = []
         self._grid_rebuild_count = 0
@@ -228,6 +232,16 @@ class AlbumReviewPage(QWidget):
 
         self.header = WorkspaceHeader("Memory Review")
         self.header.help_clicked.connect(self._on_help_clicked)
+        info_content = WORKSPACE_INFO_CONTENT[self.WORKSPACE_ID]
+        self.info_panel = WorkspaceInfoPanel(
+            workspace_id=self.WORKSPACE_ID,
+            title=info_content.title,
+            purpose=info_content.purpose,
+            purpose_details=info_content.purpose_details,
+            typical_actions=info_content.typical_actions,
+            tip=info_content.tip,
+            collapsed_label=info_content.collapsed_label,
+        )
 
         self.filter_combo = QComboBox()
         self.filter_combo.addItems(
@@ -388,6 +402,7 @@ class AlbumReviewPage(QWidget):
 
         root_layout = QVBoxLayout(self)
         root_layout.addWidget(self.header)
+        root_layout.addWidget(self.info_panel)
         root_layout.addLayout(controls_layout)
         root_layout.addWidget(splitter, 1)
 
@@ -529,6 +544,7 @@ class AlbumReviewPage(QWidget):
                 photo.sync_intelligence_from_metadata()
 
     def set_scored_photos(self, scored_photos: List[AlbumScoreBreakdown]) -> None:
+        self._empty_reason_text = ""
         for item in scored_photos:
             self._ensure_category_fields(item.photo)
 
@@ -560,6 +576,7 @@ class AlbumReviewPage(QWidget):
         scored_breakdowns: Dict[str, AlbumScoreBreakdown],
         rejection_reasons: Optional[Dict[str, int]] = None,
     ) -> None:
+        self._empty_reason_text = ""
         self._candidate_count = len(candidate_photos or [])
         self._rejection_reasons_summary = dict(rejection_reasons or {})
         selected_keys = {str(getattr(photo, "path", "")) for photo in selected_photos or []}
@@ -660,6 +677,9 @@ class AlbumReviewPage(QWidget):
         self._update_selection_count()
 
     def _results_label_text(self) -> str:
+        if not self._all_rows and self._empty_reason_text:
+            return self._empty_reason_text
+
         if self._candidate_count or self._rejection_reasons_summary:
             selected = sum(1 for row in self._all_rows if row.pipeline_state == "selected")
             rejected = sum(1 for row in self._all_rows if row.pipeline_state == "rejected")
@@ -912,7 +932,18 @@ class AlbumReviewPage(QWidget):
         return None
 
     def _row_key(self, row: AlbumReviewRow) -> str:
-        return str(getattr(row.breakdown.photo, "path", ""))
+        return self._photo_key(row.breakdown.photo)
+
+    def _normalize_photo_key_from_path(self, file_path: str) -> str:
+        raw = str(file_path or "").strip()
+        if not raw:
+            return ""
+
+        normalized = os.path.normpath(raw)
+        return normalized
+
+    def _photo_key(self, photo) -> str:
+        return self._normalize_photo_key_from_path(str(getattr(photo, "path", "") or ""))
 
     def _show_details(self, row: AlbumReviewRow, force: bool = False) -> None:
         key = self._row_key(row)
@@ -1360,17 +1391,25 @@ class AlbumReviewPage(QWidget):
     def _get_cached_card_thumbnail(self, row: AlbumReviewRow) -> Optional[QPixmap]:
         photo = row.breakdown.photo
         file_path = str(getattr(photo, "path", "") or "")
+        photo_key = self._photo_key(photo)
         if not file_path:
             return None
 
-        cache_key = self._thumbnail_cache_key(file_path, QSize(140, 140))
+        cache_key = self._thumbnail_cache_key(photo_key, QSize(140, 140))
         cached = self._thumbnail_cache.get(cache_key)
         if cached is not None:
             return cached[1]
 
+        retained = self._retained_thumbnail_by_key.get(photo_key)
+        if isinstance(retained, QPixmap) and not retained.isNull():
+            self._thumbnail_source_by_key[photo_key] = "retained"
+            self._thumbnail_cache[cache_key] = (0, retained)
+            return retained
+
         pixmap = getattr(photo, "thumbnail", None)
         if isinstance(pixmap, QPixmap) and not pixmap.isNull():
-            self._thumbnail_source_by_key[file_path] = "photo_thumbnail"
+            self._thumbnail_source_by_key[photo_key] = "photo_thumbnail"
+            self._retained_thumbnail_by_key[photo_key] = pixmap
         else:
             pixmap = None
 
@@ -1378,67 +1417,86 @@ class AlbumReviewPage(QWidget):
         if pixmap is None and thumbnail_path and Path(thumbnail_path).exists():
             pixmap = load_display_thumbnail(thumbnail_path, QSize(140, 140))
             if pixmap is not None and not pixmap.isNull():
-                self._thumbnail_source_by_key[file_path] = "thumbnail_path"
-
-        if pixmap is None and file_path and Path(file_path).exists():
-            pixmap = load_display_thumbnail(file_path, QSize(140, 140))
-            if pixmap is not None and not pixmap.isNull():
-                self._thumbnail_source_by_key[file_path] = "original_scaled"
+                self._thumbnail_source_by_key[photo_key] = "thumbnail_path"
+                self._retained_thumbnail_by_key[photo_key] = pixmap
 
         if pixmap is not None and not pixmap.isNull():
-            self._thumbnail_cache[cache_key] = (self._file_mtime(file_path), pixmap)
+            self._thumbnail_cache[cache_key] = (0, pixmap)
             return pixmap
 
         return None
 
     def update_thumbnail(self, photo, pixmap) -> None:
-        key = str(getattr(photo, "path", "") or "")
+        key = self._photo_key(photo)
         if not key:
             return
+
+        if not isinstance(pixmap, QPixmap) or pixmap.isNull():
+            return
+
+        self._retained_thumbnail_by_key[key] = pixmap
+        self._thumbnail_source_by_key[key] = "retained"
 
         self._thumbnail_cache = {
             cache_key: value for cache_key, value in self._thumbnail_cache.items() if not cache_key.startswith(f"{key}|")
         }
 
+        preview_cache_key = self._thumbnail_cache_key(key, QSize(280, 160))
+        self._preview_cache.pop(preview_cache_key, None)
+
         for row in self._all_rows:
-            if str(getattr(row.breakdown.photo, "path", "") or "") != key:
+            if self._row_key(row) != key:
                 continue
-            if isinstance(pixmap, QPixmap) and not pixmap.isNull():
-                row.breakdown.photo.thumbnail = pixmap
+            row.breakdown.photo.thumbnail = pixmap
             card = self._cards_by_key.get(self._row_key(row))
             if card is not None:
-                card.refresh_from_row(thumbnail=pixmap if isinstance(pixmap, QPixmap) and not pixmap.isNull() else None)
-                card.update()
-                card.repaint()
+                card.refresh_from_row(thumbnail=pixmap)
             if self._details_key == key:
                 self._show_details(row, force=True)
             break
 
     def _get_cached_preview(self, photo) -> Optional[QPixmap]:
-        file_path = str(getattr(photo, "path", "") or "")
-        if not file_path:
+        photo_key = self._photo_key(photo)
+        if not photo_key:
             return None
 
-        cache_key = self._thumbnail_cache_key(file_path, QSize(280, 160))
+        cache_key = self._thumbnail_cache_key(photo_key, QSize(280, 160))
         cached = self._preview_cache.get(cache_key)
         if cached is not None:
             return cached[1]
 
-        pixmap = load_display_thumbnail(file_path, QSize(280, 160))
+        retained = self._retained_thumbnail_by_key.get(photo_key)
+        if isinstance(retained, QPixmap) and not retained.isNull():
+            scaled = retained.scaled(
+                QSize(280, 160),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            self._preview_cache[cache_key] = (0, scaled)
+            return scaled
+
+        photo_thumbnail = getattr(photo, "thumbnail", None)
+        if isinstance(photo_thumbnail, QPixmap) and not photo_thumbnail.isNull():
+            scaled = photo_thumbnail.scaled(
+                QSize(280, 160),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            self._preview_cache[cache_key] = (0, scaled)
+            return scaled
+
+        thumbnail_path = str(getattr(photo, "thumbnail_path", "") or "")
+        pixmap = None
+        if thumbnail_path and Path(thumbnail_path).exists():
+            pixmap = load_display_thumbnail(thumbnail_path, QSize(280, 160))
         if pixmap is not None and not pixmap.isNull():
-            self._preview_cache[cache_key] = (self._file_mtime(file_path), pixmap)
+            self._preview_cache[cache_key] = (0, pixmap)
             return pixmap
 
         return None
 
-    def _thumbnail_cache_key(self, file_path: str, size: QSize) -> str:
-        return f"{file_path}|{size.width()}x{size.height()}|{self._file_mtime(file_path)}"
-
-    def _file_mtime(self, file_path: str) -> int:
-        try:
-            return int(Path(file_path).stat().st_mtime)
-        except Exception:
-            return 0
+    def _thumbnail_cache_key(self, photo_key: str, size: QSize) -> str:
+        return f"{photo_key}|{size.width()}x{size.height()}"
 
     def visible_filenames(self) -> List[str]:
         return [row.breakdown.photo.display_name() for row in self._visible_rows]
@@ -1497,7 +1555,7 @@ class AlbumReviewPage(QWidget):
         for row in self._all_rows:
             photo = row.breakdown.photo
             if photo.display_name() == filename:
-                return self._thumbnail_source_by_key.get(str(getattr(photo, "path", "") or ""), "")
+                return self._thumbnail_source_by_key.get(self._photo_key(photo), "")
         return ""
 
     def set_selected_decision(self, decision: str) -> None:
@@ -1505,6 +1563,22 @@ class AlbumReviewPage(QWidget):
         if selected is None:
             return
         self._apply_decision_to_rows([selected], decision, source="user")
+
+    def set_empty_reason(self, message: str) -> None:
+        self._empty_reason_text = str(message or "").strip()
+        self.results_label.setText(self._results_label_text())
+
+    def all_row_count(self) -> int:
+        return len(self._all_rows)
+
+    def visible_row_count(self) -> int:
+        return len(self._visible_rows)
+
+    def rendered_card_count(self) -> int:
+        return len(self._cards_by_key)
+
+    def retained_thumbnail_count(self) -> int:
+        return len(self._retained_thumbnail_by_key)
 
     def approve_selected(self) -> None:
         self.set_selected_decision(UserDecision.ApproveForAlbum.value)

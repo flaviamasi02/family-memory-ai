@@ -29,6 +29,8 @@ from learning.category_learning_engine import get_category_learning_engine
 from learning.preference_learning_engine import get_preference_learning_engine
 from ui.category_management_dialog import CategoryManagementDialog
 from ui.components.workspace_header import WorkspaceHeader
+from ui.components.workspace_info_content import WORKSPACE_INFO_CONTENT
+from ui.components.workspace_info_panel import WorkspaceInfoPanel
 from ui.image_preview_dialog import ImagePreviewDialog
 from ui.shared_thumbnail_grid import SharedGridItem, SharedThumbnailGrid
 from ui.help.workspace_help_content import CLEANUP_REVIEW_WORKSPACE
@@ -86,6 +88,16 @@ class IrrelevantMediaPage(QWidget):
 
         self.header = WorkspaceHeader("Cleanup Review")
         self.header.help_clicked.connect(self._on_help_clicked)
+        info_content = WORKSPACE_INFO_CONTENT[self.WORKSPACE_ID]
+        self.info_panel = WorkspaceInfoPanel(
+            workspace_id=self.WORKSPACE_ID,
+            title=info_content.title,
+            purpose=info_content.purpose,
+            purpose_details=info_content.purpose_details,
+            typical_actions=info_content.typical_actions,
+            tip=info_content.tip,
+            collapsed_label=info_content.collapsed_label,
+        )
 
         self.stats_label = QLabel("Imported: 0 | Cleanup candidates: 0 | Average confidence: 0%")
         self.stats_label.setWordWrap(True)
@@ -245,6 +257,7 @@ class IrrelevantMediaPage(QWidget):
 
         root = QVBoxLayout(self)
         root.addWidget(self.header)
+        root.addWidget(self.info_panel)
         root.addWidget(self.stats_label)
         root.addLayout(toolbar)
         root.addWidget(splitter, 1)

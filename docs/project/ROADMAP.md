@@ -60,7 +60,8 @@ Current completed foundation work includes:
 Current status:
 
 - LEARN-001 is complete.
-- LEARN-002 is the next milestone focus.
+- LEARN-002 is complete.
+- LEARN-003 is the next milestone focus.
 - This file is historical and transitional only; use docs/project/DOMAIN_ROADMAP.md for future milestones.
 
 Recently completed domain milestones relevant to Learning readiness:
@@ -70,6 +71,9 @@ Recently completed domain milestones relevant to Learning readiness:
 - MEM-005 True multi-column Memory Review grid
 - CLEAN-002 Improved deterministic initial media classification
 - CLEAN-003 Cleanup Review UX & Explainability
+- PERF-004 Staged loading and responsive import with deferred secondary workspaces
+- UX-001 Reusable WorkspaceInfoPanel with collapsible per-workspace persistence
+- MEM-REVIEW-FIX Asynchronous Memory Review synchronization and root-cause-first loading fix
 
 ### Phase 3 - Memory Intelligence
 

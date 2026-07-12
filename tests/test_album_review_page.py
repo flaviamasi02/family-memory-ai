@@ -418,18 +418,21 @@ class AlbumReviewPageTests(unittest.TestCase):
             root = Path(tmpdir)
             breakdown = self._make_breakdown(root, "loader_source.jpg", 80, 80, 80, 80, "2024:06:10 10:00:00")
             breakdown.photo.thumbnail = None
-            breakdown.photo.thumbnail_path = ""
-
-            page = AlbumReviewPage()
-            page.set_scored_photos([breakdown])
+            thumb_path = root / "loader_thumb.jpg"
+            self._write_image(thumb_path, size=120, color=Qt.GlobalColor.blue)
+            breakdown.photo.thumbnail_path = str(thumb_path)
 
             fake = QPixmap(80, 120)
             fake.fill(Qt.GlobalColor.blue)
             with patch("ui.album_review_page.load_display_thumbnail", return_value=fake) as mocked:
+                page = AlbumReviewPage()
+                page.set_scored_photos([breakdown])
                 self._flush_ui(wait_ms=80)
                 page.card_summary_for_filename("loader_source.jpg")
 
             self.assertTrue(mocked.called)
+            called_paths = [str(call.args[0]) for call in mocked.call_args_list if call.args]
+            self.assertIn(str(thumb_path), called_paths)
 
     def test_user_can_correct_category_and_effective_category_uses_override(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -745,12 +748,127 @@ class AlbumReviewPageTests(unittest.TestCase):
             breakdown.photo.metadata["thumbnail_path"] = ""
 
             page = AlbumReviewPage()
-            page.set_scored_photos([breakdown])
-            self._flush_ui(wait_ms=80)
+            calls = []
+
+            import ui.album_review_page as arp
+
+            original_loader = arp.load_display_thumbnail
+
+            def spy_load(file_path, target_size):
+                calls.append(str(file_path))
+                return original_loader(file_path, target_size)
+
+            with patch.object(arp, "load_display_thumbnail", side_effect=spy_load):
+                page.set_scored_photos([breakdown])
+                self._flush_ui(wait_ms=80)
 
             card = self._card_for_filename(page, "original_only.jpg")
+            pixmap = card.thumbnail_label.pixmap()
+            self.assertTrue(pixmap is None or pixmap.isNull())
+            self.assertEqual(page.thumbnail_source_for_filename("original_only.jpg"), "")
+            self.assertFalse(
+                any(path == str(image_path) for path in calls),
+                msg="Memory Review must not synchronously decode original images when thumbnail_path is missing.",
+            )
+
+    def test_thumbnail_arriving_before_rows_is_retained_and_used_when_rows_appear(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            source_breakdown = self._make_breakdown(root, "early_thumb.jpg", 88, 80, 80, 80, "2024:01:01 10:00:00")
+            source_photo = source_breakdown.photo
+
+            early_pixmap = QPixmap(64, 64)
+            early_pixmap.fill(Qt.GlobalColor.magenta)
+
+            page = AlbumReviewPage()
+            page.update_thumbnail(source_photo, early_pixmap)
+
+            imported_photo = Photo.from_path(source_photo.path)
+            imported_photo.metadata.update(source_photo.metadata)
+            imported_photo.sync_intelligence_from_metadata()
+            scored = AlbumScoreBreakdown(
+                photo=imported_photo,
+                total_score=88,
+                technical_score=80,
+                memory_score=80,
+                date_score=80,
+                explanation=["retained"],
+            )
+
+            page.set_pipeline_data(
+                imported_photos=[imported_photo],
+                candidate_photos=[imported_photo],
+                selected_photos=[imported_photo],
+                rejected_photos=[],
+                scored_breakdowns={str(imported_photo.path): scored},
+                rejection_reasons={},
+            )
+            self._flush_ui(wait_ms=80)
+
+            card = self._card_for_filename(page, "early_thumb.jpg")
             self.assertIsNotNone(card.thumbnail_label.pixmap())
-            self.assertEqual(page.thumbnail_source_for_filename("original_only.jpg"), "original_scaled")
+            self.assertFalse(card.thumbnail_label.pixmap().isNull())
+
+    def test_retained_thumbnail_survives_filter_change_and_rebuild(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            first = self._make_breakdown(
+                root,
+                "visible.jpg",
+                90,
+                80,
+                80,
+                80,
+                "2024:01:01 10:00:00",
+                metadata={
+                    "automatic_media_category": MediaCategory.FamilyPhoto.value,
+                    "effective_media_category": MediaCategory.FamilyPhoto.value,
+                },
+            )
+            second = self._make_breakdown(
+                root,
+                "hidden_then_visible.jpg",
+                85,
+                80,
+                80,
+                80,
+                "2024:01:01 10:00:00",
+                metadata={
+                    "automatic_media_category": MediaCategory.Unknown.value,
+                    "effective_media_category": MediaCategory.Unknown.value,
+                },
+            )
+
+            page = AlbumReviewPage()
+            page.set_scored_photos([first, second])
+            self._flush_ui(wait_ms=80)
+
+            thumb = QPixmap(64, 64)
+            thumb.fill(Qt.GlobalColor.darkCyan)
+            page.update_thumbnail(second.photo, thumb)
+
+            page.category_filter_combo.setCurrentText("Family Photo")
+            self._flush_ui(wait_ms=80)
+            self.assertEqual(page.visible_filenames(), ["visible.jpg"])
+
+            page.category_filter_combo.setCurrentText(page.CATEGORY_FILTER_ALL)
+            self._flush_ui(wait_ms=80)
+
+            card = self._card_for_filename(page, "hidden_then_visible.jpg")
+            self.assertIsNotNone(card.thumbnail_label.pixmap())
+            self.assertFalse(card.thumbnail_label.pixmap().isNull())
+
+    def test_thumbnail_keys_are_normalized_consistently(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            breakdown = self._make_breakdown(root, "normalized.jpg", 80, 80, 80, 80, "2024:01:01 10:00:00")
+            page = AlbumReviewPage()
+
+            original_key = page._photo_key(breakdown.photo)
+            variant_path = str(breakdown.photo.path).replace(str(root), str(root / "."))
+            normalized_variant_key = page._normalize_photo_key_from_path(variant_path)
+
+            self.assertEqual(original_key, normalized_variant_key)
 
     def test_category_change_is_not_required_to_show_thumbnail(self):
         with tempfile.TemporaryDirectory() as tmpdir:

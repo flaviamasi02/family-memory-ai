@@ -6,20 +6,39 @@
 
 ## Current Sprint
 
-- PERF-004 (Staged load: Photo Browser first, secondary views deferred) - In Progress
+- PERF-004 (Staged load: Photo Browser first, secondary views deferred) - Completed
+- UX-001 (Collapsible Workspace Information Panels) - Completed
+- MEM-REVIEW-FIX (Asynchronous Memory Review loading and thumbnail synchronization) - Completed and manually validated
 
 ## Project Status
 
 - Status: In Development
-- Repository state: PR #9 remains open and is not approved for merge
-- Active branch: `codex/improve-thumbnail-loading-speed-and-responsiveness`
-- Manual Windows testing: Completed for the current PERF-002 implementation
-- Current conclusion: Thumbnail loading optimizations have been implemented, but manual testing still indicates that overall loading performance is not yet satisfactory.
-- Merge status: Merge approval is postponed; the performance investigation must continue before PR #9 can be approved.
+- Repository state: PR #9 is completed and merged.
+- Performance state: asynchronous thumbnail loading, responsive import, deferred secondary workspace setup, and JPEG warning suppression are now part of the current baseline.
+- UX state: reusable `WorkspaceInfoPanel` is integrated in all main workspaces with collapsible per-workspace persisted state (default expanded).
+- Memory Review state: asynchronous loading diagnosis and root-cause fix are complete; manual Product Owner validation confirmed expected behavior.
+- Current focus: continue domain milestones on top of the stabilized import/workspace UX baseline.
 
 ## Last Updated
 
 - 2026-07-12
+
+## UX-001 Update
+
+- Added reusable `WorkspaceInfoPanel` in `src/ui/components/workspace_info_panel.py`.
+- Integrated the panel in all main workspaces: Photo Browser, Memory Review, Cleanup Review, Album Draft, and Settings.
+- Panels are collapsible with per-workspace persisted UI state.
+- Default panel state is expanded for first use.
+- The change adds concise workspace orientation only and does not introduce workflow progress indicators.
+- Existing `WorkspaceHeader` and Workspace Help interactions remain active.
+
+## Memory Review Fix Update
+
+- Root cause was diagnosed before code changes: Memory Review could appear empty when review input had no usable date-year buckets and/or relevance filtering produced an empty review input set.
+- MainWindow now emits concise aggregate Memory Review diagnostics after preparation (imported, relevant, year buckets, chosen year, candidate/selected/scored counts, rows/cards, retained thumbnails).
+- Memory Review now shows clear user-facing empty-state reasons with actual counts when no usable dates are available.
+- Asynchronous thumbnail updates are retained and synchronized with later row/card creation and rebuild flows.
+- Thumbnail rendering prioritizes retained cache, then `photo.thumbnail`, then placeholder without synchronous original-image decode fallback in Memory Review.
 
 ## Overall Completion
 
@@ -112,12 +131,12 @@ The official AI collaboration workflow has been formalized as a permanent projec
 
 Canonical workflow:
 
-Product Owner -> ChatGPT -> Implementation Prompt -> Codex -> Pull Request -> GitHub Actions -> ChatGPT Technical Review -> Product Owner Approval -> Merge.
+Implementation -> Product Owner Manual Test -> ChatGPT Review -> Commit -> Push -> Pull Request -> GitHub Actions -> Final ChatGPT Review -> Merge -> DOCSYNC.
 
 Current documentation state:
 
 - docs/development/AI_PROJECT_PLAYBOOK.md owns the collaboration workflow, repository health first rule, pull request lifecycle, GitHub Actions policy, human interaction policy, Codex Cloud limitation policy, and continuous workflow improvement rule.
-- docs/development/PROMPT_TEMPLATE.md owns the implementation prompt standard, Definition of Done prompt requirements, and User Action Rule.
+- docs/development/PROMPT_TEMPLATE.md owns the implementation prompt standard, Definition of Done prompt requirements, and Next Step rule.
 - docs/development/DECISIONS.md records the workflow adoption as DEC-0036.
 - docs/releases/CHANGELOG.md records this documentation update.
 
@@ -126,7 +145,7 @@ Operational impact:
 - repository health must be checked before implementation sprints;
 - failed GitHub Actions must be inspected and fixed at root cause in the same pull request whenever possible;
 - AI assistants must use available repository, GitHub, pull request, and workflow capabilities before asking the Product Owner for inaccessible information;
-- implementation discussions must end with a clear NEXT ACTION when Product Owner action is required.
+- implementation discussions must end with a clear Next Step section when Product Owner action is required.
 
 ---
 
@@ -949,7 +968,7 @@ Summary:
 
 ## PERF-002 — Faster Thumbnail Loading and Photo Grid Responsiveness
 
-Status: In Review
+Status: Completed (historical)
 
 Summary:
 - The thumbnail worker now checks the existing versioned disk thumbnail cache before decoding and regenerating a thumbnail.
@@ -957,5 +976,5 @@ Summary:
 - Photo Browser card creation is batched: the first visible set renders first, and additional cards are added as scrolling approaches the bottom of the grid.
 - Debug print noise and forced repaint calls were reduced in thumbnail/grid update paths to avoid unnecessary UI work.
 - Memory Review and Cleanup Review shared thumbnail grids retain their existing progressive behavior while using queued updates instead of forced repaints.
-- Manual Windows testing completed after these changes still found overall user-perceived loading performance insufficient.
-- PR #9 remains open and not approved; performance investigation must continue before merge.
+- Manual Windows testing identified remaining performance concerns after PERF-002, which led to follow-up PERF-003 and PERF-004 work.
+- PERF-003 and PERF-004 are completed; PR #9 is merged.

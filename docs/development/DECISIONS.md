@@ -428,6 +428,8 @@ Family Memory AI adopts the following official AI-assisted development workflow:
 
 Product Owner -> ChatGPT -> Implementation Prompt -> Codex -> Pull Request -> GitHub Actions -> ChatGPT Technical Review -> Product Owner Approval -> Merge.
 
+Note: the permanent execution sequence was later refined by DEC-0045 and now ends with DOCSYNC after merge, with Product Owner manual validation gating commit/push/approval/merge.
+
 This workflow formalizes repository health checks before implementation, focused pull request lifecycle rules, GitHub Actions root-cause analysis, human interaction expectations, Codex Cloud limitation handling, implementation prompt standards, Definition of Done requirements, user action guidance, and continuous workflow improvement.
 
 Permanent rules:
@@ -440,7 +442,7 @@ Permanent rules:
 - Codex Cloud limitations must be stated honestly when remote git or GitHub verification is inaccessible;
 - implementation prompts must follow the official prompt template;
 - implementation is not complete until applicable Definition of Done conditions are satisfied;
-- operational guidance to the Product Owner must end with a clear NEXT ACTION block;
+- operational guidance to the Product Owner must end with a clear Next Step section;
 - approved workflow improvements must be added to canonical documentation instead of scattered notes.
 
 **Impacted documents:**
@@ -537,3 +539,116 @@ This routing keeps new implementation work focused, sends local Windows debuggin
 
 **Impacted Sprints:**
 All future implementation, review, debugging, and PR-improvement cycles.
+
+### DEC-0041
+WorkspaceInfoPanel Reusable Intro Pattern
+
+**Value:** Product
+**Impact:** Medium
+
+Approved UX-001 decisions:
+
+- the reusable component name is `WorkspaceInfoPanel`;
+- workspace introduction panels are collapsible;
+- expanded/collapsed state is remembered separately per workspace using stable workspace identifiers;
+- default state is expanded on first workspace use;
+- no workflow progress/status indicator is included in the workspace introduction panel.
+
+Scope constraints:
+
+- persistence stores UI preference state only;
+- no business workflow logic is moved into the component;
+- existing Workspace Help remains active and separate from the compact panel.
+
+**Impacted documents:**
+- docs/project/PROJECT_STATE.md
+- docs/releases/CHANGELOG.md
+- docs/architecture/COMPONENTS.md
+
+**Impacted Sprints:**
+UX-001 and future workspace UX consistency updates.
+
+### DEC-0042
+Assistant Response Next Step Rule
+
+**Value:** Method
+**Impact:** Medium
+
+For every Family Memory AI project response, the assistant must finish with a "Next Step" section.
+
+The Next Step section must:
+
+- provide concrete executable actions;
+- avoid ambiguity;
+- specify which tool should be used;
+- include direct repository or PR/Issue links when GitHub actions are involved.
+
+**Impacted documents:**
+- docs/development/AI_PROJECT_PLAYBOOK.md
+- docs/development/PROMPT_TEMPLATE.md
+
+**Impacted Sprints:**
+All future implementation, review, debugging, and documentation-sync cycles.
+
+### DEC-0043
+Mandatory Product Owner Validation Gate
+
+**Value:** Method
+**Impact:** High
+
+Product Owner manual validation is mandatory before commit, push, PR approval, and merge.
+
+Automated tests are required but never replace Product Owner validation.
+
+**Impacted documents:**
+- docs/development/AI_PROJECT_PLAYBOOK.md
+- docs/development/PROMPT_TEMPLATE.md
+- docs/project/PROJECT_CONTEXT.md
+
+**Impacted Sprints:**
+All future implementation and release cycles.
+
+### DEC-0044
+Root Cause First Rule
+
+**Value:** Method
+**Impact:** High
+
+When manual validation fails, the mandatory fix sequence is:
+
+1. diagnose
+2. measure
+3. identify root cause
+4. implement targeted fix
+5. retest
+
+Speculative fixes must not be attempted first.
+
+Temporary diagnostics should be removed after the targeted fix unless they provide long-term maintenance value.
+
+**Impacted documents:**
+- docs/development/AI_PROJECT_PLAYBOOK.md
+- docs/development/PROMPT_TEMPLATE.md
+- docs/project/PROJECT_CONTEXT.md
+
+**Impacted Sprints:**
+All future bug-fix and validation-failure cycles.
+
+### DEC-0045
+Permanent Development Workflow Sequence
+
+**Value:** Method
+**Impact:** High
+
+Approved workflow sequence:
+
+Implementation -> Product Owner Manual Test -> ChatGPT Review -> Commit -> Push -> Pull Request -> GitHub Actions -> Final ChatGPT Review -> Merge -> DOCSYNC.
+
+**Impacted documents:**
+- docs/development/AI_PROJECT_PLAYBOOK.md
+- docs/development/PROMPT_TEMPLATE.md
+- docs/project/PROJECT_CONTEXT.md
+- docs/bootstrap/HANDOVER.md
+
+**Impacted Sprints:**
+All future implementation and documentation cycles.
