@@ -28,6 +28,8 @@ from models.photo_model import PhotoModel
 from ui.album_draft_page import AlbumDraftPage
 from ui.album_review_page import AlbumReviewPage
 from ui.components.workspace_header import WorkspaceHeader
+from ui.components.workspace_info_content import WORKSPACE_INFO_CONTENT
+from ui.components.workspace_info_panel import WorkspaceInfoPanel
 from ui.components.workspace_help_panel import WorkspaceHelpPanel
 from ui.help.workspace_help_content import PHOTO_BROWSER_WORKSPACE
 from ui.help.workspace_help_registry import WorkspaceHelpRegistry
@@ -125,7 +127,18 @@ class MainWindow(QMainWindow):
         browser_layout = QVBoxLayout(browser_page)
         browser_header = WorkspaceHeader("Photo Browser")
         browser_header.help_clicked.connect(lambda: self._on_workspace_help_requested(PHOTO_BROWSER_WORKSPACE))
+        browser_info = WORKSPACE_INFO_CONTENT[PHOTO_BROWSER_WORKSPACE]
+        self.browser_info_panel = WorkspaceInfoPanel(
+            workspace_id=PHOTO_BROWSER_WORKSPACE,
+            title=browser_info.title,
+            purpose=browser_info.purpose,
+            purpose_details=browser_info.purpose_details,
+            typical_actions=browser_info.typical_actions,
+            tip=browser_info.tip,
+            collapsed_label=browser_info.collapsed_label,
+        )
         browser_layout.addWidget(browser_header)
+        browser_layout.addWidget(self.browser_info_panel)
         filter_layout = QHBoxLayout()
         filter_layout.addWidget(QLabel("Relevance:"))
         filter_layout.addWidget(self.browser_filter_combo)

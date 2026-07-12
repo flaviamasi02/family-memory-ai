@@ -38,6 +38,9 @@ This document describes component responsibilities and interactions.
 
 - MainWindow: Application shell and workflow orchestration.
 - AlbumReviewPage: Current hybrid review UI (toolbar + grid + details), in-memory review status actions, and large-library optimizations. Long-term direction: Memory Review.
+- WorkspaceHeader: Reusable workspace title row with contextual Help action.
+- WorkspaceInfoPanel: Reusable compact workspace introduction card with collapsible content and per-workspace UI-state persistence.
+- WorkspaceInfoContent map: Centralized workspace-specific intro content definitions consumed by WorkspaceInfoPanel to avoid duplicated per-tab card construction.
 - PhotoGridWidget / PhotoCardWidget: Card-based photo browsing and selection surface with batched initial rendering and scroll-triggered continuation for large folders.
 - PhotoDetailsPanel: Selected-photo metadata and context presentation.
 

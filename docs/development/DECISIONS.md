@@ -537,3 +537,31 @@ This routing keeps new implementation work focused, sends local Windows debuggin
 
 **Impacted Sprints:**
 All future implementation, review, debugging, and PR-improvement cycles.
+
+### DEC-0041
+WorkspaceInfoPanel Reusable Intro Pattern
+
+**Value:** Product
+**Impact:** Medium
+
+Approved UX-001 decisions:
+
+- the reusable component name is `WorkspaceInfoPanel`;
+- workspace introduction panels are collapsible;
+- expanded/collapsed state is remembered separately per workspace using stable workspace identifiers;
+- default state is expanded on first workspace use;
+- no workflow progress/status indicator is included in the workspace introduction panel.
+
+Scope constraints:
+
+- persistence stores UI preference state only;
+- no business workflow logic is moved into the component;
+- existing Workspace Help remains active and separate from the compact panel.
+
+**Impacted documents:**
+- docs/project/PROJECT_STATE.md
+- docs/releases/CHANGELOG.md
+- docs/architecture/COMPONENTS.md
+
+**Impacted Sprints:**
+UX-001 and future workspace UX consistency updates.

@@ -7,6 +7,7 @@
 ## Current Sprint
 
 - PERF-004 (Staged load: Photo Browser first, secondary views deferred) - In Progress
+- UX-001 (Collapsible Workspace Information Panels) - Implemented on branch `feat/ux-001-workspace-info-panels`, pending Product Owner manual validation and PR review
 
 ## Project Status
 
@@ -20,6 +21,15 @@
 ## Last Updated
 
 - 2026-07-12
+
+## UX-001 Update
+
+- Added reusable `WorkspaceInfoPanel` in `src/ui/components/workspace_info_panel.py`.
+- Integrated the panel in all main workspaces: Photo Browser, Memory Review, Cleanup Review, Album Draft, and Settings.
+- Panels are collapsible with per-workspace persisted UI state.
+- Default panel state is expanded for first use.
+- The change adds concise workspace orientation only and does not introduce workflow progress indicators.
+- Existing `WorkspaceHeader` and Workspace Help interactions remain active.
 
 ## Overall Completion
 

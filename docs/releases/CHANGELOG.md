@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### UX-001 - Collapsible Workspace Information Panels
+- Added a reusable `WorkspaceInfoPanel` component in `src/ui/components/workspace_info_panel.py`.
+- Added centralized workspace panel content definitions in `src/ui/components/workspace_info_content.py`.
+- Integrated the panel into all required main workspaces: Photo Browser, Memory Review, Cleanup Review, Album Draft, and Settings.
+- Implemented per-workspace expanded/collapsed persistence via `QSettings` using stable workspace IDs.
+- Default panel state is expanded for first-time workspace use.
+- Preserved existing workspace Help buttons/signals and tab order.
+- Confirmed no workflow progress/status indicator is introduced in the new panel.
+- Added automated coverage for panel rendering, expand/collapse behavior, keyboard toggle accessibility, independent persistence, first-use default state, and workspace-wide integration.
+
 ### PERF-004 — Staged load: Photo Browser first, secondary views deferred
 
 **Root cause of "Not Responding" freeze (identified and fixed):**

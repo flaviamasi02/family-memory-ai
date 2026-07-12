@@ -41,6 +41,8 @@ from learning.category_learning_engine import get_category_learning_engine
 from learning.preference_learning_engine import get_preference_learning_engine
 from ui.category_management_dialog import CategoryManagementDialog
 from ui.components.workspace_header import WorkspaceHeader
+from ui.components.workspace_info_content import WORKSPACE_INFO_CONTENT
+from ui.components.workspace_info_panel import WorkspaceInfoPanel
 from ui.image_preview_dialog import ImagePreviewDialog
 from ui.learning_summary_dialog import LearningSummaryDialog
 from ui.help.workspace_help_content import MEMORY_REVIEW_WORKSPACE
@@ -228,6 +230,16 @@ class AlbumReviewPage(QWidget):
 
         self.header = WorkspaceHeader("Memory Review")
         self.header.help_clicked.connect(self._on_help_clicked)
+        info_content = WORKSPACE_INFO_CONTENT[self.WORKSPACE_ID]
+        self.info_panel = WorkspaceInfoPanel(
+            workspace_id=self.WORKSPACE_ID,
+            title=info_content.title,
+            purpose=info_content.purpose,
+            purpose_details=info_content.purpose_details,
+            typical_actions=info_content.typical_actions,
+            tip=info_content.tip,
+            collapsed_label=info_content.collapsed_label,
+        )
 
         self.filter_combo = QComboBox()
         self.filter_combo.addItems(
@@ -388,6 +400,7 @@ class AlbumReviewPage(QWidget):
 
         root_layout = QVBoxLayout(self)
         root_layout.addWidget(self.header)
+        root_layout.addWidget(self.info_panel)
         root_layout.addLayout(controls_layout)
         root_layout.addWidget(splitter, 1)
 

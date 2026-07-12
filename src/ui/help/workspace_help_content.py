@@ -114,7 +114,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                         ),
                         WorkspaceHelpTip(
                             title="Efficiency Tip",
-                            body="Folder scanning and EXIF extraction run in the background — the application stays responsive while your library loads. Cached thumbnails appear first; newly generated ones follow automatically.",
+                            body="Folder scanning and EXIF extraction run in the background — the application stays responsive while your library loads. Cached thumbnails appear first; newly generated ones follow automatically. The compact workspace introduction panel at the top can be collapsed when you need more vertical space.",
                         ),
                     ]
                 ),
@@ -166,7 +166,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                         ),
                         WorkspaceHelpTip(
                             title="Learning Tip",
-                            body="Learning Summary shows stored event dates, times, and visual/content evidence when available so you can understand each learned pattern.",
+                            body="Learning Summary shows stored event dates, times, and visual/content evidence when available so you can understand each learned pattern. The compact workspace introduction panel at the top can be collapsed after orientation.",
                         ),
                     ]
                 ),
@@ -217,7 +217,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                         ),
                         WorkspaceHelpTip(
                             title="Safety Tip",
-                            body="Cleanup moves are reversible when reviewed in the dedicated cleanup folder.",
+                            body="Cleanup moves are reversible when reviewed in the dedicated cleanup folder. The compact workspace introduction panel at the top can be collapsed whenever you need more grid space.",
                         ),
                     ]
                 ),
@@ -267,7 +267,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                         ),
                         WorkspaceHelpTip(
                             title="Coverage Tip",
-                            body="Month-by-month scanning helps identify overrepresented and missing moments quickly.",
+                            body="Month-by-month scanning helps identify overrepresented and missing moments quickly. The compact workspace introduction panel at the top can be collapsed for a denser draft view.",
                         ),
                     ]
                 ),
@@ -316,7 +316,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                         ),
                         WorkspaceHelpTip(
                             title="Team Tip",
-                            body="If multiple people review photos, align settings first to reduce inconsistent outcomes.",
+                            body="If multiple people review photos, align settings first to reduce inconsistent outcomes. The compact workspace introduction panel at the top can be collapsed after setup review.",
                         ),
                     ]
                 ),
