@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from PySide6.QtCore import QEvent, QTimer, Qt, Signal
-from PySide6.QtGui import QFontMetrics, QPixmap
+from PySide6.QtGui import QColor, QFontMetrics, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -15,6 +15,18 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+
+# Reusable grey loading placeholder — created once, shared across all SharedThumbnailCard instances.
+_SHARED_PLACEHOLDER_PIXMAP: QPixmap | None = None
+
+
+def _get_shared_placeholder_pixmap() -> QPixmap:
+    global _SHARED_PLACEHOLDER_PIXMAP
+    if _SHARED_PLACEHOLDER_PIXMAP is None or _SHARED_PLACEHOLDER_PIXMAP.isNull():
+        _SHARED_PLACEHOLDER_PIXMAP = QPixmap(140, 140)
+        _SHARED_PLACEHOLDER_PIXMAP.fill(QColor("#e8e8e8"))
+    return _SHARED_PLACEHOLDER_PIXMAP
 
 
 @dataclass
@@ -42,7 +54,7 @@ class SharedThumbnailCard(QFrame):
         self.setFixedWidth(164)
         self.setFixedHeight(228)
 
-        self.thumbnail_label = QLabel("No thumbnail")
+        self.thumbnail_label = QLabel("")
         self.thumbnail_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.thumbnail_label.setFixedSize(140, 140)
         self.thumbnail_label.setStyleSheet("border: 1px solid #bbb; background: #f6f6f6;")
@@ -92,8 +104,8 @@ class SharedThumbnailCard(QFrame):
             self.thumbnail_label.setPixmap(scaled)
             self.thumbnail_label.setText("")
         else:
-            self.thumbnail_label.setPixmap(QPixmap())
-            self.thumbnail_label.setText("No thumbnail")
+            self.thumbnail_label.setPixmap(_get_shared_placeholder_pixmap())
+            self.thumbnail_label.setText("")
 
         self.filename_label.setToolTip(item.filename)
         metrics = QFontMetrics(self.filename_label.font())
