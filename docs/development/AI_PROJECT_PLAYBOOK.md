@@ -21,6 +21,7 @@ It allows any future AI to immediately understand how the project is managed.
 - Documentation updates are mandatory.
 - Documentation is Production Code (constitutional principle).
 - Contextual Workspace Help is a mandatory product feature.
+- Every Family Memory AI response must end with a clear **Next Step** section.
 
 ---
 
@@ -39,19 +40,23 @@ Every implementation prompt should make the testing purpose explicit before the 
 
 Family Memory AI uses one official collaboration chain for AI-assisted development:
 
-Product Owner
+Implementation
 
 ↓
 
-ChatGPT
+Product Owner Manual Test
 
 ↓
 
-Implementation Prompt
+ChatGPT Review
 
 ↓
 
-Codex
+Commit
+
+↓
+
+Push
 
 ↓
 
@@ -63,15 +68,15 @@ GitHub Actions
 
 ↓
 
-ChatGPT Technical Review
-
-↓
-
-Product Owner Approval
+Final ChatGPT Review
 
 ↓
 
 Merge
+
+↓
+
+DOCSYNC
 
 ## Participant Responsibilities
 
@@ -86,7 +91,7 @@ ChatGPT:
 - translates Product Owner intent into implementation prompts;
 - checks repository context and canonical documentation before directing work;
 - reviews Codex output, GitHub Actions results, pull request status, and merge readiness;
-- gives operational guidance with a clear NEXT ACTION block when the Product Owner must act.
+- gives operational guidance with a clear Next Step section when the Product Owner must act.
 
 Implementation Prompt:
 
@@ -122,6 +127,71 @@ ChatGPT Technical Review:
 Merge:
 
 - happens only after review, required checks, mergeability confirmation, and Product Owner approval.
+
+## Mandatory Product Owner Validation Gate
+
+Product Owner manual validation is mandatory before:
+
+- commit
+- push
+- pull request approval
+- merge
+
+Automated tests are required and valuable, but they never replace Product Owner validation.
+
+## Root Cause First Rule
+
+When manual validation fails, implementation must follow this sequence:
+
+1. diagnose
+2. measure
+3. identify root cause
+4. implement targeted fix
+5. retest
+
+Speculative fixes are not allowed as the first action after a failed manual validation.
+
+Temporary diagnostics should be removed after the fix unless they provide long-term maintenance value.
+
+## Development Workflow (Permanent)
+
+Implementation
+
+↓
+
+Product Owner Manual Test
+
+↓
+
+ChatGPT Review
+
+↓
+
+Commit
+
+↓
+
+Push
+
+↓
+
+Pull Request
+
+↓
+
+GitHub Actions
+
+↓
+
+Final ChatGPT Review
+
+↓
+
+Merge
+
+↓
+
+DOCSYNC
 
 ## Execution Environment Routing
 
@@ -243,7 +313,7 @@ If the Product Owner approves the rule, add it to the appropriate canonical docu
 Canonical ownership remains:
 
 - docs/development/AI_PROJECT_PLAYBOOK.md for collaboration workflow, repository health, GitHub workflow, human interaction policy, and Codex limitations;
-- docs/development/PROMPT_TEMPLATE.md for prompt structure, Definition of Done, and User Action Rule;
+- docs/development/PROMPT_TEMPLATE.md for prompt structure, Definition of Done, and Next Step rule;
 - docs/development/DECISIONS.md for approved project decisions;
 - docs/project/PROJECT_STATE.md for current operational state;
 - docs/releases/CHANGELOG.md for documentation update history.
@@ -359,7 +429,7 @@ Every implementation should follow the same sequence to keep the repository clea
 ## Standard Workflow
 
 1. Review the current project state.
-2. Create a snapshot commit before significant work.
+2. Optionally create a snapshot commit before significant work only when explicitly approved and compatible with the Product Owner validation gate.
 
 Example commit message:
 
@@ -367,10 +437,11 @@ Example commit message:
 
 3. Implement the requested changes.
 4. Run available tests.
-5. Perform documentation synchronization (`DOCSYNC PC` or `DOCSYNC PC FULL`).
-6. Review all modified files.
-7. Create the final implementation commit.
-8. Push to the remote repository when the user decides.
+5. Product Owner performs manual validation.
+6. Perform documentation synchronization (`DOCSYNC PC` or `DOCSYNC PC FULL`).
+7. Review all modified files.
+8. Create the final implementation commit.
+9. Push to the remote repository when the user decides.
 
 ## Commit Message Convention
 
@@ -387,7 +458,9 @@ Official commit prefixes:
 
 ## Snapshot Commits
 
-Snapshot commits should be created before significant or risky work to preserve a clean rollback point.
+Snapshot commits are optional and must not violate the mandatory Product Owner validation gate for implementation commits.
+
+Use snapshot commits only when explicitly approved and when they do not bypass required manual validation.
 
 Examples:
 
@@ -410,7 +483,7 @@ Examples:
 
 AI assistants should:
 
-- Suggest creating a snapshot commit before major work.
+- Suggest snapshot commits only when explicitly requested or approved and compatible with validation gates.
 - Never ask the user to commit after every tiny change.
 - Group logically related changes into a single implementation commit.
 - Keep commit messages short and meaningful.

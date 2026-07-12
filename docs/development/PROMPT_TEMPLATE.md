@@ -134,6 +134,7 @@ Definition of Done
 Implementation is not complete until all applicable conditions are satisfied:
 
 - implementation finished
+- Product Owner manual validation completed before commit/push/PR approval/merge
 - documentation updated
 - docs/project/PROJECT_STATE.md updated
 - docs/releases/CHANGELOG.md updated
@@ -143,6 +144,8 @@ Implementation is not complete until all applicable conditions are satisfied:
 - repository ready for review
 
 If GitHub verification cannot be completed because of environment limitations, explicitly state this instead of pretending verification succeeded.
+
+If Product Owner manual validation fails, the fix sequence must be root-cause-first: diagnose, measure, identify root cause, implement targeted fix, retest.
 
 Manual Test Plan
 
@@ -197,6 +200,7 @@ Why We Test
 Definition of Done
 
 - fix implemented
+- Product Owner manual validation completed before commit/push/PR approval/merge
 - regression tests updated or confirmed not applicable
 - documentation updated where affected
 - docs/project/PROJECT_STATE.md updated when operational state changes
@@ -206,6 +210,8 @@ Definition of Done
 - repository ready for review
 
 If GitHub verification cannot be completed because of environment limitations, explicitly state this instead of pretending verification succeeded.
+
+If Product Owner manual validation fails, the fix sequence must be root-cause-first: diagnose, measure, identify root cause, implement targeted fix, retest.
 
 Manual Test Plan
 
@@ -269,21 +275,91 @@ Suggested Commit Message
 
 ---
 
-# User Action Rule
+# Next Step Rule
 
-When ChatGPT gives operational guidance to the Product Owner, it must always finish with:
+For every Family Memory AI project response, the assistant must always finish with:
 
-NEXT ACTION
+Next Step
 
-Estimated time
+Required content:
 
-Step-by-step instructions
+- concrete executable actions
+- unambiguous instructions
+- explicit tool recommendation when applicable
+- direct repository / PR / Issue links when GitHub action is required
 
-Expected result
+Never finish an implementation discussion without a clear Next Step section.
 
-Explicit "Do NOT..." instructions whenever appropriate
+---
 
-Never finish an implementation discussion without a clear next action.
+# Product Owner Validation Rule
+
+Every implementation must be manually tested by the Product Owner before:
+
+- commit
+- push
+- PR approval
+- merge
+
+Automated tests never replace Product Owner validation.
+
+---
+
+# Root Cause First Rule
+
+When manual validation fails, do not attempt speculative fixes first.
+
+Mandatory sequence:
+
+1. diagnose
+2. measure
+3. identify root cause
+4. implement targeted fix
+5. retest
+
+Temporary diagnostics should be removed after the targeted fix unless they provide long-term maintenance value.
+
+---
+
+# Development Workflow
+
+Implementation
+
+↓
+
+Product Owner Manual Test
+
+↓
+
+ChatGPT Review
+
+↓
+
+Commit
+
+↓
+
+Push
+
+↓
+
+Pull Request
+
+↓
+
+GitHub Actions
+
+↓
+
+Final ChatGPT Review
+
+↓
+
+Merge
+
+↓
+
+DOCSYNC
 
 ---
 

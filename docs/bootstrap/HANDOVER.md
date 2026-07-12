@@ -136,16 +136,15 @@ For detailed operational status, always refer to docs/project/PROJECT_STATE.md.
 
 Current status:
 
-- PR #9 is still open.
-- PR #9 is not approved.
-- Merge is postponed.
-- Active branch: `codex/improve-thumbnail-loading-speed-and-responsiveness`.
-- Current active sprint: PERF-002.
-- Manual Windows testing proved that user-perceived performance is still insufficient despite the current thumbnail loading optimizations.
+- PR #9 is completed and merged.
+- PERF-004 staged loading baseline is complete (responsive import, deferred secondary workspace setup, asynchronous thumbnails).
+- UX-001 is complete (reusable `WorkspaceInfoPanel`, collapsible panels, per-workspace persisted state, default expanded).
+- Memory Review asynchronous loading/thumbnails bug fix is complete and manually validated.
+- Current state should always be confirmed from docs/project/PROJECT_STATE.md before planning new implementation.
 
 Next task:
 
-Continue the performance investigation. The next performance sprint should identify the actual runtime bottleneck before introducing further optimizations.
+Continue domain-based milestone execution from the stabilized baseline and follow the mandatory Product Owner manual validation gate before commit/push/PR approval/merge.
 
 ---
 
@@ -172,6 +171,12 @@ When proposing AI features:
 
 - Never optimize only for accuracy.
 - Always preserve explainability and user trust.
+
+## Permanent Response and Validation Rules
+
+- Every Family Memory AI response must end with a clear Next Step section.
+- Product Owner manual validation is mandatory before commit, push, PR approval, and merge.
+- If manual validation fails, follow root-cause-first execution: diagnose, measure, identify root cause, implement targeted fix, retest.
 
 ---
 

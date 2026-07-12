@@ -83,15 +83,22 @@ Architecture should evolve continuously.
 
 The standard workflow is:
 
-1. Discuss the objective.
-2. Explain the architecture.
-3. Wait for approval.
-4. Generate a prompt for the VS Code AI.
-5. VS Code AI performs implementation.
-6. Run manual tests.
-7. Review implementation.
-8. Update documentation.
-9. Commit.
+1. Implementation.
+2. Product Owner Manual Test.
+3. ChatGPT Review.
+4. Commit.
+5. Push.
+6. Pull Request.
+7. GitHub Actions.
+8. Final ChatGPT Review.
+9. Merge.
+10. DOCSYNC.
+
+Mandatory gates:
+
+- Product Owner manual validation is required before commit, push, PR approval, and merge.
+- Automated tests support quality but never replace Product Owner validation.
+- When validation fails, follow root-cause-first execution: diagnose, measure, identify root cause, implement targeted fix, retest.
 
 ---
 
@@ -120,15 +127,11 @@ Implementation
 
 ↓
 
-Manual Test
+Product Owner Manual Test
 
 ↓
 
-Product Owner Feedback
-
-↓
-
-Documentation Update
+ChatGPT Review
 
 ↓
 
@@ -140,7 +143,23 @@ Push
 
 ↓
 
-Next Sprint
+Pull Request
+
+↓
+
+GitHub Actions
+
+↓
+
+Final ChatGPT Review
+
+↓
+
+Merge
+
+↓
+
+DOCSYNC
 
 Testing feedback is product design input.
 UX observations made during testing should be preserved as product decisions whenever appropriate.

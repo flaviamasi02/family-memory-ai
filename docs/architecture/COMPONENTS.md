@@ -36,8 +36,8 @@ This document describes component responsibilities and interactions.
 
 ### Review and UI Components
 
-- MainWindow: Application shell and workflow orchestration.
-- AlbumReviewPage: Current hybrid review UI (toolbar + grid + details), in-memory review status actions, and large-library optimizations. Long-term direction: Memory Review.
+- MainWindow: Application shell and workflow orchestration, including staged import flow (Photo Browser first, then deferred Cleanup Review and Memory Review) and aggregate Memory Review preparation diagnostics.
+- AlbumReviewPage: Current hybrid review UI (toolbar + grid + details), in-memory review status actions, and large-library optimizations. Long-term direction: Memory Review. Includes asynchronous thumbnail retention for deferred row/card creation and explicit empty-state reason handling.
 - WorkspaceHeader: Reusable workspace title row with contextual Help action.
 - WorkspaceInfoPanel: Reusable compact workspace introduction card with collapsible content and per-workspace UI-state persistence.
 - WorkspaceInfoContent map: Centralized workspace-specific intro content definitions consumed by WorkspaceInfoPanel to avoid duplicated per-tab card construction.

@@ -172,6 +172,14 @@ It is responsible for:
 
 It should not contain heavy image processing logic itself.
 
+Current orchestration behavior includes staged import flow:
+
+- Phase 1: immediate Photo Browser setup with placeholder cards;
+- Phase 2: asynchronous thumbnail worker start;
+- Phase 3: deferred secondary workspace preparation (Cleanup Review then Memory Review).
+
+This keeps the UI responsive during large imports and avoids blocking secondary workspace setup.
+
 ## PhotoGridWidget
 
 PhotoGridWidget is the current custom card grid used to display photos.
@@ -340,6 +348,24 @@ It is responsible for:
 - in-memory review state transitions (approve, reject, pending)
 
 In the long-term product direction, this interaction surface evolves into Memory Review: the main point where users teach the system what matters.
+
+Current Memory Review loading behavior includes:
+
+- asynchronous thumbnail synchronization compatible with deferred row/card creation;
+- retained thumbnail cache keyed by normalized photo path;
+- deterministic pipeline rendering with clear empty-state reasons when no usable date-year buckets are available.
+
+## WorkspaceInfoPanel
+
+WorkspaceInfoPanel is a reusable compact introduction card rendered near the top of each main workspace.
+
+It is responsible for:
+
+- concise workspace orientation (purpose, typical actions, tip);
+- collapsible presentation to recover vertical space;
+- per-workspace expanded/collapsed persistence with default expanded state.
+
+WorkspaceInfoPanel does not replace contextual Workspace Help and does not include workflow progress indicators.
 
 ## AlbumDraftBuilder
 

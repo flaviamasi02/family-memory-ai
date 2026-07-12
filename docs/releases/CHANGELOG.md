@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### DOCSYNC - PC FULL post PR #9 and UX-001
+- Updated canonical status docs to reflect completed PR #9 baseline, completed UX-001, and validated Memory Review synchronization fix.
+- Added permanent decisions and workflow rules for:
+  - mandatory Next Step section in every project response;
+  - Product Owner manual validation gate before commit/push/PR approval/merge;
+  - root-cause-first execution after failed manual validation;
+  - permanent development workflow sequence ending with DOCSYNC.
+- Aligned playbook, prompt template, handover, and project context to the approved workflow and validation gates.
+- Updated architecture/components documentation for staged import loading, WorkspaceInfoPanel responsibilities, and Memory Review asynchronous synchronization behavior.
+- Confirmed Workspace Help remains the detailed guidance surface while WorkspaceInfoPanel remains a compact introduction.
+
 ### MEM-REVIEW-FIX - Preserve asynchronous thumbnails in Memory Review
 - Root cause diagnosed from runtime flow: Memory Review could appear empty for non-thumbnail reasons when the review input set had no usable date-year buckets (and/or when relevance classification produced an empty review input). This produced zero rows/cards after deferred secondary loading, which looked like a thumbnail failure.
 - Added aggregate diagnostics after Memory Review preparation to report imported/relevant/year-bucket/candidate/selected/scored counts plus rendered row/card counts.
