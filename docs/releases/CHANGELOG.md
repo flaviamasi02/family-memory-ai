@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### MEM-REVIEW-FIX - Preserve asynchronous thumbnails in Memory Review
+- Root cause diagnosed from runtime flow: Memory Review could appear empty for non-thumbnail reasons when the review input set had no usable date-year buckets (and/or when relevance classification produced an empty review input). This produced zero rows/cards after deferred secondary loading, which looked like a thumbnail failure.
+- Added aggregate diagnostics after Memory Review preparation to report imported/relevant/year-bucket/candidate/selected/scored counts plus rendered row/card counts.
+- Memory Review now explicitly reports a clear empty-state reason with counts when no usable dates are available, instead of silently showing a blank grid.
+- MainWindow now handles the "relevant set is empty" case deterministically by falling back to imported photos for review preparation and reporting that fallback in diagnostics.
+- Preserved asynchronous thumbnail retention in `AlbumReviewPage` so thumbnails arriving before row/card creation are retained and applied later.
+- Card rendering now prioritizes retained thumbnail cache, then `photo.thumbnail`, then placeholder.
+- Normalized key usage is consistent across thumbnail updates, row keys, card lookups, and thumbnail source tracking.
+- Thumbnail retention survives refresh/filter/grid rebuild flows so hidden items still show thumbnails when visible again.
+- Memory Review card/preview thumbnail retrieval does not fall back to synchronous original-image decoding paths.
+- Added/updated regression tests for early thumbnail delivery, retention through view changes, normalized key consistency, no synchronous original decode fallback, valid-date row/card rendering, clear no-date empty-state explanation, and default-filter visibility.
+
 ### UX-001 - Collapsible Workspace Information Panels
 - Added a reusable `WorkspaceInfoPanel` component in `src/ui/components/workspace_info_panel.py`.
 - Added centralized workspace panel content definitions in `src/ui/components/workspace_info_content.py`.
