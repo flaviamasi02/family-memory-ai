@@ -178,7 +178,8 @@ PhotoGridWidget is the current custom card grid used to display photos.
 
 It is responsible for:
 
-- rendering card widgets in batches
+- rendering an initial batch of card widgets before the full collection
+- adding more card widgets in small batches as the user scrolls
 - handling photo card selection events
 - applying deferred thumbnail updates safely
 - supporting progressive loading in a scrollable container
@@ -222,10 +223,11 @@ ThumbnailWorker generates and prepares thumbnails in the background.
 
 It is responsible for:
 
-- reading image files
-- generating thumbnails
+- checking the existing versioned thumbnail cache before regenerating work
+- reading image files when no valid cached thumbnail exists
+- generating thumbnails in the background
 - storing results in the cache
-- notifying the application when thumbnails are ready
+- notifying the application when cached or generated thumbnails are ready
 
 ## ThumbnailCache
 

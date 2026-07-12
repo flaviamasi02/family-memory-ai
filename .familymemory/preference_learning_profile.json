@@ -1,8 +1,11 @@
 {
-  "total_events": 13,
+  "total_events": 45,
   "signal_counts": {
-    "category_preference": 13,
-    "category_target_preference": 13
+    "category_preference": 36,
+    "category_target_preference": 36,
+    "decision_preference": 9,
+    "positive_memory_preference": 3,
+    "cleanup_preference": 9
   },
   "signals": [
     {
@@ -30,6 +33,174 @@
       "last_learned_at": "2026-07-08T12:14:06.596625+00:00"
     },
     {
+      "id": "pref_8c8b23757d1d",
+      "signal_type": "category_target_preference",
+      "target": "to_print",
+      "decision": "user_corrected_category",
+      "support_count": 4,
+      "strength": 0.75,
+      "explanation": "User category corrections repeatedly selected To Print as the authoritative category.",
+      "source_action": "user_bulk",
+      "first_learned_at": "2026-07-12T15:32:38.652944+00:00",
+      "last_learned_at": "2026-07-12T15:32:52.425564+00:00"
+    },
+    {
+      "id": "pref_5af2ba7eabd4",
+      "signal_type": "category_target_preference",
+      "target": "meme_or_graphic",
+      "decision": "user_corrected_category",
+      "support_count": 4,
+      "strength": 0.75,
+      "explanation": "User category corrections repeatedly selected Memes as the authoritative category.",
+      "source_action": "user_bulk",
+      "first_learned_at": "2026-07-12T15:32:39.617065+00:00",
+      "last_learned_at": "2026-07-12T15:32:53.587786+00:00"
+    },
+    {
+      "id": "pref_10dbcd3ac750",
+      "signal_type": "category_target_preference",
+      "target": "family_photo",
+      "decision": "user_corrected_category",
+      "support_count": 4,
+      "strength": 0.75,
+      "explanation": "User category corrections repeatedly selected Family Photo as the authoritative category.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-08T12:14:24.573342+00:00",
+      "last_learned_at": "2026-07-12T15:32:50.981462+00:00"
+    },
+    {
+      "id": "pref_a1b2bc6a952d",
+      "signal_type": "category_preference",
+      "target": "to_print",
+      "decision": "corrected_to_to_print",
+      "support_count": 4,
+      "strength": 0.75,
+      "explanation": "User corrected media to To Print 4 time(s) from user bulk actions.",
+      "source_action": "user_bulk",
+      "first_learned_at": "2026-07-12T15:32:38.652944+00:00",
+      "last_learned_at": "2026-07-12T15:32:52.425564+00:00"
+    },
+    {
+      "id": "pref_ed93bd0e6107",
+      "signal_type": "category_preference",
+      "target": "meme_or_graphic",
+      "decision": "corrected_to_meme_or_graphic",
+      "support_count": 4,
+      "strength": 0.75,
+      "explanation": "User corrected media to Memes 4 time(s) from user bulk actions.",
+      "source_action": "user_bulk",
+      "first_learned_at": "2026-07-12T15:32:39.617065+00:00",
+      "last_learned_at": "2026-07-12T15:32:53.587786+00:00"
+    },
+    {
+      "id": "pref_047bef65f302",
+      "signal_type": "category_preference",
+      "target": "family_photo",
+      "decision": "corrected_to_family_photo",
+      "support_count": 4,
+      "strength": 0.75,
+      "explanation": "User corrected media to Family Photo 4 time(s) from user actions.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-08T12:14:24.573342+00:00",
+      "last_learned_at": "2026-07-12T15:32:50.981462+00:00"
+    },
+    {
+      "id": "pref_a40460dc5d17",
+      "signal_type": "category_target_preference",
+      "target": "advertisement",
+      "decision": "user_corrected_category",
+      "support_count": 3,
+      "strength": 0.65,
+      "explanation": "User category corrections repeatedly selected Advertisement as the authoritative category.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:44.762945+00:00",
+      "last_learned_at": "2026-07-12T15:32:49.222963+00:00"
+    },
+    {
+      "id": "pref_b300542464d2",
+      "signal_type": "category_preference",
+      "target": "advertisement",
+      "decision": "corrected_to_advertisement",
+      "support_count": 3,
+      "strength": 0.65,
+      "explanation": "User corrected media to Advertisement 3 time(s) from user actions.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:44.762945+00:00",
+      "last_learned_at": "2026-07-12T15:32:49.222963+00:00"
+    },
+    {
+      "id": "pref_8c92e8357a39",
+      "signal_type": "positive_memory_preference",
+      "target": "family_photo",
+      "decision": "approve_for_album",
+      "support_count": 2,
+      "strength": 0.55,
+      "explanation": "User made 2 positive memory decision(s) for Family Photo using approve for album.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:43.682195+00:00",
+      "last_learned_at": "2026-07-12T15:32:45.508757+00:00"
+    },
+    {
+      "id": "pref_3650f7b3a14f",
+      "signal_type": "decision_preference",
+      "target": "reject",
+      "decision": "reject",
+      "support_count": 2,
+      "strength": 0.55,
+      "explanation": "User made 2 decision(s) of reject from user actions.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:43.685710+00:00",
+      "last_learned_at": "2026-07-12T15:32:49.559557+00:00"
+    },
+    {
+      "id": "pref_218b73934879",
+      "signal_type": "decision_preference",
+      "target": "reject",
+      "decision": "reject",
+      "support_count": 2,
+      "strength": 0.55,
+      "explanation": "User made 2 decision(s) of reject from user bulk actions.",
+      "source_action": "user_bulk",
+      "first_learned_at": "2026-07-12T15:32:44.264490+00:00",
+      "last_learned_at": "2026-07-12T15:32:44.266230+00:00"
+    },
+    {
+      "id": "pref_022b2355ef5f",
+      "signal_type": "decision_preference",
+      "target": "approve_for_album",
+      "decision": "approve_for_album",
+      "support_count": 2,
+      "strength": 0.55,
+      "explanation": "User made 2 decision(s) of approve for album from user actions.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:43.682195+00:00",
+      "last_learned_at": "2026-07-12T15:32:45.508757+00:00"
+    },
+    {
+      "id": "pref_6af2efe821f5",
+      "signal_type": "cleanup_preference",
+      "target": "family_photo",
+      "decision": "approve_for_album",
+      "support_count": 2,
+      "strength": 0.55,
+      "explanation": "User made 2 cleanup-oriented decision(s) for Family Photo using approve for album.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:43.682195+00:00",
+      "last_learned_at": "2026-07-12T15:32:45.508757+00:00"
+    },
+    {
+      "id": "pref_f20ac00ebddb",
+      "signal_type": "cleanup_preference",
+      "target": "family_photo",
+      "decision": "reject",
+      "support_count": 2,
+      "strength": 0.55,
+      "explanation": "User made 2 cleanup-oriented decision(s) for Family Photo using reject.",
+      "source_action": "user_bulk",
+      "first_learned_at": "2026-07-12T15:32:44.264490+00:00",
+      "last_learned_at": "2026-07-12T15:32:44.266230+00:00"
+    },
+    {
       "id": "pref_aac292466bef",
       "signal_type": "category_target_preference",
       "target": "screenshot",
@@ -40,6 +211,54 @@
       "source_action": "user",
       "first_learned_at": "2026-07-08T12:13:36.732959+00:00",
       "last_learned_at": "2026-07-08T12:13:44.164338+00:00"
+    },
+    {
+      "id": "pref_59f6b09c59e9",
+      "signal_type": "category_target_preference",
+      "target": "meme_or_graphic",
+      "decision": "user_corrected_category",
+      "support_count": 2,
+      "strength": 0.55,
+      "explanation": "User category corrections repeatedly selected Memes as the authoritative category.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:36.759100+00:00",
+      "last_learned_at": "2026-07-12T15:32:50.531432+00:00"
+    },
+    {
+      "id": "pref_f86875c050fc",
+      "signal_type": "category_target_preference",
+      "target": "important_object",
+      "decision": "user_corrected_category",
+      "support_count": 2,
+      "strength": 0.55,
+      "explanation": "User category corrections repeatedly selected Important Object as the authoritative category.",
+      "source_action": "user_bulk",
+      "first_learned_at": "2026-07-12T15:32:44.132513+00:00",
+      "last_learned_at": "2026-07-12T15:32:44.149592+00:00"
+    },
+    {
+      "id": "pref_de78eeaaf1b7",
+      "signal_type": "category_target_preference",
+      "target": "document_or_scan",
+      "decision": "user_corrected_category",
+      "support_count": 2,
+      "strength": 0.55,
+      "explanation": "User category corrections repeatedly selected Documents as the authoritative category.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:36.325544+00:00",
+      "last_learned_at": "2026-07-12T15:32:50.099419+00:00"
+    },
+    {
+      "id": "pref_3b0d0d63dd72",
+      "signal_type": "category_target_preference",
+      "target": "advertisement",
+      "decision": "user_corrected_category",
+      "support_count": 2,
+      "strength": 0.55,
+      "explanation": "User category corrections repeatedly selected Advertisement as the authoritative category.",
+      "source_action": "user_bulk",
+      "first_learned_at": "2026-07-12T15:32:43.811451+00:00",
+      "last_learned_at": "2026-07-12T15:32:43.828789+00:00"
     },
     {
       "id": "pref_eae8515a5608",
@@ -54,6 +273,174 @@
       "last_learned_at": "2026-07-08T12:13:44.164338+00:00"
     },
     {
+      "id": "pref_75fe003e5d64",
+      "signal_type": "category_preference",
+      "target": "meme_or_graphic",
+      "decision": "corrected_to_meme_or_graphic",
+      "support_count": 2,
+      "strength": 0.55,
+      "explanation": "User corrected media to Memes 2 time(s) from user actions.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:36.759100+00:00",
+      "last_learned_at": "2026-07-12T15:32:50.531432+00:00"
+    },
+    {
+      "id": "pref_783fe1879ef1",
+      "signal_type": "category_preference",
+      "target": "important_object",
+      "decision": "corrected_to_important_object",
+      "support_count": 2,
+      "strength": 0.55,
+      "explanation": "User corrected media to Important Object 2 time(s) from user bulk actions.",
+      "source_action": "user_bulk",
+      "first_learned_at": "2026-07-12T15:32:44.132513+00:00",
+      "last_learned_at": "2026-07-12T15:32:44.149592+00:00"
+    },
+    {
+      "id": "pref_57de8a4aca02",
+      "signal_type": "category_preference",
+      "target": "document_or_scan",
+      "decision": "corrected_to_document_or_scan",
+      "support_count": 2,
+      "strength": 0.55,
+      "explanation": "User corrected media to Documents 2 time(s) from user actions.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:36.325544+00:00",
+      "last_learned_at": "2026-07-12T15:32:50.099419+00:00"
+    },
+    {
+      "id": "pref_8dac402beebd",
+      "signal_type": "category_preference",
+      "target": "advertisement",
+      "decision": "corrected_to_advertisement",
+      "support_count": 2,
+      "strength": 0.55,
+      "explanation": "User corrected media to Advertisement 2 time(s) from user bulk actions.",
+      "source_action": "user_bulk",
+      "first_learned_at": "2026-07-12T15:32:43.811451+00:00",
+      "last_learned_at": "2026-07-12T15:32:43.828789+00:00"
+    },
+    {
+      "id": "pref_82d7163825f1",
+      "signal_type": "positive_memory_preference",
+      "target": "unknown",
+      "decision": "keep",
+      "support_count": 1,
+      "strength": 0.45,
+      "explanation": "User made 1 positive memory decision(s) for Unknown using keep.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:49.555567+00:00",
+      "last_learned_at": "2026-07-12T15:32:49.555567+00:00"
+    },
+    {
+      "id": "pref_7f037c111365",
+      "signal_type": "decision_preference",
+      "target": "pending",
+      "decision": "pending",
+      "support_count": 1,
+      "strength": 0.45,
+      "explanation": "User made 1 decision(s) of pending from user actions.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:43.689187+00:00",
+      "last_learned_at": "2026-07-12T15:32:43.689187+00:00"
+    },
+    {
+      "id": "pref_21cc633abc6b",
+      "signal_type": "decision_preference",
+      "target": "keep",
+      "decision": "keep",
+      "support_count": 1,
+      "strength": 0.45,
+      "explanation": "User made 1 decision(s) of keep from user actions.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:49.555567+00:00",
+      "last_learned_at": "2026-07-12T15:32:49.555567+00:00"
+    },
+    {
+      "id": "pref_c16da45d5d2c",
+      "signal_type": "decision_preference",
+      "target": "advertisement",
+      "decision": "advertisement",
+      "support_count": 1,
+      "strength": 0.45,
+      "explanation": "User made 1 decision(s) of advertisement from user actions.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:49.543862+00:00",
+      "last_learned_at": "2026-07-12T15:32:49.543862+00:00"
+    },
+    {
+      "id": "pref_474562c5d064",
+      "signal_type": "cleanup_preference",
+      "target": "unknown",
+      "decision": "advertisement",
+      "support_count": 1,
+      "strength": 0.45,
+      "explanation": "User made 1 cleanup-oriented decision(s) for Unknown using advertisement.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:49.543862+00:00",
+      "last_learned_at": "2026-07-12T15:32:49.543862+00:00"
+    },
+    {
+      "id": "pref_fee92a7c311f",
+      "signal_type": "cleanup_preference",
+      "target": "unknown",
+      "decision": "keep",
+      "support_count": 1,
+      "strength": 0.45,
+      "explanation": "User made 1 cleanup-oriented decision(s) for Unknown using keep.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:49.555567+00:00",
+      "last_learned_at": "2026-07-12T15:32:49.555567+00:00"
+    },
+    {
+      "id": "pref_4af8045b2691",
+      "signal_type": "cleanup_preference",
+      "target": "unknown",
+      "decision": "reject",
+      "support_count": 1,
+      "strength": 0.45,
+      "explanation": "User made 1 cleanup-oriented decision(s) for Unknown using reject.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:49.559557+00:00",
+      "last_learned_at": "2026-07-12T15:32:49.559557+00:00"
+    },
+    {
+      "id": "pref_e931568c3cb0",
+      "signal_type": "cleanup_preference",
+      "target": "family_photo",
+      "decision": "reject",
+      "support_count": 1,
+      "strength": 0.45,
+      "explanation": "User made 1 cleanup-oriented decision(s) for Family Photo using reject.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:43.685710+00:00",
+      "last_learned_at": "2026-07-12T15:32:43.685710+00:00"
+    },
+    {
+      "id": "pref_3a125826c1c0",
+      "signal_type": "cleanup_preference",
+      "target": "family_photo",
+      "decision": "pending",
+      "support_count": 1,
+      "strength": 0.45,
+      "explanation": "User made 1 cleanup-oriented decision(s) for Family Photo using pending.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:43.689187+00:00",
+      "last_learned_at": "2026-07-12T15:32:43.689187+00:00"
+    },
+    {
+      "id": "pref_6a3788c42c60",
+      "signal_type": "category_target_preference",
+      "target": "to_print",
+      "decision": "user_corrected_category",
+      "support_count": 1,
+      "strength": 0.45,
+      "explanation": "User category corrections repeatedly selected To Print as the authoritative category.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:45.202332+00:00",
+      "last_learned_at": "2026-07-12T15:32:45.202332+00:00"
+    },
+    {
       "id": "pref_8e493ac2d925",
       "signal_type": "category_target_preference",
       "target": "oggetti",
@@ -64,18 +451,6 @@
       "source_action": "user",
       "first_learned_at": "2026-07-08T12:14:15.391583+00:00",
       "last_learned_at": "2026-07-08T12:14:15.391583+00:00"
-    },
-    {
-      "id": "pref_10dbcd3ac750",
-      "signal_type": "category_target_preference",
-      "target": "family_photo",
-      "decision": "user_corrected_category",
-      "support_count": 1,
-      "strength": 0.45,
-      "explanation": "User category corrections repeatedly selected Family Photo as the authoritative category.",
-      "source_action": "user",
-      "first_learned_at": "2026-07-08T12:14:24.573342+00:00",
-      "last_learned_at": "2026-07-08T12:14:24.573342+00:00"
     },
     {
       "id": "pref_6c8c2d613aaf",
@@ -90,6 +465,18 @@
       "last_learned_at": "2026-07-08T12:14:22.832465+00:00"
     },
     {
+      "id": "pref_00b95667c155",
+      "signal_type": "category_preference",
+      "target": "to_print",
+      "decision": "corrected_to_to_print",
+      "support_count": 1,
+      "strength": 0.45,
+      "explanation": "User corrected media to To Print 1 time(s) from user actions.",
+      "source_action": "user",
+      "first_learned_at": "2026-07-12T15:32:45.202332+00:00",
+      "last_learned_at": "2026-07-12T15:32:45.202332+00:00"
+    },
+    {
       "id": "pref_632c56fc4814",
       "signal_type": "category_preference",
       "target": "oggetti",
@@ -100,18 +487,6 @@
       "source_action": "user",
       "first_learned_at": "2026-07-08T12:14:15.391583+00:00",
       "last_learned_at": "2026-07-08T12:14:15.391583+00:00"
-    },
-    {
-      "id": "pref_047bef65f302",
-      "signal_type": "category_preference",
-      "target": "family_photo",
-      "decision": "corrected_to_family_photo",
-      "support_count": 1,
-      "strength": 0.45,
-      "explanation": "User corrected media to Family Photo 1 time(s) from user actions.",
-      "source_action": "user",
-      "first_learned_at": "2026-07-08T12:14:24.573342+00:00",
-      "last_learned_at": "2026-07-08T12:14:24.573342+00:00"
     },
     {
       "id": "pref_b0271230daad",
@@ -360,7 +735,583 @@
         "is_cleanup_category": true,
         "is_album_candidate_category": false
       }
+    },
+    {
+      "file_path": "/tmp/tmpcqjo1m7j/fix_me.jpg",
+      "event_type": "category_correction",
+      "target": "document_or_scan",
+      "decision": "corrected_to_document_or_scan",
+      "previous_value": "meme_or_graphic",
+      "new_value": "document_or_scan",
+      "source_action": "user",
+      "timestamp": "2026-07-12T15:32:36.325544+00:00",
+      "context": {
+        "effective_media_category": "document_or_scan",
+        "automatic_media_category": "meme_or_graphic",
+        "user_corrected_media_category": "document_or_scan",
+        "classification_confidence": 0.0,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmph4432ovy/cleanup_scroll_030.jpg",
+      "event_type": "category_correction",
+      "target": "meme_or_graphic",
+      "decision": "corrected_to_meme_or_graphic",
+      "previous_value": "unknown",
+      "new_value": "meme_or_graphic",
+      "source_action": "user",
+      "timestamp": "2026-07-12T15:32:36.759100+00:00",
+      "context": {
+        "effective_media_category": "meme_or_graphic",
+        "automatic_media_category": "unknown",
+        "user_corrected_media_category": "meme_or_graphic",
+        "classification_confidence": 0.0,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmp_bfhgf84/cleanup_unknown_005.jpg",
+      "event_type": "category_correction",
+      "target": "family_photo",
+      "decision": "corrected_to_family_photo",
+      "previous_value": "unknown",
+      "new_value": "family_photo",
+      "source_action": "user",
+      "timestamp": "2026-07-12T15:32:37.218634+00:00",
+      "context": {
+        "effective_media_category": "family_photo",
+        "automatic_media_category": "unknown",
+        "user_corrected_media_category": "family_photo",
+        "classification_confidence": 0.0,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmppdqes4ha/one.jpg",
+      "event_type": "category_correction",
+      "target": "to_print",
+      "decision": "corrected_to_to_print",
+      "previous_value": "unknown",
+      "new_value": "to_print",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-12T15:32:38.652944+00:00",
+      "context": {
+        "effective_media_category": "to_print",
+        "automatic_media_category": "unknown",
+        "user_corrected_media_category": "to_print",
+        "classification_confidence": 0.0,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmppdqes4ha/two.jpg",
+      "event_type": "category_correction",
+      "target": "to_print",
+      "decision": "corrected_to_to_print",
+      "previous_value": "unknown",
+      "new_value": "to_print",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-12T15:32:38.670469+00:00",
+      "context": {
+        "effective_media_category": "to_print",
+        "automatic_media_category": "unknown",
+        "user_corrected_media_category": "to_print",
+        "classification_confidence": 0.0,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpum_u1lnb/one.jpg",
+      "event_type": "category_correction",
+      "target": "meme_or_graphic",
+      "decision": "corrected_to_meme_or_graphic",
+      "previous_value": "unknown",
+      "new_value": "meme_or_graphic",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-12T15:32:39.617065+00:00",
+      "context": {
+        "effective_media_category": "meme_or_graphic",
+        "automatic_media_category": "unknown",
+        "user_corrected_media_category": "meme_or_graphic",
+        "classification_confidence": 0.0,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpum_u1lnb/two.jpg",
+      "event_type": "category_correction",
+      "target": "meme_or_graphic",
+      "decision": "corrected_to_meme_or_graphic",
+      "previous_value": "unknown",
+      "new_value": "meme_or_graphic",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-12T15:32:39.633846+00:00",
+      "context": {
+        "effective_media_category": "meme_or_graphic",
+        "automatic_media_category": "unknown",
+        "user_corrected_media_category": "meme_or_graphic",
+        "classification_confidence": 0.0,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpx7zmsqud/a.jpg",
+      "event_type": "cleanup_decision",
+      "target": "family_photo",
+      "decision": "approve_for_album",
+      "previous_value": "pending",
+      "new_value": "approve_for_album",
+      "source_action": "user",
+      "timestamp": "2026-07-12T15:32:43.682195+00:00",
+      "context": {
+        "effective_media_category": "family_photo",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "",
+        "classification_confidence": 0.8,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpx7zmsqud/a.jpg",
+      "event_type": "cleanup_decision",
+      "target": "family_photo",
+      "decision": "reject",
+      "previous_value": "approve_for_album",
+      "new_value": "reject",
+      "source_action": "user",
+      "timestamp": "2026-07-12T15:32:43.685710+00:00",
+      "context": {
+        "effective_media_category": "family_photo",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "",
+        "classification_confidence": 0.8,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpx7zmsqud/a.jpg",
+      "event_type": "cleanup_decision",
+      "target": "family_photo",
+      "decision": "pending",
+      "previous_value": "reject",
+      "new_value": "pending",
+      "source_action": "user",
+      "timestamp": "2026-07-12T15:32:43.689187+00:00",
+      "context": {
+        "effective_media_category": "family_photo",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "",
+        "classification_confidence": 0.8,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpqjwt2psq/first.jpg",
+      "event_type": "category_correction",
+      "target": "advertisement",
+      "decision": "corrected_to_advertisement",
+      "previous_value": "family_photo",
+      "new_value": "advertisement",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-12T15:32:43.811451+00:00",
+      "context": {
+        "effective_media_category": "advertisement",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "advertisement",
+        "classification_confidence": 0.8,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpqjwt2psq/second.jpg",
+      "event_type": "category_correction",
+      "target": "advertisement",
+      "decision": "corrected_to_advertisement",
+      "previous_value": "family_photo",
+      "new_value": "advertisement",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-12T15:32:43.828789+00:00",
+      "context": {
+        "effective_media_category": "advertisement",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "advertisement",
+        "classification_confidence": 0.8,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpuyfxihsv/one.jpg",
+      "event_type": "category_correction",
+      "target": "important_object",
+      "decision": "corrected_to_important_object",
+      "previous_value": "family_photo",
+      "new_value": "important_object",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-12T15:32:44.132513+00:00",
+      "context": {
+        "effective_media_category": "important_object",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "important_object",
+        "classification_confidence": 0.8,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpuyfxihsv/two.jpg",
+      "event_type": "category_correction",
+      "target": "important_object",
+      "decision": "corrected_to_important_object",
+      "previous_value": "family_photo",
+      "new_value": "important_object",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-12T15:32:44.149592+00:00",
+      "context": {
+        "effective_media_category": "important_object",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "important_object",
+        "classification_confidence": 0.8,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmp7uvfrjt2/first.jpg",
+      "event_type": "cleanup_decision",
+      "target": "family_photo",
+      "decision": "reject",
+      "previous_value": "pending",
+      "new_value": "reject",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-12T15:32:44.264490+00:00",
+      "context": {
+        "effective_media_category": "family_photo",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "",
+        "classification_confidence": 0.8,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmp7uvfrjt2/second.jpg",
+      "event_type": "cleanup_decision",
+      "target": "family_photo",
+      "decision": "reject",
+      "previous_value": "pending",
+      "new_value": "reject",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-12T15:32:44.266230+00:00",
+      "context": {
+        "effective_media_category": "family_photo",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "",
+        "classification_confidence": 0.8,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpmda344fa/no_action_needed.jpg",
+      "event_type": "category_correction",
+      "target": "advertisement",
+      "decision": "corrected_to_advertisement",
+      "previous_value": "family_photo",
+      "new_value": "advertisement",
+      "source_action": "user",
+      "timestamp": "2026-07-12T15:32:44.762945+00:00",
+      "context": {
+        "effective_media_category": "advertisement",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "advertisement",
+        "classification_confidence": 0.8,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmp455i34fn/a.jpg",
+      "event_type": "category_correction",
+      "target": "to_print",
+      "decision": "corrected_to_to_print",
+      "previous_value": "family_photo",
+      "new_value": "to_print",
+      "source_action": "user",
+      "timestamp": "2026-07-12T15:32:45.202332+00:00",
+      "context": {
+        "effective_media_category": "to_print",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "to_print",
+        "classification_confidence": 0.8,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmp8mibaw12/trip_rome.jpg",
+      "event_type": "cleanup_decision",
+      "target": "family_photo",
+      "decision": "approve_for_album",
+      "previous_value": "pending",
+      "new_value": "approve_for_album",
+      "source_action": "user",
+      "timestamp": "2026-07-12T15:32:45.508757+00:00",
+      "context": {
+        "effective_media_category": "family_photo",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "",
+        "classification_confidence": 0.8,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpfpc9uq7i/scroll_030.jpg",
+      "event_type": "category_correction",
+      "target": "advertisement",
+      "decision": "corrected_to_advertisement",
+      "previous_value": "family_photo",
+      "new_value": "advertisement",
+      "source_action": "user",
+      "timestamp": "2026-07-12T15:32:46.380203+00:00",
+      "context": {
+        "effective_media_category": "advertisement",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "advertisement",
+        "classification_confidence": 0.8,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpdhe4sif2/unknown_005.jpg",
+      "event_type": "category_correction",
+      "target": "family_photo",
+      "decision": "corrected_to_family_photo",
+      "previous_value": "unknown",
+      "new_value": "family_photo",
+      "source_action": "user",
+      "timestamp": "2026-07-12T15:32:46.944527+00:00",
+      "context": {
+        "effective_media_category": "family_photo",
+        "automatic_media_category": "unknown",
+        "user_corrected_media_category": "family_photo",
+        "classification_confidence": 0.8,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpq5y_u5gz/correctable.jpg",
+      "event_type": "category_correction",
+      "target": "advertisement",
+      "decision": "corrected_to_advertisement",
+      "previous_value": "family_photo",
+      "new_value": "advertisement",
+      "source_action": "user",
+      "timestamp": "2026-07-12T15:32:49.222963+00:00",
+      "context": {
+        "effective_media_category": "advertisement",
+        "automatic_media_category": "family_photo",
+        "user_corrected_media_category": "advertisement",
+        "classification_confidence": 0.8,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpk856upzd/one.jpg",
+      "event_type": "cleanup_decision",
+      "target": "unknown",
+      "decision": "advertisement",
+      "previous_value": "pending",
+      "new_value": "advertisement",
+      "source_action": "user",
+      "timestamp": "2026-07-12T15:32:49.543862+00:00",
+      "context": {
+        "effective_media_category": "unknown",
+        "automatic_media_category": "unknown",
+        "user_corrected_media_category": "",
+        "classification_confidence": 0.0,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpnkxv6n6x/two.jpg",
+      "event_type": "cleanup_decision",
+      "target": "unknown",
+      "decision": "keep",
+      "previous_value": "pending",
+      "new_value": "keep",
+      "source_action": "user",
+      "timestamp": "2026-07-12T15:32:49.555567+00:00",
+      "context": {
+        "effective_media_category": "unknown",
+        "automatic_media_category": "unknown",
+        "user_corrected_media_category": "",
+        "classification_confidence": 0.0,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpnkxv6n6x/two.jpg",
+      "event_type": "cleanup_decision",
+      "target": "unknown",
+      "decision": "reject",
+      "previous_value": "keep",
+      "new_value": "reject",
+      "source_action": "user",
+      "timestamp": "2026-07-12T15:32:49.559557+00:00",
+      "context": {
+        "effective_media_category": "unknown",
+        "automatic_media_category": "unknown",
+        "user_corrected_media_category": "",
+        "classification_confidence": 0.0,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmp5r0rpbfw/fix_me.jpg",
+      "event_type": "category_correction",
+      "target": "document_or_scan",
+      "decision": "corrected_to_document_or_scan",
+      "previous_value": "meme_or_graphic",
+      "new_value": "document_or_scan",
+      "source_action": "user",
+      "timestamp": "2026-07-12T15:32:50.099419+00:00",
+      "context": {
+        "effective_media_category": "document_or_scan",
+        "automatic_media_category": "meme_or_graphic",
+        "user_corrected_media_category": "document_or_scan",
+        "classification_confidence": 0.0,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpkvwds649/cleanup_scroll_030.jpg",
+      "event_type": "category_correction",
+      "target": "meme_or_graphic",
+      "decision": "corrected_to_meme_or_graphic",
+      "previous_value": "unknown",
+      "new_value": "meme_or_graphic",
+      "source_action": "user",
+      "timestamp": "2026-07-12T15:32:50.531432+00:00",
+      "context": {
+        "effective_media_category": "meme_or_graphic",
+        "automatic_media_category": "unknown",
+        "user_corrected_media_category": "meme_or_graphic",
+        "classification_confidence": 0.0,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpy7ovq13w/cleanup_unknown_005.jpg",
+      "event_type": "category_correction",
+      "target": "family_photo",
+      "decision": "corrected_to_family_photo",
+      "previous_value": "unknown",
+      "new_value": "family_photo",
+      "source_action": "user",
+      "timestamp": "2026-07-12T15:32:50.981462+00:00",
+      "context": {
+        "effective_media_category": "family_photo",
+        "automatic_media_category": "unknown",
+        "user_corrected_media_category": "family_photo",
+        "classification_confidence": 0.0,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpuj9xjuka/one.jpg",
+      "event_type": "category_correction",
+      "target": "to_print",
+      "decision": "corrected_to_to_print",
+      "previous_value": "unknown",
+      "new_value": "to_print",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-12T15:32:52.407992+00:00",
+      "context": {
+        "effective_media_category": "to_print",
+        "automatic_media_category": "unknown",
+        "user_corrected_media_category": "to_print",
+        "classification_confidence": 0.0,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpuj9xjuka/two.jpg",
+      "event_type": "category_correction",
+      "target": "to_print",
+      "decision": "corrected_to_to_print",
+      "previous_value": "unknown",
+      "new_value": "to_print",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-12T15:32:52.425564+00:00",
+      "context": {
+        "effective_media_category": "to_print",
+        "automatic_media_category": "unknown",
+        "user_corrected_media_category": "to_print",
+        "classification_confidence": 0.0,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpojeq478e/one.jpg",
+      "event_type": "category_correction",
+      "target": "meme_or_graphic",
+      "decision": "corrected_to_meme_or_graphic",
+      "previous_value": "unknown",
+      "new_value": "meme_or_graphic",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-12T15:32:53.366008+00:00",
+      "context": {
+        "effective_media_category": "meme_or_graphic",
+        "automatic_media_category": "unknown",
+        "user_corrected_media_category": "meme_or_graphic",
+        "classification_confidence": 0.0,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
+    },
+    {
+      "file_path": "/tmp/tmpojeq478e/two.jpg",
+      "event_type": "category_correction",
+      "target": "meme_or_graphic",
+      "decision": "corrected_to_meme_or_graphic",
+      "previous_value": "unknown",
+      "new_value": "meme_or_graphic",
+      "source_action": "user_bulk",
+      "timestamp": "2026-07-12T15:32:53.587786+00:00",
+      "context": {
+        "effective_media_category": "meme_or_graphic",
+        "automatic_media_category": "unknown",
+        "user_corrected_media_category": "meme_or_graphic",
+        "classification_confidence": 0.0,
+        "is_cleanup_category": true,
+        "is_album_candidate_category": false
+      }
     }
   ],
-  "last_updated_at": "2026-07-08T12:14:24.573342+00:00"
+  "last_updated_at": "2026-07-12T15:32:53.587786+00:00"
 }

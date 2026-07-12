@@ -11,6 +11,12 @@ _full_pixmap_cache: dict[str, QPixmap] = {}
 _thumbnail_pixmap_cache: dict[str, QPixmap] = {}
 _thumbnail_image_cache: dict[str, QImage] = {}
 
+# Session-wide set of paths that failed to decode (e.g. corrupted JPEGs).
+# Files added here are skipped on all subsequent load attempts within the same
+# process so that a single corrupted file does not cause repeated Qt/libjpeg
+# error messages or wasted decode work.
+_decode_failed_paths: set[str] = set()
+
 
 # Bump this when display-orientation behavior changes so stale on-disk thumbs are bypassed.
 DISPLAY_THUMBNAIL_VERSION = "display-v2"
@@ -21,6 +27,10 @@ def load_display_pixmap(file_path: str | Path) -> Optional[QPixmap]:
     if not path.exists() or not path.is_file():
         return None
 
+    path_str = str(path)
+    if path_str in _decode_failed_paths:
+        return None
+
     signature = _file_signature(path)
     cache_key = f"full:{DISPLAY_THUMBNAIL_VERSION}:{path}:{signature}"
     cached = _full_pixmap_cache.get(cache_key)
@@ -29,6 +39,7 @@ def load_display_pixmap(file_path: str | Path) -> Optional[QPixmap]:
 
     pixmap = _read_pixmap(path, scaled_size=None)
     if not isinstance(pixmap, QPixmap) or pixmap.isNull():
+        _decode_failed_paths.add(path_str)
         return None
 
     _full_pixmap_cache[cache_key] = pixmap
@@ -38,6 +49,10 @@ def load_display_pixmap(file_path: str | Path) -> Optional[QPixmap]:
 def load_display_thumbnail(file_path: str | Path, target_size) -> Optional[QPixmap]:
     path = Path(file_path)
     if not path.exists() or not path.is_file():
+        return None
+
+    path_str = str(path)
+    if path_str in _decode_failed_paths:
         return None
 
     size = _normalize_size(target_size)
@@ -60,7 +75,7 @@ def load_display_thumbnail(file_path: str | Path, target_size) -> Optional[QPixm
                 Qt.TransformationMode.SmoothTransformation,
             )
         else:
-            print(f"load_display_thumbnail null: {path}")
+            _decode_failed_paths.add(path_str)
             return None
 
     if pixmap.width() > size.width() or pixmap.height() > size.height():
@@ -77,6 +92,10 @@ def load_display_thumbnail(file_path: str | Path, target_size) -> Optional[QPixm
 def load_display_thumbnail_image(file_path: str | Path, target_size) -> Optional[QImage]:
     path = Path(file_path)
     if not path.exists() or not path.is_file():
+        return None
+
+    path_str = str(path)
+    if path_str in _decode_failed_paths:
         return None
 
     size = _normalize_size(target_size)
@@ -99,7 +118,7 @@ def load_display_thumbnail_image(file_path: str | Path, target_size) -> Optional
                 Qt.TransformationMode.SmoothTransformation,
             )
         else:
-            print(f"load_display_thumbnail_image null: {path}")
+            _decode_failed_paths.add(path_str)
             return None
 
     if image.width() > size.width() or image.height() > size.height():
@@ -165,3 +184,13 @@ def _file_signature(path: Path) -> str:
         return f"{int(stat.st_mtime_ns)}:{int(stat.st_size)}"
     except Exception:
         return "0:0"
+
+
+def decode_failed_count() -> int:
+    """Return the number of paths that failed to decode in this session."""
+    return len(_decode_failed_paths)
+
+
+def is_decode_failed(file_path: str | Path) -> bool:
+    """Return True if *file_path* has already failed to decode this session."""
+    return str(file_path) in _decode_failed_paths

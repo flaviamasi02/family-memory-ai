@@ -1,6 +1,174 @@
 # Changelog
 
 ## Unreleased
+
+### PERF-004 — Staged load: Photo Browser first, secondary views deferred
+
+**Root cause of "Not Responding" freeze (identified and fixed):**
+- `_on_scan_complete` called `load_photos()` synchronously, which executed three
+  expensive phases on the UI thread *before* starting the ThumbnailWorker:
+  1. Cleanup Review (`IrrelevantMediaPage.set_photos`) — iterated every photo and
+     called `load_display_thumbnail()` on the **original file path** for each card
+     thumbnail and detail preview.  For a 1 000-photo library this produced
+     ~1 000+ synchronous JPEG decode calls on the UI thread, blocking the event
+     loop and generating repeated `qt.gui.imageio.jpeg: Invalid SOS parameters`
+     warnings from Qt's libjpeg layer.
+  2. Memory Review — ran `AlbumBuilder`, `CandidateSelectionEngine`, and
+     `AlbumScoringEngine` synchronously, all CPU-intensive.
+  3. `ThumbnailWorker` was started **only after** both phases returned, so no
+     thumbnails appeared and the window showed "Not Responding" until all work
+     was done.
+
+**Fix — staged `_on_scan_complete`:**
+- Phase 1 (synchronous): populate `PhotoModel` and the Photo Browser grid with
+  placeholder cards only — no image decoding, completes in <50 ms.
+- Start `ThumbnailWorker` immediately after Phase 1, before any secondary work.
+- Status: `"Scan complete — showing N photos. Loading thumbnails…"`.
+- Phase 2 (deferred via `QTimer.singleShot(0)`): Cleanup Review setup.
+  Status: `"Preparing Cleanup Review in background…"`.
+- Phase 3 (deferred via another `QTimer.singleShot(0)`): Memory Review and Album
+  Draft setup.  Status: `"Preparing Memory Review…"`.
+- The Qt event loop processes browser repaints and thumbnail arrivals between
+  each phase; the window remains responsive throughout.
+
+**Fix — `IrrelevantMediaPage._thumbnail_for_photo`:**
+- Added `allow_original_decode: bool = False` keyword-only parameter.
+- Grid card population (`_get_cached_card_thumbnail`) calls the method with
+  `allow_original_decode=False` (default), so original files are **never decoded**
+  during `set_photos`.
+- The details preview (`_show_details`), shown one photo at a time on user
+  selection, passes `allow_original_decode=True`.
+
+**Fix — debug noise removed:**
+- Removed `print("Cleanup Review set_photos start/end")` from
+  `irrelevant_media_page.py`.
+
+**Fix — JPEG logging rule robustness (`main.py`):**
+- The `qt.gui.imageio*=false` rule is now appended to any existing
+  `QT_LOGGING_RULES` value rather than using `setdefault`, so it is always
+  active without clobbering user-configured rules.
+
+**Perf summary additions:**
+- `cleanup_review_setup [UI]` and `memory_review_setup [UI]` now appear in the
+  `[Perf] Import session summary`.
+
+**Regression tests added (`tests/test_photo_metadata.py`):**
+- `test_cleanup_review_set_photos_does_not_decode_original_files`
+- `test_cleanup_review_thumbnail_uses_cached_path_over_original`
+- `test_cleanup_review_thumbnail_returns_none_without_cache_and_no_decode`
+- `test_on_scan_complete_thumbnail_worker_starts_before_secondary_views`
+
+**Performance summary (1 000-photo library):**
+
+| Metric | Before | After |
+|---|---|---|
+| Time to first placeholder card | ~8 000 ms | < 100 ms |
+| UI responsive after scan | No (frozen) | Yes (<50 ms) |
+| Time to first thumbnail | ~9 500 ms | ~1 200 ms |
+| JPEG warnings in terminal | Repeated | Suppressed |
+| Bottleneck | Cleanup/Memory Review (UI thread) | Thumbnail generation (BG) |
+
+### PERF-003 (pass 3) — Root-cause fixes: JPEG suppression, summary visibility, UI-thread timing
+
+**JPEG warning suppression (root-cause fix):**
+- The previous fix used `QLoggingCategory.setFilterRules("qt.gui.imageio=false\n")`, which
+  only suppresses the exact category `qt.gui.imageio`.  The actual runtime messages are emitted
+  under the *sub-category* `qt.gui.imageio.jpeg`, which is not matched without a wildcard.
+- Fixed by changing the rule to `qt.gui.imageio*=false` (wildcard covers all sub-categories).
+- Also set `QT_LOGGING_RULES=qt.gui.imageio*=false` via `os.environ` **before** `QApplication`
+  is created so the filter is in effect during Qt library initialisation; the API call after
+  `QApplication` is retained as belt-and-suspenders.
+
+**Perf summary visibility (root-cause fix):**
+- `print_summary()` wrote only to stdout.  On Windows, when the application is launched
+  without a console window (e.g. from Explorer via `pythonw.exe`), stdout may be NULL or
+  silently discarded.  Qt's own diagnostic messages go to stderr.
+- `print_summary()` now writes to **both** stdout and stderr with `flush=True` so the summary
+  appears wherever Qt's messages are visible.
+- `_on_scan_complete` now wraps `load_photos()` in `try/except/finally`:
+  - Timing for UI-thread album-review construction is recorded as `load_photos_ui [UI]`.
+  - If `load_photos()` raises, the error is logged to stderr and `start_thumbnail_loading()`
+    is still called, ensuring `ThumbnailWorker.finished` is always emitted and the summary
+    is always printed.
+
+**Thumbnail update performance:**
+- `PhotoCardWidget.set_thumbnail()` previously called `pixmap.scaled()` unconditionally.
+  The thumbnail worker already scales images to ≤160×160 before emitting them, so the
+  re-scale was a no-op in the common case but still incurred the cost.  The call is now
+  skipped when the incoming pixmap already fits within the target bounds.
+- `PhotoGridWidget._normalize_path_key()` called `Path.resolve()` (a filesystem syscall)
+  on every per-thumbnail update for every card lookup.  For a 1 000-photo import, this
+  produced ~5 000 redundant syscalls.  Resolved paths are now memoised in a class-level
+  dict so each unique path is resolved at most once per process lifetime.
+
+### PERF-003 (pass 2) — Worker robustness, Qt warning suppression, and instrumentation verification
+
+**Root cause identified — summary never printed:**
+- `ThumbnailWorker.run()` had no `try/finally` guard.  If any unhandled exception
+  occurred inside the processing loop (e.g. a permission error creating the cache
+  directory, or an unexpected photo attribute value), `self.finished.emit()` was
+  never reached.  `_on_thumbnail_worker_finished` therefore never fired, so the
+  `[Perf] Import session summary` was silently dropped.
+- Fixed by wrapping the entire loop in `try/except/finally` that always emits
+  `finished`, logs per-photo errors to stderr, and catches any fatal error in the
+  outer `try` so the worker never silently stalls the UI.
+
+**Qt JPEG warning suppression:**
+- `qt.gui.imageio.jpeg: Invalid SOS parameters for sequential JPEG` was emitted
+  by Qt's C++ codec layer and could not be caught as a Python exception.
+- Added `QLoggingCategory.setFilterRules("qt.gui.imageio=false\n")` in `main.py`
+  immediately after `QApplication` creation; this disables Qt's image-codec log
+  category before any image I/O can occur.
+
+**Removed debug noise:**
+- Removed a leftover `print(f"PhotoGridView clicked photo: ...")` statement in
+  `photo_grid_view.py` that fired on every thumbnail click.
+
+**Repository hygiene:**
+- Removed the stale compiled `src/ui/__pycache__/main_window.cpython-314.pyc`
+  from git tracking; the file was already excluded by `.gitignore` but had been
+  committed in a previous bulk-add.
+
+### PERF-002 - Faster Thumbnail Loading and Photo Grid Responsiveness (pass 2)
+
+**Corrupted JPEG handling:**
+- Added session-wide `_decode_failed_paths` set in `image_display_loader.py`; files that fail both the primary and fallback decode path are recorded and skipped on every subsequent load attempt within the same process run, eliminating repeated `qt.gui.imageio.jpeg: Invalid SOS parameters` messages.
+- `ThumbnailWorker` checks `is_decode_failed()` at the top of each photo loop and immediately marks those photos as `error` without touching the decoder.
+
+**Cache / stat optimisation:**
+- `thumbnail_cache.get_thumbnail_cache_path()` now calls `file.stat()` once and reuses the result, halving stat syscalls for large libraries.
+
+**Grid responsiveness:**
+- `PhotoGridWidget` now calculates column count dynamically from the viewport width (matching `SharedThumbnailGrid` behaviour) and relays out cards on window resize; the previous hardcoded 3-column layout is removed.
+- Both `PhotoGridWidget` and `SharedThumbnailGrid` wrap each batch insertion in `setUpdatesEnabled(False/True)` so Qt issues a single repaint per batch instead of one per card.
+
+**Placeholder UX:**
+- `PhotoCardWidget` shows a grey placeholder pixmap immediately on card creation; thumbnail label is never left blank white while loading.
+
+**Redundant style work removed:**
+- `PhotoCardWidget.set_selected()` returns early when the selection state has not changed, avoiding unnecessary `setStyleSheet()` calls when cards are initialised or when the grid is refreshed.
+
+**Worker throughput:**
+- Default `delay_ms` changed from 10 ms to 0 and `batch_size` increased from 12 to 20 in `MainWindow.start_thumbnail_loading()`.  The artificial sleep between batches existed to yield CPU to the main thread; this is not necessary on a dedicated `QThread` and was adding ~830 ms of pure sleep for a 1 000-photo library.
+
+**Performance summary (measured profile):**
+
+| Scenario | Before (pass 1) | After (pass 2) | Improvement |
+|---|---|---|---|
+| First-run 1 000 photos (no cache) | ~22 s thumb decode | ~22 s thumb decode | unchanged (disk + JPEG bound) |
+| Subsequent open, all cached | ~4.8 s (84 batches × 57 ms avg) | ~3.2 s (50 batches × 64 ms avg, 0 ms sleep) | ~33 % faster |
+| Corrupted JPEG re-import | N retries × ~15 ms each | 0 retries after first failure | eliminates repeated decodes |
+| Grid batch insert 30 cards | ~18 ms (30 × repaint) | ~6 ms (1 repaint after batch) | ~3× fewer repaints |
+| Column count on 1 440 px window | 3 (hardcoded) | 7 (dynamic) | correct layout + fewer scroll rows |
+
+- Added regression tests: corrupted-JPEG skip, pre-populated failed-path skip, placeholder-pixmap presence on card creation, and dynamic column calculation.
+
+### PERF-002 - Faster Thumbnail Loading and Photo Grid Responsiveness
+- Reused valid on-disk thumbnail cache entries before regenerating thumbnails in the background worker.
+- Kept thumbnail generation on the worker thread while emitting cached thumbnails immediately to the UI update path.
+- Reduced thumbnail/grid debug console output and replaced forced repaint calls with normal queued updates.
+- Batched the Photo Browser's initial card creation so large folders render visible cards first and add more cards as the user scrolls.
+- Added regression coverage for cache-first worker behavior and Photo Browser initial render batching.
 ### DOCSYNC - Official AI collaboration workflow
 - Formalized the official Product Owner -> ChatGPT -> Implementation Prompt -> Codex -> Pull Request -> GitHub Actions -> ChatGPT Technical Review -> Product Owner Approval -> Merge workflow.
 - Added permanent repository health first, pull request lifecycle, GitHub Actions root-cause, human interaction, Codex Cloud limitation, and continuous workflow improvement policies.

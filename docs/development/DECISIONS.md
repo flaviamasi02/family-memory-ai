@@ -451,3 +451,89 @@ Permanent rules:
 
 **Impacted Sprints:**
 All future implementation and documentation cycles.
+
+### DEC-0037
+Prompt Execution Environment Standard
+
+**Value:** Method
+**Impact:** Medium
+
+Every implementation, bug-fix, documentation-sync, or Pull Request feedback prompt must explicitly state the Execution Environment before task details.
+
+Approved execution environment labels:
+
+- Codex Cloud
+- Codex Local (VS Code)
+- GitHub Copilot (PR Comment)
+
+This prevents ambiguity about where work should be performed and whether the execution agent has cloud, local Windows, or Pull Request comment context.
+
+**Impacted documents:**
+- docs/development/PROMPT_TEMPLATE.md
+- docs/development/AI_PROJECT_PLAYBOOK.md
+
+**Impacted Sprints:**
+All future implementation, debugging, review, and documentation-sync prompts.
+
+### DEC-0038
+Prompt Target Standard
+
+**Value:** Method
+**Impact:** Medium
+
+Every implementation, bug-fix, documentation-sync, or Pull Request feedback prompt must explicitly state the Target before task details.
+
+For new work, the prompt must state whether it is new implementation and whether a new branch or Pull Request is expected.
+
+For existing Pull Request work, the prompt must state the Pull Request number and branch when known, and must explicitly say not to create a new Pull Request unless the Product Owner approves one.
+
+**Impacted documents:**
+- docs/development/PROMPT_TEMPLATE.md
+- docs/development/AI_PROJECT_PLAYBOOK.md
+
+**Impacted Sprints:**
+All future implementation, debugging, review, and documentation-sync prompts.
+
+### DEC-0039
+ChatGPT Documentation Update Permission
+
+**Value:** Method
+**Impact:** Medium
+
+ChatGPT may directly update repository documentation only after explicit Product Owner approval.
+
+When approved, the update must stay within the approved documentation scope, preserve canonical ownership boundaries, avoid application source-code changes unless separately approved, and be committed as documentation-only work when a commit is requested.
+
+Repository documentation is the permanent project memory and must remain synchronized with approved project state, decisions, workflow rules, and review outcomes.
+
+**Impacted documents:**
+- docs/development/AI_PROJECT_PLAYBOOK.md
+- docs/development/PROMPT_TEMPLATE.md
+- docs/bootstrap/HANDOVER.md
+
+**Impacted Sprints:**
+All future documentation-sync and project governance updates.
+
+### DEC-0040
+Official AI Execution Workflow Routing
+
+**Value:** Method
+**Impact:** High
+
+Family Memory AI adopts the following official execution routing:
+
+- New implementation -> Codex Cloud
+- Local development/debug -> Codex Local (VS Code)
+- Existing Pull Request improvements -> GitHub Copilot (PR Comment)
+
+This routing keeps new implementation work focused, sends local Windows debugging to the local environment, and keeps existing Pull Request refinements attached to the active PR instead of creating unnecessary replacement PRs.
+
+**Impacted documents:**
+- docs/development/AI_PROJECT_PLAYBOOK.md
+- docs/development/PROMPT_TEMPLATE.md
+- docs/project/PROJECT_STATE.md
+- docs/bootstrap/HANDOVER.md
+- docs/releases/CHANGELOG.md
+
+**Impacted Sprints:**
+All future implementation, review, debugging, and PR-improvement cycles.

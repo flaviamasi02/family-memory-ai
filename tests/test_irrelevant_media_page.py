@@ -73,7 +73,7 @@ class IrrelevantMediaPageTests(unittest.TestCase):
             self.assertEqual(summary["confidence"], "87%")
             self.assertTrue(summary["action"])
 
-    def test_cleanup_review_thumbnail_falls_back_to_original_image(self):
+    def test_cleanup_review_shows_placeholder_when_no_cached_thumbnail(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             image_path = root / "original_only.jpg"
@@ -88,13 +88,37 @@ class IrrelevantMediaPageTests(unittest.TestCase):
             photo.thumbnail_path = ""
             photo.sync_intelligence_from_metadata()
 
-            page = IrrelevantMediaPage()
-            page.set_photos([photo], root, total_imported_count=1)
-            self._flush_ui(wait_ms=80)
+            decoded_originals: list[str] = []
+            import core.image_display_loader as idl
 
+            original_fn = idl.load_display_thumbnail
+
+            def spy_load(file_path, target_size):
+                if str(file_path) == str(image_path):
+                    decoded_originals.append(str(file_path))
+                return original_fn(file_path, target_size)
+
+            page = IrrelevantMediaPage()
+            with patch.object(idl, "load_display_thumbnail", side_effect=spy_load):
+                page.set_photos([photo], root, total_imported_count=1)
+                self._flush_ui(wait_ms=80)
+
+            # Card must be created.
             card = page.thumbnail_grid._cards_by_key.get(str(photo.path))
             self.assertIsNotNone(card)
-            self.assertFalse(card.thumbnail_label.pixmap().isNull())
+
+            # The original image must NOT have been decoded during set_photos.
+            self.assertEqual(
+                decoded_originals,
+                [],
+                msg="set_photos() must not decode original images; use placeholder instead",
+            )
+
+            # The card must display a non-null placeholder pixmap.
+            self.assertFalse(
+                card.thumbnail_label.pixmap().isNull(),
+                "Card must display a non-null placeholder pixmap when no cached thumbnail exists",
+            )
 
     def test_details_panel_updates_with_structured_explanations(self):
         with tempfile.TemporaryDirectory() as tmpdir:

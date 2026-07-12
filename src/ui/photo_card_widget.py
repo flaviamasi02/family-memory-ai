@@ -2,6 +2,17 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QPixmap
 from PySide6.QtWidgets import QGraphicsDropShadowEffect, QLabel, QVBoxLayout, QWidget
 
+# Reusable grey loading placeholder — created once per class, shared across all instances.
+_PLACEHOLDER_PIXMAP: QPixmap | None = None
+
+
+def _get_placeholder_pixmap() -> QPixmap:
+    global _PLACEHOLDER_PIXMAP
+    if _PLACEHOLDER_PIXMAP is None or _PLACEHOLDER_PIXMAP.isNull():
+        _PLACEHOLDER_PIXMAP = QPixmap(160, 160)
+        _PLACEHOLDER_PIXMAP.fill(QColor("#e8e8e8"))
+    return _PLACEHOLDER_PIXMAP
+
 
 class PhotoCardWidget(QWidget):
     photo_clicked = Signal(object)
@@ -58,12 +69,12 @@ class PhotoCardWidget(QWidget):
         if getattr(self.photo, "thumbnail", None) is not None:
             self.set_thumbnail(self.photo.thumbnail)
         else:
-            self.thumbnail_label.clear()
+            self._show_placeholder()
 
     def set_photo(self, photo):
         self.photo = photo
         if photo is None:
-            self.thumbnail_label.clear()
+            self._show_placeholder()
             self.name_label.setText("")
             return
 
@@ -71,24 +82,33 @@ class PhotoCardWidget(QWidget):
         if getattr(photo, "thumbnail", None) is not None:
             self.set_thumbnail(photo.thumbnail)
         else:
-            self.thumbnail_label.clear()
+            self._show_placeholder()
+
+    def _show_placeholder(self):
+        self.thumbnail_label.setPixmap(_get_placeholder_pixmap())
 
     def set_thumbnail(self, pixmap):
         if pixmap is None or pixmap.isNull():
-            self.thumbnail_label.clear()
+            self._show_placeholder()
             return
 
-        scaled = pixmap.scaled(
-            160,
-            160,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-        self.thumbnail_label.setPixmap(scaled)
+        # The thumbnail worker already scales images to ≤160×160 before
+        # emitting them; only re-scale here if the incoming pixmap is larger
+        # (e.g. from an old cached pixmap generated with a different size).
+        if pixmap.width() > 160 or pixmap.height() > 160:
+            pixmap = pixmap.scaled(
+                160,
+                160,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        self.thumbnail_label.setPixmap(pixmap)
         self.thumbnail_label.update()
-        self.thumbnail_label.repaint()
 
     def set_selected(self, selected: bool):
+        if self._is_selected == bool(selected):
+            return
+
         self._is_selected = bool(selected)
         self.selected_badge.setVisible(self._is_selected)
 

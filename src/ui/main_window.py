@@ -1,6 +1,8 @@
+import sys
+import time
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QThread
+from PySide6.QtCore import Qt, QThread, QTimer
 from PySide6.QtGui import QGuiApplication, QImage, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
@@ -20,7 +22,7 @@ from album.album_draft_builder import AlbumDraftBuilder
 from album.annual_album import AnnualAlbum
 from album.album_scoring_engine import AlbumScoringEngine
 from album.candidate_selection_engine import CandidateSelectionEngine
-from core.photo_scanner import find_photos
+from core.perf_stats import get_session_stats, reset_session_stats
 from core.safe_file_move_service import CLEANUP_REVIEW_FOLDER_NAME
 from models.photo_model import PhotoModel
 from ui.album_draft_page import AlbumDraftPage
@@ -33,6 +35,7 @@ from ui.irrelevant_media_page import IrrelevantMediaPage
 from ui.photo_details_panel import PhotoDetailsPanel
 from ui.photo_grid_widget import PhotoGridWidget
 from ui.settings_page import SettingsPage
+from workers.scan_worker import ScanWorker
 from workers.thumbnail_worker import ThumbnailWorker
 
 
@@ -56,6 +59,8 @@ class MainWindow(QMainWindow):
 
         self.thumbnail_thread = None
         self.thumbnail_worker = None
+        self.scan_thread = None
+        self.scan_worker = None
         self.selected_photo = None
         self._review_cache_signature = None
         self._review_cache_payload = None
@@ -63,6 +68,8 @@ class MainWindow(QMainWindow):
         self._current_scored_photos = []
         self._all_photos = []
         self._imported_folder = None
+        self._import_wall_t0: float = 0.0
+        self._first_thumbnail_logged: bool = False
         self._workspace_help_registry = WorkspaceHelpRegistry()
         self._tab_workspace_ids: list[str] = []
 
@@ -217,15 +224,95 @@ class MainWindow(QMainWindow):
             self.status_label.setText("No folder selected.")
             return
 
+        # Reset per-session stats and start the wall-clock timer.
+        reset_session_stats()
+        self._import_wall_t0 = time.perf_counter()
+        self._first_thumbnail_logged = False
+
         self._imported_folder = folder_path
-        photos = find_photos(folder_path)
+        self.status_label.setText("Scanning folder…")
+
+        self._start_scan(folder_path)
+
+    def _start_scan(self, folder_path: str) -> None:
+        """Launch folder scanning on a background thread via ScanWorker."""
+        # Stop any in-progress scan before starting a new one.
+        if self.scan_thread is not None and self.scan_thread.isRunning():
+            self.scan_thread.quit()
+            self.scan_thread.wait(2000)
+
+        self.scan_thread = QThread()
+        self.scan_worker = ScanWorker(folder_path)
+        self.scan_worker.moveToThread(self.scan_thread)
+
+        self.scan_thread.started.connect(self.scan_worker.run)
+        self.scan_worker.scan_complete.connect(self._on_scan_complete)
+        self.scan_worker.scan_error.connect(self._on_scan_error)
+        self.scan_worker.finished.connect(self.scan_thread.quit)
+        self.scan_worker.finished.connect(self.scan_worker.deleteLater)
+        self.scan_thread.finished.connect(self.scan_thread.deleteLater)
+
+        self.scan_thread.start()
+
+    def _on_scan_complete(self, photos: list) -> None:
+        stats = get_session_stats()
+        n = len(photos or [])
+
+        # ── Phase 1 (synchronous, UI thread) ─────────────────────────────────
+        # Populate the Photo Browser with placeholder cards.  set_photos() only
+        # creates card widgets — no image decoding occurs here — so this is fast
+        # regardless of library size.
+        t0 = time.perf_counter()
+        self._all_photos = list(photos or [])
+        self.photo_model.set_photos(photos)
+        self._apply_browser_filter()
+        stats.record("photo_browser_setup [UI]", (time.perf_counter() - t0) * 1000)
 
         self.status_label.setText(
-            f"Found {len(photos)} files. Loading thumbnails progressively in background..."
+            f"Scan complete — showing {n} photos. Loading thumbnails…"
         )
 
-        self.load_photos(photos)
+        # Start the thumbnail worker *immediately* so thumbnails begin arriving
+        # in the browser before Cleanup Review and Memory Review are prepared.
         self.start_thumbnail_loading(photos)
+
+        # ── Phase 2 & 3 (deferred) ────────────────────────────────────────────
+        # Let Qt process the browser repaint first, then set up the secondary
+        # views.  Each phase defers the next one the same way so the event loop
+        # remains responsive throughout.
+        QTimer.singleShot(0, self._deferred_setup_cleanup_review)
+
+    def _deferred_setup_cleanup_review(self) -> None:
+        """Populate Cleanup Review — deferred from _on_scan_complete."""
+        self.status_label.setText("Preparing Cleanup Review in background…")
+        t0 = time.perf_counter()
+        try:
+            self._load_irrelevant_media_data(self._all_photos)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[MainWindow] Cleanup Review setup error: {exc}", file=sys.stderr, flush=True)
+        finally:
+            get_session_stats().record(
+                "cleanup_review_setup [UI]", (time.perf_counter() - t0) * 1000
+            )
+        QTimer.singleShot(0, self._deferred_setup_memory_review)
+
+    def _deferred_setup_memory_review(self) -> None:
+        """Populate Memory Review and Album Draft — deferred from _deferred_setup_cleanup_review."""
+        self.status_label.setText("Preparing Memory Review…")
+        relevant = [p for p in self._all_photos if self._is_album_relevant(p)]
+        t0 = time.perf_counter()
+        try:
+            self._load_album_review_data(relevant)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[MainWindow] Memory Review setup error: {exc}", file=sys.stderr, flush=True)
+            self.status_label.setText("Memory Review preparation encountered an error.")
+        finally:
+            get_session_stats().record(
+                "memory_review_setup [UI]", (time.perf_counter() - t0) * 1000
+            )
+
+    def _on_scan_error(self, error_message: str) -> None:
+        self.status_label.setText(f"Scan error: {error_message}")
 
     def load_photos(self, photos):
         self._all_photos = list(photos or [])
@@ -440,30 +527,34 @@ class MainWindow(QMainWindow):
         )
 
     def start_thumbnail_loading(self, photos):
-        print("thumbnail worker started")
         self.thumbnail_thread = QThread()
-        self.thumbnail_worker = ThumbnailWorker(photos, batch_size=12, delay_ms=10)
+        self.thumbnail_worker = ThumbnailWorker(photos, batch_size=20, delay_ms=0)
 
         self.thumbnail_worker.moveToThread(self.thumbnail_thread)
 
         self.thumbnail_thread.started.connect(self.thumbnail_worker.run)
         self.thumbnail_worker.thumbnail_ready.connect(self.update_thumbnail)
-        print("thumbnail_ready connected")
+        self.thumbnail_worker.finished.connect(self._on_thumbnail_worker_finished)
         self.thumbnail_worker.finished.connect(self.thumbnail_thread.quit)
         self.thumbnail_worker.finished.connect(self.thumbnail_worker.deleteLater)
         self.thumbnail_thread.finished.connect(self.thumbnail_thread.deleteLater)
 
         self.thumbnail_thread.start()
 
+    def _on_thumbnail_worker_finished(self) -> None:
+        """Called on the UI thread when the thumbnail worker has processed all photos."""
+        if self._import_wall_t0 > 0:
+            elapsed_ms = (time.perf_counter() - self._import_wall_t0) * 1000
+            get_session_stats().record("total_import_wall_clock [UI]", elapsed_ms)
+            self._import_wall_t0 = 0.0
+            get_session_stats().print_summary()
+
     def update_thumbnail(self, photo, image_or_pixmap):
-        print(f"thumbnail signal received: {getattr(photo, 'path', None)}")
-        print("Thumbnail received", getattr(photo, "path", None))
-        if isinstance(image_or_pixmap, QImage):
-            print(f"thumbnail received image null={image_or_pixmap.isNull()}")
-        elif isinstance(image_or_pixmap, QPixmap):
-            print(f"thumbnail received pixmap null={image_or_pixmap.isNull()}")
-        else:
-            print(f"thumbnail received type={type(image_or_pixmap).__name__}")
+        # Record the first thumbnail arrival time once per session.
+        if not self._first_thumbnail_logged and self._import_wall_t0 > 0:
+            elapsed_ms = (time.perf_counter() - self._import_wall_t0) * 1000
+            get_session_stats().record("time_to_first_thumbnail [UI]", elapsed_ms)
+            self._first_thumbnail_logged = True
 
         if isinstance(image_or_pixmap, QImage):
             pixmap = QPixmap.fromImage(image_or_pixmap)
@@ -486,9 +577,5 @@ class MainWindow(QMainWindow):
             self.details_panel.set_photo(self.selected_photo)
 
     def _handle_photo_selection(self, photo):
-        if photo is not None:
-            print(f"MainWindow received selected photo: {photo.display_name()}")
-        else:
-            print("MainWindow received selected photo: None")
         self.selected_photo = photo
         self.details_panel.set_photo(photo)

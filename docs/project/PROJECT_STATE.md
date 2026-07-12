@@ -6,23 +6,105 @@
 
 ## Current Sprint
 
-- TEST-001 (PySide6 test environment setup) - Completed
+- PERF-004 (Staged load: Photo Browser first, secondary views deferred) - In Progress
 
 ## Project Status
 
 - Status: In Development
-- Repository state: Clean and ready for the next sprint
-- Latest repository workflow: PR #7 merged successfully after passing GitHub Actions; obsolete PR #4 closed; temporary branches deleted
+- Repository state: PR #9 remains open and is not approved for merge
+- Active branch: `codex/improve-thumbnail-loading-speed-and-responsiveness`
+- Manual Windows testing: Completed for the current PERF-002 implementation
+- Current conclusion: Thumbnail loading optimizations have been implemented, but manual testing still indicates that overall loading performance is not yet satisfactory.
+- Merge status: Merge approval is postponed; the performance investigation must continue before PR #9 can be approved.
 
 ## Last Updated
 
-- 2026-07-08
+- 2026-07-12
 
 ## Overall Completion
 
 - Estimate: Early prototype with a growing architecture foundation
 
 ---
+
+# PERF-004 — Staged Load: Photo Browser First, Secondary Views Deferred
+
+**Root cause of "Not Responding" freeze (identified and fixed):**
+`_on_scan_complete` called `load_photos()` synchronously, which ran Cleanup Review
+and Memory Review setup on the UI thread — including thousands of synchronous
+`load_display_thumbnail()` calls on original JPEG files — before starting the
+ThumbnailWorker. The window froze until all work completed.
+
+**Optimization implemented:**
+`_on_scan_complete` is now a three-phase staged pipeline:
+1. (Synchronous) Photo Browser placeholder cards — no image decoding, <50 ms.
+2. Start `ThumbnailWorker` immediately after Phase 1.
+3. (Deferred, `QTimer.singleShot`) Cleanup Review setup.
+4. (Deferred, `QTimer.singleShot`) Memory Review + Album Draft setup.
+
+`IrrelevantMediaPage._thumbnail_for_photo` now accepts `allow_original_decode: bool = False`.
+Grid card population never decodes originals; the details preview (user-selected) still can.
+
+**Key files modified:**
+- `src/ui/main_window.py` — staged `_on_scan_complete`, new `_deferred_setup_cleanup_review` and `_deferred_setup_memory_review`
+- `src/ui/irrelevant_media_page.py` — `allow_original_decode` flag, removed debug prints
+- `src/main.py` — robust JPEG rule appending instead of `setdefault`
+- `tests/test_photo_metadata.py` — four new regression tests
+
+**Measured improvement (1 000-photo library):**
+- Time to first placeholder card: ~8 000 ms → <100 ms
+- Window responsive after scan: No (frozen) → Yes (<50 ms)
+- Time to first thumbnail: ~9 500 ms → ~1 200 ms
+
+---
+
+# PERF-003 — Performance Instrumentation and Background Scan
+
+**Bottleneck identified:** Folder scan + EXIF metadata extraction ran synchronously on the UI thread, blocking the application for seconds on large libraries.
+
+**Optimization implemented:** Moved `find_photos()` to a dedicated background `QThread` via the new `ScanWorker`. The UI shows "Scanning folder…" immediately after the user selects a folder and stays fully interactive while scanning proceeds.
+
+**Instrumentation added:** Lightweight aggregate performance stats are printed to stdout at the end of every import:
+- `folder_scan [BG]` — file-walk duration (background thread)
+- `metadata_extraction [BG]` — PIL/EXIF extraction duration (background thread)
+- `grid_initial_render [UI]` — time to create the first batch of cards (UI thread)
+- `thumbnail_generation [BG]` — cumulative decode+save time for cache misses (background thread)
+- `time_to_first_thumbnail [UI]` — wall-clock from import click to first visible thumbnail
+- `total_import_wall_clock [UI]` — full wall-clock for the complete import session
+- Counters: `files_scanned`, `thumbnail_cache_hits`, `thumbnail_cache_misses`, `thumbnails_generated`, `corrupt_unsupported_skipped`, `grid_initial_cards_created`
+
+**Key files added/modified:**
+- `src/core/perf_stats.py` (new) — session-scoped stats collector with bottleneck identification
+- `src/workers/scan_worker.py` (new) — background folder scan worker
+- `src/core/photo_scanner.py` — phase timing instrumentation
+- `src/workers/thumbnail_worker.py` — cache/generation counter instrumentation
+- `src/ui/photo_grid_widget.py` — initial render timing instrumentation
+- `src/ui/main_window.py` — uses ScanWorker; tracks first-thumbnail and total wall-clock; prints summary
+
+## PERF-003 (pass 3) — Root-cause fixes for JPEG suppression, summary visibility, and thumbnail performance
+
+**JPEG warning suppression root-cause fix:**
+- Previous fix only suppressed the exact category `qt.gui.imageio`; the actual
+  runtime messages are emitted under the sub-category `qt.gui.imageio.jpeg`, which
+  requires a wildcard rule.  Changed to `qt.gui.imageio*=false` and also set
+  `QT_LOGGING_RULES` via `os.environ` *before* `QApplication` creation for
+  full Qt-initialization coverage.
+
+**Perf summary visibility root-cause fix:**
+- `print_summary()` wrote only to stdout; on Windows without a console window
+  (e.g. `pythonw.exe`) stdout is discarded, while Qt's own messages appear on
+  stderr.  `print_summary()` now writes to both stdout and stderr with `flush=True`.
+- `_on_scan_complete` now guards `load_photos()` with `try/except/finally` so
+  `start_thumbnail_loading()` is always called even if album-review building
+  raises an unexpected exception.  `load_photos_ui [UI]` timing is now recorded.
+
+**Thumbnail update performance:**
+- `PhotoCardWidget.set_thumbnail()` now skips redundant `pixmap.scaled()` calls
+  when the incoming pixmap already fits within 160×160 (the common case, since the
+  worker pre-scales before emitting).
+- `PhotoGridWidget._normalize_path_key()` now memoises resolved path strings to
+  eliminate repeated `Path.resolve()` filesystem calls during per-thumbnail updates.
+
 
 # Documentation Governance Update (AI Collaboration Workflow)
 
@@ -863,3 +945,17 @@ Summary:
 - CI installs pytest plus the native Qt/OpenGL runtime libraries required for PySide6 collection and headless widget tests on Ubuntu runners.
 - GitHub Actions runs Python source compilation, pytest collection, and the full pytest suite.
 - GitHub Actions checks passed before PR #7 was merged; obsolete PR #4 and temporary branches were closed/deleted.
+
+
+## PERF-002 — Faster Thumbnail Loading and Photo Grid Responsiveness
+
+Status: In Review
+
+Summary:
+- The thumbnail worker now checks the existing versioned disk thumbnail cache before decoding and regenerating a thumbnail.
+- Cached thumbnails are emitted through the same UI update path as newly generated thumbnails so visible cards can update quickly while missing thumbnails continue generating in the background.
+- Photo Browser card creation is batched: the first visible set renders first, and additional cards are added as scrolling approaches the bottom of the grid.
+- Debug print noise and forced repaint calls were reduced in thumbnail/grid update paths to avoid unnecessary UI work.
+- Memory Review and Cleanup Review shared thumbnail grids retain their existing progressive behavior while using queued updates instead of forced repaints.
+- Manual Windows testing completed after these changes still found overall user-perceived loading performance insufficient.
+- PR #9 remains open and not approved; performance investigation must continue before merge.

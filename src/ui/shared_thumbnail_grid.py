@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from PySide6.QtCore import QEvent, QTimer, Qt, Signal
-from PySide6.QtGui import QFontMetrics, QPixmap
+from PySide6.QtGui import QColor, QFontMetrics, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -15,6 +15,18 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+
+# Reusable grey loading placeholder — created once, shared across all SharedThumbnailCard instances.
+_SHARED_PLACEHOLDER_PIXMAP: QPixmap | None = None
+
+
+def _get_shared_placeholder_pixmap() -> QPixmap:
+    global _SHARED_PLACEHOLDER_PIXMAP
+    if _SHARED_PLACEHOLDER_PIXMAP is None or _SHARED_PLACEHOLDER_PIXMAP.isNull():
+        _SHARED_PLACEHOLDER_PIXMAP = QPixmap(140, 140)
+        _SHARED_PLACEHOLDER_PIXMAP.fill(QColor("#e8e8e8"))
+    return _SHARED_PLACEHOLDER_PIXMAP
 
 
 @dataclass
@@ -42,7 +54,7 @@ class SharedThumbnailCard(QFrame):
         self.setFixedWidth(164)
         self.setFixedHeight(228)
 
-        self.thumbnail_label = QLabel("No thumbnail")
+        self.thumbnail_label = QLabel("")
         self.thumbnail_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.thumbnail_label.setFixedSize(140, 140)
         self.thumbnail_label.setStyleSheet("border: 1px solid #bbb; background: #f6f6f6;")
@@ -92,8 +104,8 @@ class SharedThumbnailCard(QFrame):
             self.thumbnail_label.setPixmap(scaled)
             self.thumbnail_label.setText("")
         else:
-            self.thumbnail_label.setPixmap(QPixmap())
-            self.thumbnail_label.setText("No thumbnail")
+            self.thumbnail_label.setPixmap(_get_shared_placeholder_pixmap())
+            self.thumbnail_label.setText("")
 
         self.filename_label.setToolTip(item.filename)
         metrics = QFontMetrics(self.filename_label.font())
@@ -102,9 +114,7 @@ class SharedThumbnailCard(QFrame):
         self.badge_two.setText(item.badge_two)
         self.badge_three.setText(item.badge_three)
         self.thumbnail_label.update()
-        self.thumbnail_label.repaint()
         self.update()
-        self.repaint()
 
     def set_selected(self, selected: bool) -> None:
         if selected:
@@ -200,7 +210,6 @@ class SharedThumbnailGrid(QWidget):
         return len(self._cards_by_key)
 
     def update_item(self, item: SharedGridItem) -> None:
-        print(f"SharedThumbnailGrid.update_item {item.key}")
         self._items_by_key[item.key] = item
         for index, existing in enumerate(self._items):
             if existing.key == item.key:
@@ -212,7 +221,6 @@ class SharedThumbnailGrid(QWidget):
             card.refresh(item)
             card.set_selected(item.key in self._selected_keys)
             card.update()
-            card.repaint()
 
     def visible_keys(self) -> list[str]:
         return [item.key for item in self._items]
@@ -297,28 +305,27 @@ class SharedThumbnailGrid(QWidget):
             self.selection_changed.emit(set(self._selected_keys), self._selected_key)
             return
 
-        if self._pending_render_index == 0:
-            print("SharedThumbnailGrid first batch start")
-
         batch_end = min(self._pending_render_index + self._render_batch_size, render_limit)
-        for index in range(self._pending_render_index, batch_end):
-            item = self._items[index]
-            card = SharedThumbnailCard(item=item)
-            card.clicked.connect(self._on_card_clicked)
-            card.double_clicked.connect(self._on_card_double_clicked)
-            self._cards_by_key[item.key] = card
-            self._rendered_keys.append(item.key)
 
-            card_index = len(self._rendered_keys) - 1
-            grid_row = card_index // self._grid_columns
-            grid_column = card_index % self._grid_columns
-            self.grid_layout.addWidget(card, grid_row, grid_column)
+        self.content_widget.setUpdatesEnabled(False)
+        try:
+            for index in range(self._pending_render_index, batch_end):
+                item = self._items[index]
+                card = SharedThumbnailCard(item=item)
+                card.clicked.connect(self._on_card_clicked)
+                card.double_clicked.connect(self._on_card_double_clicked)
+                self._cards_by_key[item.key] = card
+                self._rendered_keys.append(item.key)
+
+                card_index = len(self._rendered_keys) - 1
+                grid_row = card_index // self._grid_columns
+                grid_column = card_index % self._grid_columns
+                self.grid_layout.addWidget(card, grid_row, grid_column)
+        finally:
+            self.content_widget.setUpdatesEnabled(True)
 
         self._pending_render_index = batch_end
         self._refresh_card_selection()
-
-        if self._pending_render_index >= render_limit:
-            print("SharedThumbnailGrid first batch complete")
 
         if self._pending_render_index >= render_limit:
             self.selection_changed.emit(set(self._selected_keys), self._selected_key)

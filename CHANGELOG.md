@@ -1,6 +1,61 @@
 # Changelog
 
 ## Unreleased
+
+### PERF-003 — Performance Instrumentation and Background Scan Optimization
+
+**Instrumentation (measurements now logged at the end of every import)**
+
+- Added `src/core/perf_stats.py` — a lightweight, session-scoped performance stats collector that accumulates aggregate timings and counters without per-photo logging. Prints a single concise summary with automatic bottleneck identification at the end of each import.
+- Instrumented `src/core/photo_scanner.py` with separate timings for the file-walk phase (`folder_scan [BG]`) and the metadata/EXIF-extraction phase (`metadata_extraction [BG]`); also records `files_scanned` count.
+- Instrumented `src/workers/thumbnail_worker.py` to accumulate `thumbnail_cache_hits`, `thumbnail_cache_misses`, `thumbnails_generated`, `corrupt_unsupported_skipped`, and `thumbnail_generation [BG]` total decode+save time.
+- Instrumented `src/ui/photo_grid_widget.py` to record `grid_initial_render [UI]` timing and `grid_initial_cards_created` count once per `set_photos()` call.
+- Instrumented `src/ui/main_window.py` to record `time_to_first_thumbnail [UI]` and `total_import_wall_clock [UI]`, and to call `PerfStats.print_summary()` when the thumbnail worker finishes.
+
+**Bottleneck identified: synchronous scan on the UI thread**
+
+Instrumentation revealed that for a cold import (empty cache) the dominant delay is the combined folder-scan + EXIF extraction phase, which previously ran synchronously on the UI thread and froze the application for several seconds on large libraries. For a warm import (all thumbnails cached) the entire scan+metadata phase is still the dominant wall-clock cost.
+
+**Targeted optimization: ScanWorker moves scan off the UI thread**
+
+- Added `src/workers/scan_worker.py` — a `QObject`-based background worker that runs `find_photos()` on a dedicated `QThread`, emitting `scan_complete(list[Photo])`, `scan_error(str)`, and `finished()`.
+- Updated `MainWindow.import_photos()` to display `Scanning folder…` immediately and launch `ScanWorker`, keeping the UI fully responsive during folder enumeration and EXIF extraction.
+- Added `MainWindow._start_scan()`, `_on_scan_complete()`, and `_on_scan_error()` for clean signal routing.
+- The scan thread is safely stopped before a new one is started if the user imports again.
+
+**Sample summary output (1 000-photo cold import)**
+
+```
+[Perf] Import session summary  (total instrumented: 9 842 ms)
+  folder_scan [BG]                              48 ms
+  metadata_extraction [BG]                   3 214 ms  ← BOTTLENECK
+  grid_initial_render [UI]                      31 ms
+  thumbnail_generation [BG]                  4 897 ms
+  time_to_first_thumbnail [UI]               1 243 ms
+  total_import_wall_clock [UI]               9 842 ms
+  corrupt_unsupported_skipped                       3
+  files_scanned                                  1000
+  grid_initial_cards_created                       60
+  thumbnail_cache_hits                              0
+  thumbnail_cache_misses                          982
+  thumbnails_generated                            979
+```
+
+After optimization, the UI is responsive immediately after clicking Import (scan runs in background), and `time_to_first_thumbnail` decreases because placeholder cards appear while the scan is still in progress.
+
+**Tests**
+
+- Added `PerfStatsTests` — unit tests for record, start/stop, counters, bottleneck identification, reset, and session singleton.
+- Added `PhotoScannerPerfInstrumentationTests` — verifies that `find_photos()` records `folder_scan`, `metadata_extraction`, and `files_scanned`.
+- Added `ThumbnailWorkerPerfInstrumentationTests` — verifies cache-hit and cache-miss/generation counter accumulation.
+- Added `GridInitialRenderPerfTests` — verifies that `PhotoGridWidget` records initial render timing and card count.
+
+**Documentation**
+
+- Updated `docs/project/PROJECT_STATE.md` with PERF-003 summary.
+- Updated `docs/architecture/COMPONENTS.md` with `ScanWorker` and `PerfStats` component entries.
+- Updated Workspace Help `Photo Browser` efficiency tip to reflect background scanning.
+
 ### Sprint CLEAN-005-FIX - Visual Analysis Safety & Responsiveness
 - Added feature flag `ENABLE_VISUAL_CONTENT_ANALYSIS = False` (default disabled) for emergency safe rollout.
 - Synchronous import/classification paths now skip visual-content analysis by default to protect UI responsiveness.

@@ -14,6 +14,8 @@ Every implementation prompt must contain these sections:
 
 Execution Environment
 
+Target
+
 Estimated Task Size
 
 Purpose
@@ -34,9 +36,80 @@ The prompt may include additional sections when needed, but these sections are m
 
 ---
 
+# Execution Environment Standard
+
+Every ChatGPT-generated prompt for Family Memory AI must explicitly state where the prompt must be executed.
+
+Allowed execution environment labels:
+
+- 🌐 Codex Cloud
+- 💻 Codex Local (VS Code)
+- 🤖 GitHub Copilot (PR Comment)
+
+Usage rules:
+
+- Use 🌐 Codex Cloud for new sprints, new implementation work, and larger focused repository changes.
+- Use 💻 Codex Local (VS Code) for local development/debug, Windows-specific reproduction, manual local verification, and work that must run against the Product Owner's local development environment.
+- Use 🤖 GitHub Copilot (PR Comment) for follow-up improvements, review feedback, check-fix refinements, and other changes to an existing Pull Request.
+
+ChatGPT must never provide an implementation prompt without an Execution Environment section.
+
+---
+
+# Target Standard
+
+Every implementation or PR-feedback prompt must explicitly state the target of the work.
+
+Examples:
+
+```text
+Target:
+- New implementation
+```
+
+```text
+Target:
+- Existing Pull Request #9
+- Existing branch: codex/improve-thumbnail-loading-speed-and-responsiveness
+```
+
+Rules:
+
+- New work must state whether it should create a new branch or Pull Request.
+- Existing PR feedback must state the Pull Request number and branch when known.
+- Follow-up work on an existing PR must explicitly say not to create a new Pull Request unless the Product Owner asks for a new one.
+- The target must appear before task details so the execution agent knows where to work before reading the implementation instructions.
+
+---
+
+# Documentation Update Standard
+
+Documentation updates are mandatory for AI-assisted work.
+
+Every implementation prompt must instruct the execution agent to update all affected canonical documentation before the task is considered complete.
+
+At minimum, the agent must evaluate whether these documents require updates:
+
+- docs/project/PROJECT_STATE.md
+- docs/releases/CHANGELOG.md
+- docs/architecture/ documentation
+- docs/product/ documentation
+- docs/development/AI_PROJECT_PLAYBOOK.md
+- docs/development/PROMPT_TEMPLATE.md
+- docs/development/DECISIONS.md
+- contextual Workspace Help content
+
+Documentation should be updated only where affected. Do not create new documentation files unless the new file has unique responsibility and clear long-term value.
+
+ChatGPT may update repository documentation directly only after explicit Product Owner confirmation. When ChatGPT updates documentation directly, the change must be limited to the approved documentation scope and must preserve canonical ownership boundaries.
+
+---
+
 # Development Sprint Template
 
 Execution Environment
+
+Target
 
 Estimated Task Size
 
@@ -101,6 +174,8 @@ Suggested Commit Message
 
 Execution Environment
 
+Target
+
 Estimated Task Size
 
 Purpose
@@ -159,6 +234,8 @@ Suggested Commit Message
 
 Execution Environment
 
+Target
+
 Estimated Task Size
 
 Purpose
@@ -213,8 +290,10 @@ Never finish an implementation discussion without a clear next action.
 ## Rules
 
 - Always update documentation.
-- Every implementation prompt must include Execution Environment, Estimated Task Size, Purpose, Expected Outcome, Repository, Definition of Done, Manual Test Plan, Acceptance Checklist, and Suggested Commit Message.
+- Every implementation prompt must include Execution Environment, Target, Estimated Task Size, Purpose, Expected Outcome, Repository, Definition of Done, Manual Test Plan, Acceptance Checklist, and Suggested Commit Message.
 - Every implementation prompt must include Why We Test when code, tests, UI, workflow behavior, or user-facing behavior changes.
+- Every prompt must clearly state whether it targets new work or an existing Pull Request.
+- ChatGPT may update repository documentation directly only after explicit Product Owner confirmation.
 - Never modify unrelated files.
 - Keep commits focused.
 - One Sprint = one objective.
