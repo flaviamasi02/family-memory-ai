@@ -906,6 +906,7 @@ class IrrelevantMediaPage(QWidget):
                 corrected_category=category,
                 source="user_bulk" if len(selected_rows) > 1 else "user",
             )
+            self._category_learning_engine.start_pending_visual_analysis_worker(limit=25)
             self._preference_learning_engine.record_category_correction(
                 row.photo,
                 previous_category=previous,
@@ -914,6 +915,7 @@ class IrrelevantMediaPage(QWidget):
             )
             self._save_photo_user_metadata(row.photo)
 
+        self._category_learning_engine.start_pending_visual_analysis_worker(limit=25)
         self._rows = [self._build_row(row.photo) for row in self._rows]
         self._show_user_saved_indicator("User category saved")
         self._refresh_group_options()
