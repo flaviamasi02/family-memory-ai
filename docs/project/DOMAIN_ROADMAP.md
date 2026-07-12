@@ -310,3 +310,7 @@ Outcome:
 - Persisted visual feature profiles through backward-compatible sidecar metadata.
 - Connected category learning to visual/content evidence while keeping metadata-only corrections non-generalized.
 - Preserved app responsiveness by keeping extraction behind an explicit service boundary for future background batching.
+
+## Learning Domain - LEARN-003.2
+
+Content-based learning is the current learning-domain milestone. User category corrections teach the system from deterministic local visual features first; preference counts, filenames, and metadata remain secondary support. The milestone preserves local-only storage, no cloud image upload, no black-box model dependency, and background visual enrichment so review workflows stay responsive.

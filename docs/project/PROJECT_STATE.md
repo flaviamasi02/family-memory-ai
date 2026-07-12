@@ -978,3 +978,7 @@ Summary:
 - Memory Review and Cleanup Review shared thumbnail grids retain their existing progressive behavior while using queued updates instead of forced repaints.
 - Manual Windows testing identified remaining performance concerns after PERF-002, which led to follow-up PERF-003 and PERF-004 work.
 - PERF-003 and PERF-004 are completed; PR #9 is merged.
+
+## LEARN-003.2 Update
+
+LEARN-003.2 adds content-first learning from user category corrections. Category corrections remain immediate, while missing visual evidence is queued for local background enrichment. Persistent learning data now includes versioned category visual profiles with corrected-example counts, visual-example counts, feature support, confidence, timestamps, and human-readable summaries. Filename and metadata signals are retained only as secondary context and cannot create strong visual-content rules by themselves. Unknown remains a conservative outcome when visual evidence is weak or contradictory.

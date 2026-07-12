@@ -69,3 +69,10 @@ Import
 -> Outputs
 
 Each step has a single primary owner component. Current deterministic implementations are early foundations of this broader Memory Intelligence pipeline.
+
+### Content Learning Components
+
+- VisualFeatureProfile: Local deterministic visual evidence model used as primary category-learning evidence.
+- VisualFeatureExtractionService: Bounded local image-analysis boundary; it reads pixels, avoids cloud upload, and stores reusable profiles in sidecar metadata.
+- CategoryLearningEngine: Records user category corrections, queues missing visual analysis, aggregates category visual profiles, persists schema-versioned learning data, and exposes conservative learned visual rules for recommendations and Learning Summary.
+- LearningSummaryDialog: Separates activity counts, category visual learning, preference signals, learned visual-content rules, and recent learning activity so counts alone are not presented as visual learning.

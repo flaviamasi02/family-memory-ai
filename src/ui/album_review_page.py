@@ -1167,6 +1167,7 @@ class AlbumReviewPage(QWidget):
                 corrected_category=category,
                 source=source,
             )
+            self._category_learning_engine.start_pending_visual_analysis_worker(limit=25)
             self._preference_learning_engine.record_category_correction(
                 photo,
                 previous_category=previous,
@@ -1179,6 +1180,7 @@ class AlbumReviewPage(QWidget):
             if card is not None:
                 card.refresh_from_row(thumbnail=self._get_cached_card_thumbnail(row))
 
+        self._category_learning_engine.start_pending_visual_analysis_worker(limit=25)
         self._show_user_saved_indicator("User category saved")
         self.review_state_changed.emit()
         self._refresh_after_category_change(
