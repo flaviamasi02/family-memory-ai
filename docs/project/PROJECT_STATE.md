@@ -6,7 +6,7 @@
 
 ## Current Sprint
 
-- PERF-002 (Thumbnail loading speed and responsiveness) - In Review
+- PERF-004 (Staged load: Photo Browser first, secondary views deferred) - In Progress
 
 ## Project Status
 
@@ -19,7 +19,7 @@
 
 ## Last Updated
 
-- 2026-07-09
+- 2026-07-12
 
 ## Overall Completion
 
@@ -27,21 +27,38 @@
 
 ---
 
-# PERF-002 - Thumbnail Loading Speed and Responsiveness Review
+# PERF-004 — Staged Load: Photo Browser First, Secondary Views Deferred
 
-PR #9 remains open on branch `codex/improve-thumbnail-loading-speed-and-responsiveness`.
+**Root cause of "Not Responding" freeze (identified and fixed):**
+`_on_scan_complete` called `load_photos()` synchronously, which ran Cleanup Review
+and Memory Review setup on the UI thread — including thousands of synchronous
+`load_display_thumbnail()` calls on original JPEG files — before starting the
+ThumbnailWorker. The window froze until all work completed.
 
-Manual Windows testing has been completed for the current PERF-002 implementation.
+**Optimization implemented:**
+`_on_scan_complete` is now a three-phase staged pipeline:
+1. (Synchronous) Photo Browser placeholder cards — no image decoding, <50 ms.
+2. Start `ThumbnailWorker` immediately after Phase 1.
+3. (Deferred, `QTimer.singleShot`) Cleanup Review setup.
+4. (Deferred, `QTimer.singleShot`) Memory Review + Album Draft setup.
 
-Current review conclusion:
+`IrrelevantMediaPage._thumbnail_for_photo` now accepts `allow_original_decode: bool = False`.
+Grid card population never decodes originals; the details preview (user-selected) still can.
 
-- Thumbnail loading optimizations have been implemented.
-- User-perceived overall loading performance is still not satisfactory.
-- PR #9 is not approved for merge.
-- Merge is postponed until the actual runtime bottleneck is identified and addressed.
-- The next performance sprint should investigate measured runtime behavior before introducing further optimizations.
+**Key files modified:**
+- `src/ui/main_window.py` — staged `_on_scan_complete`, new `_deferred_setup_cleanup_review` and `_deferred_setup_memory_review`
+- `src/ui/irrelevant_media_page.py` — `allow_original_decode` flag, removed debug prints
+- `src/main.py` — robust JPEG rule appending instead of `setdefault`
+- `tests/test_photo_metadata.py` — four new regression tests
 
-## PERF-003 draft investigation notes - not current merge approval state
+**Measured improvement (1 000-photo library):**
+- Time to first placeholder card: ~8 000 ms → <100 ms
+- Window responsive after scan: No (frozen) → Yes (<50 ms)
+- Time to first thumbnail: ~9 500 ms → ~1 200 ms
+
+---
+
+# PERF-003 — Performance Instrumentation and Background Scan
 
 **Bottleneck identified:** Folder scan + EXIF metadata extraction ran synchronously on the UI thread, blocking the application for seconds on large libraries.
 
@@ -64,23 +81,29 @@ Current review conclusion:
 - `src/ui/photo_grid_widget.py` — initial render timing instrumentation
 - `src/ui/main_window.py` — uses ScanWorker; tracks first-thumbnail and total wall-clock; prints summary
 
-## PERF-003 (pass 2) — Worker robustness and instrumentation pipeline verification
+## PERF-003 (pass 3) — Root-cause fixes for JPEG suppression, summary visibility, and thumbnail performance
 
-**Root cause — `[Perf] Import session summary` never printed:**
-`ThumbnailWorker.run()` lacked a `try/finally` guard.  Any unhandled exception
-in the processing loop (e.g. a permission error creating the cache directory)
-prevented `self.finished.emit()` from being called, which in turn prevented
-`_on_thumbnail_worker_finished` from running, so the perf summary was silently
-dropped.
+**JPEG warning suppression root-cause fix:**
+- Previous fix only suppressed the exact category `qt.gui.imageio`; the actual
+  runtime messages are emitted under the sub-category `qt.gui.imageio.jpeg`, which
+  requires a wildcard rule.  Changed to `qt.gui.imageio*=false` and also set
+  `QT_LOGGING_RULES` via `os.environ` *before* `QApplication` creation for
+  full Qt-initialization coverage.
 
-**Fix applied:**
-- Entire `run()` body wrapped in `try/except/finally`; `finished` is now always
-  emitted regardless of errors.  Per-photo exceptions are logged and skipped so
-  one bad file cannot stall the worker.
-- `QLoggingCategory.setFilterRules("qt.gui.imageio=false\n")` added to `main.py`
-  to suppress Qt's low-level JPEG codec warnings before any image I/O starts.
-- Removed stale `src/ui/__pycache__/main_window.cpython-314.pyc` from git
-  tracking; removed leftover `print()` in `photo_grid_view.py`.
+**Perf summary visibility root-cause fix:**
+- `print_summary()` wrote only to stdout; on Windows without a console window
+  (e.g. `pythonw.exe`) stdout is discarded, while Qt's own messages appear on
+  stderr.  `print_summary()` now writes to both stdout and stderr with `flush=True`.
+- `_on_scan_complete` now guards `load_photos()` with `try/except/finally` so
+  `start_thumbnail_loading()` is always called even if album-review building
+  raises an unexpected exception.  `load_photos_ui [UI]` timing is now recorded.
+
+**Thumbnail update performance:**
+- `PhotoCardWidget.set_thumbnail()` now skips redundant `pixmap.scaled()` calls
+  when the incoming pixmap already fits within 160×160 (the common case, since the
+  worker pre-scales before emitting).
+- `PhotoGridWidget._normalize_path_key()` now memoises resolved path strings to
+  eliminate repeated `Path.resolve()` filesystem calls during per-thumbnail updates.
 
 
 # Documentation Governance Update (AI Collaboration Workflow)

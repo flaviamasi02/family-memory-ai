@@ -92,13 +92,17 @@ class PhotoCardWidget(QWidget):
             self._show_placeholder()
             return
 
-        scaled = pixmap.scaled(
-            160,
-            160,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-        self.thumbnail_label.setPixmap(scaled)
+        # The thumbnail worker already scales images to ≤160×160 before
+        # emitting them; only re-scale here if the incoming pixmap is larger
+        # (e.g. from an old cached pixmap generated with a different size).
+        if pixmap.width() > 160 or pixmap.height() > 160:
+            pixmap = pixmap.scaled(
+                160,
+                160,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        self.thumbnail_label.setPixmap(pixmap)
         self.thumbnail_label.update()
 
     def set_selected(self, selected: bool):

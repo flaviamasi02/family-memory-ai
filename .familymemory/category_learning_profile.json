@@ -1,14 +1,14 @@
 {
-  "total_events": 1037,
+  "total_events": 1060,
   "category_event_counts": {
-    "advertisement": 81,
-    "important_object": 40,
-    "to_print": 51,
-    "document_or_scan": 20,
-    "meme_or_graphic": 42,
+    "advertisement": 86,
+    "important_object": 42,
+    "to_print": 56,
+    "document_or_scan": 22,
+    "meme_or_graphic": 48,
     "avaloq": 84,
     "meme": 20,
-    "family_photo": 127,
+    "family_photo": 130,
     "da_buttare": 116,
     "document": 18,
     "unknown": 425,
@@ -16,1010 +16,7 @@
     "screenshot": 2,
     "oggetti": 9
   },
-  "rules": [
-    {
-      "id": "rule_unknown_279987377858",
-      "target_category": "unknown",
-      "conditions": {
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 424,
-      "explanation": "User often marks media with without camera metadata; extension .jpg; tiny file size as Unknown.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_unknown_682154682096",
-      "target_category": "unknown",
-      "conditions": {
-        "date_source": "filename",
-        "extension": ".jpg"
-      },
-      "confidence_boost": 0.5,
-      "support_count": 422,
-      "explanation": "User often marks media with date source filename; extension .jpg as Unknown.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_unknown_191020580471",
-      "target_category": "unknown",
-      "conditions": {
-        "contains_whatsapp": true,
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 414,
-      "explanation": "User often marks media with WhatsApp-like filename; without camera metadata as Unknown.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_unknown_780539277647",
-      "target_category": "unknown",
-      "conditions": {
-        "contains_whatsapp": true,
-        "extension": ".jpg"
-      },
-      "confidence_boost": 0.5,
-      "support_count": 414,
-      "explanation": "User often marks media with WhatsApp-like filename; extension .jpg as Unknown.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_unknown_735590275592",
-      "target_category": "unknown",
-      "conditions": {
-        "contains_whatsapp": true,
-        "file_size_bucket": "tiny"
-      },
-      "confidence_boost": 0.5,
-      "support_count": 414,
-      "explanation": "User often marks media with WhatsApp-like filename; tiny file size as Unknown.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_unknown_192939497009",
-      "target_category": "unknown",
-      "conditions": {
-        "contains_whatsapp": true,
-        "date_source": "filename",
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false,
-        "has_exif_date": true,
-        "has_gps": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 412,
-      "explanation": "User often marks media with WhatsApp-like filename; without camera metadata; with EXIF date; date source filename; extension .jpg; tiny file size as Unknown.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_family_photo_744263444600",
-      "target_category": "family_photo",
-      "conditions": {
-        "date_source": "filename",
-        "extension": ".jpg"
-      },
-      "confidence_boost": 0.5,
-      "support_count": 104,
-      "explanation": "User often marks media with date source filename; extension .jpg as Family Photo.",
-      "first_learned_at": "2026-07-08T12:14:24.548215+00:00",
-      "last_learned_at": "2026-07-08T12:14:24.548215+00:00"
-    },
-    {
-      "id": "rule_da_buttare_789783977306",
-      "target_category": "da_buttare",
-      "conditions": {
-        "date_source": "filename",
-        "extension": ".jpg"
-      },
-      "confidence_boost": 0.5,
-      "support_count": 98,
-      "explanation": "User often marks media with date source filename; extension .jpg as da buttare.",
-      "first_learned_at": "2026-07-08T12:14:22.806958+00:00",
-      "last_learned_at": "2026-07-08T12:14:22.806958+00:00"
-    },
-    {
-      "id": "rule_avaloq_141255880895",
-      "target_category": "avaloq",
-      "conditions": {
-        "date_source": "filename",
-        "extension": ".jpg"
-      },
-      "confidence_boost": 0.5,
-      "support_count": 84,
-      "explanation": "User often marks media with date source filename; extension .jpg as Avaloq.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_advertisement_269886992713",
-      "target_category": "advertisement",
-      "conditions": {
-        "date_source": "unknown",
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false,
-        "has_exif_date": true,
-        "has_gps": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 81,
-      "explanation": "User often marks media with without camera metadata; with EXIF date; date source unknown; extension .jpg; tiny file size as Advertisement.",
-      "first_learned_at": "2026-07-07T20:14:37.500315+00:00",
-      "last_learned_at": "2026-07-07T20:28:45.533008+00:00"
-    },
-    {
-      "id": "rule_advertisement_663540321512",
-      "target_category": "advertisement",
-      "conditions": {
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 81,
-      "explanation": "User often marks media with without camera metadata; extension .jpg; tiny file size as Advertisement.",
-      "first_learned_at": "2026-07-07T20:14:37.500315+00:00",
-      "last_learned_at": "2026-07-07T20:28:45.533008+00:00"
-    },
-    {
-      "id": "rule_advertisement_809064390388",
-      "target_category": "advertisement",
-      "conditions": {
-        "date_source": "unknown",
-        "extension": ".jpg"
-      },
-      "confidence_boost": 0.5,
-      "support_count": 81,
-      "explanation": "User often marks media with date source unknown; extension .jpg as Advertisement.",
-      "first_learned_at": "2026-07-07T20:14:37.500315+00:00",
-      "last_learned_at": "2026-07-07T20:28:45.533008+00:00"
-    },
-    {
-      "id": "rule_avaloq_649637058339",
-      "target_category": "avaloq",
-      "conditions": {
-        "date_source": "filename",
-        "extension": ".jpg",
-        "file_size_bucket": "medium",
-        "has_camera_metadata": false,
-        "has_exif_date": true,
-        "has_gps": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 72,
-      "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; medium file size as Avaloq.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_avaloq_769903351874",
-      "target_category": "avaloq",
-      "conditions": {
-        "extension": ".jpg",
-        "file_size_bucket": "medium",
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 72,
-      "explanation": "User often marks media with without camera metadata; extension .jpg; medium file size as Avaloq.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_da_buttare_312765122849",
-      "target_category": "da_buttare",
-      "conditions": {
-        "contains_whatsapp": true,
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 59,
-      "explanation": "User often marks media with WhatsApp-like filename; without camera metadata as da buttare.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_family_photo_540350829060",
-      "target_category": "family_photo",
-      "conditions": {
-        "date_source": "filename",
-        "extension": ".jpg",
-        "file_size_bucket": "large",
-        "has_camera_metadata": false,
-        "has_exif_date": true,
-        "has_gps": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 52,
-      "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; large file size as Family Photo.",
-      "first_learned_at": "2026-07-08T12:14:24.548215+00:00",
-      "last_learned_at": "2026-07-08T12:14:24.548215+00:00"
-    },
-    {
-      "id": "rule_family_photo_337337001028",
-      "target_category": "family_photo",
-      "conditions": {
-        "extension": ".jpg",
-        "file_size_bucket": "large",
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 52,
-      "explanation": "User often marks media with without camera metadata; extension .jpg; large file size as Family Photo.",
-      "first_learned_at": "2026-07-08T12:14:24.548215+00:00",
-      "last_learned_at": "2026-07-08T12:14:24.548215+00:00"
-    },
-    {
-      "id": "rule_to_print_652979588257",
-      "target_category": "to_print",
-      "conditions": {
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 51,
-      "explanation": "User often marks media with without camera metadata; extension .jpg; tiny file size as To Print.",
-      "first_learned_at": "2026-07-07T20:14:52.268228+00:00",
-      "last_learned_at": "2026-07-07T20:28:49.173727+00:00"
-    },
-    {
-      "id": "rule_to_print_437367654295",
-      "target_category": "to_print",
-      "conditions": {
-        "date_source": "unknown",
-        "extension": ".jpg"
-      },
-      "confidence_boost": 0.5,
-      "support_count": 51,
-      "explanation": "User often marks media with date source unknown; extension .jpg as To Print.",
-      "first_learned_at": "2026-07-07T20:14:52.268228+00:00",
-      "last_learned_at": "2026-07-07T20:28:49.173727+00:00"
-    },
-    {
-      "id": "rule_family_photo_552408881835",
-      "target_category": "family_photo",
-      "conditions": {
-        "date_source": "filename",
-        "extension": ".jpg",
-        "file_size_bucket": "medium",
-        "has_camera_metadata": false,
-        "has_exif_date": true,
-        "has_gps": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 49,
-      "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; medium file size as Family Photo.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_family_photo_537707140693",
-      "target_category": "family_photo",
-      "conditions": {
-        "extension": ".jpg",
-        "file_size_bucket": "medium",
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 49,
-      "explanation": "User often marks media with without camera metadata; extension .jpg; medium file size as Family Photo.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_da_buttare_927483701090",
-      "target_category": "da_buttare",
-      "conditions": {
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 47,
-      "explanation": "User often marks media with without camera metadata; extension .jpg; tiny file size as da buttare.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_da_buttare_524806677905",
-      "target_category": "da_buttare",
-      "conditions": {
-        "contains_whatsapp": true,
-        "date_source": "filename",
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false,
-        "has_exif_date": true,
-        "has_gps": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 43,
-      "explanation": "User often marks media with WhatsApp-like filename; without camera metadata; with EXIF date; date source filename; extension .jpg; tiny file size as da buttare.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_da_buttare_407803529680",
-      "target_category": "da_buttare",
-      "conditions": {
-        "contains_whatsapp": true,
-        "extension": ".jpg"
-      },
-      "confidence_boost": 0.5,
-      "support_count": 43,
-      "explanation": "User often marks media with WhatsApp-like filename; extension .jpg as da buttare.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_da_buttare_362854527625",
-      "target_category": "da_buttare",
-      "conditions": {
-        "contains_whatsapp": true,
-        "file_size_bucket": "tiny"
-      },
-      "confidence_boost": 0.5,
-      "support_count": 43,
-      "explanation": "User often marks media with WhatsApp-like filename; tiny file size as da buttare.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_meme_or_graphic_401715011351",
-      "target_category": "meme_or_graphic",
-      "conditions": {
-        "date_source": "unknown",
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false,
-        "has_exif_date": false,
-        "has_gps": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 42,
-      "explanation": "User often marks media with without camera metadata; without EXIF date; date source unknown; extension .jpg; tiny file size as Memes.",
-      "first_learned_at": "2026-07-07T20:14:49.514021+00:00",
-      "last_learned_at": "2026-07-07T20:28:50.287907+00:00"
-    },
-    {
-      "id": "rule_meme_or_graphic_863932400741",
-      "target_category": "meme_or_graphic",
-      "conditions": {
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 42,
-      "explanation": "User often marks media with without camera metadata; extension .jpg; tiny file size as Memes.",
-      "first_learned_at": "2026-07-07T20:14:49.514021+00:00",
-      "last_learned_at": "2026-07-07T20:28:50.287907+00:00"
-    },
-    {
-      "id": "rule_meme_or_graphic_398764234610",
-      "target_category": "meme_or_graphic",
-      "conditions": {
-        "extension": ".jpg",
-        "has_camera_metadata": false,
-        "has_exif_date": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 42,
-      "explanation": "User often marks media with without camera metadata; without EXIF date; extension .jpg as Memes.",
-      "first_learned_at": "2026-07-07T20:14:49.514021+00:00",
-      "last_learned_at": "2026-07-07T20:28:50.287907+00:00"
-    },
-    {
-      "id": "rule_meme_or_graphic_491862705272",
-      "target_category": "meme_or_graphic",
-      "conditions": {
-        "date_source": "unknown",
-        "extension": ".jpg"
-      },
-      "confidence_boost": 0.5,
-      "support_count": 42,
-      "explanation": "User often marks media with date source unknown; extension .jpg as Memes.",
-      "first_learned_at": "2026-07-07T20:14:49.514021+00:00",
-      "last_learned_at": "2026-07-07T20:28:50.287907+00:00"
-    },
-    {
-      "id": "rule_important_object_643136243074",
-      "target_category": "important_object",
-      "conditions": {
-        "date_source": "unknown",
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false,
-        "has_exif_date": true,
-        "has_gps": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 40,
-      "explanation": "User often marks media with without camera metadata; with EXIF date; date source unknown; extension .jpg; tiny file size as Important Object.",
-      "first_learned_at": "2026-07-07T20:20:56.956384+00:00",
-      "last_learned_at": "2026-07-07T20:28:39.079322+00:00"
-    },
-    {
-      "id": "rule_important_object_698018308030",
-      "target_category": "important_object",
-      "conditions": {
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 40,
-      "explanation": "User often marks media with without camera metadata; extension .jpg; tiny file size as Important Object.",
-      "first_learned_at": "2026-07-07T20:20:56.956384+00:00",
-      "last_learned_at": "2026-07-07T20:28:39.079322+00:00"
-    },
-    {
-      "id": "rule_important_object_630252265202",
-      "target_category": "important_object",
-      "conditions": {
-        "date_source": "unknown",
-        "extension": ".jpg"
-      },
-      "confidence_boost": 0.5,
-      "support_count": 40,
-      "explanation": "User often marks media with date source unknown; extension .jpg as Important Object.",
-      "first_learned_at": "2026-07-07T20:20:56.956384+00:00",
-      "last_learned_at": "2026-07-07T20:28:39.079322+00:00"
-    },
-    {
-      "id": "rule_da_buttare_494830296353",
-      "target_category": "da_buttare",
-      "conditions": {
-        "date_source": "filename",
-        "extension": ".jpg",
-        "file_size_bucket": "large",
-        "has_camera_metadata": false,
-        "has_exif_date": true,
-        "has_gps": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 36,
-      "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; large file size as da buttare.",
-      "first_learned_at": "2026-07-08T12:14:22.806958+00:00",
-      "last_learned_at": "2026-07-08T12:14:22.806958+00:00"
-    },
-    {
-      "id": "rule_da_buttare_291816468322",
-      "target_category": "da_buttare",
-      "conditions": {
-        "extension": ".jpg",
-        "file_size_bucket": "large",
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 36,
-      "explanation": "User often marks media with without camera metadata; extension .jpg; large file size as da buttare.",
-      "first_learned_at": "2026-07-08T12:14:22.806958+00:00",
-      "last_learned_at": "2026-07-08T12:14:22.806958+00:00"
-    },
-    {
-      "id": "rule_to_print_616923318945",
-      "target_category": "to_print",
-      "conditions": {
-        "date_source": "unknown",
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false,
-        "has_exif_date": false,
-        "has_gps": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 32,
-      "explanation": "User often marks media with without camera metadata; without EXIF date; date source unknown; extension .jpg; tiny file size as To Print.",
-      "first_learned_at": "2026-07-07T20:14:52.268228+00:00",
-      "last_learned_at": "2026-07-07T20:28:49.173727+00:00"
-    },
-    {
-      "id": "rule_to_print_613972542204",
-      "target_category": "to_print",
-      "conditions": {
-        "extension": ".jpg",
-        "has_camera_metadata": false,
-        "has_exif_date": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 32,
-      "explanation": "User often marks media with without camera metadata; without EXIF date; extension .jpg as To Print.",
-      "first_learned_at": "2026-07-07T20:14:52.268228+00:00",
-      "last_learned_at": "2026-07-07T20:28:49.173727+00:00"
-    },
-    {
-      "id": "rule_family_photo_566334026047",
-      "target_category": "family_photo",
-      "conditions": {
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 24,
-      "explanation": "User often marks media with without camera metadata; extension .jpg; tiny file size as Family Photo.",
-      "first_learned_at": "2026-07-07T20:09:59.888849+00:00",
-      "last_learned_at": "2026-07-07T20:28:47.284262+00:00"
-    },
-    {
-      "id": "rule_family_photo_194264330578",
-      "target_category": "family_photo",
-      "conditions": {
-        "date_source": "unknown",
-        "extension": ".jpg"
-      },
-      "confidence_boost": 0.5,
-      "support_count": 21,
-      "explanation": "User often marks media with date source unknown; extension .jpg as Family Photo.",
-      "first_learned_at": "2026-07-07T20:09:59.888849+00:00",
-      "last_learned_at": "2026-07-07T20:28:47.284262+00:00"
-    },
-    {
-      "id": "rule_meme_569675996102",
-      "target_category": "meme",
-      "conditions": {
-        "date_source": "filename",
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false,
-        "has_exif_date": true,
-        "has_gps": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 20,
-      "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; tiny file size as Meme.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_meme_590464635030",
-      "target_category": "meme",
-      "conditions": {
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 20,
-      "explanation": "User often marks media with without camera metadata; extension .jpg; tiny file size as Meme.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_meme_768394053583",
-      "target_category": "meme",
-      "conditions": {
-        "date_source": "filename",
-        "extension": ".jpg"
-      },
-      "confidence_boost": 0.5,
-      "support_count": 20,
-      "explanation": "User often marks media with date source filename; extension .jpg as Meme.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_to_print_568817815091",
-      "target_category": "to_print",
-      "conditions": {
-        "date_source": "unknown",
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false,
-        "has_exif_date": true,
-        "has_gps": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 19,
-      "explanation": "User often marks media with without camera metadata; with EXIF date; date source unknown; extension .jpg; tiny file size as To Print.",
-      "first_learned_at": "2026-07-07T20:21:20.797675+00:00",
-      "last_learned_at": "2026-07-07T20:28:40.362106+00:00"
-    },
-    {
-      "id": "rule_document_or_scan_600013883612",
-      "target_category": "document_or_scan",
-      "conditions": {
-        "date_source": "unknown",
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false,
-        "has_exif_date": false,
-        "has_gps": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 19,
-      "explanation": "User often marks media with without camera metadata; without EXIF date; date source unknown; extension .jpg; tiny file size as Documents.",
-      "first_learned_at": "2026-07-07T20:14:48.936720+00:00",
-      "last_learned_at": "2026-07-07T20:28:45.938956+00:00"
-    },
-    {
-      "id": "rule_document_or_scan_562439245987",
-      "target_category": "document_or_scan",
-      "conditions": {
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 19,
-      "explanation": "User often marks media with without camera metadata; extension .jpg; tiny file size as Documents.",
-      "first_learned_at": "2026-07-07T20:14:48.936720+00:00",
-      "last_learned_at": "2026-07-07T20:28:45.938956+00:00"
-    },
-    {
-      "id": "rule_document_or_scan_602964660353",
-      "target_category": "document_or_scan",
-      "conditions": {
-        "extension": ".jpg",
-        "has_camera_metadata": false,
-        "has_exif_date": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 19,
-      "explanation": "User often marks media with without camera metadata; without EXIF date; extension .jpg as Documents.",
-      "first_learned_at": "2026-07-07T20:14:48.936720+00:00",
-      "last_learned_at": "2026-07-07T20:28:45.938956+00:00"
-    },
-    {
-      "id": "rule_document_or_scan_894972479381",
-      "target_category": "document_or_scan",
-      "conditions": {
-        "date_source": "unknown",
-        "extension": ".jpg"
-      },
-      "confidence_boost": 0.5,
-      "support_count": 19,
-      "explanation": "User often marks media with date source unknown; extension .jpg as Documents.",
-      "first_learned_at": "2026-07-07T20:14:48.936720+00:00",
-      "last_learned_at": "2026-07-07T20:28:45.938956+00:00"
-    },
-    {
-      "id": "rule_document_593888298582",
-      "target_category": "document",
-      "conditions": {
-        "date_source": "filename",
-        "extension": ".jpg"
-      },
-      "confidence_boost": 0.49,
-      "support_count": 17,
-      "explanation": "User often marks media with date source filename; extension .jpg as Document.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_da_buttare_106673514321",
-      "target_category": "da_buttare",
-      "conditions": {
-        "date_source": "filename",
-        "extension": ".jpg",
-        "file_size_bucket": "medium",
-        "has_camera_metadata": false,
-        "has_exif_date": true,
-        "has_gps": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 16,
-      "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; medium file size as da buttare.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_document_378020024809",
-      "target_category": "document",
-      "conditions": {
-        "date_source": "filename",
-        "extension": ".jpg",
-        "file_size_bucket": "medium",
-        "has_camera_metadata": false,
-        "has_exif_date": true,
-        "has_gps": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 16,
-      "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; medium file size as Document.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_da_buttare_121375255463",
-      "target_category": "da_buttare",
-      "conditions": {
-        "extension": ".jpg",
-        "file_size_bucket": "medium",
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 16,
-      "explanation": "User often marks media with without camera metadata; extension .jpg; medium file size as da buttare.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_da_buttare_162997290835",
-      "target_category": "da_buttare",
-      "conditions": {
-        "contains_whatsapp": true,
-        "extension": ".jpeg"
-      },
-      "confidence_boost": 0.5,
-      "support_count": 16,
-      "explanation": "User often marks media with WhatsApp-like filename; extension .jpeg as da buttare.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_da_buttare_862520350395",
-      "target_category": "da_buttare",
-      "conditions": {
-        "date_source": "filename",
-        "extension": ".jpeg"
-      },
-      "confidence_boost": 0.5,
-      "support_count": 16,
-      "explanation": "User often marks media with date source filename; extension .jpeg as da buttare.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_document_317270934187",
-      "target_category": "document",
-      "conditions": {
-        "extension": ".jpg",
-        "file_size_bucket": "medium",
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.485,
-      "support_count": 16,
-      "explanation": "User often marks media with without camera metadata; extension .jpg; medium file size as Document.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_family_photo_543952374955",
-      "target_category": "family_photo",
-      "conditions": {
-        "date_source": "unknown",
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false,
-        "has_exif_date": false,
-        "has_gps": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 15,
-      "explanation": "User often marks media with without camera metadata; without EXIF date; date source unknown; extension .jpg; tiny file size as Family Photo.",
-      "first_learned_at": "2026-07-07T20:11:10.288650+00:00",
-      "last_learned_at": "2026-07-07T20:28:47.284262+00:00"
-    },
-    {
-      "id": "rule_family_photo_541001598214",
-      "target_category": "family_photo",
-      "conditions": {
-        "extension": ".jpg",
-        "has_camera_metadata": false,
-        "has_exif_date": false
-      },
-      "confidence_boost": 0.465,
-      "support_count": 15,
-      "explanation": "User often marks media with without camera metadata; without EXIF date; extension .jpg as Family Photo.",
-      "first_learned_at": "2026-07-07T20:11:10.288650+00:00",
-      "last_learned_at": "2026-07-07T20:28:47.284262+00:00"
-    },
-    {
-      "id": "rule_da_buttare_121512011342",
-      "target_category": "da_buttare",
-      "conditions": {
-        "contains_whatsapp": true,
-        "date_source": "filename",
-        "extension": ".jpeg",
-        "file_size_bucket": "medium",
-        "has_camera_metadata": false,
-        "has_exif_date": true,
-        "has_gps": false
-      },
-      "confidence_boost": 0.5,
-      "support_count": 14,
-      "explanation": "User often marks media with WhatsApp-like filename; without camera metadata; with EXIF date; date source filename; extension .jpeg; medium file size as da buttare.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_da_buttare_744358545163",
-      "target_category": "da_buttare",
-      "conditions": {
-        "extension": ".jpeg",
-        "file_size_bucket": "medium",
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.485,
-      "support_count": 14,
-      "explanation": "User often marks media with without camera metadata; extension .jpeg; medium file size as da buttare.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_da_buttare_144079629437",
-      "target_category": "da_buttare",
-      "conditions": {
-        "contains_whatsapp": true,
-        "file_size_bucket": "medium"
-      },
-      "confidence_boost": 0.47,
-      "support_count": 14,
-      "explanation": "User often marks media with WhatsApp-like filename; medium file size as da buttare.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_oggetti_850704999677",
-      "target_category": "oggetti",
-      "conditions": {
-        "date_source": "filename",
-        "extension": ".jpg",
-        "file_size_bucket": "large",
-        "has_camera_metadata": false,
-        "has_exif_date": true,
-        "has_gps": false
-      },
-      "confidence_boost": 0.43,
-      "support_count": 9,
-      "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; large file size as Oggetti.",
-      "first_learned_at": "2026-07-08T12:13:55.757480+00:00",
-      "last_learned_at": "2026-07-08T12:14:15.364702+00:00"
-    },
-    {
-      "id": "rule_unknown_523965929494",
-      "target_category": "unknown",
-      "conditions": {
-        "date_source": "filename",
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false,
-        "has_exif_date": true,
-        "has_gps": false
-      },
-      "confidence_boost": 0.39,
-      "support_count": 9,
-      "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; tiny file size as Unknown.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_oggetti_818179068272",
-      "target_category": "oggetti",
-      "conditions": {
-        "extension": ".jpg",
-        "file_size_bucket": "large",
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.385,
-      "support_count": 9,
-      "explanation": "User often marks media with without camera metadata; extension .jpg; large file size as Oggetti.",
-      "first_learned_at": "2026-07-08T12:13:55.757480+00:00",
-      "last_learned_at": "2026-07-08T12:14:15.364702+00:00"
-    },
-    {
-      "id": "rule_oggetti_645130633678",
-      "target_category": "oggetti",
-      "conditions": {
-        "date_source": "filename",
-        "extension": ".jpg"
-      },
-      "confidence_boost": 0.37,
-      "support_count": 9,
-      "explanation": "User often marks media with date source filename; extension .jpg as Oggetti.",
-      "first_learned_at": "2026-07-08T12:13:55.757480+00:00",
-      "last_learned_at": "2026-07-08T12:14:15.364702+00:00"
-    },
-    {
-      "id": "rule_avaloq_701316014606",
-      "target_category": "avaloq",
-      "conditions": {
-        "date_source": "filename",
-        "extension": ".jpg",
-        "file_size_bucket": "large",
-        "has_camera_metadata": false,
-        "has_exif_date": true,
-        "has_gps": false
-      },
-      "confidence_boost": 0.41,
-      "support_count": 8,
-      "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; large file size as Avaloq.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_avaloq_199726913774",
-      "target_category": "avaloq",
-      "conditions": {
-        "extension": ".jpg",
-        "file_size_bucket": "large",
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.365,
-      "support_count": 8,
-      "explanation": "User often marks media with without camera metadata; extension .jpg; large file size as Avaloq.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_family_photo_641788759081",
-      "target_category": "family_photo",
-      "conditions": {
-        "date_source": "unknown",
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false,
-        "has_exif_date": true,
-        "has_gps": false
-      },
-      "confidence_boost": 0.33,
-      "support_count": 6,
-      "explanation": "User often marks media with without camera metadata; with EXIF date; date source unknown; extension .jpg; tiny file size as Family Photo.",
-      "first_learned_at": "2026-07-07T20:09:59.888849+00:00",
-      "last_learned_at": "2026-07-07T20:28:42.693459+00:00"
-    },
-    {
-      "id": "rule_avaloq_285397080924",
-      "target_category": "avaloq",
-      "conditions": {
-        "date_source": "filename",
-        "extension": ".jpg",
-        "file_size_bucket": "small",
-        "has_camera_metadata": false,
-        "has_exif_date": true,
-        "has_gps": false
-      },
-      "confidence_boost": 0.33,
-      "support_count": 4,
-      "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; small file size as Avaloq.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_avaloq_755124520713",
-      "target_category": "avaloq",
-      "conditions": {
-        "extension": ".jpg",
-        "file_size_bucket": "small",
-        "has_camera_metadata": false
-      },
-      "confidence_boost": 0.285,
-      "support_count": 4,
-      "explanation": "User often marks media with without camera metadata; extension .jpg; small file size as Avaloq.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    },
-    {
-      "id": "rule_da_buttare_151230181527",
-      "target_category": "da_buttare",
-      "conditions": {
-        "date_source": "filename",
-        "extension": ".jpg",
-        "file_size_bucket": "tiny",
-        "has_camera_metadata": false,
-        "has_exif_date": true,
-        "has_gps": false
-      },
-      "confidence_boost": 0.31,
-      "support_count": 3,
-      "explanation": "User often marks media with without camera metadata; with EXIF date; date source filename; extension .jpg; tiny file size as da buttare.",
-      "first_learned_at": "",
-      "last_learned_at": ""
-    }
-  ],
+  "rules": [],
   "event_summaries": [
     {
       "corrected_category": "advertisement",
@@ -31093,7 +30090,697 @@
         "extension": ".jpg",
         "file_size_bucket": "large"
       }
+    },
+    {
+      "corrected_category": "document_or_scan",
+      "source": "user",
+      "timestamp": "2026-07-12T15:32:36.308138+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": false,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "meme_or_graphic",
+      "source": "user",
+      "timestamp": "2026-07-12T15:32:36.741966+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": false,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "family_photo",
+      "source": "user",
+      "timestamp": "2026-07-12T15:32:37.202512+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": false,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "to_print",
+      "source": "user_bulk",
+      "timestamp": "2026-07-12T15:32:38.635041+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": false,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "to_print",
+      "source": "user_bulk",
+      "timestamp": "2026-07-12T15:32:38.654135+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": false,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "meme_or_graphic",
+      "source": "user_bulk",
+      "timestamp": "2026-07-12T15:32:39.599073+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": false,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "meme_or_graphic",
+      "source": "user_bulk",
+      "timestamp": "2026-07-12T15:32:39.618124+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": false,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "advertisement",
+      "source": "user_bulk",
+      "timestamp": "2026-07-12T15:32:43.793917+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "advertisement",
+      "source": "user_bulk",
+      "timestamp": "2026-07-12T15:32:43.812855+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "important_object",
+      "source": "user_bulk",
+      "timestamp": "2026-07-12T15:32:44.114649+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "important_object",
+      "source": "user_bulk",
+      "timestamp": "2026-07-12T15:32:44.134017+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "advertisement",
+      "source": "user",
+      "timestamp": "2026-07-12T15:32:44.744644+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "to_print",
+      "source": "user",
+      "timestamp": "2026-07-12T15:32:45.185611+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "advertisement",
+      "source": "user",
+      "timestamp": "2026-07-12T15:32:46.362662+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "family_photo",
+      "source": "user",
+      "timestamp": "2026-07-12T15:32:46.927246+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "advertisement",
+      "source": "user",
+      "timestamp": "2026-07-12T15:32:49.205305+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": true,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "document_or_scan",
+      "source": "user",
+      "timestamp": "2026-07-12T15:32:50.081139+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": false,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "meme_or_graphic",
+      "source": "user",
+      "timestamp": "2026-07-12T15:32:50.514522+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": false,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "family_photo",
+      "source": "user",
+      "timestamp": "2026-07-12T15:32:50.964659+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": false,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "to_print",
+      "source": "user_bulk",
+      "timestamp": "2026-07-12T15:32:52.390683+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": false,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "to_print",
+      "source": "user_bulk",
+      "timestamp": "2026-07-12T15:32:52.409682+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": false,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "meme_or_graphic",
+      "source": "user_bulk",
+      "timestamp": "2026-07-12T15:32:53.348815+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": false,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
+    },
+    {
+      "corrected_category": "meme_or_graphic",
+      "source": "user_bulk",
+      "timestamp": "2026-07-12T15:32:53.367638+00:00",
+      "signals": {
+        "contains_whatsapp": false,
+        "contains_screenshot": false,
+        "contains_download": false,
+        "contains_forwarded": false,
+        "contains_giphy": false,
+        "contains_tenor": false,
+        "contains_meme": false,
+        "contains_buongiorno": false,
+        "contains_auguri": false,
+        "width": 0,
+        "height": 0,
+        "aspect_ratio": 0.0,
+        "is_small_image": false,
+        "is_square": false,
+        "is_very_wide": false,
+        "is_very_tall": false,
+        "has_camera_metadata": false,
+        "has_exif_date": false,
+        "has_gps": false,
+        "date_source": "unknown",
+        "extension": ".jpg",
+        "file_size_bucket": "tiny",
+        "visual_features_available": false
+      }
     }
   ],
-  "updated_at": "2026-07-08T12:14:24.564309+00:00"
+  "updated_at": "2026-07-12T15:32:53.369282+00:00"
 }

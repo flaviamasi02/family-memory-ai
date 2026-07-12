@@ -264,7 +264,6 @@ class IrrelevantMediaPage(QWidget):
         self._trigger_refresh(force=True)
 
     def set_photos(self, photos, imported_root: Optional[str | Path], total_imported_count: Optional[int] = None) -> None:
-        print("Cleanup Review set_photos start")
         self._imported_root = Path(imported_root) if imported_root else None
         self._imported_total_count = int(total_imported_count) if isinstance(total_imported_count, int) else len(photos or [])
 
@@ -274,7 +273,6 @@ class IrrelevantMediaPage(QWidget):
         self._reload_category_selector_options()
         self._refresh_group_options()
         self._trigger_refresh(force=True)
-        print("Cleanup Review set_photos end")
 
     def update_thumbnail(self, photo, pixmap) -> None:
         key = self._photo_key(photo)
@@ -731,7 +729,7 @@ class IrrelevantMediaPage(QWidget):
             self.alternatives_list.addItem(f"{label} ({score}%)")
         self._refresh_alternatives_visibility(row.confidence < 0.80)
 
-        pixmap = self._thumbnail_for_photo(photo, (320, 220))
+        pixmap = self._thumbnail_for_photo(photo, (320, 220), allow_original_decode=True)
         if isinstance(pixmap, QPixmap) and not pixmap.isNull():
             self.preview_label.setPixmap(pixmap)
             self.preview_label.setText("")
@@ -1016,7 +1014,7 @@ class IrrelevantMediaPage(QWidget):
     def _photo_key(self, photo) -> str:
         return str(getattr(photo, "path", ""))
 
-    def _thumbnail_for_photo(self, photo, target_size) -> Optional[QPixmap]:
+    def _thumbnail_for_photo(self, photo, target_size, *, allow_original_decode: bool = False) -> Optional[QPixmap]:
         thumbnail = getattr(photo, "thumbnail", None)
         if isinstance(thumbnail, QPixmap) and not thumbnail.isNull():
             return thumbnail
@@ -1027,11 +1025,18 @@ class IrrelevantMediaPage(QWidget):
             if isinstance(thumbnail, QPixmap) and not thumbnail.isNull():
                 return thumbnail
 
-        file_path = str(getattr(photo, "path", "") or "")
-        if file_path and Path(file_path).exists():
-            thumbnail = load_display_thumbnail(file_path, target_size)
-            if isinstance(thumbnail, QPixmap) and not thumbnail.isNull():
-                return thumbnail
+        # Only decode the original file when the caller explicitly opts in
+        # (e.g. the user clicks on a card to open the detail view).
+        # During the initial grid population this flag is False so that
+        # thousands of original JPEGs are never decoded synchronously on the
+        # UI thread, which is the root cause of the "Not Responding" freeze
+        # and the repeated Qt JPEG warnings.
+        if allow_original_decode:
+            file_path = str(getattr(photo, "path", "") or "")
+            if file_path and Path(file_path).exists():
+                thumbnail = load_display_thumbnail(file_path, target_size)
+                if isinstance(thumbnail, QPixmap) and not thumbnail.isNull():
+                    return thumbnail
 
         return None
 
