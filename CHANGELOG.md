@@ -245,3 +245,10 @@ After optimization, the UI is responsive immediately after clicking Import (scan
 - Added dedicated interpreter validation for 64-bit Python, pip, writability, persistence, restart revalidation, and warnings when the active application environment is selected.
 - Expanded Settings → AI Models actions for plan, install confirmation, cancel, verify, test guidance, model folder, logs, and safe removal plan while keeping MobileCLIP evaluation-only.
 - Added tests covering official source planning, selected interpreter command construction, checkpoint path outside Git, Ready-after-verification behavior, cancellation cleanup, and UI construction.
+
+### MODEL-002B review corrections
+- Fixed the AI Models Install action so it now performs the confirmed installation flow instead of displaying instructions only.
+- Moved install, verify, one-image test, and removal operations onto a Qt worker thread with progress, completion, failure, and cancellation handling.
+- Persisted the selected interpreter before install/verify/test execution and required verification to use that persisted runtime interpreter.
+- Moved MobileCLIP checkpoint URL metadata out of the generic manager and into MobileCLIP runtime registration.
+- Added safe confirmed removal execution for manager-owned model files only, plus additional tests for confirmation, threading wiring, removal, download progress, invalid checkpoints, and provider-agnostic manager behavior.

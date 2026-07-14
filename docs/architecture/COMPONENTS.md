@@ -99,3 +99,7 @@ Each step has a single primary owner component. Current deterministic implementa
 - `AIRuntimeManager.execute_installation_plan`: runs only confirmed typed actions, including dependency installation, checkpoint download, import checks, and provider verification.
 - `AIRuntimeManager.verify_provider`: performs selected-interpreter end-to-end MobileCLIP verification before Ready.
 - `SettingsPage`: exposes MobileCLIP plan/install/cancel/verify/test/folder/log/removal actions without replacing the production classifier.
+
+### AI runtime worker component
+
+- `workers.ai_runtime_worker.AIRuntimeOperationWorker`: runs install, verify, one-image embedding test, and model-file removal off the Qt UI thread while emitting progress, completed, failed, and finished signals. Settings owns button state and cancellation while the worker delegates runtime behavior to `AIRuntimeManager`.
