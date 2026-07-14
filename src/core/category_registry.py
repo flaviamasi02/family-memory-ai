@@ -63,7 +63,12 @@ def _now_iso() -> str:
 
 class CategoryRegistry:
     def __init__(self, storage_root: Optional[str | Path] = None):
-        service = get_app_data_service(storage_root or os.environ.get("FAMILY_MEMORY_CATEGORIES_ROOT"), legacy_root=Path.cwd())
+        configured_root = storage_root if storage_root is not None else os.environ.get("FAMILY_MEMORY_CATEGORIES_ROOT")
+        service = get_app_data_service(
+            configured_root,
+            legacy_root=Path.cwd(),
+            migrate_legacy=configured_root is None,
+        )
         self._storage_root = service.root
         self.migration_diagnostics = service.diagnostics
         self._storage_path = service.config_path("categories.json")

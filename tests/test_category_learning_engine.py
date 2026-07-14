@@ -215,7 +215,9 @@ class CategoryLearningEngineTests(unittest.TestCase):
             classification = classifier.classify_photo(target_photo)
 
             self.assertEqual(target_photo.media_category, "meme")
-            self.assertIn("learned user rule", target_photo.classification_reason.lower())
+            reason = target_photo.classification_reason.lower()
+            self.assertIn("learned visual content", reason)
+            self.assertIn("corrected examples", reason)
             self.assertIn("learned", classification.classification_reason.lower())
 
     def test_profile_persisted_and_loaded_on_next_run(self):

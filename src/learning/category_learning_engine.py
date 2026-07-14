@@ -78,7 +78,12 @@ class CategoryLearningProfile:
 
 class CategoryLearningEngine:
     def __init__(self, storage_root: Optional[str | Path] = None):
-        service = get_app_data_service(storage_root or os.environ.get("FAMILY_MEMORY_LEARNING_ROOT"), legacy_root=Path.cwd())
+        configured_root = storage_root if storage_root is not None else os.environ.get("FAMILY_MEMORY_LEARNING_ROOT")
+        service = get_app_data_service(
+            configured_root,
+            legacy_root=Path.cwd(),
+            migrate_legacy=configured_root is None,
+        )
         self._storage_root = service.root
         self.migration_diagnostics = service.diagnostics
         self._storage_path = service.profile_path("category_learning_profile.json")
@@ -99,7 +104,12 @@ class CategoryLearningEngine:
         area = (width * height) if isinstance(width, int) and isinstance(height, int) else 0
         aspect_ratio = float(width / height) if isinstance(width, int) and isinstance(height, int) and height > 0 else 0.0
         has_camera = bool(str(metadata_dict.get("camera_make", "") or "").strip() or str(metadata_dict.get("camera_model", "") or "").strip())
-        file_size = _to_int(metadata_dict.get("file_size")) or 0
+        file_size = _to_int(metadata_dict.get("file_size"))
+        if file_size is None:
+            try:
+                file_size = path.stat().st_size
+            except OSError:
+                file_size = 0
         profile = _visual_profile_from_inputs(metadata_dict, visual_profile)
         signals: dict[str, str | int | float | bool] = {
             "contains_whatsapp": "whatsapp" in filename_lower or "-wa" in filename_lower,
@@ -334,9 +344,15 @@ def _size_bucket(file_size: int) -> str:
 _default_engine: Optional[CategoryLearningEngine] = None
 def get_category_learning_engine(storage_root: Optional[str | Path] = None, force_reload: bool = False) -> CategoryLearningEngine:
     global _default_engine
+    configured_root = storage_root if storage_root is not None else os.environ.get("FAMILY_MEMORY_LEARNING_ROOT")
+    expected_root = Path(configured_root).expanduser() if configured_root is not None else None
     if storage_root is not None:
         return CategoryLearningEngine(storage_root=storage_root)
-    if force_reload or _default_engine is None:
+    if (
+        force_reload
+        or _default_engine is None
+        or (expected_root is not None and _default_engine._storage_root != expected_root)
+    ):
         _default_engine = CategoryLearningEngine()
     return _default_engine
 

@@ -116,7 +116,13 @@ class ApplicationDataPathService:
         return self.diagnostics
 
 
-def get_app_data_service(storage_root: str | Path | None = None, legacy_root: str | Path | None = None) -> ApplicationDataPathService:
+def get_app_data_service(
+    storage_root: str | Path | None = None,
+    legacy_root: str | Path | None = None,
+    *,
+    migrate_legacy: bool = True,
+) -> ApplicationDataPathService:
     service = ApplicationDataPathService(storage_root, legacy_root)
-    service.migrate_legacy_files()
+    if migrate_legacy:
+        service.migrate_legacy_files()
     return service
