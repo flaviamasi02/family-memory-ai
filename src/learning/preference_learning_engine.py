@@ -64,7 +64,13 @@ CLEANUP_DECISIONS = {
 
 class PreferenceLearningEngine:
     def __init__(self, storage_root: Optional[str | Path] = None):
-        service = get_app_data_service(storage_root or os.environ.get("FAMILY_MEMORY_LEARNING_ROOT"), legacy_root=Path.cwd())
+        configured_root = storage_root if storage_root is not None else os.environ.get("FAMILY_MEMORY_LEARNING_ROOT")
+        service = get_app_data_service(
+            configured_root,
+            legacy_root=Path.cwd(),
+            migrate_legacy=configured_root is None,
+        )
+        self._storage_root = service.root
         self.migration_diagnostics = service.diagnostics
         self._storage_path = service.profile_path("preference_learning_profile.json")
         self._event_summaries: list[dict[str, Any]] = []
@@ -402,8 +408,16 @@ def get_preference_learning_engine(
     force_reload: bool = False,
 ) -> PreferenceLearningEngine:
     global _default_engine
-    if force_reload or _default_engine is None:
-        _default_engine = PreferenceLearningEngine(storage_root=storage_root)
+    configured_root = storage_root if storage_root is not None else os.environ.get("FAMILY_MEMORY_LEARNING_ROOT")
+    expected_root = Path(configured_root).expanduser() if configured_root is not None else None
+    if storage_root is not None:
+        return PreferenceLearningEngine(storage_root=storage_root)
+    if (
+        force_reload
+        or _default_engine is None
+        or (expected_root is not None and _default_engine._storage_root != expected_root)
+    ):
+        _default_engine = PreferenceLearningEngine()
     return _default_engine
 
 

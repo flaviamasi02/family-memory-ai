@@ -78,7 +78,12 @@ class CategoryLearningProfile:
 
 class CategoryLearningEngine:
     def __init__(self, storage_root: Optional[str | Path] = None):
-        service = get_app_data_service(storage_root or os.environ.get("FAMILY_MEMORY_LEARNING_ROOT"), legacy_root=Path.cwd())
+        configured_root = storage_root if storage_root is not None else os.environ.get("FAMILY_MEMORY_LEARNING_ROOT")
+        service = get_app_data_service(
+            configured_root,
+            legacy_root=Path.cwd(),
+            migrate_legacy=configured_root is None,
+        )
         self._storage_root = service.root
         self.migration_diagnostics = service.diagnostics
         self._storage_path = service.profile_path("category_learning_profile.json")
@@ -334,9 +339,15 @@ def _size_bucket(file_size: int) -> str:
 _default_engine: Optional[CategoryLearningEngine] = None
 def get_category_learning_engine(storage_root: Optional[str | Path] = None, force_reload: bool = False) -> CategoryLearningEngine:
     global _default_engine
+    configured_root = storage_root if storage_root is not None else os.environ.get("FAMILY_MEMORY_LEARNING_ROOT")
+    expected_root = Path(configured_root).expanduser() if configured_root is not None else None
     if storage_root is not None:
         return CategoryLearningEngine(storage_root=storage_root)
-    if force_reload or _default_engine is None:
+    if (
+        force_reload
+        or _default_engine is None
+        or (expected_root is not None and _default_engine._storage_root != expected_root)
+    ):
         _default_engine = CategoryLearningEngine()
     return _default_engine
 
