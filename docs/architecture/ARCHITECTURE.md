@@ -804,3 +804,11 @@ The selected first checkpoint is `apple/MobileCLIP-S0` from the official Apple H
 Photo analysis remains local.  The base app imports and starts without `torch`, `torchvision`, `mobileclip`, network access, or model weights.  Model download is explicit and is never triggered by app startup, photo import, or settings inspection.  Embeddings are stored in per-user application data, not beside original photos and not inside source images.
 
 Embedding persistence uses SQLite under the stable application-data cache.  Records include a stable resolved path key, source fingerprint, size and mtime invalidation data, provider/checkpoint/revision, embedding dimension, normalized embedding, timestamp, and status/error.  SQLite was chosen instead of one large JSON file so the cache can grow toward 50,000 photos without repeatedly rewriting all records.
+
+## Generic AI Runtime Manager
+
+The `ai_runtime` package is the canonical architecture for optional local AI providers. Providers register an `AIRuntimeDescriptor` with stable ID, display metadata, type, checkpoint/revision, capabilities, source, code/model licenses, expected size, supported devices, Python dependencies, required model files, provider factory, and verifier. The registry supports future providers without Settings UI rewrites and does not import heavy ML packages at app startup.
+
+`AIRuntimeManager` performs deterministic status checks: Ready requires importable dependencies, registered model files in the managed cache, matching metadata, and provider verification. It generates structured installation and removal plans made of typed actions; UI code does not execute arbitrary shell strings. Install execution requires explicit plan confirmation and uses `AIRuntimeCommandExecutor` with argv tokens, active interpreter visibility, bounded output, timeout, cancellation, and structured results.
+
+Runtime metadata is stored through `ApplicationDataPathService` outside the repository under `ai-runtimes/`, `cache/models/<provider>/`, and `logs/ai-runtime/`. JSON writes are atomic, schema-versioned, and corruption-safe. Removal plans delete only manager-owned paths with ownership markers and never delete photos, thumbnails, categories, learning profiles, or semantic embeddings unless a future explicit embedding cleanup option is approved.

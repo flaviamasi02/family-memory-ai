@@ -393,3 +393,7 @@ This document is the primary planning document.
 ### MODEL-001 implementation note
 
 Implement MobileCLIP as an optional local provider with explicit setup/download, no CUDA requirement, no silent downloads, bounded CPU batches, cancellation, persistent embeddings, zero-shot reports, personalized prototype evaluation, and manual Product Owner validation before production adoption.
+
+### MODEL-002A Runtime Management Foundation
+
+Build a generic AI Runtime Manager before production model adoption. Required policies: all photo analysis remains local, no photo upload, no silent model/dependency downloads, explicit installation/removal confirmation, model files outside Git, separate runtime environment support, license visibility, benchmark history, and safe removal. MobileCLIP is the first registered provider; real installation is deferred to MODEL-002B.
