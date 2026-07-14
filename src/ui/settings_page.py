@@ -7,9 +7,11 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QFileDialog,
     QButtonGroup,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QFrame,
     QRadioButton,
     QSpinBox,
     QTextEdit,
@@ -78,6 +80,32 @@ class SettingsPage(QWidget):
 
         self.ai_models_title = QLabel("AI Models")
         self.ai_models_title.setStyleSheet("font-size: 16px; font-weight: 700;")
+        self.ai_models_card = QFrame()
+        self.ai_models_card.setFrameShape(QFrame.Shape.StyledPanel)
+        self.ai_models_card.setStyleSheet("QFrame { border: 1px solid #d4d9df; border-radius: 8px; padding: 8px; background: #fbfcfe; }")
+        self.ai_model_name = QLabel("MobileCLIP")
+        self.ai_model_name.setStyleSheet("font-size: 15px; font-weight: 700;")
+        self.ai_detail_labels: dict[str, QLabel] = {}
+        for key in (
+            "Status",
+            "Checkpoint",
+            "Capabilities",
+            "Device",
+            "Python environment",
+            "Download size",
+            "Disk usage",
+            "Code license",
+            "Model license",
+            "Last installed",
+            "Last updated",
+            "Last benchmark",
+            "Last error",
+        ):
+            label = QLabel("checking…")
+            label.setWordWrap(True)
+            self.ai_detail_labels[key] = label
+        self.ai_actions_label = QLabel("Actions: View details, verify, test, update, remove, open model folder, and view logs are surfaced according to runtime state. Install requires an explicitly confirmed plan.")
+        self.ai_actions_label.setWordWrap(True)
         self.mobileclip_status = QLabel("MobileCLIP: checking optional local provider…")
         self.mobileclip_status.setWordWrap(True)
         self.ai_env_input = QLineEdit()
@@ -90,10 +118,6 @@ class SettingsPage(QWidget):
         self.selected_radio = QRadioButton("Selected photos")
         self.folder_radio = QRadioButton("Another folder")
         self.source_group = QButtonGroup(self)
-        for button in (self.library_radio, self.selected_radio, self.folder_radio):
-            self.source_group.addButton(button)
-            button.toggled.connect(self._refresh_source_summary)
-        self.library_radio.setChecked(True)
         self.select_folder_button = QPushButton("Choose another folder…")
         self.run_button = QPushButton("Run MobileCLIP evaluation")
         self.cancel_note = QLabel("Evaluation runs outside the UI thread in the evaluation service; no model is downloaded automatically.")
@@ -101,9 +125,25 @@ class SettingsPage(QWidget):
         self.source_summary = QLabel("")
         self.source_summary.setWordWrap(True)
         self.report_box = QTextEdit(); self.report_box.setReadOnly(True); self.report_box.setMaximumHeight(120)
+        for button in (self.library_radio, self.selected_radio, self.folder_radio):
+            self.source_group.addButton(button)
+            button.toggled.connect(self._refresh_source_summary)
+        self.library_radio.setChecked(True)
         controls = QHBoxLayout(); controls.addWidget(QLabel("Max sample size (default 100, cap 300):")); controls.addWidget(self.sample_limit); controls.addStretch(1)
         source_layout = QVBoxLayout(); source_layout.addWidget(QLabel("Evaluation source:")); source_layout.addWidget(self.library_radio); source_layout.addWidget(self.selected_radio); source_layout.addWidget(self.folder_radio)
         root.addWidget(self.ai_models_title)
+        card_layout = QVBoxLayout(self.ai_models_card)
+        card_layout.addWidget(self.ai_model_name)
+        details_layout = QGridLayout()
+        for row, (key, value_label) in enumerate(self.ai_detail_labels.items()):
+            key_label = QLabel(f"{key}:")
+            key_label.setStyleSheet("font-weight: 600;")
+            key_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+            details_layout.addWidget(key_label, row, 0)
+            details_layout.addWidget(value_label, row, 1)
+        card_layout.addLayout(details_layout)
+        card_layout.addWidget(self.ai_actions_label)
+        root.addWidget(self.ai_models_card)
         root.addWidget(self.mobileclip_status)
         env_layout = QHBoxLayout(); env_layout.addWidget(QLabel("Python environment:")); env_layout.addWidget(self.ai_env_input); env_layout.addWidget(self.inspect_env_button); env_layout.addWidget(self.plan_button)
         root.addLayout(env_layout)
@@ -138,15 +178,26 @@ class SettingsPage(QWidget):
         status = self.ai_runtime_manager.status("mobileclip")
         record = self.ai_runtime_manager.installation_record("mobileclip")
         last_benchmark = next((b.date for b in reversed(self.ai_runtime_manager.storage.benchmarks()) if b.provider_id == "mobileclip"), "never")
+        details = {
+            "Status": status.state,
+            "Checkpoint": f"{descriptor.checkpoint_id} ({descriptor.revision})",
+            "Capabilities": ", ".join(c.value.replace("_", " ") for c in descriptor.capabilities),
+            "Device": "CPU",
+            "Python environment": record.interpreter_path or "current application environment",
+            "Download size": descriptor.expected_download_size,
+            "Disk usage": f"{record.installed_disk_usage_bytes} bytes",
+            "Code license": descriptor.code_license,
+            "Model license": descriptor.model_license,
+            "Last installed": record.install_date or "never",
+            "Last updated": record.update_date or "never",
+            "Last benchmark": last_benchmark,
+            "Last error": status.last_error or "none",
+        }
+        for key, value in details.items():
+            self.ai_detail_labels[key].setText(value)
         self.mobileclip_status.setText(
-            f"MobileCLIP\nStatus: {status.state}. Checkpoint: {descriptor.checkpoint_id} ({descriptor.revision}). "
-            f"Capabilities: {', '.join(c.value.replace('_', ' ') for c in descriptor.capabilities)}. Device: CPU. "
-            f"Download: {descriptor.expected_download_size}. Installed disk usage: {record.installed_disk_usage_bytes} bytes. "
-            f"Code license: {descriptor.code_license}. Model license: {descriptor.model_license}. "
-            f"Python environment: {record.interpreter_path or 'current application environment'}. "
-            f"Last installed: {record.install_date or 'never'}. Last updated: {record.update_date or 'never'}. Last benchmark: {last_benchmark}. "
-            f"Last error: {status.last_error or 'none'}. Actions available: View details, Install after confirmed plan, Verify, Test, Update, Remove, Open model folder, View logs. "
-            "Only valid actions are enabled by state; no package or model is downloaded automatically."
+            "MobileCLIP remains local-only and evaluation-only. "
+            "Only valid actions are enabled by runtime state; no package or model is downloaded automatically."
         )
 
     def _inspect_ai_environment(self) -> None:
@@ -184,6 +235,9 @@ class SettingsPage(QWidget):
         return current_library_source(self._library_provider(), limit)
 
     def _refresh_source_summary(self) -> None:
+        required_widgets = ("run_button", "select_folder_button", "source_summary")
+        if not all(hasattr(self, name) for name in required_widgets):
+            return
         result = self._active_source_result()
         self._last_source_result = result
         self.run_button.setEnabled(result.available and result.sample_count > 0)
