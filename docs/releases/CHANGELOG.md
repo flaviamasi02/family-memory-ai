@@ -562,3 +562,10 @@
 - Missing visual profiles are queued for bounded background enrichment instead of blocking category-correction UI; completed analyses can update pending learning records idempotently.
 - Recommendation learning now uses learned visual-content matches conservatively and reports matched visual signals/support while filename and metadata remain secondary evidence only.
 - Learning Summary now separates Overview, Category Visual Learning, Activity, Learned Rules, Preference Signals, and Recent Learning Activity.
+
+## MODEL-001 — MobileCLIP local vision foundation
+
+- Added stable per-user application-data storage with safe migration from legacy repository-local `.familymemory` profiles.
+- Added an optional `VisionEmbeddingProvider` boundary, SQLite semantic embedding cache, and evaluation-only MobileCLIP-S0 provider.
+- Added bounded MobileCLIP evaluation reporting with zero-shot prompt aggregation and personalized category prototype evaluation.
+- Updated Settings and Learning Summary surfaces to expose MobileCLIP status without replacing the production classifier.

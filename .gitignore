@@ -18,3 +18,5 @@ Thumbs.db
 *.log
 
 /cache/
+# Family Memory local runtime/user data (not project source)
+.familymemory/

@@ -76,3 +76,10 @@ Each step has a single primary owner component. Current deterministic implementa
 - VisualFeatureExtractionService: Bounded local image-analysis boundary; it reads pixels, avoids cloud upload, and stores reusable profiles in sidecar metadata.
 - CategoryLearningEngine: Records user category corrections, queues missing visual analysis, aggregates category visual profiles, persists schema-versioned learning data, and exposes conservative learned visual rules for recommendations and Learning Summary.
 - LearningSummaryDialog: Separates activity counts, category visual learning, preference signals, learned visual-content rules, and recent learning activity so counts alone are not presented as visual learning.
+
+## Vision embedding components
+
+- `core.application_data.ApplicationDataPathService`: canonical stable application-data paths, legacy `.familymemory` migration, atomic JSON writes, and migration diagnostics.
+- `vision.embedding_provider`: provider protocol, model metadata/status, normalized embedding records, fake provider, and SQLite embedding store.
+- `vision.mobileclip_provider.MobileCLIPEmbeddingProvider`: optional MobileCLIP-S0 CPU provider with lazy loading and explicit local checkpoint cache.
+- `vision.evaluation`: bounded evaluation workflow, timing/storage report, zero-shot prompt aggregation, and personalized prototype evaluation without self-match leakage.

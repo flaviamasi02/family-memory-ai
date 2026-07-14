@@ -122,6 +122,11 @@ class MainWindow(QMainWindow):
         self.irrelevant_media_page.faces_analyzed.connect(self._handle_faces_analyzed)
         self.settings_page = SettingsPage()
         self.settings_page.help_requested.connect(self._on_workspace_help_requested)
+        self.settings_page.set_evaluation_context_providers(
+            self._mobileclip_library_photos,
+            self._mobileclip_selected_photos,
+        )
+        self.settings_page.mobileclip_evaluation_requested.connect(self._handle_mobileclip_evaluation_requested)
 
         browser_page = QWidget()
         browser_layout = QVBoxLayout(browser_page)
@@ -178,6 +183,27 @@ class MainWindow(QMainWindow):
         self._build_workspace_help_dock()
         self._on_tab_changed(self.tabs.currentIndex())
 
+
+    def _mobileclip_library_photos(self) -> list:
+        return list(self._all_photos or [])
+
+    def _mobileclip_selected_photos(self) -> list:
+        current_index = self.tabs.currentIndex() if hasattr(self, "tabs") else -1
+        current_label = self.tabs.tabText(current_index) if current_index >= 0 else ""
+        if current_label == "Cleanup Review":
+            return list(self.irrelevant_media_page.selected_photos())
+        if current_label == "Photo Browser" and self.selected_photo is not None:
+            return [self.selected_photo]
+        cleanup_selected = self.irrelevant_media_page.selected_photos()
+        if cleanup_selected:
+            return list(cleanup_selected)
+        return [self.selected_photo] if self.selected_photo is not None else []
+
+    def _handle_mobileclip_evaluation_requested(self, source_result) -> None:
+        self.status_label.setText(
+            f"MobileCLIP evaluation ready: {source_result.sample_count} image(s) from {source_result.source_label}."
+        )
+
     def _build_workspace_help_dock(self) -> None:
         self.workspace_help_panel = WorkspaceHelpPanel(self)
         self.workspace_help_panel.close_requested.connect(self._close_workspace_help)
@@ -197,6 +223,8 @@ class MainWindow(QMainWindow):
         if index < 0 or index >= len(self._tab_workspace_ids):
             return
         workspace_id = self._tab_workspace_ids[index]
+        if hasattr(self, "settings_page"):
+            self.settings_page._refresh_source_summary()
         definition = self._workspace_help_registry.get(workspace_id)
         self.workspace_help_panel.set_help_definition(definition)
 
@@ -674,3 +702,5 @@ class MainWindow(QMainWindow):
     def _handle_photo_selection(self, photo):
         self.selected_photo = photo
         self.details_panel.set_photo(photo)
+        if hasattr(self, "settings_page"):
+            self.settings_page._refresh_source_summary()

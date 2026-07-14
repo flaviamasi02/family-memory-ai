@@ -657,3 +657,7 @@ All future implementation and documentation cycles.
 Content-first category learning is approved for LEARN-003.2. Visual evidence from local deterministic feature extraction is the primary learning evidence for category profiles. Metadata and filenames may support explanations but must not create strong learned visual rules on their own. Learning profiles use explicit schema versioning and local persistence; no cloud upload or black-box model training is introduced.
 
 Approved.
+
+## Decision: Stable app data and optional MobileCLIP provider
+
+Learning profiles and ML artifacts must live outside the Git checkout in a platform-aware per-user application-data directory.  Repository-local `.familymemory` is legacy runtime data and is ignored by Git.  MobileCLIP integration uses a provider boundary so future checkpoints/providers can be added without rewriting the domain layer.  Model weights are never downloaded silently.
