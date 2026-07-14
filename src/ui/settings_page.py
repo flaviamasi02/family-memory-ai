@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QProgressBar,
     QFrame,
     QRadioButton,
     QSpinBox,
@@ -132,6 +133,8 @@ class SettingsPage(QWidget):
         self.view_logs_button = QPushButton("View logs")
         self.remove_model_files_button = QPushButton("Remove model files")
         self.ai_plan_box = QTextEdit(); self.ai_plan_box.setReadOnly(True); self.ai_plan_box.setMaximumHeight(170)
+        self.runtime_step_label = QLabel("Current step: idle")
+        self.runtime_progress_bar = QProgressBar(); self.runtime_progress_bar.setRange(0, 1); self.runtime_progress_bar.setValue(0)
         self.sample_limit = QSpinBox(); self.sample_limit.setRange(1, 300); self.sample_limit.setValue(100)
         self.library_radio = QRadioButton("Current imported library")
         self.selected_radio = QRadioButton("Selected photos")
@@ -171,6 +174,8 @@ class SettingsPage(QWidget):
             action_layout.addWidget(action_button)
         root.addLayout(action_layout)
         root.addWidget(self.ai_plan_box)
+        root.addWidget(self.runtime_step_label)
+        root.addWidget(self.runtime_progress_bar)
         root.addWidget(QLabel("MobileCLIP Local Evaluation (evaluation-only)"))
         root.addLayout(controls)
         root.addLayout(source_layout)
@@ -277,6 +282,7 @@ class SettingsPage(QWidget):
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
         worker.progress.connect(self._on_ai_runtime_progress)
+        worker.current_step.connect(lambda step: self.runtime_step_label.setText(f"Current step: {step}"))
         worker.completed.connect(lambda result: self._on_ai_runtime_completed(operation, result))
         worker.failed.connect(self._on_ai_runtime_failed)
         worker.finished.connect(thread.quit)
@@ -286,6 +292,7 @@ class SettingsPage(QWidget):
         self._active_runtime_thread = thread
         self._active_runtime_worker = worker
         self._set_runtime_buttons_enabled(False)
+        self.runtime_progress_bar.setRange(0, 0)
         thread.start()
 
     def _clear_ai_runtime_worker(self) -> None:
@@ -293,10 +300,16 @@ class SettingsPage(QWidget):
         self._active_runtime_worker = None
         self._active_cancel_event = None
         self._set_runtime_buttons_enabled(True)
+        self.runtime_progress_bar.setRange(0, 1); self.runtime_progress_bar.setValue(1)
         self._refresh_mobileclip_status()
 
     def _on_ai_runtime_progress(self, step: str, message: str) -> None:
         self.ai_plan_box.append(f"[{step}] {message}")
+        if step == "download" and "/" in message:
+            done_text, total_text = message.split("/", 1)
+            total_text = total_text.split()[0]
+            if done_text.isdigit() and total_text.isdigit() and int(total_text) > 0:
+                self.runtime_progress_bar.setRange(0, int(total_text)); self.runtime_progress_bar.setValue(int(done_text))
 
     def _on_ai_runtime_completed(self, operation: str, result: object) -> None:
         self.ai_plan_box.append(f"{operation.title()} completed.")
@@ -332,7 +345,10 @@ class SettingsPage(QWidget):
         )
 
     def _confirm_and_install_mobileclip(self) -> None:
-        interpreter = self.ai_env_input.text().strip() or (self._last_installation_plan.python_environment.interpreter_path if self._last_installation_plan else None)
+        if self._last_installation_plan is None:
+            self.ai_plan_box.setPlainText("View the MobileCLIP installation plan before installing.")
+            return
+        interpreter = self.ai_env_input.text().strip() or self._last_installation_plan.python_environment.interpreter_path
         if not interpreter:
             self.ai_plan_box.setPlainText("Select and inspect a MobileCLIP Python interpreter before installing.")
             return

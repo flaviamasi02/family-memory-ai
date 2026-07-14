@@ -109,6 +109,7 @@ def test_settings_install_cancel_and_background_worker_are_wired(monkeypatch, tm
     app=QApplication.instance() or QApplication([])
     page=SettingsPage()
     page.ai_env_input.setText(sys.executable)
+    page._last_installation_plan = page.ai_runtime_manager.build_installation_plan("mobileclip", sys.executable)
     started=[]
     monkeypatch.setattr(QMessageBox, 'question', lambda *a, **k: QMessageBox.StandardButton.No)
     monkeypatch.setattr(page, '_start_ai_runtime_operation', lambda *a, **k: started.append((a,k)))

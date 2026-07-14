@@ -12,6 +12,7 @@ from ai_runtime.models import AIRuntimeInstallationPlan
 
 class AIRuntimeOperationWorker(QObject):
     progress = Signal(str, str)
+    current_step = Signal(str)
     completed = Signal(object)
     failed = Signal(str)
     finished = Signal()
@@ -36,7 +37,9 @@ class AIRuntimeOperationWorker(QObject):
 
     def run(self) -> None:
         try:
-            callback = lambda step, message: self.progress.emit(str(step), str(message))
+            def callback(step, message):
+                self.current_step.emit(str(step))
+                self.progress.emit(str(step), str(message))
             if self.operation == "install":
                 if self.plan is None:
                     raise ValueError("Installation plan is required.")
