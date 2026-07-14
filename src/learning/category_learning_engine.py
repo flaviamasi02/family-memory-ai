@@ -104,7 +104,12 @@ class CategoryLearningEngine:
         area = (width * height) if isinstance(width, int) and isinstance(height, int) else 0
         aspect_ratio = float(width / height) if isinstance(width, int) and isinstance(height, int) and height > 0 else 0.0
         has_camera = bool(str(metadata_dict.get("camera_make", "") or "").strip() or str(metadata_dict.get("camera_model", "") or "").strip())
-        file_size = _to_int(metadata_dict.get("file_size")) or 0
+        file_size = _to_int(metadata_dict.get("file_size"))
+        if file_size is None:
+            try:
+                file_size = path.stat().st_size
+            except OSError:
+                file_size = 0
         profile = _visual_profile_from_inputs(metadata_dict, visual_profile)
         signals: dict[str, str | int | float | bool] = {
             "contains_whatsapp": "whatsapp" in filename_lower or "-wa" in filename_lower,
