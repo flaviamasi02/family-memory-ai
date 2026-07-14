@@ -306,6 +306,9 @@ class IrrelevantMediaPage(QWidget):
     def selected_count(self) -> int:
         return self.thumbnail_grid.selected_count()
 
+    def selected_photos(self) -> list:
+        return [row.photo for row in self._selected_rows()]
+
     def grid_column_count(self) -> int:
         return self.thumbnail_grid.grid_column_count()
 

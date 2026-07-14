@@ -287,36 +287,36 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                 _purpose_section(
                     why_this_workspace_exists="Settings centralizes product behavior preferences so your workflow remains consistent across imports and review sessions.",
                     problem_it_solves="Growing AI workflows require explicit defaults and visibility into system behavior to avoid accidental drift.",
-                    ai_automation="The system applies configured defaults and will later surface adaptive recommendations based on project usage.",
-                    user_interaction="Adjust application preferences deliberately, then validate effects in the workspace where decisions are made.",
-                    expected_outcome="Predictable behavior, clearer control, and safer long-term scaling of memory workflows.",
+                    ai_automation="MobileCLIP remains evaluation-only: it can embed a bounded sample locally for reports, but it does not automatically change categories, cleanup decisions, thumbnails, or imports.",
+                    user_interaction="Choose whether MobileCLIP evaluates the current imported library, the currently selected photos, or another folder; review the sample-count preview, then press Run explicitly.",
+                    expected_outcome="Predictable behavior, clearer control, local-only model processing, and safer long-term scaling of memory workflows.",
                 ),
                 _workflow_section(
                     [
                         "Review Current Defaults",
-                        "Adjust Workflow Preferences",
-                        "Save and Validate Changes",
-                        "Run a Small Test Import",
+                        "Choose a MobileCLIP Evaluation Source",
+                        "Confirm Available and Sample Counts",
+                        "Run Evaluation Only When Ready",
                         "Keep Stable Baselines for Team Use",
                     ]
                 ),
                 _best_practices_section(
                     [
-                        "Change one setting group at a time and validate quickly.",
-                        "Document preference changes for shared family workflows.",
-                        "Keep conservative defaults for cleanup and irreversible actions.",
-                        "Revisit settings after major model or workflow updates.",
+                        "Use Current imported library to evaluate photos already loaded in Family Memory AI without importing again.",
+                        "Use Selected photos after selecting one or more items in Photo Browser or Cleanup Review; the app will not silently fall back to the full library.",
+                        "Use Another folder only for an explicit external folder test, and keep the maximum sample cap small for CPU-only validation.",
+                        "Treat MobileCLIP output as local-only evaluation evidence; it does not automatically change categories or original images.",
                     ]
                 ),
                 _tips_section(
                     [
                         WorkspaceHelpTip(
                             title="Tip of the Day",
-                            body="Stable defaults make AI behavior easier to understand and improve over time.",
+                            body="The maximum sample cap controls how many eligible images are evaluated before any MobileCLIP run starts.",
                         ),
                         WorkspaceHelpTip(
                             title="Team Tip",
-                            body="If multiple people review photos, align settings first to reduce inconsistent outcomes. The compact workspace introduction panel at the top can be collapsed after setup review.",
+                            body="MobileCLIP processing is local-only and evaluation-only; install dependencies first, verify the preview counts, and press Run only when you are ready. The compact workspace introduction panel at the top can be collapsed after setup review.",
                         ),
                     ]
                 ),
