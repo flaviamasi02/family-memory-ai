@@ -235,3 +235,7 @@ After optimization, the UI is responsive immediately after clicking Import (scan
 ### Notes
 - The current UI now uses a custom card grid as the first step toward a more reliable custom photo browser.
 - True virtual scrolling remains pending for very large photo libraries.
+## MODEL-002A — Generic AI Runtime Manager
+- Added a generic AI Runtime Manager architecture for provider registration, environment inspection, explicit installation plans, status/history/benchmark persistence, safe removal planning, and diagnostics.
+- Registered MobileCLIP-S0 as the first managed runtime without automatically installing dependencies or downloading model weights; real installation is deferred to MODEL-002B after Product Owner approval.
+- Added Settings → AI Models UI content that surfaces runtime status, licenses, checkpoint, capabilities, cache destination, Python environment, and generated installation plans.

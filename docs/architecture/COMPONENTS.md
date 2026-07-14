@@ -83,3 +83,12 @@ Each step has a single primary owner component. Current deterministic implementa
 - `vision.embedding_provider`: provider protocol, model metadata/status, normalized embedding records, fake provider, and SQLite embedding store.
 - `vision.mobileclip_provider.MobileCLIPEmbeddingProvider`: optional MobileCLIP-S0 CPU provider with lazy loading and explicit local checkpoint cache.
 - `vision.evaluation`: bounded evaluation workflow, timing/storage report, zero-shot prompt aggregation, and personalized prototype evaluation without self-match leakage.
+
+## AI runtime components
+
+- `ai_runtime.models`: canonical runtime descriptors, states, capabilities, installation records, environment records, typed plan actions, history records, and benchmark records.
+- `ai_runtime.registry.AIRuntimeRegistry`: lightweight provider registry with duplicate-provider protection and lazy provider factory storage.
+- `ai_runtime.manager.AIRuntimeManager`: status detection, Python environment inspection, explicit installation/removal plan generation, metadata persistence, diagnostics, and confirmation-gated execution.
+- `ai_runtime.executor.AIRuntimeCommandExecutor`: safe typed command execution using argv tokens, explicit interpreter paths, bounded output, timeout, cancellation, and structured results.
+- `ai_runtime.mobileclip_registration`: registers MobileCLIP-S0 as the first generic runtime while preserving evaluation-only behavior and no automatic downloads.
+- `ui.settings_page.SettingsPage`: exposes the user-visible AI Models section, runtime status, environment inspection, and plan preview.

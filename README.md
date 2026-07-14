@@ -38,3 +38,7 @@ Start here for project context and current status:
 The base app does not require ML packages.  To evaluate MobileCLIP locally, explicitly install compatible CPU PyTorch, torchvision, Pillow, and Apple's official MobileCLIP package/checkpoint into your environment and place the selected `apple/MobileCLIP-S0` `.pt` checkpoint in the app-data model cache shown in Settings.  The app never downloads model weights automatically.
 
 In Settings, choose an explicit MobileCLIP evaluation source before pressing **Run MobileCLIP evaluation**: the current imported library, the photos selected in a supported workspace, or another folder.  The preview shows available images and the configured sample cap before any evaluation starts.  MobileCLIP remains local-only and evaluation-only; it does not modify originals, thumbnails, categories, cleanup decisions, or the normal import workflow.
+
+### AI Models runtime management
+
+Settings includes an **AI Models** section backed by the generic AI Runtime Manager. It can show registered providers such as MobileCLIP, inspect the selected Python interpreter, and generate an explicit installation plan with dependencies, model files, destination, licenses, and warnings. MODEL-002A does not install packages or download checkpoints automatically; real MobileCLIP installation is deferred to MODEL-002B and requires Product Owner approval.

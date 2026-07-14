@@ -287,13 +287,15 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                 _purpose_section(
                     why_this_workspace_exists="Settings centralizes product behavior preferences so your workflow remains consistent across imports and review sessions.",
                     problem_it_solves="Growing AI workflows require explicit defaults and visibility into system behavior to avoid accidental drift.",
-                    ai_automation="MobileCLIP remains evaluation-only: it can embed a bounded sample locally for reports, but it does not automatically change categories, cleanup decisions, thumbnails, or imports.",
-                    user_interaction="Choose whether MobileCLIP evaluates the current imported library, the currently selected photos, or another folder; review the sample-count preview, then press Run explicitly.",
+                    ai_automation="The AI Models section uses the generic AI Runtime Manager to show local provider status, Python environment details, licenses, and explicit installation plans. MobileCLIP remains evaluation-only and no model or dependency downloads silently.",
+                    user_interaction="Inspect or select a Python environment, generate and review an AI model installation plan, then separately choose whether MobileCLIP evaluates the current library, selected photos, or another folder.",
                     expected_outcome="Predictable behavior, clearer control, local-only model processing, and safer long-term scaling of memory workflows.",
                 ),
                 _workflow_section(
                     [
                         "Review Current Defaults",
+                        "Open AI Models and Review Registered Runtime Status",
+                        "Inspect the Python Environment or Generate an Installation Plan",
                         "Choose a MobileCLIP Evaluation Source",
                         "Confirm Available and Sample Counts",
                         "Run Evaluation Only When Ready",
@@ -306,6 +308,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                         "Use Selected photos after selecting one or more items in Photo Browser or Cleanup Review; the app will not silently fall back to the full library.",
                         "Use Another folder only for an explicit external folder test, and keep the maximum sample cap small for CPU-only validation.",
                         "Treat MobileCLIP output as local-only evaluation evidence; it does not automatically change categories or original images.",
+                        "Do not approve installation or removal unless the generated AI Models plan shows the expected interpreter, cache path, licenses, and warnings.",
                     ]
                 ),
                 _tips_section(
@@ -316,7 +319,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                         ),
                         WorkspaceHelpTip(
                             title="Team Tip",
-                            body="MobileCLIP processing is local-only and evaluation-only; install dependencies first, verify the preview counts, and press Run only when you are ready. The compact workspace introduction panel at the top can be collapsed after setup review.",
+                            body="AI Models installation plans are previews until explicitly confirmed; MODEL-002A does not automatically install MobileCLIP packages or download checkpoints.",
                         ),
                     ]
                 ),

@@ -988,3 +988,9 @@ LEARN-003.2 adds content-first learning from user category corrections. Category
 MODEL-001 introduces an optional, evaluation-only MobileCLIP semantic embedding foundation.  The app keeps the existing category system and correction history authoritative; Unknown remains the conservative result when semantic evidence is weak.  MobileCLIP evaluation is bounded to a default sample of 100 images with a hard UI/workflow cap of 300 images and runs outside UI widgets through reusable services.
 
 Stable per-user data storage has been introduced for learning profiles, categories, visual profiles, MobileCLIP embeddings, model configuration, and evaluation reports.  Existing repository-local `.familymemory` profiles are migrated safely, with diagnostics and newer stable data protected from older legacy files.
+
+## MODEL-002A Generic AI Runtime Manager
+
+Family Memory AI now has a canonical generic AI Runtime Manager for optional local AI providers. The manager owns provider registration, status checks, dependency and model-file inspection, explicit installation-plan generation, separate Python environment records, app-data metadata persistence, history, benchmark records, diagnostics, safe removal planning, and update-policy placeholders.
+
+MobileCLIP is registered as the first provider through this generic registry. It remains local-only and evaluation-only, does not replace the production classifier, and is not installed or downloaded automatically. The real MobileCLIP installation workflow is deferred to MODEL-002B and requires Product Owner confirmation of the generated plan.

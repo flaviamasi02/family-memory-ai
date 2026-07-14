@@ -318,3 +318,9 @@ Content-based learning is the current learning-domain milestone. User category c
 ### MODEL-001 MobileCLIP local vision evaluation
 
 The roadmap now follows a pretrained-model-first strategy: use a compact pretrained image/text model for general visual semantics, then let Family Memory AI learn personal meaning from corrections through embedding similarity.  MobileCLIP-S0 is the first CPU baseline provider; Florence-2 remains a possible future secondary provider.  Tags, subcategories, combined rules, and a bulk rule editor are intentionally deferred.
+
+### MODEL-002A Generic AI Runtime Manager
+
+Approved: optional local AI models are managed by a generic runtime registry and manager rather than MobileCLIP-specific UI or services. Current and future providers can register descriptors, dependencies, model files, capabilities, licenses, environment needs, and verification behavior without requiring runtime-manager UI rewrites.
+
+MODEL-002A delivers architecture, MobileCLIP registration, Settings → AI Models visibility, installation-plan generation, metadata/history/benchmark persistence, and safe removal planning. SigLIP2, Florence-2, OCR, face recognition, and other local providers remain future registrations unless intentionally added. Real MobileCLIP installation and checkpoint execution are deferred to MODEL-002B.
