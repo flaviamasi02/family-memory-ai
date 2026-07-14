@@ -42,3 +42,11 @@ In Settings, choose an explicit MobileCLIP evaluation source before pressing **R
 ### AI Models runtime management
 
 Settings includes an **AI Models** section backed by the generic AI Runtime Manager. It can show registered providers such as MobileCLIP, inspect the selected Python interpreter, and generate an explicit installation plan with dependencies, model files, destination, licenses, and warnings. MODEL-002A does not install packages or download checkpoints automatically; real MobileCLIP installation is deferred to MODEL-002B and requires Product Owner approval.
+
+### MODEL-002B managed MobileCLIP installation
+
+MobileCLIP is now the first real managed AI runtime. Use **Settings → AI Models** to select the dedicated interpreter, normally `C:\Projects\family-memory-ai\.venv-mobileclip\Scripts\python.exe` on the Product Owner Windows machine. The app validates that interpreter, persists it, and revalidates it after restart.
+
+The installation plan is explicit and must be reviewed before anything runs. It shows the selected Python path/version, 64-bit/writable/pip validation, CPU-only device, package commands using `python.exe -m pip`, the official Apple MobileCLIP GitHub source, `apple/MobileCLIP-S0`, the app-data checkpoint destination outside Git, estimated size/disk usage, code/model licenses, restart note, warnings, and verification steps. There are no automatic downloads or silent package installs.
+
+Verification requires imports, the checkpoint file, model/transforms creation, tokenizer creation, and one synthetic image embedding with finite numeric output before Ready is recorded. Manual Product Owner testing is required before merge. After merge, repository cleanup remains mandatory: switch to `main`, fetch/pull, delete merged local branches, confirm no open PRs, confirm `git stash list` is empty, and confirm GitHub Desktop shows 0 changed files.

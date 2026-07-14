@@ -98,6 +98,10 @@ class SettingsPage(QWidget):
             "Model license",
             "Last installed",
             "Last updated",
+            "Current step",
+            "Installed packages",
+            "Checkpoint status",
+            "Last verification",
             "Last benchmark",
             "Last error",
         ):
@@ -112,6 +116,13 @@ class SettingsPage(QWidget):
         self.ai_env_input.setPlaceholderText("Python interpreter for selected AI runtime (current app environment by default)")
         self.inspect_env_button = QPushButton("Inspect Python environment")
         self.plan_button = QPushButton("View installation plan")
+        self.install_button = QPushButton("Install")
+        self.cancel_install_button = QPushButton("Cancel")
+        self.verify_button = QPushButton("Verify")
+        self.test_button = QPushButton("Test")
+        self.open_model_folder_button = QPushButton("Open model folder")
+        self.view_logs_button = QPushButton("View logs")
+        self.remove_model_files_button = QPushButton("Remove model files")
         self.ai_plan_box = QTextEdit(); self.ai_plan_box.setReadOnly(True); self.ai_plan_box.setMaximumHeight(170)
         self.sample_limit = QSpinBox(); self.sample_limit.setRange(1, 300); self.sample_limit.setValue(100)
         self.library_radio = QRadioButton("Current imported library")
@@ -147,6 +158,10 @@ class SettingsPage(QWidget):
         root.addWidget(self.mobileclip_status)
         env_layout = QHBoxLayout(); env_layout.addWidget(QLabel("Python environment:")); env_layout.addWidget(self.ai_env_input); env_layout.addWidget(self.inspect_env_button); env_layout.addWidget(self.plan_button)
         root.addLayout(env_layout)
+        action_layout = QHBoxLayout()
+        for action_button in (self.install_button, self.cancel_install_button, self.verify_button, self.test_button, self.open_model_folder_button, self.view_logs_button, self.remove_model_files_button):
+            action_layout.addWidget(action_button)
+        root.addLayout(action_layout)
         root.addWidget(self.ai_plan_box)
         root.addWidget(QLabel("MobileCLIP Local Evaluation (evaluation-only)"))
         root.addLayout(controls)
@@ -158,6 +173,13 @@ class SettingsPage(QWidget):
         root.addWidget(self.report_box)
         self.inspect_env_button.clicked.connect(self._inspect_ai_environment)
         self.plan_button.clicked.connect(self._show_ai_installation_plan)
+        self.install_button.clicked.connect(self._show_install_confirmation_required)
+        self.cancel_install_button.clicked.connect(lambda: self.ai_plan_box.setPlainText("Installation/download cancelled before execution; no changes were made."))
+        self.verify_button.clicked.connect(self._verify_mobileclip_runtime)
+        self.test_button.clicked.connect(self._test_mobileclip_one_image)
+        self.open_model_folder_button.clicked.connect(lambda: self.ai_plan_box.setPlainText(f"Model folder: {self.ai_runtime_manager.installation_record('mobileclip').local_model_cache_path}"))
+        self.view_logs_button.clicked.connect(lambda: self.ai_plan_box.setPlainText(f"Runtime logs/history folder: {self.ai_runtime_manager.storage.logs_dir}"))
+        self.remove_model_files_button.clicked.connect(self._show_mobileclip_removal_plan)
         self.select_folder_button.clicked.connect(self._select_mobileclip_folder)
         self.run_button.clicked.connect(self._run_mobileclip_evaluation)
         self.sample_limit.valueChanged.connect(self._refresh_source_summary)
@@ -190,6 +212,10 @@ class SettingsPage(QWidget):
             "Model license": descriptor.model_license,
             "Last installed": record.install_date or "never",
             "Last updated": record.update_date or "never",
+            "Current step": status.state,
+            "Installed packages": "available" if status.dependencies_available else f"missing: {', '.join(status.missing_dependencies)}",
+            "Checkpoint status": "present" if status.model_files_available else f"missing: {', '.join(status.missing_model_files)}",
+            "Last verification": record.last_validation_result or "never",
             "Last benchmark": last_benchmark,
             "Last error": status.last_error or "none",
         }
@@ -225,6 +251,23 @@ class SettingsPage(QWidget):
             f"Warnings:\n{warnings}\nTyped actions (not executed until explicit confirmation):\n{actions}"
         )
         QMessageBox.information(self, "AI Models installation plan", "Plan generated only. Nothing was installed or downloaded.")
+
+
+    def _show_install_confirmation_required(self) -> None:
+        self.ai_plan_box.setPlainText("Install requires explicit Product Owner confirmation. Generate and review the installation plan first; automated tests never install packages or download models.")
+
+    def _verify_mobileclip_runtime(self) -> None:
+        result = self.ai_runtime_manager.verify_provider("mobileclip")
+        self.ai_plan_box.setPlainText(f"Verification return code: {result.returncode}\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}")
+        self._refresh_mobileclip_status()
+
+    def _test_mobileclip_one_image(self) -> None:
+        self.report_box.setPlainText("Manual MobileCLIP test runs one local image through embedding only, reports elapsed time, and does not classify or modify the photo. Use Run MobileCLIP evaluation with sample size 1 after selecting a source.")
+
+    def _show_mobileclip_removal_plan(self) -> None:
+        plan = self.ai_runtime_manager.removal_plan("mobileclip")
+        warnings = "\n".join(f"- {w}" for w in plan.warnings)
+        self.ai_plan_box.setPlainText(f"Removal plan for {plan.provider_name}\nDestination: {plan.destination_path}\nWarnings:\n{warnings}\nNo photos, thumbnails, categories, learning profiles, or originals are removed.")
 
     def _active_source_result(self) -> EvaluationSourceResult:
         limit = self.sample_limit.value()

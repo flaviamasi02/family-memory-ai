@@ -27,7 +27,18 @@ class AIRuntimeCommandExecutor:
             import json; d=json.loads(p.stdout.strip())
             env_path=d.get('prefix') or str(path.parent); writable=os.access(d.get('purelib') or env_path, os.W_OK)
             env_type='virtualenv' if d.get('prefix') != d.get('base_prefix') else 'system'
-            return PythonEnvironmentInfo(str(path), d.get('version',''), d.get('arch',''), env_path, env_type, bool(d.get('pip')), writable, bool(d.get('pip')), '')
+            
+            version=d.get('version','')
+            arch=d.get('arch','')
+            major_minor=tuple(int(x) for x in version.split('.')[:2]) if version else (0,0)
+            is_64='64' in arch or arch.lower() in ('amd64','x86_64','arm64','aarch64')
+            valid=bool(d.get('pip')) and writable and is_64 and (major_minor >= (3,10))
+            msg=''
+            if not d.get('pip'): msg='pip is not available.'
+            elif not writable: msg='Environment package directory is not writable.'
+            elif not is_64: msg='Python architecture must be 64-bit.'
+            elif major_minor < (3,10): msg='Python 3.10 or newer is required for MobileCLIP.'
+            return PythonEnvironmentInfo(str(path), version, arch, env_path, env_type, bool(d.get('pip')), writable, valid, msg)
         except Exception as exc: return PythonEnvironmentInfo(str(path), valid=False, message=str(exc))
     def imports_available(self, interpreter: str|Path, import_names: tuple[str, ...]) -> tuple[str, ...]:
         missing=[]

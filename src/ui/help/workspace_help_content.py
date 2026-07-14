@@ -319,7 +319,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                         ),
                         WorkspaceHelpTip(
                             title="Team Tip",
-                            body="AI Models installation plans are previews until explicitly confirmed; MODEL-002A does not automatically install MobileCLIP packages or download checkpoints.",
+                            body="AI Models installation plans are previews until explicitly confirmed; MODEL-002B still requires explicit Product Owner confirmation before installing packages or downloading checkpoints; no startup action installs MobileCLIP silently.",
                         ),
                     ]
                 ),

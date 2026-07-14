@@ -324,3 +324,7 @@ The roadmap now follows a pretrained-model-first strategy: use a compact pretrai
 Approved: optional local AI models are managed by a generic runtime registry and manager rather than MobileCLIP-specific UI or services. Current and future providers can register descriptors, dependencies, model files, capabilities, licenses, environment needs, and verification behavior without requiring runtime-manager UI rewrites.
 
 MODEL-002A delivers architecture, MobileCLIP registration, Settings → AI Models visibility, installation-plan generation, metadata/history/benchmark persistence, and safe removal planning. SigLIP2, Florence-2, OCR, face recognition, and other local providers remain future registrations unless intentionally added. Real MobileCLIP installation and checkpoint execution are deferred to MODEL-002B.
+
+### MODEL-002B MobileCLIP managed installation
+
+MODEL-002B turns MobileCLIP from a registered optional provider into the first real managed runtime. It keeps MODEL-002A's generic manager architecture, requires a dedicated Python environment, supports CPU-only installation, uses official Apple MobileCLIP code and `apple/MobileCLIP-S0`, stores weights outside Git, and requires explicit Product Owner confirmation plus full verification before Ready.

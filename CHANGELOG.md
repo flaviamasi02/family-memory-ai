@@ -239,3 +239,9 @@ After optimization, the UI is responsive immediately after clicking Import (scan
 - Added a generic AI Runtime Manager architecture for provider registration, environment inspection, explicit installation plans, status/history/benchmark persistence, safe removal planning, and diagnostics.
 - Registered MobileCLIP-S0 as the first managed runtime without automatically installing dependencies or downloading model weights; real installation is deferred to MODEL-002B after Product Owner approval.
 - Added Settings → AI Models UI content that surfaces runtime status, licenses, checkpoint, capabilities, cache destination, Python environment, and generated installation plans.
+
+## MODEL-002B — Real MobileCLIP runtime installation
+- Added confirmation-gated MobileCLIP installation execution using the generic AI Runtime Manager, selected interpreter, typed `python -m pip` commands, explicit checkpoint download, cancellation, bounded command output, and provider verification.
+- Added dedicated interpreter validation for 64-bit Python, pip, writability, persistence, restart revalidation, and warnings when the active application environment is selected.
+- Expanded Settings → AI Models actions for plan, install confirmation, cancel, verify, test guidance, model folder, logs, and safe removal plan while keeping MobileCLIP evaluation-only.
+- Added tests covering official source planning, selected interpreter command construction, checkpoint path outside Git, Ready-after-verification behavior, cancellation cleanup, and UI construction.

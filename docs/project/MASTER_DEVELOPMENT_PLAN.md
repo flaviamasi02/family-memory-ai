@@ -397,3 +397,7 @@ Implement MobileCLIP as an optional local provider with explicit setup/download,
 ### MODEL-002A Runtime Management Foundation
 
 Build a generic AI Runtime Manager before production model adoption. Required policies: all photo analysis remains local, no photo upload, no silent model/dependency downloads, explicit installation/removal confirmation, model files outside Git, separate runtime environment support, license visibility, benchmark history, and safe removal. MobileCLIP is the first registered provider; real installation is deferred to MODEL-002B.
+
+### MODEL-002B Runtime Installation Policy
+
+Real AI runtime installation is allowed only through the generic AI Runtime Manager. MobileCLIP uses a dedicated environment, explicit typed commands, official source disclosure, local app-data model storage, cancellation, logs/history, safe removal plans, and full verification. It remains evaluation-only and must not replace production classification until a later approved milestone.
