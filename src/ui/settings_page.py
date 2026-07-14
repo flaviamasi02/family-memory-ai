@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from threading import Event
 from typing import Callable
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QThread
 from PySide6.QtWidgets import (
     QFileDialog,
     QButtonGroup,
@@ -11,6 +13,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QProgressBar,
     QFrame,
     QRadioButton,
     QSpinBox,
@@ -27,6 +30,8 @@ from vision.evaluation_sources import (
     selected_photos_source,
 )
 from ai_runtime.manager import create_default_runtime_manager
+from ai_runtime.models import AIRuntimeInstallationPlan
+from workers.ai_runtime_worker import AIRuntimeOperationWorker
 
 from ui.components.workspace_header import WorkspaceHeader
 from ui.components.workspace_info_content import WORKSPACE_INFO_CONTENT
@@ -49,6 +54,10 @@ class SettingsPage(QWidget):
         self._selected_folder: Path | None = None
         self._last_source_result: EvaluationSourceResult | None = None
         self.ai_runtime_manager = create_default_runtime_manager()
+        self._last_installation_plan: AIRuntimeInstallationPlan | None = None
+        self._active_runtime_thread: QThread | None = None
+        self._active_runtime_worker: AIRuntimeOperationWorker | None = None
+        self._active_cancel_event: Event | None = None
 
         self.header = WorkspaceHeader("Settings")
         self.header.help_clicked.connect(self._on_help_clicked)
@@ -98,6 +107,10 @@ class SettingsPage(QWidget):
             "Model license",
             "Last installed",
             "Last updated",
+            "Current step",
+            "Installed packages",
+            "Checkpoint status",
+            "Last verification",
             "Last benchmark",
             "Last error",
         ):
@@ -112,7 +125,16 @@ class SettingsPage(QWidget):
         self.ai_env_input.setPlaceholderText("Python interpreter for selected AI runtime (current app environment by default)")
         self.inspect_env_button = QPushButton("Inspect Python environment")
         self.plan_button = QPushButton("View installation plan")
+        self.install_button = QPushButton("Install")
+        self.cancel_install_button = QPushButton("Cancel")
+        self.verify_button = QPushButton("Verify")
+        self.test_button = QPushButton("Test")
+        self.open_model_folder_button = QPushButton("Open model folder")
+        self.view_logs_button = QPushButton("View logs")
+        self.remove_model_files_button = QPushButton("Remove model files")
         self.ai_plan_box = QTextEdit(); self.ai_plan_box.setReadOnly(True); self.ai_plan_box.setMaximumHeight(170)
+        self.runtime_step_label = QLabel("Current step: idle")
+        self.runtime_progress_bar = QProgressBar(); self.runtime_progress_bar.setRange(0, 1); self.runtime_progress_bar.setValue(0)
         self.sample_limit = QSpinBox(); self.sample_limit.setRange(1, 300); self.sample_limit.setValue(100)
         self.library_radio = QRadioButton("Current imported library")
         self.selected_radio = QRadioButton("Selected photos")
@@ -120,7 +142,7 @@ class SettingsPage(QWidget):
         self.source_group = QButtonGroup(self)
         self.select_folder_button = QPushButton("Choose another folder…")
         self.run_button = QPushButton("Run MobileCLIP evaluation")
-        self.cancel_note = QLabel("Evaluation runs outside the UI thread in the evaluation service; no model is downloaded automatically.")
+        self.cancel_note = QLabel("Evaluation and AI runtime operations run outside the UI thread; no model is downloaded automatically.")
         self.cancel_note.setWordWrap(True)
         self.source_summary = QLabel("")
         self.source_summary.setWordWrap(True)
@@ -147,7 +169,13 @@ class SettingsPage(QWidget):
         root.addWidget(self.mobileclip_status)
         env_layout = QHBoxLayout(); env_layout.addWidget(QLabel("Python environment:")); env_layout.addWidget(self.ai_env_input); env_layout.addWidget(self.inspect_env_button); env_layout.addWidget(self.plan_button)
         root.addLayout(env_layout)
+        action_layout = QHBoxLayout()
+        for action_button in (self.install_button, self.cancel_install_button, self.verify_button, self.test_button, self.open_model_folder_button, self.view_logs_button, self.remove_model_files_button):
+            action_layout.addWidget(action_button)
+        root.addLayout(action_layout)
         root.addWidget(self.ai_plan_box)
+        root.addWidget(self.runtime_step_label)
+        root.addWidget(self.runtime_progress_bar)
         root.addWidget(QLabel("MobileCLIP Local Evaluation (evaluation-only)"))
         root.addLayout(controls)
         root.addLayout(source_layout)
@@ -158,6 +186,13 @@ class SettingsPage(QWidget):
         root.addWidget(self.report_box)
         self.inspect_env_button.clicked.connect(self._inspect_ai_environment)
         self.plan_button.clicked.connect(self._show_ai_installation_plan)
+        self.install_button.clicked.connect(self._confirm_and_install_mobileclip)
+        self.cancel_install_button.clicked.connect(self._cancel_ai_runtime_operation)
+        self.verify_button.clicked.connect(self._verify_mobileclip_runtime)
+        self.test_button.clicked.connect(self._test_mobileclip_one_image)
+        self.open_model_folder_button.clicked.connect(lambda: self.ai_plan_box.setPlainText(f"Model folder: {self.ai_runtime_manager.installation_record('mobileclip').local_model_cache_path}"))
+        self.view_logs_button.clicked.connect(lambda: self.ai_plan_box.setPlainText(f"Runtime logs/history folder: {self.ai_runtime_manager.storage.logs_dir}"))
+        self.remove_model_files_button.clicked.connect(self._show_mobileclip_removal_plan)
         self.select_folder_button.clicked.connect(self._select_mobileclip_folder)
         self.run_button.clicked.connect(self._run_mobileclip_evaluation)
         self.sample_limit.valueChanged.connect(self._refresh_source_summary)
@@ -190,6 +225,10 @@ class SettingsPage(QWidget):
             "Model license": descriptor.model_license,
             "Last installed": record.install_date or "never",
             "Last updated": record.update_date or "never",
+            "Current step": status.state,
+            "Installed packages": "available" if status.dependencies_available else f"missing: {', '.join(status.missing_dependencies)}",
+            "Checkpoint status": "present" if status.model_files_available else f"missing: {', '.join(status.missing_model_files)}",
+            "Last verification": record.last_validation_result or "never",
             "Last benchmark": last_benchmark,
             "Last error": status.last_error or "none",
         }
@@ -211,6 +250,7 @@ class SettingsPage(QWidget):
     def _show_ai_installation_plan(self) -> None:
         interpreter = self.ai_env_input.text().strip() or None
         plan = self.ai_runtime_manager.build_installation_plan("mobileclip", interpreter)
+        self._last_installation_plan = plan
         actions = "\n".join(f"- {a.action_type.value}: {a.label}" for a in plan.actions)
         warnings = "\n".join(f"- {w}" for w in plan.warnings)
         self.ai_plan_box.setPlainText(
@@ -225,6 +265,144 @@ class SettingsPage(QWidget):
             f"Warnings:\n{warnings}\nTyped actions (not executed until explicit confirmation):\n{actions}"
         )
         QMessageBox.information(self, "AI Models installation plan", "Plan generated only. Nothing was installed or downloaded.")
+
+
+    def _set_runtime_buttons_enabled(self, enabled: bool) -> None:
+        for button in (self.inspect_env_button, self.plan_button, self.install_button, self.verify_button, self.test_button, self.open_model_folder_button, self.view_logs_button, self.remove_model_files_button):
+            button.setEnabled(enabled)
+        self.cancel_install_button.setEnabled(not enabled)
+
+    def _start_ai_runtime_operation(self, operation: str, *, plan: AIRuntimeInstallationPlan | None = None, image_path: Path | None = None) -> None:
+        if self._active_runtime_thread is not None:
+            self.ai_plan_box.setPlainText("Another AI runtime operation is already running.")
+            return
+        self._active_cancel_event = Event()
+        thread = QThread(self)
+        worker = AIRuntimeOperationWorker(self.ai_runtime_manager, operation, plan=plan, image_path=image_path, cancel_event=self._active_cancel_event)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.progress.connect(self._on_ai_runtime_progress)
+        worker.current_step.connect(lambda step: self.runtime_step_label.setText(f"Current step: {step}"))
+        worker.completed.connect(lambda result: self._on_ai_runtime_completed(operation, result))
+        worker.failed.connect(self._on_ai_runtime_failed)
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        thread.finished.connect(self._clear_ai_runtime_worker)
+        self._active_runtime_thread = thread
+        self._active_runtime_worker = worker
+        self._set_runtime_buttons_enabled(False)
+        self.runtime_progress_bar.setRange(0, 0)
+        thread.start()
+
+    def _clear_ai_runtime_worker(self) -> None:
+        self._active_runtime_thread = None
+        self._active_runtime_worker = None
+        self._active_cancel_event = None
+        self._set_runtime_buttons_enabled(True)
+        self.runtime_progress_bar.setRange(0, 1); self.runtime_progress_bar.setValue(1)
+        self._refresh_mobileclip_status()
+
+    def _on_ai_runtime_progress(self, step: str, message: str) -> None:
+        self.ai_plan_box.append(f"[{step}] {message}")
+        if step == "download" and "/" in message:
+            done_text, total_text = message.split("/", 1)
+            total_text = total_text.split()[0]
+            if done_text.isdigit() and total_text.isdigit() and int(total_text) > 0:
+                self.runtime_progress_bar.setRange(0, int(total_text)); self.runtime_progress_bar.setValue(int(done_text))
+
+    def _on_ai_runtime_completed(self, operation: str, result: object) -> None:
+        self.ai_plan_box.append(f"{operation.title()} completed.")
+        if operation == "test" and hasattr(result, "stdout"):
+            try:
+                payload = json.loads(result.stdout.strip())
+                self.report_box.setPlainText(
+                    f"MobileCLIP one-image test succeeded.\nElapsed seconds: {payload.get('elapsed_seconds'):.3f}\nEmbedding dimension: {payload.get('embedding_dimension')}\nFinite numeric output: {payload.get('finite')}\nNo classification, upload, or photo modification was performed."
+                )
+            except Exception:
+                self.report_box.setPlainText(f"MobileCLIP one-image test completed.\n{getattr(result, 'stdout', '')}\n{getattr(result, 'stderr', '')}")
+        self._refresh_mobileclip_status()
+
+    def _on_ai_runtime_failed(self, error: str) -> None:
+        self.ai_plan_box.append(f"AI runtime operation failed: {error}")
+        self._refresh_mobileclip_status()
+
+    def _cancel_ai_runtime_operation(self) -> None:
+        if self._active_cancel_event is not None:
+            self._active_cancel_event.set()
+            self.ai_plan_box.append("Cancellation requested. The running step will stop as soon as it is safe.")
+        else:
+            self.ai_plan_box.setPlainText("No AI runtime operation is running; nothing changed.")
+
+    def _confirmation_text_for_plan(self, plan: AIRuntimeInstallationPlan) -> str:
+        warnings = "\n".join(f"- {w}" for w in plan.warnings)
+        return (
+            f"Interpreter:\n{plan.python_environment.interpreter_path}\n\n"
+            f"Packages:\n{chr(10).join(plan.packages_to_install) or 'none'}\n\n"
+            f"Checkpoint: {plan.checkpoint_id}\nDestination: {plan.destination_path}\n\n"
+            f"Licenses:\nCode: {plan.licenses['code']}\nModel: {plan.licenses['model']}\n\n"
+            f"Disk estimate: {plan.estimated_disk_requirement}\n\nWarnings:\n{warnings}"
+        )
+
+    def _confirm_and_install_mobileclip(self) -> None:
+        if self._last_installation_plan is None:
+            self.ai_plan_box.setPlainText("View the MobileCLIP installation plan before installing.")
+            return
+        interpreter = self.ai_env_input.text().strip() or self._last_installation_plan.python_environment.interpreter_path
+        if not interpreter:
+            self.ai_plan_box.setPlainText("Select and inspect a MobileCLIP Python interpreter before installing.")
+            return
+        env = self.ai_runtime_manager.save_environment_selection("mobileclip", interpreter)
+        if not env.valid:
+            self.ai_plan_box.setPlainText(f"Selected interpreter is invalid; installation was not started.\n{env.message}")
+            self._refresh_mobileclip_status()
+            return
+        plan = self.ai_runtime_manager.build_installation_plan("mobileclip", interpreter)
+        self._last_installation_plan = plan
+        if QMessageBox.question(self, "Confirm MobileCLIP installation", self._confirmation_text_for_plan(plan)) != QMessageBox.StandardButton.Yes:
+            self.ai_plan_box.setPlainText("Installation cancelled before execution; no packages or model files were changed.")
+            return
+        plan.confirmed = True
+        self.ai_plan_box.setPlainText("Starting confirmed MobileCLIP installation…")
+        self._start_ai_runtime_operation("install", plan=plan)
+
+    def _verify_mobileclip_runtime(self) -> None:
+        interpreter = self.ai_env_input.text().strip() or self.ai_runtime_manager.installation_record("mobileclip").interpreter_path
+        if interpreter:
+            env = self.ai_runtime_manager.save_environment_selection("mobileclip", interpreter)
+            if not env.valid:
+                self.ai_plan_box.setPlainText(f"Selected interpreter is invalid; verification was not started.\n{env.message}")
+                return
+        self.ai_plan_box.setPlainText("Starting MobileCLIP verification…")
+        self._start_ai_runtime_operation("verify")
+
+    def _test_mobileclip_one_image(self) -> None:
+        result = self._active_source_result()
+        image_path = result.paths[0] if result.available and result.paths else None
+        if image_path is None:
+            selected, _ = QFileDialog.getOpenFileName(self, "Select one image for MobileCLIP embedding test", "", "Images (*.jpg *.jpeg *.png *.bmp *.webp)")
+            image_path = Path(selected) if selected else None
+        if image_path is None:
+            self.report_box.setPlainText("No image selected; MobileCLIP one-image test was not started.")
+            return
+        interpreter = self.ai_env_input.text().strip() or self.ai_runtime_manager.installation_record("mobileclip").interpreter_path
+        if interpreter:
+            env = self.ai_runtime_manager.save_environment_selection("mobileclip", interpreter)
+            if not env.valid:
+                self.report_box.setPlainText(f"Selected interpreter is invalid; test was not started.\n{env.message}")
+                return
+        self.report_box.setPlainText(f"Starting MobileCLIP one-image embedding test for {image_path}…")
+        self._start_ai_runtime_operation("test", image_path=Path(image_path))
+
+    def _show_mobileclip_removal_plan(self) -> None:
+        plan = self.ai_runtime_manager.removal_plan("mobileclip")
+        warnings = "\n".join(f"- {w}" for w in plan.warnings)
+        self.ai_plan_box.setPlainText(f"Removal plan for {plan.provider_name}\nDestination: {plan.destination_path}\nWarnings:\n{warnings}\nNo photos, thumbnails, categories, learning profiles, or originals are removed.")
+        if QMessageBox.question(self, "Confirm MobileCLIP model-file removal", "Remove only manager-owned MobileCLIP checkpoint/cache files?\n\nPhotos, thumbnails, categories, profiles, and source images will be preserved.") != QMessageBox.StandardButton.Yes:
+            self.ai_plan_box.append("Removal cancelled before execution; nothing changed.")
+            return
+        plan.confirmed = True
+        self._start_ai_runtime_operation("remove", plan=plan)
 
     def _active_source_result(self) -> EvaluationSourceResult:
         limit = self.sample_limit.value()

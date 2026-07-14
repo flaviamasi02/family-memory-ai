@@ -52,6 +52,8 @@ class RequiredModelFile:
     description: str = ""
     sha256: str = ""
     size_bytes: int | None = None
+    download_url: str = ""
+    minimum_size_bytes: int | None = None
 
 
 @dataclass(frozen=True)

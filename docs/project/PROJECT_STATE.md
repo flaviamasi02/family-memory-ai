@@ -994,3 +994,15 @@ Stable per-user data storage has been introduced for learning profiles, categori
 Family Memory AI now has a canonical generic AI Runtime Manager for optional local AI providers. The manager owns provider registration, status checks, dependency and model-file inspection, explicit installation-plan generation, separate Python environment records, app-data metadata persistence, history, benchmark records, diagnostics, safe removal planning, and update-policy placeholders.
 
 MobileCLIP is registered as the first provider through this generic registry. It remains local-only and evaluation-only, does not replace the production classifier, and is not installed or downloaded automatically. The real MobileCLIP installation workflow is deferred to MODEL-002B and requires Product Owner confirmation of the generated plan.
+
+## MODEL-002B Real MobileCLIP Runtime Installation
+
+Status: implemented for Product Owner manual validation.
+
+MobileCLIP is the first real managed AI runtime installed through the canonical AI Runtime Manager. The selected dedicated Python interpreter is persisted and revalidated; the Windows Product Owner path is expected to be `C:\Projects\family-memory-ai\.venv-mobileclip\Scripts\python.exe` using Python 3.10 on a CPU-only machine. The base app still starts and works without MobileCLIP installed.
+
+Installation is explicit: no packages or checkpoints are installed/downloaded until the Product Owner reviews and confirms the plan. Runtime files and model weights are stored through `ApplicationDataPathService` outside the Git repository. Ready is recorded only after full provider verification, including checkpoint load, model/transforms, tokenizer, and a finite synthetic image embedding. Manual Product Owner testing and post-merge repository cleanup are required before merge completion.
+
+### MODEL-002B review correction status
+
+Critical review findings were addressed after PR #17 review. Root causes were that the initial UI buttons exposed plans/instructions without executing confirmed background operations, verification could run on the Qt UI thread, one-image Test was instructional only, removal did not execute, selected interpreter persistence was incomplete, and the generic manager contained provider-specific checkpoint URL knowledge. The corrected flow uses confirmation dialogs, Qt worker-thread execution, progress/current-step updates, cancellation events, persisted interpreter metadata, real selected-interpreter verification/test subprocesses, and confirmed manager-owned cache removal.

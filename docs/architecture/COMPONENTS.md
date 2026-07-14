@@ -92,3 +92,14 @@ Each step has a single primary owner component. Current deterministic implementa
 - `ai_runtime.executor.AIRuntimeCommandExecutor`: safe typed command execution using argv tokens, explicit interpreter paths, bounded output, timeout, cancellation, and structured results.
 - `ai_runtime.mobileclip_registration`: registers MobileCLIP-S0 as the first generic runtime while preserving evaluation-only behavior and no automatic downloads.
 - `ui.settings_page.SettingsPage`: exposes the user-visible AI Models section, runtime status, environment inspection, and plan preview.
+
+### MODEL-002B MobileCLIP runtime installation components
+
+- `AIRuntimeManager.build_installation_plan`: creates the explicit MobileCLIP plan with selected interpreter, CPU device, package commands, official sources, checkpoint destination, licenses, warnings, and verification actions.
+- `AIRuntimeManager.execute_installation_plan`: runs only confirmed typed actions, including dependency installation, checkpoint download, import checks, and provider verification.
+- `AIRuntimeManager.verify_provider`: performs selected-interpreter end-to-end MobileCLIP verification before Ready.
+- `SettingsPage`: exposes MobileCLIP plan/install/cancel/verify/test/folder/log/removal actions without replacing the production classifier.
+
+### AI runtime worker component
+
+- `workers.ai_runtime_worker.AIRuntimeOperationWorker`: runs install, verify, one-image embedding test, and model-file removal off the Qt UI thread while emitting progress, completed, failed, and finished signals. Settings owns button state and cancellation while the worker delegates runtime behavior to `AIRuntimeManager`.
