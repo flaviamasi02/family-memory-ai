@@ -33,3 +33,6 @@ Start here for project context and current status:
 - docs/releases/CHANGELOG.md: Sprint-by-sprint implementation history
 - docs/project/PROJECT_STATE.md: Current operational state (single source of truth for current sprint and status)
 - docs/project/PROJECT_CONTEXT.md: Long-term development context and collaboration model
+### Optional MobileCLIP evaluation dependencies
+
+The base app does not require ML packages.  To evaluate MobileCLIP locally, explicitly install compatible CPU PyTorch, torchvision, Pillow, and Apple's official MobileCLIP package/checkpoint into your environment and place the selected `apple/MobileCLIP-S0` `.pt` checkpoint in the app-data model cache shown in Settings.  The app never downloads model weights automatically.

@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+from core.application_data import get_app_data_service, atomic_write_json
 from core.category_registry import get_category_registry
 from core.user_metadata_service import UserMetadataService
 from models.visual_feature_profile import VisualFeatureProfile
@@ -77,9 +78,10 @@ class CategoryLearningProfile:
 
 class CategoryLearningEngine:
     def __init__(self, storage_root: Optional[str | Path] = None):
-        root = Path(storage_root or os.environ.get("FAMILY_MEMORY_LEARNING_ROOT") or Path.cwd())
-        self._storage_root = root
-        self._storage_path = root / ".familymemory" / "category_learning_profile.json"
+        service = get_app_data_service(storage_root or os.environ.get("FAMILY_MEMORY_LEARNING_ROOT"), legacy_root=Path.cwd())
+        self._storage_root = service.root
+        self.migration_diagnostics = service.diagnostics
+        self._storage_path = service.profile_path("category_learning_profile.json")
         self._event_summaries: list[dict[str, Any]] = []
         self._learned_event_ids: set[str] = set()
         self.profile = CategoryLearningProfile()

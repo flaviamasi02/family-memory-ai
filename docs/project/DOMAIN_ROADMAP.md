@@ -314,3 +314,7 @@ Outcome:
 ## Learning Domain - LEARN-003.2
 
 Content-based learning is the current learning-domain milestone. User category corrections teach the system from deterministic local visual features first; preference counts, filenames, and metadata remain secondary support. The milestone preserves local-only storage, no cloud image upload, no black-box model dependency, and background visual enrichment so review workflows stay responsive.
+
+### MODEL-001 MobileCLIP local vision evaluation
+
+The roadmap now follows a pretrained-model-first strategy: use a compact pretrained image/text model for general visual semantics, then let Family Memory AI learn personal meaning from corrections through embedding similarity.  MobileCLIP-S0 is the first CPU baseline provider; Florence-2 remains a possible future secondary provider.  Tags, subcategories, combined rules, and a bulk rule editor are intentionally deferred.

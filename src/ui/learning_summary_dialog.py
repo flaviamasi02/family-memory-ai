@@ -5,6 +5,8 @@ from typing import Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDialog, QLabel, QListWidget, QVBoxLayout
+from vision.mobileclip_provider import MobileCLIPEmbeddingProvider
+from vision.embedding_provider import EmbeddingStore
 
 from learning.category_learning_engine import CategoryLearningEngine
 from learning.preference_learning_engine import PreferenceLearningEngine
@@ -86,8 +88,16 @@ class LearningSummaryDialog(QDialog):
                 timestamp = _format_local_timestamp(str(event.get("timestamp", "") or ""))
                 self.events_list.addItem(f"{timestamp} | category={event.get('corrected_category', 'unknown')} | source={event.get('source', 'user')} | visual={event.get('visual_status', 'unknown')}")
 
+        self.mobileclip_label = QLabel("MobileCLIP Evaluation (optional; production classifier not replaced)")
+        try:
+            provider = MobileCLIPEmbeddingProvider(); status = provider.availability(); emb_count = EmbeddingStore().count()
+            mobileclip_text = f"Status={status.state}; checkpoint={provider.metadata.checkpoint_id}; semantic embeddings cached={emb_count}; evaluation-only label; personalized prototypes are report-only."
+        except Exception as exc:
+            mobileclip_text = f"Status=Failed; evaluation-only label; {exc}"
+        self.mobileclip_list = QListWidget(); self.mobileclip_list.addItem(mobileclip_text)
+
         root = QVBoxLayout(self)
-        for widget, stretch in [(self.total_label,0),(self.visual_label,0),(self.visual_list,2),(self.activity_label,0),(self.activity_list,1),(self.rules_label,0),(self.rules_list,2),(self.preference_label,0),(self.preference_list,2),(self.events_label,0),(self.events_list,1)]:
+        for widget, stretch in [(self.total_label,0),(self.visual_label,0),(self.visual_list,2),(self.activity_label,0),(self.activity_list,1),(self.rules_label,0),(self.rules_list,2),(self.preference_label,0),(self.preference_list,2),(self.mobileclip_label,0),(self.mobileclip_list,1),(self.events_label,0),(self.events_list,1)]:
             root.addWidget(widget, stretch)
         root.setAlignment(Qt.AlignmentFlag.AlignTop)
 

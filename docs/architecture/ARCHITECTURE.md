@@ -794,3 +794,13 @@ Architecture should always optimize maintainability before complexity.
 ## Content-Based Learning Architecture
 
 LEARN-003.2 keeps learning responsibilities separated. UI review pages record authoritative user corrections and return immediately. `CategoryLearningEngine` owns persistent category visual profiles, idempotent correction event handling, conservative thresholds, pending visual-analysis records, and explainable visual-content rules. `VisualFeatureExtractionService` remains the deterministic local pixel-analysis boundary and persists completed profiles through existing sidecar metadata rather than original photo files. Recommendation integration combines deterministic classifier output with learned visual profile matches conservatively; filename and metadata evidence are secondary and cannot create high-confidence visual rules alone.
+
+## MODEL-001 MobileCLIP Local Vision Foundation
+
+Family Memory AI now treats pretrained vision models as optional local providers behind a `VisionEmbeddingProvider` boundary.  The production classifier is not replaced by this milestone: MobileCLIP is evaluation-only until Product Owner validation confirms speed and quality on the target Windows CPU-only machine.
+
+The selected first checkpoint is `apple/MobileCLIP-S0` from the official Apple Hugging Face/GitHub release.  It is the smallest practical official MobileCLIP candidate currently documented for image/text embeddings, uses the Apple ML Research Model Terms for weights and MIT for the official code, has a 216 MB PyTorch checkpoint, and produces 512-dimensional normalized embeddings.  Its Apple/mobile latency claims are not used as Windows performance claims; the evaluation report records measured local CPU timings.
+
+Photo analysis remains local.  The base app imports and starts without `torch`, `torchvision`, `mobileclip`, network access, or model weights.  Model download is explicit and is never triggered by app startup, photo import, or settings inspection.  Embeddings are stored in per-user application data, not beside original photos and not inside source images.
+
+Embedding persistence uses SQLite under the stable application-data cache.  Records include a stable resolved path key, source fingerprint, size and mtime invalidation data, provider/checkpoint/revision, embedding dimension, normalized embedding, timestamp, and status/error.  SQLite was chosen instead of one large JSON file so the cache can grow toward 50,000 photos without repeatedly rewriting all records.

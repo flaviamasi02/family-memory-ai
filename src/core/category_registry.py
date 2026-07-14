@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 import re
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+
+from core.application_data import get_app_data_service, atomic_write_json
 
 
 @dataclass
@@ -60,9 +63,10 @@ def _now_iso() -> str:
 
 class CategoryRegistry:
     def __init__(self, storage_root: Optional[str | Path] = None):
-        root = Path(storage_root or os.environ.get("FAMILY_MEMORY_CATEGORIES_ROOT") or Path.cwd())
-        self._storage_root = root
-        self._storage_path = self._storage_root / ".familymemory" / "categories.json"
+        service = get_app_data_service(storage_root or os.environ.get("FAMILY_MEMORY_CATEGORIES_ROOT"), legacy_root=Path.cwd())
+        self._storage_root = service.root
+        self.migration_diagnostics = service.diagnostics
+        self._storage_path = service.config_path("categories.json")
         self._categories: dict[str, CategoryDefinition] = {}
         self._system_defaults: dict[str, CategoryDefinition] = {}
         self._bootstrap_system_categories()
@@ -378,7 +382,9 @@ class CategoryRegistry:
             if self._categories[category_id].is_system and self._is_system_overridden(category_id)
         ]
         payload = {"system_overrides": system_overrides, "categories": user_items}
-        self._storage_path.write_text(json.dumps(payload, indent=2, ensure_ascii=True), encoding="utf-8")
+        payload["schema_version"] = 1
+        payload["updated_at"] = _now_iso()
+        atomic_write_json(self._storage_path, payload)
 
     def _is_system_overridden(self, category_id: str) -> bool:
         current = self._categories.get(category_id)
@@ -433,8 +439,10 @@ _default_registry: Optional[CategoryRegistry] = None
 
 def get_category_registry(storage_root: Optional[str | Path] = None, force_reload: bool = False) -> CategoryRegistry:
     global _default_registry
+    if storage_root is not None:
+        return CategoryRegistry(storage_root=storage_root)
     if force_reload or _default_registry is None:
-        _default_registry = CategoryRegistry(storage_root=storage_root)
+        _default_registry = CategoryRegistry()
     return _default_registry
 
 

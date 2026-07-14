@@ -389,3 +389,7 @@ This document is the primary planning document.
 - DOMAIN_ROADMAP.md defines how future milestones are grouped by domain.
 - PROJECT_STATE.md defines the current active domain, current milestone, and operational state.
 - ROADMAP.md is retained as historical and transitional planning context.
+
+### MODEL-001 implementation note
+
+Implement MobileCLIP as an optional local provider with explicit setup/download, no CUDA requirement, no silent downloads, bounded CPU batches, cancellation, persistent embeddings, zero-shot reports, personalized prototype evaluation, and manual Product Owner validation before production adoption.

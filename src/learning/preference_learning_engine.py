@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+from core.application_data import get_app_data_service, atomic_write_json
 from core.category_registry import get_category_registry
 
 
@@ -63,8 +64,9 @@ CLEANUP_DECISIONS = {
 
 class PreferenceLearningEngine:
     def __init__(self, storage_root: Optional[str | Path] = None):
-        root = Path(storage_root or os.environ.get("FAMILY_MEMORY_LEARNING_ROOT") or Path.cwd())
-        self._storage_path = root / ".familymemory" / "preference_learning_profile.json"
+        service = get_app_data_service(storage_root or os.environ.get("FAMILY_MEMORY_LEARNING_ROOT"), legacy_root=Path.cwd())
+        self.migration_diagnostics = service.diagnostics
+        self._storage_path = service.profile_path("preference_learning_profile.json")
         self._event_summaries: list[dict[str, Any]] = []
         self.profile = PreferenceLearningProfile()
         self._load_profile()
@@ -221,10 +223,8 @@ class PreferenceLearningEngine:
             "event_summaries": self._event_summaries,
             "last_updated_at": self.profile.last_updated_at or _now_iso(),
         }
-        self._storage_path.write_text(
-            json.dumps(payload, indent=2, ensure_ascii=True),
-            encoding="utf-8",
-        )
+        payload["schema_version"] = 1
+        atomic_write_json(self._storage_path, payload)
 
     def _load_profile(self) -> None:
         if not self._storage_path.exists():

@@ -982,3 +982,9 @@ Summary:
 ## LEARN-003.2 Update
 
 LEARN-003.2 adds content-first learning from user category corrections. Category corrections remain immediate, while missing visual evidence is queued for local background enrichment. Persistent learning data now includes versioned category visual profiles with corrected-example counts, visual-example counts, feature support, confidence, timestamps, and human-readable summaries. Filename and metadata signals are retained only as secondary context and cannot create strong visual-content rules by themselves. Unknown remains a conservative outcome when visual evidence is weak or contradictory.
+
+## MODEL-001 MobileCLIP foundation status
+
+MODEL-001 introduces an optional, evaluation-only MobileCLIP semantic embedding foundation.  The app keeps the existing category system and correction history authoritative; Unknown remains the conservative result when semantic evidence is weak.  MobileCLIP evaluation is bounded to a default sample of 100 images with a hard UI/workflow cap of 300 images and runs outside UI widgets through reusable services.
+
+Stable per-user data storage has been introduced for learning profiles, categories, visual profiles, MobileCLIP embeddings, model configuration, and evaluation reports.  Existing repository-local `.familymemory` profiles are migrated safely, with diagnostics and newer stable data protected from older legacy files.
