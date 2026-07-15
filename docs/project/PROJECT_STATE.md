@@ -999,7 +999,7 @@ MobileCLIP is registered as the first provider through this generic registry. It
 
 Status: implemented for Product Owner manual validation.
 
-MobileCLIP is the first real managed AI runtime installed through the canonical AI Runtime Manager. The selected dedicated Python interpreter is persisted and revalidated; the Windows Product Owner path is expected to be `C:\Projects\family-memory-ai\.venv-mobileclip\Scripts\python.exe` using Python 3.10 on a CPU-only machine. The base app still starts and works without MobileCLIP installed.
+MobileCLIP is the first real managed AI runtime supported by the canonical AI Runtime Manager installation flow. The selected dedicated Python interpreter is persisted and revalidated; the Windows Product Owner path is expected to be `C:\Projects\family-memory-ai\.venv-mobileclip\Scripts\python.exe` using Python 3.10 on a CPU-only machine. The base app still starts and works without MobileCLIP installed, and repository evidence does not show MobileCLIP installed on the Product Owner machine yet.
 
 Installation is explicit: no packages or checkpoints are installed/downloaded until the Product Owner reviews and confirms the plan. Runtime files and model weights are stored through `ApplicationDataPathService` outside the Git repository. Ready is recorded only after full provider verification, including checkpoint load, model/transforms, tokenizer, and a finite synthetic image embedding. Manual Product Owner testing and post-merge repository cleanup are required before merge completion.
 
