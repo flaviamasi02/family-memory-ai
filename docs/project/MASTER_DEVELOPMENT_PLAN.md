@@ -401,3 +401,7 @@ Build a generic AI Runtime Manager before production model adoption. Required po
 ### MODEL-002B Runtime Installation Policy
 
 Real AI runtime installation is allowed only through the generic AI Runtime Manager. MobileCLIP uses a dedicated environment, explicit typed commands, official source disclosure, local app-data model storage, cancellation, logs/history, safe removal plans, and full verification. It remains evaluation-only and must not replace production classification until a later approved milestone.
+
+### MODEL-002C validation direction
+
+The next practical model milestone is Product Owner-guided MobileCLIP validation, not production replacement. The project must validate real dependency installation, checkpoint download, runtime Ready status, one-image embedding, 10-image smoke test, 100-image benchmark, restart persistence, and CPU performance before making quality or speed claims. If the Settings -> AI Models metadata fields still appear blank, that UI rendering issue must be investigated in the same validation stream. Production classifier migration remains a later decision that requires measured evidence and explicit Product Owner approval.

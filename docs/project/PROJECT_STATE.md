@@ -1006,3 +1006,32 @@ Installation is explicit: no packages or checkpoints are installed/downloaded un
 ### MODEL-002B review correction status
 
 Critical review findings were addressed after PR #17 review. Root causes were that the initial UI buttons exposed plans/instructions without executing confirmed background operations, verification could run on the Qt UI thread, one-image Test was instructional only, removal did not execute, selected interpreter persistence was incomplete, and the generic manager contained provider-specific checkpoint URL knowledge. The corrected flow uses confirmation dialogs, Qt worker-thread execution, progress/current-step updates, cancellation events, persisted interpreter metadata, real selected-interpreter verification/test subprocesses, and confirmed manager-owned cache removal.
+
+---
+
+## DOCSYNC GITHUB FULL — AI Runtime Status Update (2026-07-15)
+
+Completed and merged:
+- MODEL-001 MobileCLIP foundation is merged as an optional, local-only, evaluation-only vision provider foundation.
+- MODEL-002A Generic AI Runtime Manager is merged. The repository contains a provider-agnostic AI Runtime Manager with runtime registration, environment inspection, installation plans, confirmation-gated execution, model storage outside Git, status/history/benchmark records, verification hooks, and safe removal planning.
+- MODEL-002B managed MobileCLIP installation architecture and UI flow is merged. MobileCLIP is registered as the first managed runtime and Settings includes an AI Models section with action buttons, progress area, background-worker execution, dependency installation/checkpoint download flow, verification, one-image embedding test, and model-file removal support.
+
+Manual validation status:
+- Product Owner detailed manual validation of MODEL-002B is deferred.
+- Do not claim MobileCLIP is installed, Ready, or performance-validated from repository evidence alone.
+- Not yet manually validated: real dependency installation through the app, real checkpoint download, Ready status, one-image embedding result, 10-image evaluation, 100-image benchmark, restart persistence after successful installation, and real CPU performance on the Product Owner computer.
+- Latest UI observation: AI Models action buttons and progress area appeared, but some MobileCLIP/provider metadata fields appeared visually empty. This is a known unresolved UI investigation item, not a resolved issue.
+
+Environment facts to preserve:
+- Main application environment: `C:\Projects\family-memory-ai\.venv`.
+- MobileCLIP runtime environment: `C:\Projects\family-memory-ai\.venv-mobileclip`.
+- MobileCLIP target interpreter: Python 3.10, 64-bit, CPU-only, explicit selected interpreter, no reliance on shell activation, package commands via `python.exe -m pip ...`.
+- The Product Owner computer is CPU-only with no NVIDIA GPU.
+
+Next practical milestone: MODEL-002C Product Owner-guided MobileCLIP validation.
+- Validate MobileCLIP installation through Settings -> AI Models.
+- Fix or confirm AI Models metadata rendering if the blank-field observation is still present.
+- Verify runtime Ready only after full provider verification succeeds.
+- Run one-image real embedding, 10-image smoke test, and 100-image benchmark.
+- Document actual CPU performance.
+- Do not replace the production classifier in this milestone.

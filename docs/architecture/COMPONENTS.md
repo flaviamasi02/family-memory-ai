@@ -103,3 +103,7 @@ Each step has a single primary owner component. Current deterministic implementa
 ### AI runtime worker component
 
 - `workers.ai_runtime_worker.AIRuntimeOperationWorker`: runs install, verify, one-image embedding test, and model-file removal off the Qt UI thread while emitting progress, completed, failed, and finished signals. Settings owns button state and cancellation while the worker delegates runtime behavior to `AIRuntimeManager`.
+
+### Current AI runtime validation boundary
+
+The AI Runtime Manager and Settings AI Models UI are implemented, and MobileCLIP is registered as the first managed runtime. Repository evidence supports the architecture and automated tests around planning, workers, verification boundaries, and UI actions. Product Owner validation of real installation, checkpoint download, Ready state, one-image embedding, 10-image evaluation, 100-image benchmark, restart persistence, and CPU-only performance is still pending. The production classifier remains unchanged.

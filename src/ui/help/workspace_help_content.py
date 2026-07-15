@@ -288,7 +288,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                     why_this_workspace_exists="Settings centralizes product behavior preferences so your workflow remains consistent across imports and review sessions.",
                     problem_it_solves="Growing AI workflows require explicit defaults and visibility into system behavior to avoid accidental drift.",
                     ai_automation="The AI Models section uses the generic AI Runtime Manager to show local provider status, Python environment details, licenses, and explicit installation plans. MobileCLIP remains evaluation-only and no model or dependency downloads silently.",
-                    user_interaction="Inspect or select a Python environment, generate and review an AI model installation plan, then separately choose whether MobileCLIP evaluates the current library, selected photos, or another folder.",
+                    user_interaction="Inspect or select a Python environment, generate and review an AI model installation plan, confirm before installing, use Verify or Test only when ready, remove manager-owned model files when needed, and separately choose whether MobileCLIP evaluates the current library, selected photos, or another folder.",
                     expected_outcome="Predictable behavior, clearer control, local-only model processing, and safer long-term scaling of memory workflows.",
                 ),
                 _workflow_section(
@@ -296,6 +296,9 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                         "Review Current Defaults",
                         "Open AI Models and Review Registered Runtime Status",
                         "Inspect the Python Environment or Generate an Installation Plan",
+                        "Review the Installation Plan Before Installing",
+                        "Explicitly Confirm Install/Verify/Test/Remove Actions",
+                        "Monitor Progress or Cancel Long-Running Runtime Work",
                         "Choose a MobileCLIP Evaluation Source",
                         "Confirm Available and Sample Counts",
                         "Run Evaluation Only When Ready",
@@ -307,7 +310,9 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                         "Use Current imported library to evaluate photos already loaded in Family Memory AI without importing again.",
                         "Use Selected photos after selecting one or more items in Photo Browser or Cleanup Review; the app will not silently fall back to the full library.",
                         "Use Another folder only for an explicit external folder test, and keep the maximum sample cap small for CPU-only validation.",
-                        "Treat MobileCLIP output as local-only evaluation evidence; it does not automatically change categories or original images.",
+                        "Treat MobileCLIP output as local-only evaluation evidence; it does not automatically change categories, original images, or the production classifier.",
+                        "An installation plan is only a preview; installation starts only after explicit confirmation and uses the selected dedicated Python environment.",
+                        "Use Verify to check the runtime, Test for one-image embedding validation, and Remove model files only for manager-owned model files outside Git.",
                         "Do not approve installation or removal unless the generated AI Models plan shows the expected interpreter, cache path, licenses, and warnings.",
                     ]
                 ),
@@ -319,7 +324,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                         ),
                         WorkspaceHelpTip(
                             title="Team Tip",
-                            body="AI Models installation plans are previews until explicitly confirmed; MODEL-002B still requires explicit Product Owner confirmation before installing packages or downloading checkpoints; no startup action installs MobileCLIP silently.",
+                            body="AI Models installation plans are previews until explicitly confirmed; MODEL-002B is merged but Product Owner detailed manual validation is pending, and no startup action installs MobileCLIP silently.",
                         ),
                     ]
                 ),
