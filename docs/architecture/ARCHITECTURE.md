@@ -816,3 +816,22 @@ Runtime metadata is stored through `ApplicationDataPathService` outside the repo
 ## MODEL-002B Managed Runtime Installation Flow
 
 MobileCLIP installation now uses the same `AIRuntimeManager` architecture introduced in MODEL-002A. The manager validates the selected Python interpreter, builds a typed plan, executes only confirmed actions, downloads the checkpoint to a temporary partial file before atomic rename, and records history/status outside Git. Verification is performed in the selected interpreter and requires torch, torchvision, Pillow, mobileclip, checkpoint presence/load, model/transforms, tokenizer, and a finite synthetic image embedding before the runtime becomes Ready.
+
+## AI Runtime Safety and Storage Rules
+
+Permanent runtime rules:
+- Photo processing remains local; photos are not uploaded and originals are never modified.
+- Optional AI models must not be downloaded silently, and dependencies must not be installed silently.
+- Product Owner confirmation is required before installation, checkpoint download, verification actions that depend on installed model files, or removal.
+- Long-running AI operations run outside the Qt UI thread.
+- The base app works without optional AI models, model weights, torch, torchvision, or mobileclip installed.
+- Runtime metadata and model files use application-data locations outside the Git repository.
+- Virtual environments, AI model files, user profiles, and learning data must not be committed.
+- Model removal may remove manager-owned model files only; it must never delete photos, thumbnails, categories, or learning profiles.
+- Shared Python packages are not silently removed.
+- Automated tests must not install packages or download real models.
+
+Current environment strategy:
+- Main app: `C:\Projects\family-memory-ai\.venv`.
+- MobileCLIP runtime: `C:\Projects\family-memory-ai\.venv-mobileclip`.
+- MobileCLIP target: Python 3.10, 64-bit, CPU-only, explicit selected interpreter, no shell-activation dependency, and package commands using `python.exe -m pip ...`.

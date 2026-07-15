@@ -374,3 +374,20 @@ DOCSYNC
 - Keep commits focused.
 - One Sprint = one objective.
 - One Documentation Sync = one document whenever practical.
+
+---
+
+# GitHub/Codex Prompt Link Rule
+
+Every GitHub/Codex implementation prompt must include:
+- Codex link: `https://chatgpt.com/codex`
+- Repository link: `https://github.com/flaviamasi02/family-memory-ai`
+- Execution environment
+- Estimated task size
+- Purpose
+- Expected outcome
+- Base branch
+- Instruction not to merge automatically
+- Manual Product Owner test requirement
+
+When the prompt corrects an existing Pull Request, it must identify the existing PR/branch and state that Codex must update the same PR, not create a new PR unless explicitly instructed.

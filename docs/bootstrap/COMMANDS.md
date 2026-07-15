@@ -638,3 +638,86 @@ When adding new commands:
 Compatibility guidance:
 - Future commands should remain backward compatible whenever possible.
 - Existing command semantics must not change without explicit approval.
+
+---
+
+## DOCSYNC MOBILE FULL
+
+Purpose:
+Perform a complete mobile-session documentation synchronization and quality audit.
+
+Trigger:
+DOCSYNC MOBILE FULL
+
+Actions:
+1. Execute DOCSYNC MOBILE.
+2. Audit canonical project, architecture, roadmap, decisions, changelog, setup, help, and handover documents where applicable.
+3. Reconcile contradictions and report remaining follow-ups.
+
+Output:
+- Full mobile documentation synchronization report.
+
+Notes:
+- Do not create duplicate documents when an existing canonical document owns the subject.
+
+---
+
+## DOCSYNC GITHUB
+
+Purpose:
+Synchronize documentation from the current GitHub repository state.
+
+Trigger:
+DOCSYNC GITHUB
+
+Actions:
+1. Inspect repository implementation and changed documentation.
+2. Update affected canonical documents and Workspace Help where applicable.
+3. Preserve truthfulness boundaries between implemented, automated-test verified, Product Owner manually tested, deferred, planned, and known limitations.
+4. Create or update the requested documentation PR when instructed.
+
+Output:
+- GitHub documentation synchronization report and PR status.
+
+---
+
+## DOCSYNC GITHUB FULL
+
+Purpose:
+Perform a complete repository-first documentation synchronization and consistency audit from GitHub/repository state.
+
+Trigger:
+DOCSYNC GITHUB FULL
+
+Actions:
+1. Inspect repository implementation.
+2. Inspect canonical documents.
+3. Reconcile contradictions.
+4. Update status, architecture, roadmap, decisions, changelog, setup, help, and handover where applicable.
+5. Create a documentation PR.
+6. Do not merge automatically.
+7. Avoid unnecessary new documentation files.
+
+Output:
+- Full repository documentation synchronization report, changed documents list, validation performed, and PR link/status when available.
+
+---
+
+## DOCVERIFY GITHUB
+
+Purpose:
+Verify repository documentation synchronization without modifying files.
+
+Trigger:
+DOCVERIFY GITHUB
+
+Actions:
+1. Inspect the repository and canonical documentation.
+2. Verify implementation/documentation consistency, links, terminology, and truthfulness boundaries.
+3. Report missing or contradictory documentation.
+
+Output:
+- GitHub documentation verification report.
+
+Notes:
+- Verification only; never modifies documentation and never creates a PR.

@@ -323,8 +323,31 @@ The roadmap now follows a pretrained-model-first strategy: use a compact pretrai
 
 Approved: optional local AI models are managed by a generic runtime registry and manager rather than MobileCLIP-specific UI or services. Current and future providers can register descriptors, dependencies, model files, capabilities, licenses, environment needs, and verification behavior without requiring runtime-manager UI rewrites.
 
-MODEL-002A delivers architecture, MobileCLIP registration, Settings → AI Models visibility, installation-plan generation, metadata/history/benchmark persistence, and safe removal planning. SigLIP2, Florence-2, OCR, face recognition, and other local providers remain future registrations unless intentionally added. Real MobileCLIP installation and checkpoint execution are deferred to MODEL-002B.
+MODEL-002A delivers architecture, MobileCLIP registration, Settings → AI Models visibility, installation-plan generation, metadata/history/benchmark persistence, and safe removal planning. SigLIP2, Florence-2, OCR, face recognition, and other local providers remain future registrations unless intentionally added. MODEL-002B implements the managed MobileCLIP installation and verification flow; Product Owner validation remains pending.
 
 ### MODEL-002B MobileCLIP managed installation
 
 MODEL-002B turns MobileCLIP from a registered optional provider into the first real managed runtime. It keeps MODEL-002A's generic manager architecture, requires a dedicated Python environment, supports CPU-only installation, uses official Apple MobileCLIP code and `apple/MobileCLIP-S0`, stores weights outside Git, and requires explicit Product Owner confirmation plus full verification before Ready.
+
+### MODEL-002C Product Owner-guided MobileCLIP validation
+
+Status: next practical milestone.
+
+Now:
+- Validate managed MobileCLIP installation through Settings -> AI Models on the Product Owner CPU-only Windows computer.
+- Confirm or fix AI Models metadata rendering after the observed blank MobileCLIP/provider fields.
+- Verify runtime Ready only after dependency import, checkpoint load, provider construction, tokenizer creation, and finite embedding verification succeed.
+- Run one-image real embedding, 10-image smoke test, and 100-image benchmark.
+- Record actual CPU performance and any installation friction.
+
+Not in scope yet:
+- Replacing the production classifier.
+- Claiming real classification quality or performance before measured evidence.
+
+Later:
+- Compare MobileCLIP against current visual learning.
+- Explore zero-shot category suggestions.
+- Integrate semantic embeddings into learning after evidence supports it.
+- Evaluate Florence-2 as a possible second-stage model.
+- Evaluate face recognition, OCR, object detection, and category/tag/subcategory/rule-system expansions.
+- Migrate production classification only after measured evidence and explicit approval.

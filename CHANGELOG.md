@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### DOCSYNC — AI Runtime and Workflow Documentation
+
+- Synchronized documentation for merged MODEL-001, MODEL-002A Generic AI Runtime Manager, and MODEL-002B managed MobileCLIP installation foundation.
+- Documented dedicated MobileCLIP runtime environment support, explicit Product Owner confirmation, background operation support, checkpoint handling, verification and one-image test architecture, and safe model-file removal.
+- Recorded that MODEL-002B detailed Product Owner manual validation is still pending; do not claim installation succeeded, runtime Ready, real embedding quality, or CPU performance results yet.
+- Preserved workflow, prompt-link, repository cleanup, stash-inspection, user-data, virtual-environment, and model-file safety rules.
+
+
 ### PERF-003 — Performance Instrumentation and Background Scan Optimization
 
 **Instrumentation (measurements now logged at the end of every import)**

@@ -573,3 +573,64 @@ If Help is missing or outdated, it must be reported as a documentation issue wit
 - Future AI assistants must treat workspace Help updates as part of Definition of Done.
 - A user-facing feature is not considered complete until its contextual Workspace Help has been updated and accurately reflects current functionality.
 - DOCSYNC prepares and applies Help updates. DOCVERIFY validates that Help updates were applied correctly.
+
+---
+
+# Permanent Role and Workflow Rules
+
+Roles:
+- Product Owner = Flavia.
+- ChatGPT = Chief Architect and Quality Gate.
+- Codex = Software Engineer.
+
+Workflow:
+Product Owner -> ChatGPT specification -> Codex implementation -> ChatGPT review -> Product Owner manual test -> Product Owner approval -> merge -> repository cleanup.
+
+Manual testing rule:
+- Every code modification must be manually tested by the Product Owner before merge.
+- Automated tests do not replace Product Owner testing.
+- Documentation-only PRs require documentation review but do not require launching the application unless they alter user-visible application help generated from code.
+
+PR update rule:
+- When correcting an existing PR, Codex must update the same PR.
+- Codex must not create a new PR unless explicitly instructed.
+
+# Sprint Closure Repository Cleanup Checklist
+
+After every merged feature or bug-fix PR:
+1. Confirm all required checks are green.
+2. Confirm Product Owner manual test was completed.
+3. Merge the PR.
+4. Switch GitHub Desktop to `main`.
+5. Fetch and pull origin.
+6. Delete the merged local branch.
+7. Delete the merged remote branch where appropriate.
+8. Confirm no open PR remains unintentionally.
+9. Run `git stash list`.
+10. Confirm the stash list is empty.
+11. Run `git status`.
+12. Confirm `nothing to commit, working tree clean`.
+13. Confirm GitHub Desktop shows `No local changes`.
+14. Confirm current branch is `main`.
+
+Important stash exception:
+- Do not automatically delete a stash without first inspecting its contents.
+- Safe PowerShell inspection commands:
+  - `git stash list`
+  - `git stash show --stat "stash@{0}"`
+- Only after verification, remove the inspected stash with `git stash drop "stash@{0}"`.
+- Do not recommend `git stash clear` unless the user explicitly intends to remove all stashes and has reviewed them.
+
+# User Data and Generated Runtime File Prevention
+
+Recent lesson learned:
+- `.venv-mobileclip` was accidentally included in a GitHub Desktop stash because it was not adequately excluded at that moment.
+- Local generated learning-profile files under `.familymemory` also appeared in an old stash.
+- These files were removed after inspection.
+
+Permanent prevention rules:
+- User data and virtual environments must remain outside Git.
+- Generated runtime/user files are not source code.
+- Stashes must be inspected before deletion.
+- Runtime metadata, model files, user profiles, and learning data should use application-data storage outside the repository rather than repository-local storage.
+- Private learning-profile contents must never be copied into documentation or PR descriptions.
