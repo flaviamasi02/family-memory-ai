@@ -96,26 +96,20 @@ class SettingsPage(QWidget):
         self.ai_model_name = QLabel("MobileCLIP")
         self.ai_model_name.setStyleSheet("font-size: 15px; font-weight: 700;")
         self.ai_detail_labels: dict[str, QLabel] = {}
+        self.ai_detail_key_labels: dict[str, QLabel] = {}
         for key in (
+            "Provider",
             "Status",
-            "Checkpoint",
-            "Capabilities",
-            "Device",
             "Python environment",
             "Python version",
             "Provider revision",
             "Model path",
-            "Download size",
-            "Disk usage",
-            "Code license",
-            "Model license",
-            "Last installed",
-            "Last updated",
-            "Current step",
+            "Checkpoint",
+            "Capabilities",
+            "Device",
             "Installed packages",
             "Checkpoint status",
             "Last verification",
-            "Last benchmark",
             "Last error",
         ):
             label = QLabel("checking…")
@@ -160,14 +154,21 @@ class SettingsPage(QWidget):
         root.addWidget(self.ai_models_title)
         card_layout = QVBoxLayout(self.ai_models_card)
         card_layout.addWidget(self.ai_model_name)
-        details_layout = QGridLayout()
+        self.ai_details_widget = QWidget(self.ai_models_card)
+        self.ai_details_layout = QGridLayout(self.ai_details_widget)
+        self.ai_details_layout.setContentsMargins(0, 4, 0, 4)
+        self.ai_details_layout.setHorizontalSpacing(12)
+        self.ai_details_layout.setVerticalSpacing(4)
         for row, (key, value_label) in enumerate(self.ai_detail_labels.items()):
             key_label = QLabel(f"{key}:")
             key_label.setStyleSheet("font-weight: 600;")
             key_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-            details_layout.addWidget(key_label, row, 0)
-            details_layout.addWidget(value_label, row, 1)
-        card_layout.addLayout(details_layout)
+            key_label.setBuddy(value_label)
+            self.ai_detail_key_labels[key] = key_label
+            self.ai_details_layout.addWidget(key_label, row, 0)
+            self.ai_details_layout.addWidget(value_label, row, 1)
+        self.ai_details_layout.setColumnStretch(1, 1)
+        card_layout.addWidget(self.ai_details_widget)
         card_layout.addWidget(self.ai_actions_label)
         root.addWidget(self.ai_models_card)
         root.addWidget(self.mobileclip_status)
@@ -216,28 +217,20 @@ class SettingsPage(QWidget):
         descriptor = self.ai_runtime_manager.registry.require("mobileclip")
         status = self.ai_runtime_manager.status("mobileclip")
         record = self.ai_runtime_manager.installation_record("mobileclip")
-        last_benchmark = next((b.date for b in reversed(self.ai_runtime_manager.storage.benchmarks()) if b.provider_id == "mobileclip"), "never")
         interpreter = record.interpreter_path or "current application environment"
         details = {
+            "Provider": f"{descriptor.display_name} ({descriptor.provider_id})",
             "Status": status.state,
-            "Checkpoint": f"{descriptor.checkpoint_id} ({descriptor.revision})",
-            "Capabilities": ", ".join(c.value.replace("_", " ") for c in descriptor.capabilities),
-            "Device": "CPU",
             "Python environment": interpreter,
             "Python version": record.python_version or (status.environment.python_version if status.environment else "unknown") or "unknown",
             "Provider revision": descriptor.revision or "unknown",
             "Model path": record.local_model_cache_path or str(self.ai_runtime_manager.storage.cache_dir_for("mobileclip")),
-            "Download size": descriptor.expected_download_size,
-            "Disk usage": f"{record.installed_disk_usage_bytes} bytes",
-            "Code license": descriptor.code_license,
-            "Model license": descriptor.model_license,
-            "Last installed": record.install_date or "never",
-            "Last updated": record.update_date or "never",
-            "Current step": status.state,
+            "Checkpoint": descriptor.checkpoint_id,
+            "Capabilities": ", ".join(c.value.replace("_", " ") for c in descriptor.capabilities),
+            "Device": "CPU",
             "Installed packages": "available" if status.dependencies_available else f"missing: {', '.join(status.missing_dependencies)}",
             "Checkpoint status": "present" if status.model_files_available else f"missing: {', '.join(status.missing_model_files)}",
             "Last verification": record.last_validation_result or "never",
-            "Last benchmark": last_benchmark,
             "Last error": status.last_error or "none",
         }
         for key, value in details.items():

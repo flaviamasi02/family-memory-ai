@@ -169,13 +169,38 @@ def test_settings_provider_metadata_and_plan_dialog_are_populated(monkeypatch, t
     assert page.ai_models_card.objectName() == 'aiModelsCard'
     assert 'QFrame {' not in page.ai_models_card.styleSheet()
     assert '#aiModelsCard' in page.ai_models_card.styleSheet()
+    assert page.ai_details_widget.parent() == page.ai_models_card
+    assert page.ai_models_card.isAncestorOf(page.ai_details_widget)
+    assert page.ai_details_widget.isVisible()
+    expected_rows = (
+        'Provider',
+        'Status',
+        'Python environment',
+        'Python version',
+        'Provider revision',
+        'Model path',
+        'Checkpoint',
+        'Capabilities',
+    )
+    assert page.ai_details_layout.rowCount() >= len(expected_rows)
     assert page.ai_model_name.isVisible()
     assert page.ai_model_name.sizeHint().height() > 0
-    assert page.ai_detail_labels['Status'].isVisible()
-    assert page.ai_detail_labels['Status'].sizeHint().height() > 0
+    for row, key in enumerate(page.ai_detail_labels):
+        key_label = page.ai_detail_key_labels[key]
+        value_label = page.ai_detail_labels[key]
+        assert page.ai_models_card.isAncestorOf(key_label)
+        assert page.ai_models_card.isAncestorOf(value_label)
+        assert key_label.isVisible()
+        assert value_label.isVisible()
+        assert key_label.sizeHint().height() > 0
+        assert value_label.sizeHint().height() > 0
+        assert page.ai_details_layout.itemAtPosition(row, 0).widget() is key_label
+        assert page.ai_details_layout.itemAtPosition(row, 1).widget() is value_label
     visible_text = "\n".join(w.text() for w in page.findChildren(type(page.ai_model_name)) if w.isVisible())
     assert "MobileCLIP" in visible_text
+    assert "Provider:" in visible_text
     assert page.ai_detail_labels['Status'].text() in visible_text
+    assert page.ai_detail_labels['Provider'].text()
     assert page.ai_detail_labels['Python environment'].text()
     assert page.ai_detail_labels['Python version'].text()
     assert page.ai_detail_labels['Provider revision'].text()
