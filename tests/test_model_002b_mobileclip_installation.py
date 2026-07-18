@@ -140,3 +140,43 @@ def test_verify_and_test_use_background_worker(monkeypatch, tmp_path):
     assert calls[-1][0][0] == 'test'
     assert calls[-1][1]['image_path'] == img
     page.deleteLater()
+
+
+def test_verify_reports_not_installed_without_model_002a_placeholder(tmp_path):
+    m=create_default_runtime_manager(ApplicationDataPathService(tmp_path,tmp_path))
+    rec=m.installation_record('mobileclip'); rec.interpreter_path=sys.executable; m.storage.save_installation(rec)
+    result=m.verify_provider('mobileclip')
+    assert result.returncode != 0
+    assert 'Not Installed' in result.stderr
+    assert 'MODEL-002A' not in result.stderr
+    assert 'intentionally not implemented' not in result.stderr
+    assert m.installation_record('mobileclip').installation_state == AIRuntimeState.NOT_INSTALLED.value
+
+
+def test_settings_provider_metadata_and_plan_dialog_are_populated(monkeypatch, tmp_path):
+    try:
+        from PySide6.QtWidgets import QApplication, QMessageBox
+    except ImportError as exc:
+        pytest.skip(f'PySide6 unavailable in this environment: {exc}')
+    from ui.settings_page import SettingsPage
+    monkeypatch.setenv('FAMILY_MEMORY_APP_DATA_ROOT', str(tmp_path))
+    app=QApplication.instance() or QApplication([])
+    page=SettingsPage(); page.ai_env_input.setText(sys.executable)
+    captured=[]
+    monkeypatch.setattr(QMessageBox, 'information', lambda parent, title, text: captured.append((title,text)))
+    page._refresh_mobileclip_status()
+    assert page.ai_detail_labels['Provider'].text()
+    assert page.ai_detail_labels['Runtime state'].text()
+    assert page.ai_detail_labels['Installation state'].text()
+    assert page.ai_detail_labels['Interpreter'].text()
+    assert page.ai_detail_labels['Model path'].text()
+    page._show_ai_installation_plan()
+    assert captured
+    dialog_text=captured[-1][1]
+    assert 'Plan generated only. Nothing was installed or downloaded.' not in dialog_text
+    assert 'Python environment:' in dialog_text
+    assert 'Virtual environment:' in dialog_text
+    assert 'Packages:' in dialog_text
+    assert 'Destination:' in dialog_text
+    assert 'Typed actions' in dialog_text
+    page.deleteLater()

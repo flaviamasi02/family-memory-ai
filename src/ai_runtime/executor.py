@@ -56,7 +56,7 @@ class AIRuntimeCommandExecutor:
         if cancel_event and cancel_event.is_set(): return CommandResult(action.action_type.value, -1, '', 'Cancelled before start', 0, cancelled=True)
         if action.action_type == AIRuntimeActionType.CREATE_DIRECTORY:
             Path(action.destination).mkdir(parents=True, exist_ok=True); return CommandResult(action.action_type.value,0,'created','',time.perf_counter()-start)
-        if action.action_type in (AIRuntimeActionType.VERIFY_IMPORT, AIRuntimeActionType.INSTALL_PYTHON_PACKAGE, AIRuntimeActionType.CLONE_OR_INSTALL_OFFICIAL_PACKAGE):
+        if action.action_type in (AIRuntimeActionType.VERIFY_IMPORT, AIRuntimeActionType.INSTALL_PYTHON_PACKAGE, AIRuntimeActionType.CLONE_OR_INSTALL_OFFICIAL_PACKAGE, AIRuntimeActionType.VERIFY_PROVIDER):
             argv=list(action.argv)
             if not argv or any(not isinstance(x,str) or not x for x in argv): raise ValueError('Typed command action requires argv tokens')
             proc=subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=False)

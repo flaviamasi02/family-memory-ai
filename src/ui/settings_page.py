@@ -96,6 +96,13 @@ class SettingsPage(QWidget):
         self.ai_model_name.setStyleSheet("font-size: 15px; font-weight: 700;")
         self.ai_detail_labels: dict[str, QLabel] = {}
         for key in (
+            "Provider",
+            "Runtime state",
+            "Installation state",
+            "Runtime version",
+            "Interpreter",
+            "Model path",
+            "Current status",
             "Status",
             "Checkpoint",
             "Capabilities",
@@ -213,12 +220,20 @@ class SettingsPage(QWidget):
         status = self.ai_runtime_manager.status("mobileclip")
         record = self.ai_runtime_manager.installation_record("mobileclip")
         last_benchmark = next((b.date for b in reversed(self.ai_runtime_manager.storage.benchmarks()) if b.provider_id == "mobileclip"), "never")
+        interpreter = record.interpreter_path or "current application environment"
         details = {
+            "Provider": f"{descriptor.display_name} ({descriptor.provider_id})",
+            "Runtime state": status.state,
+            "Installation state": record.installation_state or status.state,
+            "Runtime version": record.python_version or descriptor.revision or "unknown",
+            "Interpreter": interpreter,
+            "Model path": record.local_model_cache_path or str(self.ai_runtime_manager.storage.cache_dir_for("mobileclip")),
+            "Current status": status.last_error or record.last_validation_result or status.state,
             "Status": status.state,
             "Checkpoint": f"{descriptor.checkpoint_id} ({descriptor.revision})",
             "Capabilities": ", ".join(c.value.replace("_", " ") for c in descriptor.capabilities),
             "Device": "CPU",
-            "Python environment": record.interpreter_path or "current application environment",
+            "Python environment": interpreter,
             "Download size": descriptor.expected_download_size,
             "Disk usage": f"{record.installed_disk_usage_bytes} bytes",
             "Code license": descriptor.code_license,
@@ -251,20 +266,30 @@ class SettingsPage(QWidget):
         interpreter = self.ai_env_input.text().strip() or None
         plan = self.ai_runtime_manager.build_installation_plan("mobileclip", interpreter)
         self._last_installation_plan = plan
-        actions = "\n".join(f"- {a.action_type.value}: {a.label}" for a in plan.actions)
+        actions = "\n".join(
+            f"- {a.action_type.value}: {a.label}"
+            f"{' | command: ' + ' '.join(a.argv) if a.argv else ''}"
+            f"{' | destination: ' + a.destination if a.destination else ''}"
+            f"{' | download: ' + a.url if a.url else ''}"
+            for a in plan.actions
+        )
         warnings = "\n".join(f"- {w}" for w in plan.warnings)
-        self.ai_plan_box.setPlainText(
+        plan_text = (
             f"Installation plan for {plan.provider_name}\n"
             f"Checkpoint: {plan.checkpoint_id}\n"
             f"Python environment:\n{plan.python_environment.interpreter_path}\n"
+            f"Python version: {plan.python_environment.python_version or 'unknown'}\n"
+            f"Virtual environment: {plan.python_environment.environment_path or 'unknown'} ({plan.python_environment.environment_type})\n"
             f"Packages: {', '.join(plan.packages_to_install) or 'none'}\n"
             f"Model files: {', '.join(plan.model_files_to_download) or 'none'}\n"
             f"Download size: {plan.expected_download_size}\nDestination: {plan.destination_path}\n"
+            f"Estimated disk requirement: {plan.estimated_disk_requirement}\n"
             f"Licenses: code={plan.licenses['code']}; model={plan.licenses['model']}\n"
             f"Device: {plan.device}\nAdmin rights expected: {plan.administrator_rights_expected}\nRestart may be required: {plan.restart_may_be_required}\n"
             f"Warnings:\n{warnings}\nTyped actions (not executed until explicit confirmation):\n{actions}"
         )
-        QMessageBox.information(self, "AI Models installation plan", "Plan generated only. Nothing was installed or downloaded.")
+        self.ai_plan_box.setPlainText(plan_text)
+        QMessageBox.information(self, "AI Models installation plan", plan_text)
 
 
     def _set_runtime_buttons_enabled(self, enabled: bool) -> None:
