@@ -165,18 +165,29 @@ def test_settings_provider_metadata_and_plan_dialog_are_populated(monkeypatch, t
     captured=[]
     monkeypatch.setattr(QMessageBox, 'information', lambda parent, title, text: captured.append((title,text)))
     page._refresh_mobileclip_status()
-    assert page.ai_detail_labels['Provider'].text()
-    assert page.ai_detail_labels['Runtime state'].text()
-    assert page.ai_detail_labels['Installation state'].text()
-    assert page.ai_detail_labels['Interpreter'].text()
+    page.show(); app.processEvents()
+    assert page.ai_models_card.objectName() == 'aiModelsCard'
+    assert 'QFrame {' not in page.ai_models_card.styleSheet()
+    assert '#aiModelsCard' in page.ai_models_card.styleSheet()
+    assert page.ai_model_name.isVisible()
+    assert page.ai_model_name.sizeHint().height() > 0
+    assert page.ai_detail_labels['Status'].isVisible()
+    assert page.ai_detail_labels['Status'].sizeHint().height() > 0
+    visible_text = "\n".join(w.text() for w in page.findChildren(type(page.ai_model_name)) if w.isVisible())
+    assert "MobileCLIP" in visible_text
+    assert page.ai_detail_labels['Status'].text() in visible_text
+    assert page.ai_detail_labels['Python environment'].text()
+    assert page.ai_detail_labels['Python version'].text()
+    assert page.ai_detail_labels['Provider revision'].text()
     assert page.ai_detail_labels['Model path'].text()
     page._show_ai_installation_plan()
     assert captured
     dialog_text=captured[-1][1]
-    assert 'Plan generated only. Nothing was installed or downloaded.' not in dialog_text
-    assert 'Python environment:' in dialog_text
-    assert 'Virtual environment:' in dialog_text
-    assert 'Packages:' in dialog_text
-    assert 'Destination:' in dialog_text
-    assert 'Typed actions' in dialog_text
+    assert dialog_text == 'Plan generated and displayed below. Nothing was installed or downloaded.'
+    panel_text = page.ai_plan_box.toPlainText()
+    assert 'Python environment:' in panel_text
+    assert 'Virtual environment:' in panel_text
+    assert 'Packages:' in panel_text
+    assert 'Destination:' in panel_text
+    assert 'Typed actions' in panel_text
     page.deleteLater()

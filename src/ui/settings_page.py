@@ -90,24 +90,21 @@ class SettingsPage(QWidget):
         self.ai_models_title = QLabel("AI Models")
         self.ai_models_title.setStyleSheet("font-size: 16px; font-weight: 700;")
         self.ai_models_card = QFrame()
+        self.ai_models_card.setObjectName("aiModelsCard")
         self.ai_models_card.setFrameShape(QFrame.Shape.StyledPanel)
-        self.ai_models_card.setStyleSheet("QFrame { border: 1px solid #d4d9df; border-radius: 8px; padding: 8px; background: #fbfcfe; }")
+        self.ai_models_card.setStyleSheet("#aiModelsCard { border: 1px solid #d4d9df; border-radius: 8px; background: #fbfcfe; }")
         self.ai_model_name = QLabel("MobileCLIP")
         self.ai_model_name.setStyleSheet("font-size: 15px; font-weight: 700;")
         self.ai_detail_labels: dict[str, QLabel] = {}
         for key in (
-            "Provider",
-            "Runtime state",
-            "Installation state",
-            "Runtime version",
-            "Interpreter",
-            "Model path",
-            "Current status",
             "Status",
             "Checkpoint",
             "Capabilities",
             "Device",
             "Python environment",
+            "Python version",
+            "Provider revision",
+            "Model path",
             "Download size",
             "Disk usage",
             "Code license",
@@ -222,18 +219,14 @@ class SettingsPage(QWidget):
         last_benchmark = next((b.date for b in reversed(self.ai_runtime_manager.storage.benchmarks()) if b.provider_id == "mobileclip"), "never")
         interpreter = record.interpreter_path or "current application environment"
         details = {
-            "Provider": f"{descriptor.display_name} ({descriptor.provider_id})",
-            "Runtime state": status.state,
-            "Installation state": record.installation_state or status.state,
-            "Runtime version": record.python_version or descriptor.revision or "unknown",
-            "Interpreter": interpreter,
-            "Model path": record.local_model_cache_path or str(self.ai_runtime_manager.storage.cache_dir_for("mobileclip")),
-            "Current status": status.last_error or record.last_validation_result or status.state,
             "Status": status.state,
             "Checkpoint": f"{descriptor.checkpoint_id} ({descriptor.revision})",
             "Capabilities": ", ".join(c.value.replace("_", " ") for c in descriptor.capabilities),
             "Device": "CPU",
             "Python environment": interpreter,
+            "Python version": record.python_version or (status.environment.python_version if status.environment else "unknown") or "unknown",
+            "Provider revision": descriptor.revision or "unknown",
+            "Model path": record.local_model_cache_path or str(self.ai_runtime_manager.storage.cache_dir_for("mobileclip")),
             "Download size": descriptor.expected_download_size,
             "Disk usage": f"{record.installed_disk_usage_bytes} bytes",
             "Code license": descriptor.code_license,
@@ -289,7 +282,7 @@ class SettingsPage(QWidget):
             f"Warnings:\n{warnings}\nTyped actions (not executed until explicit confirmation):\n{actions}"
         )
         self.ai_plan_box.setPlainText(plan_text)
-        QMessageBox.information(self, "AI Models installation plan", plan_text)
+        QMessageBox.information(self, "AI Models installation plan", "Plan generated and displayed below. Nothing was installed or downloaded.")
 
 
     def _set_runtime_buttons_enabled(self, enabled: bool) -> None:
