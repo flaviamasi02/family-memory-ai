@@ -35,3 +35,25 @@ def test_settings_page_can_be_constructed_without_attribute_error(monkeypatch, t
     assert page.ai_detail_labels["Status"].text()
     assert page.ai_detail_labels["Checkpoint"].text()
     page.deleteLater()
+
+
+def test_ai_metadata_diagnostics_report_is_generated(monkeypatch, tmp_path):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    try:
+        from PySide6.QtWidgets import QApplication
+        from ui.settings_page import SettingsPage
+    except ImportError as exc:
+        pytest.skip(f"PySide6 unavailable in this environment: {exc}")
+
+    monkeypatch.setenv("FAMILY_MEMORY_APP_DATA_ROOT", str(tmp_path))
+    app = QApplication.instance() or QApplication([])
+    page = SettingsPage()
+
+    page._dump_ai_metadata_diagnostics()
+    report = page.ai_plan_box.toPlainText()
+
+    assert "AI metadata diagnostics" in report
+    assert "Row count:" in report
+    assert "Widget count:" in report
+    assert "Metadata labels:" in report
+    page.deleteLater()

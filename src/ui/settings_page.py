@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from threading import Event
 from typing import Callable
@@ -37,6 +38,9 @@ from ui.components.workspace_header import WorkspaceHeader
 from ui.components.workspace_info_content import WORKSPACE_INFO_CONTENT
 from ui.components.workspace_info_panel import WorkspaceInfoPanel
 from ui.help.workspace_help_content import SETTINGS_WORKSPACE
+
+
+logger = logging.getLogger(__name__)
 
 
 class SettingsPage(QWidget):
@@ -95,6 +99,8 @@ class SettingsPage(QWidget):
         self.ai_model_name = QLabel("MobileCLIP")
         self.ai_model_name.setStyleSheet("font-size: 15px; font-weight: 700;")
         self.ai_detail_labels: dict[str, QLabel] = {}
+        self.ai_detail_key_labels: dict[str, QLabel] = {}
+        self._ai_details_grid_rows_inserted = 0
         for key in (
             "Status",
             "Checkpoint",
@@ -132,6 +138,7 @@ class SettingsPage(QWidget):
         self.open_model_folder_button = QPushButton("Open model folder")
         self.view_logs_button = QPushButton("View logs")
         self.remove_model_files_button = QPushButton("Remove model files")
+        self.dump_ai_diagnostics_button = QPushButton("Dump AI metadata diagnostics")
         self.ai_plan_box = QTextEdit(); self.ai_plan_box.setReadOnly(True); self.ai_plan_box.setMaximumHeight(170)
         self.runtime_step_label = QLabel("Current step: idle")
         self.runtime_progress_bar = QProgressBar(); self.runtime_progress_bar.setRange(0, 1); self.runtime_progress_bar.setValue(0)
@@ -156,14 +163,17 @@ class SettingsPage(QWidget):
         root.addWidget(self.ai_models_title)
         card_layout = QVBoxLayout(self.ai_models_card)
         card_layout.addWidget(self.ai_model_name)
-        details_layout = QGridLayout()
+        self.ai_details_widget = QWidget()
+        self.ai_details_layout = QGridLayout(self.ai_details_widget)
         for row, (key, value_label) in enumerate(self.ai_detail_labels.items()):
             key_label = QLabel(f"{key}:")
             key_label.setStyleSheet("font-weight: 600;")
             key_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-            details_layout.addWidget(key_label, row, 0)
-            details_layout.addWidget(value_label, row, 1)
-        card_layout.addLayout(details_layout)
+            self.ai_detail_key_labels[key] = key_label
+            self.ai_details_layout.addWidget(key_label, row, 0)
+            self.ai_details_layout.addWidget(value_label, row, 1)
+            self._ai_details_grid_rows_inserted += 1
+        card_layout.addWidget(self.ai_details_widget)
         card_layout.addWidget(self.ai_actions_label)
         root.addWidget(self.ai_models_card)
         root.addWidget(self.mobileclip_status)
@@ -173,6 +183,7 @@ class SettingsPage(QWidget):
         for action_button in (self.install_button, self.cancel_install_button, self.verify_button, self.test_button, self.open_model_folder_button, self.view_logs_button, self.remove_model_files_button):
             action_layout.addWidget(action_button)
         root.addLayout(action_layout)
+        root.addWidget(self.dump_ai_diagnostics_button)
         root.addWidget(self.ai_plan_box)
         root.addWidget(self.runtime_step_label)
         root.addWidget(self.runtime_progress_bar)
@@ -193,6 +204,7 @@ class SettingsPage(QWidget):
         self.open_model_folder_button.clicked.connect(lambda: self.ai_plan_box.setPlainText(f"Model folder: {self.ai_runtime_manager.installation_record('mobileclip').local_model_cache_path}"))
         self.view_logs_button.clicked.connect(lambda: self.ai_plan_box.setPlainText(f"Runtime logs/history folder: {self.ai_runtime_manager.storage.logs_dir}"))
         self.remove_model_files_button.clicked.connect(self._show_mobileclip_removal_plan)
+        self.dump_ai_diagnostics_button.clicked.connect(self._dump_ai_metadata_diagnostics)
         self.select_folder_button.clicked.connect(self._select_mobileclip_folder)
         self.run_button.clicked.connect(self._run_mobileclip_evaluation)
         self.sample_limit.valueChanged.connect(self._refresh_source_summary)
@@ -209,35 +221,89 @@ class SettingsPage(QWidget):
         self.help_requested.emit(self.WORKSPACE_ID)
 
     def _refresh_mobileclip_status(self) -> None:
-        descriptor = self.ai_runtime_manager.registry.require("mobileclip")
-        status = self.ai_runtime_manager.status("mobileclip")
-        record = self.ai_runtime_manager.installation_record("mobileclip")
-        last_benchmark = next((b.date for b in reversed(self.ai_runtime_manager.storage.benchmarks()) if b.provider_id == "mobileclip"), "never")
-        details = {
-            "Status": status.state,
-            "Checkpoint": f"{descriptor.checkpoint_id} ({descriptor.revision})",
-            "Capabilities": ", ".join(c.value.replace("_", " ") for c in descriptor.capabilities),
-            "Device": "CPU",
-            "Python environment": record.interpreter_path or "current application environment",
-            "Download size": descriptor.expected_download_size,
-            "Disk usage": f"{record.installed_disk_usage_bytes} bytes",
-            "Code license": descriptor.code_license,
-            "Model license": descriptor.model_license,
-            "Last installed": record.install_date or "never",
-            "Last updated": record.update_date or "never",
-            "Current step": status.state,
-            "Installed packages": "available" if status.dependencies_available else f"missing: {', '.join(status.missing_dependencies)}",
-            "Checkpoint status": "present" if status.model_files_available else f"missing: {', '.join(status.missing_model_files)}",
-            "Last verification": record.last_validation_result or "never",
-            "Last benchmark": last_benchmark,
-            "Last error": status.last_error or "none",
-        }
-        for key, value in details.items():
-            self.ai_detail_labels[key].setText(value)
-        self.mobileclip_status.setText(
-            "MobileCLIP remains local-only and evaluation-only. "
-            "Only valid actions are enabled by runtime state; no package or model is downloaded automatically."
-        )
+        logger.info("Entering _refresh_mobileclip_status()")
+        try:
+            descriptor = self.ai_runtime_manager.registry.require("mobileclip")
+            logger.info("Provider descriptor loaded: provider_id=%s display_name=%s", descriptor.provider_id, descriptor.display_name)
+            status = self.ai_runtime_manager.status("mobileclip")
+            logger.info("Status object loaded: state=%s dependencies_available=%s model_files_available=%s", status.state, status.dependencies_available, status.model_files_available)
+            record = self.ai_runtime_manager.installation_record("mobileclip")
+            logger.info("Installation record loaded: interpreter_path=%s install_date=%s", record.interpreter_path, record.install_date)
+            last_benchmark = next((b.date for b in reversed(self.ai_runtime_manager.storage.benchmarks()) if b.provider_id == "mobileclip"), "never")
+            details = {
+                "Status": status.state,
+                "Checkpoint": f"{descriptor.checkpoint_id} ({descriptor.revision})",
+                "Capabilities": ", ".join(c.value.replace("_", " ") for c in descriptor.capabilities),
+                "Device": "CPU",
+                "Python environment": record.interpreter_path or "current application environment",
+                "Download size": descriptor.expected_download_size,
+                "Disk usage": f"{record.installed_disk_usage_bytes} bytes",
+                "Code license": descriptor.code_license,
+                "Model license": descriptor.model_license,
+                "Last installed": record.install_date or "never",
+                "Last updated": record.update_date or "never",
+                "Current step": status.state,
+                "Installed packages": "available" if status.dependencies_available else f"missing: {', '.join(status.missing_dependencies)}",
+                "Checkpoint status": "present" if status.model_files_available else f"missing: {', '.join(status.missing_model_files)}",
+                "Last verification": record.last_validation_result or "never",
+                "Last benchmark": last_benchmark,
+                "Last error": status.last_error or "none",
+            }
+            logger.info("AI details dictionary keys: %s", list(details.keys()))
+            logger.info("AI metadata rows expected: %s", len(details))
+            logger.info("AI metadata QLabel objects created: %s", len(self.ai_detail_labels))
+            for key, value in details.items():
+                self.ai_detail_labels[key].setText(value)
+            logger.info("AI details grid rows inserted: %s", self._ai_details_grid_rows_inserted)
+            logger.info("ai_details_widget children count: %s", len(self.ai_details_widget.children()))
+            logger.info("ai_details_widget visible: %s", self.ai_details_widget.isVisible())
+            logger.info("ai_models_card geometry: %s", self.ai_models_card.geometry().getRect())
+            logger.info("ai_details_widget geometry: %s", self.ai_details_widget.geometry().getRect())
+            for key, label in self.ai_detail_labels.items():
+                logger.info("AI metadata QLabel visibility: key=%s visible=%s text=%r geometry=%s", key, label.isVisible(), label.text(), label.geometry().getRect())
+            self.mobileclip_status.setText(
+                "MobileCLIP remains local-only and evaluation-only. "
+                "Only valid actions are enabled by runtime state; no package or model is downloaded automatically."
+            )
+        except Exception:
+            logger.exception("Exception during _refresh_mobileclip_status()")
+            raise
+
+    def _dump_ai_metadata_diagnostics(self) -> None:
+        self.ai_plan_box.setPlainText(self._build_ai_metadata_diagnostics_report())
+
+    def _build_ai_metadata_diagnostics_report(self) -> str:
+        lines = [
+            "AI metadata diagnostics",
+            f"Row count: {self._ai_details_grid_rows_inserted}",
+            f"Widget count: {len(self.ai_details_widget.findChildren(QWidget)) + 1}",
+            f"ai_models_card geometry: {self.ai_models_card.geometry().getRect()}",
+            f"ai_details_widget geometry: {self.ai_details_widget.geometry().getRect()}",
+            f"ai_details_widget visible: {self.ai_details_widget.isVisible()}",
+            "Metadata labels:",
+        ]
+        for key, label in self.ai_detail_labels.items():
+            lines.append(f"- {key}: text={label.text()!r}; visible={label.isVisible()}; geometry={label.geometry().getRect()}; parent={self._widget_parent_hierarchy(label)}")
+        lines.extend(["Visible widgets:", *self._visible_widget_lines(self), "Widget tree:", *self._widget_tree_lines(self)])
+        return "\n".join(lines)
+
+    def _visible_widget_lines(self, root: QWidget) -> list[str]:
+        return [f"- {widget.metaObject().className()}: visible={widget.isVisible()}; geometry={widget.geometry().getRect()}; text={getattr(widget, 'text', lambda: '')()!r}; parent={self._widget_parent_hierarchy(widget)}" for widget in [root, *root.findChildren(QWidget)] if widget.isVisible()]
+
+    def _widget_tree_lines(self, widget: QWidget, depth: int = 0) -> list[str]:
+        text = getattr(widget, 'text', lambda: '')()
+        lines = [f"{'  ' * depth}- {widget.metaObject().className()}: visible={widget.isVisible()}; geometry={widget.geometry().getRect()}; text={text!r}"]
+        for child in widget.findChildren(QWidget, options=Qt.FindChildOption.FindDirectChildrenOnly):
+            lines.extend(self._widget_tree_lines(child, depth + 1))
+        return lines
+
+    def _widget_parent_hierarchy(self, widget: QWidget) -> str:
+        names = []
+        parent = widget.parentWidget()
+        while parent is not None:
+            names.append(parent.metaObject().className())
+            parent = parent.parentWidget()
+        return " -> ".join(names) or "<none>"
 
     def _inspect_ai_environment(self) -> None:
         interpreter = self.ai_env_input.text().strip() or None
