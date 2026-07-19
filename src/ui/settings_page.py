@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from threading import Event
 from typing import Callable
@@ -39,6 +40,9 @@ from ui.components.workspace_header import WorkspaceHeader
 from ui.components.workspace_info_content import WORKSPACE_INFO_CONTENT
 from ui.components.workspace_info_panel import WorkspaceInfoPanel
 from ui.help.workspace_help_content import SETTINGS_WORKSPACE
+
+
+logger = logging.getLogger(__name__)
 
 
 class SettingsPage(QWidget):
@@ -92,14 +96,15 @@ class SettingsPage(QWidget):
         self.ai_models_title = QLabel("AI Models")
         self.ai_models_title.setStyleSheet("font-size: 16px; font-weight: 700;")
         self.ai_models_card = QFrame()
-        self.ai_models_card.setObjectName("ai_models_card")
+        self.ai_models_card.setObjectName("aiModelsCard")
         self.ai_models_card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
         self.ai_models_card.setFrameShape(QFrame.Shape.StyledPanel)
-        self.ai_models_card.setStyleSheet("QFrame { border: 1px solid #d4d9df; border-radius: 8px; padding: 8px; background: #fbfcfe; }")
+        self.ai_models_card.setStyleSheet("#aiModelsCard { border: 1px solid #d4d9df; border-radius: 8px; padding: 8px; background: #fbfcfe; }")
         self.ai_model_name = QLabel("MobileCLIP")
         self.ai_model_name.setStyleSheet("font-size: 15px; font-weight: 700;")
         self.ai_detail_labels: dict[str, QLabel] = {}
         self.ai_detail_key_labels: dict[str, QLabel] = {}
+        self._ai_details_grid_rows_inserted = 0
         for key in (
             "Provider",
             "Status",
@@ -144,6 +149,7 @@ class SettingsPage(QWidget):
         self.view_logs_button = QPushButton("View logs")
         self.remove_model_files_button = QPushButton("Remove model files")
         self.ai_plan_box = QTextEdit(); self.ai_plan_box.setReadOnly(True); self.ai_plan_box.setMaximumHeight(170)
+        self.dump_ai_metadata_button = QPushButton("Dump AI metadata diagnostics")
         self.runtime_step_label = QLabel("Current step: idle")
         self.runtime_progress_bar = QProgressBar(); self.runtime_progress_bar.setRange(0, 1); self.runtime_progress_bar.setValue(0)
         self.sample_limit = QSpinBox(); self.sample_limit.setRange(1, 300); self.sample_limit.setValue(100)
@@ -186,6 +192,7 @@ class SettingsPage(QWidget):
             details_layout.setRowStretch(row, 0)
             details_layout.addWidget(key_label, row, 0)
             details_layout.addWidget(value_label, row, 1)
+        self._ai_details_grid_rows_inserted = details_layout.rowCount()
         card_layout.addWidget(self.ai_details_widget)
         card_layout.addWidget(self.ai_actions_label)
         root.addWidget(self.ai_models_card, 0)
@@ -197,6 +204,7 @@ class SettingsPage(QWidget):
             action_layout.addWidget(action_button)
         root.addLayout(action_layout)
         root.addWidget(self.ai_plan_box)
+        root.addWidget(self.dump_ai_metadata_button)
         root.addWidget(self.runtime_step_label)
         root.addWidget(self.runtime_progress_bar)
         root.addWidget(QLabel("MobileCLIP Local Evaluation (evaluation-only)"))
@@ -209,6 +217,7 @@ class SettingsPage(QWidget):
         root.addWidget(self.report_box)
         self.inspect_env_button.clicked.connect(self._inspect_ai_environment)
         self.plan_button.clicked.connect(self._show_ai_installation_plan)
+        self.dump_ai_metadata_button.clicked.connect(self._dump_ai_metadata_diagnostics)
         self.install_button.clicked.connect(self._confirm_and_install_mobileclip)
         self.cancel_install_button.clicked.connect(self._cancel_ai_runtime_operation)
         self.verify_button.clicked.connect(self._verify_mobileclip_runtime)
@@ -232,6 +241,7 @@ class SettingsPage(QWidget):
         self.help_requested.emit(self.WORKSPACE_ID)
 
     def _refresh_mobileclip_status(self) -> None:
+        logger.info("Refreshing AI Models metadata status")
         descriptor = self.ai_runtime_manager.registry.require("mobileclip")
         status = self.ai_runtime_manager.status("mobileclip")
         record = self.ai_runtime_manager.installation_record("mobileclip")
@@ -259,9 +269,11 @@ class SettingsPage(QWidget):
             "Last benchmark": last_benchmark,
             "Last error": status.last_error or "none",
         }
+        logger.info("AI Models metadata details keys: %s", list(details))
         for key, value in details.items():
             self.ai_detail_labels[key].setText(value)
         self._refresh_ai_details_geometry()
+        logger.info("AI Models metadata rows=%s child_widgets=%s card_geometry=%s details_geometry=%s", self._ai_details_grid_rows_inserted, len(self.ai_details_widget.findChildren(QWidget)), self.ai_models_card.geometry().getRect(), self.ai_details_widget.geometry().getRect())
         self.mobileclip_status.setText(
             "MobileCLIP remains local-only and evaluation-only. "
             "Only valid actions are enabled by runtime state; no package or model is downloaded automatically."
@@ -282,6 +294,64 @@ class SettingsPage(QWidget):
         if card_layout is not None:
             card_layout.activate()
         self.ai_models_card.updateGeometry()
+
+
+    def _dump_ai_metadata_diagnostics(self) -> None:
+        report = self._build_ai_metadata_diagnostics_report()
+        logger.info("AI metadata diagnostics report:\n%s", report)
+        self.ai_plan_box.setPlainText(report)
+
+    def _build_ai_metadata_diagnostics_report(self) -> str:
+        details_layout = self.ai_details_widget.layout()
+        lines = [
+            "AI metadata diagnostics",
+            f"Card object name: {self.ai_models_card.objectName()}",
+            f"Row count: {self._ai_details_grid_rows_inserted}",
+            f"Widget count: {len(self.ai_details_widget.findChildren(QWidget))}",
+            f"Card geometry: {self.ai_models_card.geometry().getRect()}",
+            f"Details geometry: {self.ai_details_widget.geometry().getRect()}",
+            f"Details sizeHint: {self.ai_details_widget.sizeHint().width()}x{self.ai_details_widget.sizeHint().height()}",
+            f"Details minimumSizeHint: {self.ai_details_widget.minimumSizeHint().width()}x{self.ai_details_widget.minimumSizeHint().height()}",
+            "Rows:",
+        ]
+        for row, key in enumerate(self.ai_detail_labels):
+            key_label = self.ai_detail_key_labels[key]
+            value_label = self.ai_detail_labels[key]
+            key_item = details_layout.itemAtPosition(row, 0).widget() if isinstance(details_layout, QGridLayout) and details_layout.itemAtPosition(row, 0) else None
+            value_item = details_layout.itemAtPosition(row, 1).widget() if isinstance(details_layout, QGridLayout) and details_layout.itemAtPosition(row, 1) else None
+            lines.append(
+                f"- {row}: {key} | key_visible={key_label.isVisible()} key_geometry={key_label.geometry().getRect()} "
+                f"key_is_grid_item={key_item is key_label} | value_visible={value_label.isVisible()} "
+                f"value_geometry={value_label.geometry().getRect()} value_is_grid_item={value_item is value_label} "
+                f"value={value_label.text()}"
+            )
+        lines.extend(["Visible widgets:", *self._visible_widget_lines(self.ai_models_card)])
+        lines.extend(["Widget tree:", *self._widget_tree_lines(self.ai_models_card)])
+        lines.extend(["Parent hierarchy:", *self._widget_parent_hierarchy(self.ai_details_widget)])
+        return "\n".join(lines)
+
+    def _visible_widget_lines(self, root: QWidget) -> list[str]:
+        lines: list[str] = []
+        for widget in root.findChildren(QWidget):
+            if widget.isVisible():
+                lines.append(f"- {widget.__class__.__name__} name={widget.objectName() or '<unnamed>'} geometry={widget.geometry().getRect()}")
+        return lines or ["- none"]
+
+    def _widget_tree_lines(self, root: QWidget, depth: int = 0) -> list[str]:
+        indent = "  " * depth
+        lines = [f"{indent}- {root.__class__.__name__} name={root.objectName() or '<unnamed>'} geometry={root.geometry().getRect()} visible={root.isVisible()}"]
+        for child in root.findChildren(QWidget, options=Qt.FindChildOption.FindDirectChildrenOnly):
+            lines.extend(self._widget_tree_lines(child, depth + 1))
+        return lines
+
+    def _widget_parent_hierarchy(self, widget: QWidget) -> list[str]:
+        lines: list[str] = []
+        current: QWidget | None = widget
+        while current is not None:
+            lines.append(f"- {current.__class__.__name__} name={current.objectName() or '<unnamed>'} geometry={current.geometry().getRect()}")
+            parent = current.parentWidget()
+            current = parent if isinstance(parent, QWidget) else None
+        return lines
 
     def _inspect_ai_environment(self) -> None:
         interpreter = self.ai_env_input.text().strip() or None

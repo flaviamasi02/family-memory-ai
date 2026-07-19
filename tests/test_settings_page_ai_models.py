@@ -98,3 +98,40 @@ def test_ai_models_metadata_rows_receive_positive_layout_height(monkeypatch, tmp
     assert actions_top > last_metadata_bottom
     page.close()
     page.deleteLater()
+
+
+def test_ai_models_card_uses_targeted_stylesheet_and_diagnostics_source_is_present():
+    source = Path("src/ui/settings_page.py").read_text(encoding="utf-8")
+    assert 'setObjectName("aiModelsCard")' in source
+    assert 'setStyleSheet("#aiModelsCard {' in source
+    assert 'setStyleSheet("QFrame {' not in source
+    assert 'dump_ai_metadata_button = QPushButton("Dump AI metadata diagnostics")' in source
+    assert "def _build_ai_metadata_diagnostics_report" in source
+    assert "logger.info" in source
+
+
+def test_ai_models_diagnostics_report_is_generated(monkeypatch, tmp_path):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    try:
+        from PySide6.QtWidgets import QApplication
+    except ImportError as exc:
+        pytest.skip(f"PySide6 unavailable in this environment: {exc}")
+    from ui.settings_page import SettingsPage
+
+    monkeypatch.setenv("FAMILY_MEMORY_APP_DATA_ROOT", str(tmp_path))
+    app = QApplication.instance() or QApplication([])
+    page = SettingsPage()
+    page.show()
+    app.processEvents()
+
+    report = page._build_ai_metadata_diagnostics_report()
+    assert "AI metadata diagnostics" in report
+    assert "Row count:" in report
+    assert "Widget count:" in report
+    assert "Provider" in report
+    assert "key_is_grid_item=True" in report
+    assert "value_is_grid_item=True" in report
+    page.dump_ai_metadata_button.click()
+    assert "AI metadata diagnostics" in page.ai_plan_box.toPlainText()
+    page.close()
+    page.deleteLater()
