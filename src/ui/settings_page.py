@@ -22,6 +22,8 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QVBoxLayout,
     QWidget,
+    QSizePolicy,
+    QLayout,
 )
 from vision.evaluation_sources import (
     EvaluationSourceResult,
@@ -90,17 +92,24 @@ class SettingsPage(QWidget):
         self.ai_models_title = QLabel("AI Models")
         self.ai_models_title.setStyleSheet("font-size: 16px; font-weight: 700;")
         self.ai_models_card = QFrame()
+        self.ai_models_card.setObjectName("ai_models_card")
+        self.ai_models_card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
         self.ai_models_card.setFrameShape(QFrame.Shape.StyledPanel)
         self.ai_models_card.setStyleSheet("QFrame { border: 1px solid #d4d9df; border-radius: 8px; padding: 8px; background: #fbfcfe; }")
         self.ai_model_name = QLabel("MobileCLIP")
         self.ai_model_name.setStyleSheet("font-size: 15px; font-weight: 700;")
         self.ai_detail_labels: dict[str, QLabel] = {}
+        self.ai_detail_key_labels: dict[str, QLabel] = {}
         for key in (
+            "Provider",
             "Status",
             "Checkpoint",
             "Capabilities",
             "Device",
             "Python environment",
+            "Python version",
+            "Provider revision",
+            "Model path",
             "Download size",
             "Disk usage",
             "Code license",
@@ -116,6 +125,8 @@ class SettingsPage(QWidget):
         ):
             label = QLabel("checking…")
             label.setWordWrap(True)
+            label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+            label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
             self.ai_detail_labels[key] = label
         self.ai_actions_label = QLabel("Actions: View details, verify, test, update, remove, open model folder, and view logs are surfaced according to runtime state. Install requires an explicitly confirmed plan.")
         self.ai_actions_label.setWordWrap(True)
@@ -155,17 +166,29 @@ class SettingsPage(QWidget):
         source_layout = QVBoxLayout(); source_layout.addWidget(QLabel("Evaluation source:")); source_layout.addWidget(self.library_radio); source_layout.addWidget(self.selected_radio); source_layout.addWidget(self.folder_radio)
         root.addWidget(self.ai_models_title)
         card_layout = QVBoxLayout(self.ai_models_card)
+        card_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         card_layout.addWidget(self.ai_model_name)
-        details_layout = QGridLayout()
+        self.ai_details_widget = QWidget(self.ai_models_card)
+        self.ai_details_widget.setObjectName("ai_details_widget")
+        self.ai_details_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
+        details_layout = QGridLayout(self.ai_details_widget)
+        details_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        details_layout.setColumnStretch(0, 0)
+        details_layout.setColumnStretch(1, 1)
         for row, (key, value_label) in enumerate(self.ai_detail_labels.items()):
             key_label = QLabel(f"{key}:")
             key_label.setStyleSheet("font-weight: 600;")
             key_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+            key_label.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
+            self.ai_detail_key_labels[key] = key_label
+            row_height = max(key_label.sizeHint().height(), value_label.sizeHint().height())
+            details_layout.setRowMinimumHeight(row, row_height)
+            details_layout.setRowStretch(row, 0)
             details_layout.addWidget(key_label, row, 0)
             details_layout.addWidget(value_label, row, 1)
-        card_layout.addLayout(details_layout)
+        card_layout.addWidget(self.ai_details_widget)
         card_layout.addWidget(self.ai_actions_label)
-        root.addWidget(self.ai_models_card)
+        root.addWidget(self.ai_models_card, 0)
         root.addWidget(self.mobileclip_status)
         env_layout = QHBoxLayout(); env_layout.addWidget(QLabel("Python environment:")); env_layout.addWidget(self.ai_env_input); env_layout.addWidget(self.inspect_env_button); env_layout.addWidget(self.plan_button)
         root.addLayout(env_layout)
@@ -214,11 +237,15 @@ class SettingsPage(QWidget):
         record = self.ai_runtime_manager.installation_record("mobileclip")
         last_benchmark = next((b.date for b in reversed(self.ai_runtime_manager.storage.benchmarks()) if b.provider_id == "mobileclip"), "never")
         details = {
+            "Provider": descriptor.display_name,
             "Status": status.state,
             "Checkpoint": f"{descriptor.checkpoint_id} ({descriptor.revision})",
             "Capabilities": ", ".join(c.value.replace("_", " ") for c in descriptor.capabilities),
             "Device": "CPU",
             "Python environment": record.interpreter_path or "current application environment",
+            "Python version": record.python_version or descriptor.python_version_spec or "unknown",
+            "Provider revision": descriptor.revision,
+            "Model path": record.local_model_cache_path or "not selected",
             "Download size": descriptor.expected_download_size,
             "Disk usage": f"{record.installed_disk_usage_bytes} bytes",
             "Code license": descriptor.code_license,
@@ -234,10 +261,27 @@ class SettingsPage(QWidget):
         }
         for key, value in details.items():
             self.ai_detail_labels[key].setText(value)
+        self._refresh_ai_details_geometry()
         self.mobileclip_status.setText(
             "MobileCLIP remains local-only and evaluation-only. "
             "Only valid actions are enabled by runtime state; no package or model is downloaded automatically."
         )
+
+
+    def _refresh_ai_details_geometry(self) -> None:
+        details_layout = self.ai_details_widget.layout()
+        if isinstance(details_layout, QGridLayout):
+            for row, key in enumerate(self.ai_detail_labels):
+                key_label = self.ai_detail_key_labels[key]
+                value_label = self.ai_detail_labels[key]
+                row_height = max(key_label.sizeHint().height(), value_label.sizeHint().height())
+                details_layout.setRowMinimumHeight(row, row_height)
+            details_layout.activate()
+        self.ai_details_widget.updateGeometry()
+        card_layout = self.ai_models_card.layout()
+        if card_layout is not None:
+            card_layout.activate()
+        self.ai_models_card.updateGeometry()
 
     def _inspect_ai_environment(self) -> None:
         interpreter = self.ai_env_input.text().strip() or None
