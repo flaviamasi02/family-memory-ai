@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import subprocess
 from pathlib import Path
 from threading import Event
 from typing import Callable
@@ -94,30 +95,27 @@ class SettingsPage(QWidget):
         self.ai_models_title = QLabel("AI Models")
         self.ai_models_title.setStyleSheet("font-size: 16px; font-weight: 700;")
         self.ai_models_card = QFrame()
+        self.ai_models_card.setObjectName("aiModelsCard")
         self.ai_models_card.setFrameShape(QFrame.Shape.StyledPanel)
-        self.ai_models_card.setStyleSheet("QFrame { border: 1px solid #d4d9df; border-radius: 8px; padding: 8px; background: #fbfcfe; }")
+        self.ai_models_card.setStyleSheet("#aiModelsCard { border: 1px solid #d4d9df; border-radius: 8px; background: #fbfcfe; }")
         self.ai_model_name = QLabel("MobileCLIP")
         self.ai_model_name.setStyleSheet("font-size: 15px; font-weight: 700;")
         self.ai_detail_labels: dict[str, QLabel] = {}
         self.ai_detail_key_labels: dict[str, QLabel] = {}
         self._ai_details_grid_rows_inserted = 0
         for key in (
+            "Provider",
             "Status",
+            "Python environment",
+            "Python version",
+            "Provider revision",
+            "Model path",
             "Checkpoint",
             "Capabilities",
             "Device",
-            "Python environment",
-            "Download size",
-            "Disk usage",
-            "Code license",
-            "Model license",
-            "Last installed",
-            "Last updated",
-            "Current step",
             "Installed packages",
             "Checkpoint status",
             "Last verification",
-            "Last benchmark",
             "Last error",
         ):
             label = QLabel("checking…")
@@ -163,16 +161,21 @@ class SettingsPage(QWidget):
         root.addWidget(self.ai_models_title)
         card_layout = QVBoxLayout(self.ai_models_card)
         card_layout.addWidget(self.ai_model_name)
-        self.ai_details_widget = QWidget()
+        self.ai_details_widget = QWidget(self.ai_models_card)
         self.ai_details_layout = QGridLayout(self.ai_details_widget)
+        self.ai_details_layout.setContentsMargins(0, 4, 0, 4)
+        self.ai_details_layout.setHorizontalSpacing(12)
+        self.ai_details_layout.setVerticalSpacing(4)
         for row, (key, value_label) in enumerate(self.ai_detail_labels.items()):
             key_label = QLabel(f"{key}:")
             key_label.setStyleSheet("font-weight: 600;")
             key_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+            key_label.setBuddy(value_label)
             self.ai_detail_key_labels[key] = key_label
             self.ai_details_layout.addWidget(key_label, row, 0)
             self.ai_details_layout.addWidget(value_label, row, 1)
             self._ai_details_grid_rows_inserted += 1
+        self.ai_details_layout.setColumnStretch(1, 1)
         card_layout.addWidget(self.ai_details_widget)
         card_layout.addWidget(self.ai_actions_label)
         root.addWidget(self.ai_models_card)
@@ -229,24 +232,20 @@ class SettingsPage(QWidget):
             logger.info("Status object loaded: state=%s dependencies_available=%s model_files_available=%s", status.state, status.dependencies_available, status.model_files_available)
             record = self.ai_runtime_manager.installation_record("mobileclip")
             logger.info("Installation record loaded: interpreter_path=%s install_date=%s", record.interpreter_path, record.install_date)
-            last_benchmark = next((b.date for b in reversed(self.ai_runtime_manager.storage.benchmarks()) if b.provider_id == "mobileclip"), "never")
+            interpreter = record.interpreter_path or "current application environment"
             details = {
+                "Provider": f"{descriptor.display_name} ({descriptor.provider_id})",
                 "Status": status.state,
-                "Checkpoint": f"{descriptor.checkpoint_id} ({descriptor.revision})",
+                "Python environment": interpreter,
+                "Python version": record.python_version or (status.environment.python_version if status.environment else "unknown") or "unknown",
+                "Provider revision": descriptor.revision or "unknown",
+                "Model path": record.local_model_cache_path or str(self.ai_runtime_manager.storage.cache_dir_for("mobileclip")),
+                "Checkpoint": descriptor.checkpoint_id,
                 "Capabilities": ", ".join(c.value.replace("_", " ") for c in descriptor.capabilities),
                 "Device": "CPU",
-                "Python environment": record.interpreter_path or "current application environment",
-                "Download size": descriptor.expected_download_size,
-                "Disk usage": f"{record.installed_disk_usage_bytes} bytes",
-                "Code license": descriptor.code_license,
-                "Model license": descriptor.model_license,
-                "Last installed": record.install_date or "never",
-                "Last updated": record.update_date or "never",
-                "Current step": status.state,
                 "Installed packages": "available" if status.dependencies_available else f"missing: {', '.join(status.missing_dependencies)}",
                 "Checkpoint status": "present" if status.model_files_available else f"missing: {', '.join(status.missing_model_files)}",
                 "Last verification": record.last_validation_result or "never",
-                "Last benchmark": last_benchmark,
                 "Last error": status.last_error or "none",
             }
             logger.info("AI details dictionary keys: %s", list(details.keys()))
@@ -273,22 +272,51 @@ class SettingsPage(QWidget):
         self.ai_plan_box.setPlainText(self._build_ai_metadata_diagnostics_report())
 
     def _build_ai_metadata_diagnostics_report(self) -> str:
+        card_layout = self.ai_models_card.layout()
         lines = [
             "AI metadata diagnostics",
-            f"Row count: {self._ai_details_grid_rows_inserted}",
+            f"Git commit/build: {self._git_build_identifier()}",
+            f"Metadata row count: {len(self.ai_detail_labels)}",
+            f"Grid row count: {self.ai_details_layout.rowCount()}",
             f"Widget count: {len(self.ai_details_widget.findChildren(QWidget)) + 1}",
-            f"ai_models_card geometry: {self.ai_models_card.geometry().getRect()}",
-            f"ai_details_widget geometry: {self.ai_details_widget.geometry().getRect()}",
-            f"ai_details_widget visible: {self.ai_details_widget.isVisible()}",
+            f"Card geometry: {self.ai_models_card.geometry().getRect()}",
+            f"Details widget geometry: {self.ai_details_widget.geometry().getRect()}",
+            f"Card visible: {self.ai_models_card.isVisible()}",
+            f"Details widget visible: {self.ai_details_widget.isVisible()}",
+            f"Card sizing: {self._widget_sizing(self.ai_models_card)}",
+            f"Details widget sizing: {self._widget_sizing(self.ai_details_widget)}",
+            f"Card height constraint: {self._height_constraint(self.ai_models_card)}",
+            f"Details widget height constraint: {self._height_constraint(self.ai_details_widget)}",
+            f"Card layout item count: {card_layout.count() if card_layout else 0}",
+            f"Details layout item count: {self.ai_details_layout.count()}",
             "Metadata labels:",
         ]
-        for key, label in self.ai_detail_labels.items():
-            lines.append(f"- {key}: text={label.text()!r}; visible={label.isVisible()}; geometry={label.geometry().getRect()}; parent={self._widget_parent_hierarchy(label)}")
+        for row, (key, label) in enumerate(self.ai_detail_labels.items()):
+            key_label = self.ai_detail_key_labels.get(key)
+            lines.append(self._metadata_label_line(row, key, "key", key_label))
+            lines.append(self._metadata_label_line(row, key, "value", label))
         lines.extend(["Visible widgets:", *self._visible_widget_lines(self), "Widget tree:", *self._widget_tree_lines(self)])
         return "\n".join(lines)
 
+    def _metadata_label_line(self, row: int, key: str, role: str, label: QLabel | None) -> str:
+        if label is None:
+            return f"- {key} [{role}]: <missing>"
+        column = 0 if role == "key" else 1
+        item = self.ai_details_layout.itemAtPosition(row, column)
+        in_visible_card = self.ai_models_card.isVisible() and self.ai_models_card.isAncestorOf(label)
+        return (
+            f"- {key} [{role}]: text={label.text()!r}; visible={label.isVisible()}; "
+            f"geometry={label.geometry().getRect()}; parent={self._widget_parent_hierarchy(label)}; "
+            f"in_visible_card={in_visible_card}; valid_layout_item={item is not None and item.widget() is label}; "
+            f"sizing={self._widget_sizing(label)}; height_constraint={self._height_constraint(label)}"
+        )
+
     def _visible_widget_lines(self, root: QWidget) -> list[str]:
-        return [f"- {widget.metaObject().className()}: visible={widget.isVisible()}; geometry={widget.geometry().getRect()}; text={getattr(widget, 'text', lambda: '')()!r}; parent={self._widget_parent_hierarchy(widget)}" for widget in [root, *root.findChildren(QWidget)] if widget.isVisible()]
+        return [
+            f"- {widget.metaObject().className()}: visible={widget.isVisible()}; geometry={widget.geometry().getRect()}; text={getattr(widget, 'text', lambda: '')()!r}; parent={self._widget_parent_hierarchy(widget)}"
+            for widget in [root, *root.findChildren(QWidget)]
+            if widget.isVisible()
+        ]
 
     def _widget_tree_lines(self, widget: QWidget, depth: int = 0) -> list[str]:
         text = getattr(widget, 'text', lambda: '')()
@@ -305,6 +333,25 @@ class SettingsPage(QWidget):
             parent = parent.parentWidget()
         return " -> ".join(names) or "<none>"
 
+    def _widget_sizing(self, widget: QWidget) -> str:
+        policy = widget.sizePolicy()
+        return (
+            f"minimum_size={widget.minimumSize().width()}x{widget.minimumSize().height()}; "
+            f"size_hint={widget.sizeHint().width()}x{widget.sizeHint().height()}; "
+            f"minimum_size_hint={widget.minimumSizeHint().width()}x{widget.minimumSizeHint().height()}; "
+            f"size_policy=({policy.horizontalPolicy().name},{policy.verticalPolicy().name})"
+        )
+
+    def _height_constraint(self, widget: QWidget) -> str:
+        return f"minimum_height={widget.minimumHeight()}; maximum_height={widget.maximumHeight()}; fixed_height={widget.minimumHeight() == widget.maximumHeight()}"
+
+    def _git_build_identifier(self) -> str:
+        try:
+            return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True, stderr=subprocess.DEVNULL).strip() or "unknown"
+        except Exception as exc:
+            logger.info("Unable to read git build identifier: %s", exc)
+            return "unknown"
+
     def _inspect_ai_environment(self) -> None:
         interpreter = self.ai_env_input.text().strip() or None
         env = self.ai_runtime_manager.save_environment_selection("mobileclip", interpreter or __import__('sys').executable)
@@ -317,21 +364,30 @@ class SettingsPage(QWidget):
         interpreter = self.ai_env_input.text().strip() or None
         plan = self.ai_runtime_manager.build_installation_plan("mobileclip", interpreter)
         self._last_installation_plan = plan
-        actions = "\n".join(f"- {a.action_type.value}: {a.label}" for a in plan.actions)
+        actions = "\n".join(
+            f"- {a.action_type.value}: {a.label}"
+            f"{' | command: ' + ' '.join(a.argv) if a.argv else ''}"
+            f"{' | destination: ' + a.destination if a.destination else ''}"
+            f"{' | download: ' + a.url if a.url else ''}"
+            for a in plan.actions
+        )
         warnings = "\n".join(f"- {w}" for w in plan.warnings)
-        self.ai_plan_box.setPlainText(
+        plan_text = (
             f"Installation plan for {plan.provider_name}\n"
             f"Checkpoint: {plan.checkpoint_id}\n"
             f"Python environment:\n{plan.python_environment.interpreter_path}\n"
+            f"Python version: {plan.python_environment.python_version or 'unknown'}\n"
+            f"Virtual environment: {plan.python_environment.environment_path or 'unknown'} ({plan.python_environment.environment_type})\n"
             f"Packages: {', '.join(plan.packages_to_install) or 'none'}\n"
             f"Model files: {', '.join(plan.model_files_to_download) or 'none'}\n"
             f"Download size: {plan.expected_download_size}\nDestination: {plan.destination_path}\n"
+            f"Estimated disk requirement: {plan.estimated_disk_requirement}\n"
             f"Licenses: code={plan.licenses['code']}; model={plan.licenses['model']}\n"
             f"Device: {plan.device}\nAdmin rights expected: {plan.administrator_rights_expected}\nRestart may be required: {plan.restart_may_be_required}\n"
             f"Warnings:\n{warnings}\nTyped actions (not executed until explicit confirmation):\n{actions}"
         )
-        QMessageBox.information(self, "AI Models installation plan", "Plan generated only. Nothing was installed or downloaded.")
-
+        self.ai_plan_box.setPlainText(plan_text)
+        QMessageBox.information(self, "AI Models installation plan", "Plan generated and displayed below. Nothing was installed or downloaded.")
 
     def _set_runtime_buttons_enabled(self, enabled: bool) -> None:
         for button in (self.inspect_env_button, self.plan_button, self.install_button, self.verify_button, self.test_button, self.open_model_folder_button, self.view_logs_button, self.remove_model_files_button):

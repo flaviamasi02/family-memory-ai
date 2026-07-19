@@ -53,7 +53,12 @@ def test_ai_metadata_diagnostics_report_is_generated(monkeypatch, tmp_path):
     report = page.ai_plan_box.toPlainText()
 
     assert "AI metadata diagnostics" in report
-    assert "Row count:" in report
+    assert "Metadata row count:" in report
+    assert "Grid row count:" in report
     assert "Widget count:" in report
+    assert "Git commit/build:" in report
+    assert "Card layout item count:" in report
+    assert "Details layout item count:" in report
+    assert "height_constraint=" in report
     assert "Metadata labels:" in report
     page.deleteLater()

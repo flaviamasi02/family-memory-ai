@@ -83,6 +83,18 @@ class AIRuntimeManager:
         rec=self.installation_record(provider_id)
         if not rec.interpreter_path: return CommandResult(AIRuntimeActionType.VERIFY_PROVIDER.value,1,'','No persisted interpreter is selected for this runtime.',0)
         interp=rec.interpreter_path; cache=Path(rec.local_model_cache_path or self.storage.cache_dir_for(provider_id))
+        d=self.registry.require(provider_id)
+        missing_deps=self.executor.imports_available(interp, tuple(dep.import_name for dep in d.required_python_packages))
+        missing_files=tuple(f.relative_path for f in d.required_model_files if not (cache/f.relative_path).exists())
+        if missing_deps or missing_files:
+            details=[]
+            if missing_deps: details.append('missing Python packages: '+', '.join(missing_deps))
+            if missing_files: details.append('missing model files: '+', '.join(missing_files))
+            message='Not Installed - '+ '; '.join(details)
+            rec.last_status_check=now_iso(); rec.last_validation_result='Not Installed'; rec.installation_state=AIRuntimeState.NOT_INSTALLED.value; rec.last_error=message; rec.installed_disk_usage_bytes=self.storage.disk_usage(cache); self.storage.save_installation(rec)
+            self.storage.append_history(AIRuntimeHistoryRecord(provider_id,now_iso(),'verification completed','not installed',interpreter_path=interp,error_summary=message))
+            if progress: progress('verification', message)
+            return CommandResult(AIRuntimeActionType.VERIFY_PROVIDER.value,1,'',message,0)
         if progress: progress('verification','Running provider verification')
         script="""
 import json, math, pathlib, sys
