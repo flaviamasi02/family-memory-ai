@@ -140,3 +140,62 @@ def test_verify_and_test_use_background_worker(monkeypatch, tmp_path):
     assert calls[-1][0][0] == 'test'
     assert calls[-1][1]['image_path'] == img
     page.deleteLater()
+
+
+def test_verify_provider_action_dispatch_runs_typed_command(tmp_path):
+    from ai_runtime.executor import AIRuntimeCommandExecutor
+    from ai_runtime.models import AIRuntimePlanAction
+
+    executor = AIRuntimeCommandExecutor()
+    action = AIRuntimePlanAction(
+        AIRuntimeActionType.VERIFY_PROVIDER,
+        "Verify fake provider",
+        argv=(sys.executable, "-c", "print('provider verified')"),
+    )
+
+    result = executor.run_action(action)
+
+    assert result.returncode == 0
+    assert "provider verified" in result.stdout
+    assert "MODEL-002A" not in result.stderr
+
+
+def test_verify_provider_not_installed_preflight_records_clear_status(tmp_path):
+    m = create_default_runtime_manager(ApplicationDataPathService(tmp_path, tmp_path))
+    rec = m.installation_record("mobileclip")
+    rec.interpreter_path = sys.executable
+    m.storage.save_installation(rec)
+
+    result = m.verify_provider("mobileclip")
+    rec = m.installation_record("mobileclip")
+
+    assert result.returncode != 0
+    assert "Not Installed" in result.stderr
+    assert "missing" in result.stderr
+    assert rec.last_validation_result == "Not Installed"
+    assert rec.installation_state == AIRuntimeState.NOT_INSTALLED.value
+    assert "MODEL-002A" not in result.stderr
+
+
+def test_settings_installation_plan_remains_detailed(monkeypatch, tmp_path):
+    try:
+        from PySide6.QtWidgets import QApplication, QMessageBox
+    except ImportError as exc:
+        pytest.skip(f"PySide6 unavailable in this environment: {exc}")
+    from ui.settings_page import SettingsPage
+
+    monkeypatch.setenv("FAMILY_MEMORY_APP_DATA_ROOT", str(tmp_path))
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+    app = QApplication.instance() or QApplication([])
+    page = SettingsPage()
+    page.ai_env_input.setText(sys.executable)
+
+    page._show_ai_installation_plan()
+    text = page.ai_plan_box.toPlainText()
+
+    assert "Installation plan for MobileCLIP" in text
+    assert "Python environment:" in text
+    assert "Typed actions (not executed until explicit confirmation):" in text
+    assert "verify_provider" in text
+    assert "Destination:" in text
+    page.deleteLater()

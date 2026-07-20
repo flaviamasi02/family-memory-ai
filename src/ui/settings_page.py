@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from threading import Event
 from typing import Callable
@@ -22,6 +23,9 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QVBoxLayout,
     QWidget,
+    QSizePolicy,
+    QLayout,
+    QScrollArea,
 )
 from vision.evaluation_sources import (
     EvaluationSourceResult,
@@ -37,6 +41,9 @@ from ui.components.workspace_header import WorkspaceHeader
 from ui.components.workspace_info_content import WORKSPACE_INFO_CONTENT
 from ui.components.workspace_info_panel import WorkspaceInfoPanel
 from ui.help.workspace_help_content import SETTINGS_WORKSPACE
+
+
+logger = logging.getLogger(__name__)
 
 
 class SettingsPage(QWidget):
@@ -82,25 +89,44 @@ class SettingsPage(QWidget):
             "font-size: 14px; color: #3f4752; border: 1px solid #d4d9df; border-radius: 8px; padding: 12px;"
         )
 
-        root = QVBoxLayout(self)
-        root.addWidget(self.header)
+        page_layout = QVBoxLayout(self)
+        page_layout.addWidget(self.header)
+
+        self.settings_scroll_area = QScrollArea()
+        self.settings_scroll_area.setObjectName("settingsScrollArea")
+        self.settings_scroll_area.setWidgetResizable(True)
+        self.settings_scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.settings_scroll_content = QWidget()
+        self.settings_scroll_content.setObjectName("settingsScrollContent")
+        root = QVBoxLayout(self.settings_scroll_content)
+        root.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         root.addWidget(self.info_panel)
         root.addWidget(self.description_label)
+        page_layout.addWidget(self.settings_scroll_area, 1)
+        self.settings_scroll_area.setWidget(self.settings_scroll_content)
 
         self.ai_models_title = QLabel("AI Models")
         self.ai_models_title.setStyleSheet("font-size: 16px; font-weight: 700;")
         self.ai_models_card = QFrame()
+        self.ai_models_card.setObjectName("aiModelsCard")
+        self.ai_models_card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
         self.ai_models_card.setFrameShape(QFrame.Shape.StyledPanel)
-        self.ai_models_card.setStyleSheet("QFrame { border: 1px solid #d4d9df; border-radius: 8px; padding: 8px; background: #fbfcfe; }")
+        self.ai_models_card.setStyleSheet("#aiModelsCard { border: 1px solid #d4d9df; border-radius: 8px; padding: 8px; background: #fbfcfe; }")
         self.ai_model_name = QLabel("MobileCLIP")
         self.ai_model_name.setStyleSheet("font-size: 15px; font-weight: 700;")
         self.ai_detail_labels: dict[str, QLabel] = {}
+        self.ai_detail_key_labels: dict[str, QLabel] = {}
+        self._ai_details_grid_rows_inserted = 0
         for key in (
+            "Provider",
             "Status",
             "Checkpoint",
             "Capabilities",
             "Device",
             "Python environment",
+            "Python version",
+            "Provider revision",
+            "Model path",
             "Download size",
             "Disk usage",
             "Code license",
@@ -116,6 +142,8 @@ class SettingsPage(QWidget):
         ):
             label = QLabel("checking…")
             label.setWordWrap(True)
+            label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+            label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
             self.ai_detail_labels[key] = label
         self.ai_actions_label = QLabel("Actions: View details, verify, test, update, remove, open model folder, and view logs are surfaced according to runtime state. Install requires an explicitly confirmed plan.")
         self.ai_actions_label.setWordWrap(True)
@@ -133,6 +161,7 @@ class SettingsPage(QWidget):
         self.view_logs_button = QPushButton("View logs")
         self.remove_model_files_button = QPushButton("Remove model files")
         self.ai_plan_box = QTextEdit(); self.ai_plan_box.setReadOnly(True); self.ai_plan_box.setMaximumHeight(170)
+        self.dump_ai_metadata_button = QPushButton("Dump AI metadata diagnostics")
         self.runtime_step_label = QLabel("Current step: idle")
         self.runtime_progress_bar = QProgressBar(); self.runtime_progress_bar.setRange(0, 1); self.runtime_progress_bar.setValue(0)
         self.sample_limit = QSpinBox(); self.sample_limit.setRange(1, 300); self.sample_limit.setValue(100)
@@ -153,30 +182,45 @@ class SettingsPage(QWidget):
         self.library_radio.setChecked(True)
         controls = QHBoxLayout(); controls.addWidget(QLabel("Max sample size (default 100, cap 300):")); controls.addWidget(self.sample_limit); controls.addStretch(1)
         source_layout = QVBoxLayout(); source_layout.addWidget(QLabel("Evaluation source:")); source_layout.addWidget(self.library_radio); source_layout.addWidget(self.selected_radio); source_layout.addWidget(self.folder_radio)
+        env_layout = QHBoxLayout(); env_layout.addWidget(QLabel("Python environment:")); env_layout.addWidget(self.ai_env_input); env_layout.addWidget(self.inspect_env_button); env_layout.addWidget(self.plan_button)
+        action_layout = QHBoxLayout()
+        for action_button in (self.install_button, self.cancel_install_button, self.verify_button, self.test_button, self.open_model_folder_button, self.view_logs_button, self.remove_model_files_button):
+            action_layout.addWidget(action_button)
         root.addWidget(self.ai_models_title)
         card_layout = QVBoxLayout(self.ai_models_card)
+        card_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         card_layout.addWidget(self.ai_model_name)
-        details_layout = QGridLayout()
+        self.ai_details_widget = QWidget(self.ai_models_card)
+        self.ai_details_widget.setObjectName("ai_details_widget")
+        self.ai_details_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
+        details_layout = QGridLayout(self.ai_details_widget)
+        details_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        details_layout.setColumnStretch(0, 0)
+        details_layout.setColumnStretch(1, 1)
         for row, (key, value_label) in enumerate(self.ai_detail_labels.items()):
             key_label = QLabel(f"{key}:")
             key_label.setStyleSheet("font-weight: 600;")
             key_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+            key_label.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
+            self.ai_detail_key_labels[key] = key_label
+            row_height = max(key_label.sizeHint().height(), value_label.sizeHint().height())
+            details_layout.setRowMinimumHeight(row, row_height)
+            details_layout.setRowStretch(row, 0)
             details_layout.addWidget(key_label, row, 0)
             details_layout.addWidget(value_label, row, 1)
-        card_layout.addLayout(details_layout)
+        self._ai_details_grid_rows_inserted = details_layout.rowCount()
+        card_layout.addWidget(self.ai_details_widget)
+        card_layout.addWidget(self.mobileclip_status)
         card_layout.addWidget(self.ai_actions_label)
-        root.addWidget(self.ai_models_card)
-        root.addWidget(self.mobileclip_status)
-        env_layout = QHBoxLayout(); env_layout.addWidget(QLabel("Python environment:")); env_layout.addWidget(self.ai_env_input); env_layout.addWidget(self.inspect_env_button); env_layout.addWidget(self.plan_button)
-        root.addLayout(env_layout)
-        action_layout = QHBoxLayout()
-        for action_button in (self.install_button, self.cancel_install_button, self.verify_button, self.test_button, self.open_model_folder_button, self.view_logs_button, self.remove_model_files_button):
-            action_layout.addWidget(action_button)
-        root.addLayout(action_layout)
-        root.addWidget(self.ai_plan_box)
-        root.addWidget(self.runtime_step_label)
-        root.addWidget(self.runtime_progress_bar)
-        root.addWidget(QLabel("MobileCLIP Local Evaluation (evaluation-only)"))
+        card_layout.addLayout(action_layout)
+        card_layout.addWidget(self.dump_ai_metadata_button)
+        card_layout.addLayout(env_layout)
+        card_layout.addWidget(self.ai_plan_box)
+        card_layout.addWidget(self.runtime_step_label)
+        card_layout.addWidget(self.runtime_progress_bar)
+        root.addWidget(self.ai_models_card, 0)
+        self.mobileclip_evaluation_title = QLabel("MobileCLIP Local Evaluation (evaluation-only)")
+        root.addWidget(self.mobileclip_evaluation_title)
         root.addLayout(controls)
         root.addLayout(source_layout)
         root.addWidget(self.select_folder_button)
@@ -186,6 +230,7 @@ class SettingsPage(QWidget):
         root.addWidget(self.report_box)
         self.inspect_env_button.clicked.connect(self._inspect_ai_environment)
         self.plan_button.clicked.connect(self._show_ai_installation_plan)
+        self.dump_ai_metadata_button.clicked.connect(self._dump_ai_metadata_diagnostics)
         self.install_button.clicked.connect(self._confirm_and_install_mobileclip)
         self.cancel_install_button.clicked.connect(self._cancel_ai_runtime_operation)
         self.verify_button.clicked.connect(self._verify_mobileclip_runtime)
@@ -209,16 +254,21 @@ class SettingsPage(QWidget):
         self.help_requested.emit(self.WORKSPACE_ID)
 
     def _refresh_mobileclip_status(self) -> None:
+        logger.info("Refreshing AI Models metadata status")
         descriptor = self.ai_runtime_manager.registry.require("mobileclip")
         status = self.ai_runtime_manager.status("mobileclip")
         record = self.ai_runtime_manager.installation_record("mobileclip")
         last_benchmark = next((b.date for b in reversed(self.ai_runtime_manager.storage.benchmarks()) if b.provider_id == "mobileclip"), "never")
         details = {
+            "Provider": descriptor.display_name,
             "Status": status.state,
             "Checkpoint": f"{descriptor.checkpoint_id} ({descriptor.revision})",
             "Capabilities": ", ".join(c.value.replace("_", " ") for c in descriptor.capabilities),
             "Device": "CPU",
             "Python environment": record.interpreter_path or "current application environment",
+            "Python version": record.python_version or descriptor.python_version_spec or "unknown",
+            "Provider revision": descriptor.revision,
+            "Model path": record.local_model_cache_path or "not selected",
             "Download size": descriptor.expected_download_size,
             "Disk usage": f"{record.installed_disk_usage_bytes} bytes",
             "Code license": descriptor.code_license,
@@ -232,12 +282,89 @@ class SettingsPage(QWidget):
             "Last benchmark": last_benchmark,
             "Last error": status.last_error or "none",
         }
+        logger.info("AI Models metadata details keys: %s", list(details))
         for key, value in details.items():
             self.ai_detail_labels[key].setText(value)
+        self._refresh_ai_details_geometry()
+        logger.info("AI Models metadata rows=%s child_widgets=%s card_geometry=%s details_geometry=%s", self._ai_details_grid_rows_inserted, len(self.ai_details_widget.findChildren(QWidget)), self.ai_models_card.geometry().getRect(), self.ai_details_widget.geometry().getRect())
         self.mobileclip_status.setText(
             "MobileCLIP remains local-only and evaluation-only. "
             "Only valid actions are enabled by runtime state; no package or model is downloaded automatically."
         )
+
+
+    def _refresh_ai_details_geometry(self) -> None:
+        details_layout = self.ai_details_widget.layout()
+        if isinstance(details_layout, QGridLayout):
+            for row, key in enumerate(self.ai_detail_labels):
+                key_label = self.ai_detail_key_labels[key]
+                value_label = self.ai_detail_labels[key]
+                row_height = max(key_label.sizeHint().height(), value_label.sizeHint().height())
+                details_layout.setRowMinimumHeight(row, row_height)
+            details_layout.activate()
+        self.ai_details_widget.updateGeometry()
+        card_layout = self.ai_models_card.layout()
+        if card_layout is not None:
+            card_layout.activate()
+        self.ai_models_card.updateGeometry()
+
+
+    def _dump_ai_metadata_diagnostics(self) -> None:
+        report = self._build_ai_metadata_diagnostics_report()
+        logger.info("AI metadata diagnostics report:\n%s", report)
+        self.ai_plan_box.setPlainText(report)
+
+    def _build_ai_metadata_diagnostics_report(self) -> str:
+        details_layout = self.ai_details_widget.layout()
+        lines = [
+            "AI metadata diagnostics",
+            f"Card object name: {self.ai_models_card.objectName()}",
+            f"Row count: {self._ai_details_grid_rows_inserted}",
+            f"Widget count: {len(self.ai_details_widget.findChildren(QWidget))}",
+            f"Card geometry: {self.ai_models_card.geometry().getRect()}",
+            f"Details geometry: {self.ai_details_widget.geometry().getRect()}",
+            f"Details sizeHint: {self.ai_details_widget.sizeHint().width()}x{self.ai_details_widget.sizeHint().height()}",
+            f"Details minimumSizeHint: {self.ai_details_widget.minimumSizeHint().width()}x{self.ai_details_widget.minimumSizeHint().height()}",
+            "Rows:",
+        ]
+        for row, key in enumerate(self.ai_detail_labels):
+            key_label = self.ai_detail_key_labels[key]
+            value_label = self.ai_detail_labels[key]
+            key_item = details_layout.itemAtPosition(row, 0).widget() if isinstance(details_layout, QGridLayout) and details_layout.itemAtPosition(row, 0) else None
+            value_item = details_layout.itemAtPosition(row, 1).widget() if isinstance(details_layout, QGridLayout) and details_layout.itemAtPosition(row, 1) else None
+            lines.append(
+                f"- {row}: {key} | key_visible={key_label.isVisible()} key_geometry={key_label.geometry().getRect()} "
+                f"key_is_grid_item={key_item is key_label} | value_visible={value_label.isVisible()} "
+                f"value_geometry={value_label.geometry().getRect()} value_is_grid_item={value_item is value_label} "
+                f"value={value_label.text()}"
+            )
+        lines.extend(["Visible widgets:", *self._visible_widget_lines(self.ai_models_card)])
+        lines.extend(["Widget tree:", *self._widget_tree_lines(self.ai_models_card)])
+        lines.extend(["Parent hierarchy:", *self._widget_parent_hierarchy(self.ai_details_widget)])
+        return "\n".join(lines)
+
+    def _visible_widget_lines(self, root: QWidget) -> list[str]:
+        lines: list[str] = []
+        for widget in root.findChildren(QWidget):
+            if widget.isVisible():
+                lines.append(f"- {widget.__class__.__name__} name={widget.objectName() or '<unnamed>'} geometry={widget.geometry().getRect()}")
+        return lines or ["- none"]
+
+    def _widget_tree_lines(self, root: QWidget, depth: int = 0) -> list[str]:
+        indent = "  " * depth
+        lines = [f"{indent}- {root.__class__.__name__} name={root.objectName() or '<unnamed>'} geometry={root.geometry().getRect()} visible={root.isVisible()}"]
+        for child in root.findChildren(QWidget, options=Qt.FindChildOption.FindDirectChildrenOnly):
+            lines.extend(self._widget_tree_lines(child, depth + 1))
+        return lines
+
+    def _widget_parent_hierarchy(self, widget: QWidget) -> list[str]:
+        lines: list[str] = []
+        current: QWidget | None = widget
+        while current is not None:
+            lines.append(f"- {current.__class__.__name__} name={current.objectName() or '<unnamed>'} geometry={current.geometry().getRect()}")
+            parent = current.parentWidget()
+            current = parent if isinstance(parent, QWidget) else None
+        return lines
 
     def _inspect_ai_environment(self) -> None:
         interpreter = self.ai_env_input.text().strip() or None
