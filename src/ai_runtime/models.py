@@ -23,6 +23,7 @@ class AIRuntimeState(str, Enum):
     DEPENDENCIES_MISSING = "Dependencies missing"
     DEPENDENCIES_INSTALLING = "Dependencies installing"
     MODEL_NOT_DOWNLOADED = "Model not downloaded"
+    CHECKPOINT_MISSING = "Checkpoint Missing"
     MODEL_DOWNLOADING = "Model downloading"
     VERIFYING = "Verifying"
     READY = "Ready"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from pathlib import Path
 from threading import Event
 from typing import Callable
@@ -55,6 +56,7 @@ class SettingsPage(QWidget):
     WORKSPACE_ID = SETTINGS_WORKSPACE
 
     def __init__(self, parent=None):
+        t0 = time.perf_counter()
         super().__init__(parent)
         self._library_provider: Callable[[], list] = lambda: []
         self._selection_provider: Callable[[], list] = lambda: []
@@ -236,13 +238,15 @@ class SettingsPage(QWidget):
         self.verify_button.clicked.connect(self._verify_mobileclip_runtime)
         self.test_button.clicked.connect(self._test_mobileclip_one_image)
         self.open_model_folder_button.clicked.connect(lambda: self.ai_plan_box.setPlainText(f"Model folder: {self.ai_runtime_manager.installation_record('mobileclip').local_model_cache_path}"))
-        self.view_logs_button.clicked.connect(lambda: self.ai_plan_box.setPlainText(f"Runtime logs/history folder: {self.ai_runtime_manager.storage.logs_dir}"))
+        self.view_logs_button.clicked.connect(self._show_ai_runtime_logs)
         self.remove_model_files_button.clicked.connect(self._show_mobileclip_removal_plan)
         self.select_folder_button.clicked.connect(self._select_mobileclip_folder)
         self.run_button.clicked.connect(self._run_mobileclip_evaluation)
         self.sample_limit.valueChanged.connect(self._refresh_source_summary)
+        self._restore_ai_environment_selection()
         self._refresh_mobileclip_status()
         self._refresh_source_summary()
+        logger.info("SettingsPage construction %.1f ms", (time.perf_counter() - t0) * 1000)
         root.addStretch(1)
 
     def set_evaluation_context_providers(self, library_provider: Callable[[], list], selection_provider: Callable[[], list]) -> None:
@@ -253,10 +257,19 @@ class SettingsPage(QWidget):
     def _on_help_clicked(self) -> None:
         self.help_requested.emit(self.WORKSPACE_ID)
 
+    def _restore_ai_environment_selection(self) -> None:
+        record = self.ai_runtime_manager.installation_record("mobileclip")
+        if record.interpreter_path and not self.ai_env_input.text().strip():
+            self.ai_env_input.setText(record.interpreter_path)
+
+    def _show_ai_runtime_logs(self) -> None:
+        self.ai_plan_box.setPlainText(self.ai_runtime_manager.storage.recent_log_text())
+
     def _refresh_mobileclip_status(self) -> None:
-        logger.info("Refreshing AI Models metadata status")
+        refresh_t0 = time.perf_counter()
+        logger.info("Refreshing AI Models cached metadata status")
         descriptor = self.ai_runtime_manager.registry.require("mobileclip")
-        status = self.ai_runtime_manager.status("mobileclip")
+        status = self.ai_runtime_manager.status("mobileclip", deep=False)
         record = self.ai_runtime_manager.installation_record("mobileclip")
         last_benchmark = next((b.date for b in reversed(self.ai_runtime_manager.storage.benchmarks()) if b.provider_id == "mobileclip"), "never")
         details = {
@@ -286,7 +299,7 @@ class SettingsPage(QWidget):
         for key, value in details.items():
             self.ai_detail_labels[key].setText(value)
         self._refresh_ai_details_geometry()
-        logger.info("AI Models metadata rows=%s child_widgets=%s card_geometry=%s details_geometry=%s", self._ai_details_grid_rows_inserted, len(self.ai_details_widget.findChildren(QWidget)), self.ai_models_card.geometry().getRect(), self.ai_details_widget.geometry().getRect())
+        logger.info("AI Models cached status refresh %.1f ms; rows=%s child_widgets=%s card_geometry=%s details_geometry=%s", (time.perf_counter() - refresh_t0) * 1000, self._ai_details_grid_rows_inserted, len(self.ai_details_widget.findChildren(QWidget)), self.ai_models_card.geometry().getRect(), self.ai_details_widget.geometry().getRect())
         self.mobileclip_status.setText(
             "MobileCLIP remains local-only and evaluation-only. "
             "Only valid actions are enabled by runtime state; no package or model is downloaded automatically."
@@ -439,7 +452,13 @@ class SettingsPage(QWidget):
                 self.runtime_progress_bar.setRange(0, int(total_text)); self.runtime_progress_bar.setValue(int(done_text))
 
     def _on_ai_runtime_completed(self, operation: str, result: object) -> None:
+        self.runtime_step_label.setText(f"Current step: {operation} completed")
         self.ai_plan_box.append(f"{operation.title()} completed.")
+        if hasattr(result, "stdout") or hasattr(result, "stderr"):
+            out = getattr(result, "stdout", "") or ""
+            err = getattr(result, "stderr", "") or ""
+            code = getattr(result, "returncode", "")
+            self.ai_plan_box.append(f"Final result: exit_code={code}\n{out}\n{err}".strip())
         if operation == "test" and hasattr(result, "stdout"):
             try:
                 payload = json.loads(result.stdout.strip())
@@ -451,6 +470,7 @@ class SettingsPage(QWidget):
         self._refresh_mobileclip_status()
 
     def _on_ai_runtime_failed(self, error: str) -> None:
+        self.runtime_step_label.setText("Current step: failed")
         self.ai_plan_box.append(f"AI runtime operation failed: {error}")
         self._refresh_mobileclip_status()
 

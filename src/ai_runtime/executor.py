@@ -1,5 +1,5 @@
 from __future__ import annotations
-import os, platform, subprocess, sys, time
+import json, os, platform, subprocess, sys, time
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Event
@@ -40,18 +40,39 @@ class AIRuntimeCommandExecutor:
             elif major_minor < (3,10): msg='Python 3.10 or newer is required for MobileCLIP.'
             return PythonEnvironmentInfo(str(path), version, arch, env_path, env_type, bool(d.get('pip')), writable, valid, msg)
         except Exception as exc: return PythonEnvironmentInfo(str(path), valid=False, message=str(exc))
-    def imports_available(self, interpreter: str|Path, import_names: tuple[str, ...]) -> tuple[str, ...]:
-        missing=[]
+    def package_state(self, interpreter: str|Path, import_names: tuple[str, ...]) -> dict[str, dict[str, str | bool]]:
         path=Path(interpreter).expanduser()
-        for name in import_names:
-            try:
-                p=subprocess.run([str(path),'-c',f'import {name}'], text=True, capture_output=True, timeout=10, shell=False)
-                if p.returncode != 0: missing.append(name)
-            except Exception:
-                missing.append(name)
-        return tuple(missing)
+        code="""
+import importlib, importlib.metadata as md, json
+name_map={'PIL':'Pillow'}
+out={}
+for name in __import__('sys').argv[1:]:
+    try:
+        importlib.import_module(name)
+        dist=name_map.get(name, name)
+        try:
+            version=md.version(dist)
+        except Exception:
+            version=''
+        out[name]={'available': True, 'version': version}
+    except Exception as exc:
+        out[name]={'available': False, 'version': '', 'error': str(exc)[-500:]}
+print(json.dumps(out, sort_keys=True))
+"""
+        try:
+            p=subprocess.run([str(path),'-c',code,*import_names], text=True, capture_output=True, timeout=30, shell=False)
+            if p.returncode != 0:
+                return {name: {'available': False, 'version': '', 'error': (p.stderr or p.stdout)[-500:]} for name in import_names}
+            data=json.loads(p.stdout.strip() or '{}')
+            return {name: data.get(name, {'available': False, 'version': '', 'error': 'missing from probe output'}) for name in import_names}
+        except Exception as exc:
+            return {name: {'available': False, 'version': '', 'error': str(exc)} for name in import_names}
 
-    def run_action(self, action: AIRuntimePlanAction, cancel_event: Event|None=None) -> CommandResult:
+    def imports_available(self, interpreter: str|Path, import_names: tuple[str, ...]) -> tuple[str, ...]:
+        state=self.package_state(interpreter, import_names)
+        return tuple(name for name, info in state.items() if not info.get('available'))
+
+    def run_action(self, action: AIRuntimePlanAction, cancel_event: Event|None=None, run_log=None) -> CommandResult:
         start=time.perf_counter()
         if cancel_event and cancel_event.is_set(): return CommandResult(action.action_type.value, -1, '', 'Cancelled before start', 0, cancelled=True)
         if action.action_type == AIRuntimeActionType.CREATE_DIRECTORY:
@@ -59,14 +80,18 @@ class AIRuntimeCommandExecutor:
         if action.action_type in (AIRuntimeActionType.VERIFY_IMPORT, AIRuntimeActionType.INSTALL_PYTHON_PACKAGE, AIRuntimeActionType.CLONE_OR_INSTALL_OFFICIAL_PACKAGE, AIRuntimeActionType.VERIFY_PROVIDER):
             argv=list(action.argv)
             if not argv or any(not isinstance(x,str) or not x for x in argv): raise ValueError('Typed command action requires argv tokens')
-            proc=subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=False)
+            try:
+                proc=subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=False)
+            except Exception as exc:
+                if run_log: run_log.exception(exc)
+                return CommandResult(action.action_type.value,1,'',str(exc),time.perf_counter()-start)
             try:
                 while proc.poll() is None:
-                    if cancel_event and cancel_event.is_set(): proc.terminate(); return CommandResult(action.action_type.value,-1,'','Cancelled',time.perf_counter()-start,cancelled=True)
-                    if time.perf_counter()-start > action.timeout_seconds: proc.kill(); out,err=proc.communicate(); return CommandResult(action.action_type.value,-1,out[-self.output_limit:],err[-self.output_limit:],time.perf_counter()-start,timed_out=True)
+                    if cancel_event and cancel_event.is_set(): proc.terminate(); res=CommandResult(action.action_type.value,-1,'','Cancelled',time.perf_counter()-start,cancelled=True); run_log.command(argv,res.stdout,res.stderr,res.returncode,res.duration_seconds) if run_log else None; return res
+                    if time.perf_counter()-start > action.timeout_seconds: proc.kill(); out,err=proc.communicate(); res=CommandResult(action.action_type.value,-1,out[-self.output_limit:],err[-self.output_limit:],time.perf_counter()-start,timed_out=True); run_log.command(argv,res.stdout,res.stderr,res.returncode,res.duration_seconds) if run_log else None; return res
                     time.sleep(0.05)
                 out,err=proc.communicate()
-                return CommandResult(action.action_type.value, proc.returncode, out[-self.output_limit:], err[-self.output_limit:], time.perf_counter()-start)
+                res=CommandResult(action.action_type.value, proc.returncode, out[-self.output_limit:], err[-self.output_limit:], time.perf_counter()-start); run_log.command(argv,res.stdout,res.stderr,res.returncode,res.duration_seconds) if run_log else None; return res
             finally:
                 if proc.poll() is None: proc.kill()
         raise NotImplementedError(f'Execution for {action.action_type.value} is intentionally not implemented in MODEL-002A')
