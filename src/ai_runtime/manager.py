@@ -1,5 +1,5 @@
 from __future__ import annotations
-import importlib.util, json, shutil, sys, time, urllib.request
+import importlib.util, json, logging, shutil, sys, time, urllib.request
 from pathlib import Path
 from threading import Event
 from core.application_data import ApplicationDataPathService, get_app_data_service
@@ -11,13 +11,14 @@ from ai_runtime.registry import AIRuntimeRegistry
 from ai_runtime.storage import AIRuntimeStorage
 
 ProgressCallback = Callable[[str, str], None]
+logger = logging.getLogger(__name__)
 
 class AIRuntimeManager:
     def __init__(self, registry: AIRuntimeRegistry|None=None, app_data: ApplicationDataPathService|None=None, executor: AIRuntimeCommandExecutor|None=None):
-        self.registry=registry or AIRuntimeRegistry(); self.app_data=app_data or get_app_data_service(); self.storage=AIRuntimeStorage(self.app_data); self.executor=executor or AIRuntimeCommandExecutor()
+        t0=time.perf_counter(); self.registry=registry or AIRuntimeRegistry(); self.app_data=app_data or get_app_data_service(); self.storage=AIRuntimeStorage(self.app_data); self.executor=executor or AIRuntimeCommandExecutor(); logger.info("AI Runtime Manager construction %.1f ms", (time.perf_counter()-t0)*1000)
     def inspect_environment(self, interpreter: str|Path|None=None) -> PythonEnvironmentInfo: return self.executor.validate_interpreter(interpreter or sys.executable)
     def installation_record(self, provider_id:str) -> AIRuntimeInstallationRecord:
-        rec=self.storage.installations().get(provider_id)
+        t0=time.perf_counter(); rec=self.storage.installations().get(provider_id); logger.debug("AI runtime installation record loading for %s %.1f ms", provider_id, (time.perf_counter()-t0)*1000)
         if rec: return rec
         d=self.registry.require(provider_id); cache=self.storage.cache_dir_for(provider_id)
         return AIRuntimeInstallationRecord(provider_id=provider_id, local_model_cache_path=str(cache), local_installation_path=str(cache), checkpoint_id=d.checkpoint_id, revision=d.revision)
@@ -55,7 +56,9 @@ class AIRuntimeManager:
         if state == AIRuntimeState.CHECKPOINT_MISSING.value and (not missing_deps) and 'missing Python packages' in (rec.last_error or ''):
             rec.last_error='Checkpoint Missing - missing model files: '+', '.join(missing_files)
             rec.last_validation_result=rec.last_error
-        rec.installation_state=state; rec.last_status_check=now_iso(); rec.installed_disk_usage_bytes=self.storage.disk_usage(cache); self.storage.save_installation(rec)
+        if deep:
+            rec.installed_disk_usage_bytes=self.storage.disk_usage(cache)
+        rec.installation_state=state; rec.last_status_check=now_iso(); self.storage.save_installation(rec)
         return AIRuntimeStatus(provider_id,state,state==AIRuntimeState.READY.value,not missing_deps,not missing_files,'Unknown',rec.last_error,rec.last_status_check,missing_deps,missing_files,env)
     def build_installation_plan(self, provider_id:str, interpreter:str|Path|None=None, device:str='CPU') -> AIRuntimeInstallationPlan:
         d=self.registry.require(provider_id); env=self.inspect_environment(interpreter or self.installation_record(provider_id).interpreter_path or sys.executable); cache=self.storage.cache_dir_for(provider_id)

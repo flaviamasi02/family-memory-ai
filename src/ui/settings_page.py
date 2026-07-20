@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from pathlib import Path
 from threading import Event
 from typing import Callable
@@ -55,6 +56,7 @@ class SettingsPage(QWidget):
     WORKSPACE_ID = SETTINGS_WORKSPACE
 
     def __init__(self, parent=None):
+        t0 = time.perf_counter()
         super().__init__(parent)
         self._library_provider: Callable[[], list] = lambda: []
         self._selection_provider: Callable[[], list] = lambda: []
@@ -244,6 +246,7 @@ class SettingsPage(QWidget):
         self._restore_ai_environment_selection()
         self._refresh_mobileclip_status()
         self._refresh_source_summary()
+        logger.info("SettingsPage construction %.1f ms", (time.perf_counter() - t0) * 1000)
         root.addStretch(1)
 
     def set_evaluation_context_providers(self, library_provider: Callable[[], list], selection_provider: Callable[[], list]) -> None:
@@ -263,7 +266,8 @@ class SettingsPage(QWidget):
         self.ai_plan_box.setPlainText(self.ai_runtime_manager.storage.recent_log_text())
 
     def _refresh_mobileclip_status(self) -> None:
-        logger.info("Refreshing AI Models metadata status")
+        refresh_t0 = time.perf_counter()
+        logger.info("Refreshing AI Models cached metadata status")
         descriptor = self.ai_runtime_manager.registry.require("mobileclip")
         status = self.ai_runtime_manager.status("mobileclip", deep=False)
         record = self.ai_runtime_manager.installation_record("mobileclip")
@@ -295,7 +299,7 @@ class SettingsPage(QWidget):
         for key, value in details.items():
             self.ai_detail_labels[key].setText(value)
         self._refresh_ai_details_geometry()
-        logger.info("AI Models metadata rows=%s child_widgets=%s card_geometry=%s details_geometry=%s", self._ai_details_grid_rows_inserted, len(self.ai_details_widget.findChildren(QWidget)), self.ai_models_card.geometry().getRect(), self.ai_details_widget.geometry().getRect())
+        logger.info("AI Models cached status refresh %.1f ms; rows=%s child_widgets=%s card_geometry=%s details_geometry=%s", (time.perf_counter() - refresh_t0) * 1000, self._ai_details_grid_rows_inserted, len(self.ai_details_widget.findChildren(QWidget)), self.ai_models_card.geometry().getRect(), self.ai_details_widget.geometry().getRect())
         self.mobileclip_status.setText(
             "MobileCLIP remains local-only and evaluation-only. "
             "Only valid actions are enabled by runtime state; no package or model is downloaded automatically."

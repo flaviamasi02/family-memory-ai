@@ -325,3 +325,26 @@ def test_settings_initial_status_uses_cached_metadata_not_deep_subprocess(monkey
     assert page.ai_detail_labels["Status"].text() == AIRuntimeState.CHECKPOINT_MISSING.value
     assert "missing Python packages" not in page.ai_detail_labels["Last error"].text()
     page.deleteLater()
+
+
+def test_cached_status_does_not_scan_disk_usage_or_preserve_exact_old_error(tmp_path, monkeypatch):
+    m = create_default_runtime_manager(ApplicationDataPathService(tmp_path, tmp_path))
+    rec = m.installation_record("mobileclip")
+    rec.interpreter_path = sys.executable
+    rec.installation_state = AIRuntimeState.DEPENDENCIES_MISSING.value
+    rec.installed_disk_usage_bytes = 12345
+    old = "Not Installed - missing Python packages: torch, torchvision, PIL, mobileclip; missing model files: mobileclip_s0.pt"
+    rec.last_error = old
+    rec.last_validation_result = old
+    m.storage.save_installation(rec)
+    monkeypatch.setattr(m.storage, "disk_usage", lambda *a, **k: (_ for _ in ()).throw(AssertionError("startup disk scan")))
+    monkeypatch.setattr(m.executor, "validate_interpreter", lambda *a, **k: (_ for _ in ()).throw(AssertionError("startup interpreter subprocess")))
+    monkeypatch.setattr(m.executor, "imports_available", lambda *a, **k: (_ for _ in ()).throw(AssertionError("startup import subprocess")))
+
+    status = m.status("mobileclip", deep=False)
+    rec = m.installation_record("mobileclip")
+
+    assert status.state == AIRuntimeState.CHECKPOINT_MISSING.value
+    assert rec.installed_disk_usage_bytes == 12345
+    assert rec.last_error == "Checkpoint Missing - missing model files: mobileclip_s0.pt"
+    assert rec.last_validation_result == rec.last_error
