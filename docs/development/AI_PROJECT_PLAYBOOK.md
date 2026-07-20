@@ -634,3 +634,15 @@ Permanent prevention rules:
 - Stashes must be inspected before deletion.
 - Runtime metadata, model files, user profiles, and learning data should use application-data storage outside the repository rather than repository-local storage.
 - Private learning-profile contents must never be copied into documentation or PR descriptions.
+
+
+## AI Runtime implementation rules
+
+Future AI-runtime work must preserve the MODEL-002 baseline:
+
+- Add providers through the generic runtime registry/descriptor model, not through provider-specific UI rewrites.
+- Never install packages or download model files without an explicit Product Owner-confirmed plan.
+- Keep optional AI runtimes outside the base application environment unless a milestone explicitly changes that decision.
+- Run long AI runtime operations in workers, not directly on Qt widgets or the UI thread.
+- Record Ready only after full provider verification succeeds.
+- When UI metadata appears blank, diagnose layout geometry and widget hierarchy before assuming provider/runtime data is missing.

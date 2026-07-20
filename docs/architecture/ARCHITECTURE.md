@@ -835,3 +835,12 @@ Current environment strategy:
 - Main app: `C:\Projects\family-memory-ai\.venv`.
 - MobileCLIP runtime: `C:\Projects\family-memory-ai\.venv-mobileclip`.
 - MobileCLIP target: Python 3.10, 64-bit, CPU-only, explicit selected interpreter, no shell-activation dependency, and package commands using `python.exe -m pip ...`.
+
+
+## Current AI Runtime Architecture
+
+The current optional local-model architecture is provider-agnostic. `src/ai_runtime/registry.py` stores provider descriptors; `src/ai_runtime/manager.py` coordinates environment inspection, status, installation plans, verification, diagnostics, history, benchmarks, and safe removal; `src/ai_runtime/storage.py` persists runtime records under app-data locations outside Git; and `src/workers/ai_runtime_worker.py` runs long operations off the Qt UI thread.
+
+MobileCLIP is registered in `src/ai_runtime/mobileclip_registration.py` as the first provider with image embeddings, text embeddings, and zero-shot classification capabilities. It uses official Apple MobileCLIP code and the `apple/MobileCLIP-S0` checkpoint, but remains optional and local-only. The production deterministic classifier remains authoritative until a later milestone explicitly changes classification behavior.
+
+Provider lifecycle is register -> inspect/select interpreter -> generate plan -> Product Owner confirmation -> worker-thread install/download -> strict provider verification -> Ready/history records -> optional testing/evaluation/removal. MODEL-002F is the next milestone for Product Owner-guided MobileCLIP installation and operational validation. MODEL-003 classification integration follows only after MODEL-002F succeeds.

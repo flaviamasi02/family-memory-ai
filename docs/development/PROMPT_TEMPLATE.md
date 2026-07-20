@@ -391,3 +391,14 @@ Every GitHub/Codex implementation prompt must include:
 - Manual Product Owner test requirement
 
 When the prompt corrects an existing Pull Request, it must identify the existing PR/branch and state that Codex must update the same PR, not create a new PR unless explicitly instructed.
+
+
+## AI Runtime prompt addendum
+
+Prompts that touch AI Runtime Manager, MobileCLIP, or future local model providers must state:
+
+- whether the work is documentation-only, UI-only, runtime-only, or model-behavior-changing;
+- that no source photos, thumbnails, categories, or user decisions may be modified unless explicitly in scope;
+- whether installation, verification, diagnostics, or classification behavior is affected;
+- the manual Product Owner validation required for Windows CPU-only runtime behavior;
+- the fallback behavior when the optional provider is absent, not installed, failed, or not Ready.

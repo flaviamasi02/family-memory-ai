@@ -1035,3 +1035,60 @@ Next practical milestone: MODEL-002C Product Owner-guided MobileCLIP validation.
 - Run one-image real embedding, 10-image smoke test, and 100-image benchmark.
 - Document actual CPU performance.
 - Do not replace the production classifier in this milestone.
+
+---
+
+## DOCSYNC GITHUB FULL — after MODEL-002E (2026-07-20)
+
+Current status: MODEL-002A and MODEL-002B were merged in their original PRs. MODEL-002C, MODEL-002D, and MODEL-002E work was ultimately consolidated and merged through PR #22; PR #20 and PR #21 were closed without merge. Repository cleanup after PR #22 is complete: obsolete feature branches and superseded pull requests have been closed.
+
+Implementation and validation distinction:
+- Implementation complete: generic AI Runtime Manager foundation, managed MobileCLIP installation flow, stricter verification workflow, diagnostics workflow, and Settings -> AI Models metadata layout fix.
+- Manually validated: the repaired Settings -> AI Models UI on Windows, including visible provider metadata after the layout sizing fix.
+- Operational validation still pending: MobileCLIP itself is not fully installed or Ready on the Product Owner machine.
+
+Latest confirmed Product Owner runtime state:
+- Status: Dependencies missing.
+- Missing packages include `torch`, `torchvision`, `PIL`, and `mobileclip`.
+- Checkpoint `mobileclip_s0.pt` is missing.
+- Real installation through the application is not yet completed.
+- Runtime Ready has not been confirmed.
+- Real one-image embedding has not been confirmed.
+- 10-image and 100-image evaluations have not been completed.
+- Actual CPU performance has not been recorded.
+
+Current AI Runtime architecture:
+- `src/ai_runtime` is the canonical provider-agnostic runtime layer. The registry owns provider descriptors and capabilities; the manager owns status, installation plans, selected-interpreter persistence, verification, history, diagnostics, benchmark metadata, and safe removal of manager-owned cache paths.
+- MobileCLIP is the first registered provider. It is local-only, CPU-capable, optional, and evaluation-only. It does not replace deterministic production classification or modify source photos, thumbnails, categories, or cleanup decisions.
+- Runtime files and model weights remain outside Git through the app-data path service. The base application continues to run when MobileCLIP is absent.
+
+Current provider lifecycle:
+1. Register provider descriptor.
+2. Inspect/select a dedicated Python interpreter.
+3. Generate an explicit installation plan.
+4. Product Owner confirms before any package install or checkpoint download.
+5. Run installation in a Qt worker thread with progress and cancellation.
+6. Verify imports, checkpoint presence, model/transforms construction, tokenizer creation, and finite embedding output.
+7. Record Ready only after verification passes.
+8. Allow one-image testing, bounded evaluation reporting, log/history inspection, diagnostics dumps, and manager-owned model-file removal.
+
+Current Settings -> AI Models UI:
+- Displays MobileCLIP provider metadata: provider, status, checkpoint/revision, capabilities, CPU device, Python environment/version, model path, download/disk usage, licenses, installed/updated timestamps, current step, package/checkpoint availability, verification, benchmark, and last error.
+- Exposes Inspect Python environment, View installation plan, Install, Cancel, Verify, Test, Open model folder, View logs, Remove model files, and Dump AI metadata diagnostics.
+- Uses a scrollable Settings page and explicit minimum row heights for metadata rows so later controls cannot overlap or hide provider metadata.
+
+Verification and diagnostics workflow:
+- Verification is stricter than file existence. Ready requires dependency imports, checkpoint load, provider/model/transforms construction, tokenizer creation, and finite numeric embedding output.
+- Temporary diagnostics added during MODEL-002D were used to investigate the blank metadata rendering bug. The current UI includes a diagnostics dump for AI metadata layout geometry and widget hierarchy so future UI regressions can be diagnosed from actual widget state.
+- Lesson learned: a blank Qt metadata region can be a layout-sizing/geometry bug even when labels contain valid text. Root-cause work must inspect widget hierarchy, row counts, size hints, geometry, and placement before changing runtime state or provider logic.
+
+Completed implementation milestones:
+- MODEL-002A — AI Runtime Manager foundation.
+- MODEL-002B — runtime validation and managed MobileCLIP installation improvements.
+- MODEL-002C — Product Owner-guided provider verification workflow.
+- MODEL-002D — temporary runtime diagnostics for metadata rendering investigation.
+- MODEL-002E — Qt layout sizing fix for Settings -> AI Models metadata.
+
+Next milestone: MODEL-002F — Product Owner-guided MobileCLIP installation and operational validation. Scope: select or confirm the dedicated `.venv-mobileclip` Python 3.10 interpreter; review the installation plan; install dependencies through the app; download the checkpoint through the confirmed flow; verify Ready; run one-image embedding; run 10-image smoke test; run 100-image benchmark; record real CPU timing and memory observations; verify persistence after restart; keep the production classifier unchanged.
+
+Following planned milestone: MODEL-003 — first real MobileCLIP classification integration, only after MODEL-002F succeeds.
