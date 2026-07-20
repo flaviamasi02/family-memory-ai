@@ -661,3 +661,27 @@ Approved.
 ## Decision: Stable app data and optional MobileCLIP provider
 
 Learning profiles and ML artifacts must live outside the Git checkout in a platform-aware per-user application-data directory.  Repository-local `.familymemory` is legacy runtime data and is ignored by Git.  MobileCLIP integration uses a provider boundary so future checkpoints/providers can be added without rewriting the domain layer.  Model weights are never downloaded silently.
+
+### DEC-0046
+Generic AI Runtime Manager is the canonical local-model foundation.
+
+**Value:** Both
+**Impact:** High
+
+Approved. Optional local AI providers must be registered and managed through the provider-agnostic AI Runtime Manager. Provider descriptors own capabilities, dependencies, model files, licenses, environment requirements, and verification hooks. Runtime UI should consume generic manager state rather than hard-coding provider-specific lifecycle behavior.
+
+### DEC-0047
+MobileCLIP Ready requires full verification.
+
+**Value:** Product
+**Impact:** High
+
+Approved. MobileCLIP must not be treated as Ready solely because dependencies or checkpoint files exist. Ready requires import checks, checkpoint load, provider/model/transforms construction, tokenizer creation, and a finite embedding result.
+
+### DEC-0048
+AI Models metadata rendering bugs require layout diagnostics first.
+
+**Value:** Method
+**Impact:** Medium
+
+Approved. If Settings -> AI Models metadata appears blank, future agents must inspect Qt widget hierarchy, row counts, size hints, geometry, visibility, and layout order before changing provider data or runtime verification logic. MODEL-002D/002E showed that valid label text can be hidden by layout sizing.

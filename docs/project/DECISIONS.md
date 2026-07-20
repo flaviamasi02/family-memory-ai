@@ -64,3 +64,13 @@ Rules:
 - Every GitHub/Codex implementation prompt must include the Codex link `https://chatgpt.com/codex`, repository link `https://github.com/flaviamasi02/family-memory-ai`, execution environment, estimated task size, purpose, expected outcome, base branch, instruction not to merge automatically, and Product Owner manual-test requirement.
 - When correcting an existing PR, Codex must update the same PR and must not create a new PR unless explicitly instructed.
 - After every merged feature or bug-fix PR, complete the repository cleanup checklist documented in `docs/development/AI_PROJECT_PLAYBOOK.md`.
+
+## MODEL-002E metadata-rendering lesson
+
+Decision: Settings -> AI Models metadata rendering defects must be diagnosed as UI layout problems before runtime/provider data is changed.
+
+Consequences:
+- Keep AI Runtime provider state generic and data-oriented.
+- Inspect Qt widget hierarchy, grid rows, visibility, geometry, size hints, and layout ordering when metadata appears blank.
+- Preserve explicit row sizing/geometry refresh behavior in the AI Models card.
+- Use MODEL-003 for first real MobileCLIP image classification; do not mix classification behavior changes into runtime diagnostics or layout fixes.

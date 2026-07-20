@@ -351,3 +351,17 @@ Later:
 - Evaluate Florence-2 as a possible second-stage model.
 - Evaluate face recognition, OCR, object detection, and category/tag/subcategory/rule-system expansions.
 - Migrate production classification only after measured evidence and explicit approval.
+
+## MODEL roadmap update after MODEL-002E
+
+Completed:
+- [x] MODEL-002A — Generic AI Runtime Manager foundation.
+- [x] MODEL-002B — Managed MobileCLIP installation and runtime validation improvements.
+- [x] MODEL-002C — Provider verification workflow.
+- [x] MODEL-002D — Runtime diagnostics for AI Models metadata investigation.
+- [x] MODEL-002E — Settings -> AI Models Qt layout sizing fix.
+
+Next planned implementation:
+- [ ] MODEL-003 — First real MobileCLIP image classification.
+
+MODEL-003 should build on the completed runtime lifecycle and must define safe integration points before MobileCLIP evidence affects production classification. Existing deterministic classification and user corrections remain authoritative unless explicitly changed by the MODEL-003 acceptance scope.

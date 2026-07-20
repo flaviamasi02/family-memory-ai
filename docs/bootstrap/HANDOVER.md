@@ -199,3 +199,9 @@ Each information type has one official location. Reference these documents inste
 
 If new mandatory project documents are introduced in the future, this reading order must be updated so that every new ChatGPT conversation starts with a complete and consistent project context.
 
+
+## Current handover update — after MODEL-002E
+
+As of 2026-07-20, MODEL-002A through MODEL-002E are complete and merged. The AI Runtime Manager baseline is current, the Settings -> AI Models metadata rendering issue has been diagnosed and fixed, and repository cleanup after PR #22 is complete.
+
+For the next implementation handover, treat MODEL-003 — first real MobileCLIP image classification — as the next planned milestone. Do not reopen MODEL-002 diagnostics unless a new regression appears. Preserve the rule that MobileCLIP remains optional/local and that runtime Ready requires full provider verification, not just downloaded files.

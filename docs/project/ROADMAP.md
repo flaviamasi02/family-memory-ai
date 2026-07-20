@@ -112,3 +112,18 @@ Product-direction update:
 - Gift Albums
 - Event Albums
 - Story Timeline
+
+
+## AI Runtime and Model Roadmap Update — after MODEL-002E
+
+Completed:
+- [x] MODEL-002A — Generic AI Runtime Manager foundation.
+- [x] MODEL-002B — Managed MobileCLIP installation and runtime validation improvements.
+- [x] MODEL-002C — Provider verification workflow.
+- [x] MODEL-002D — Runtime diagnostics for AI Models metadata investigation.
+- [x] MODEL-002E — Settings -> AI Models Qt layout sizing fix.
+
+Next planned implementation:
+- [ ] MODEL-003 — First real MobileCLIP image classification.
+
+MODEL-003 must begin from the completed runtime baseline: provider registration, explicit installation, verification-before-Ready, diagnostics, and visible Settings metadata are already in place. The next milestone should define how MobileCLIP classification evidence is used safely without silently replacing existing deterministic classification behavior.

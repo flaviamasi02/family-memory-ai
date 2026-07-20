@@ -222,3 +222,10 @@ Optimize for long-term sustainability.
 The purpose of AI is not to replace the Product Owner.
 
 The purpose of AI is to amplify the Product Owner by taking over as much implementation work as possible while keeping humans responsible for vision, priorities and decisions.
+
+
+## Current AI Runtime collaboration context
+
+The MODEL-002A through MODEL-002E sequence established the generic AI Runtime Manager as the permanent foundation for optional local AI providers. Future AI work must use this generic manager and provider registry rather than adding MobileCLIP-specific one-off runtime flows.
+
+MobileCLIP is currently the first managed provider and remains local-only, CPU-capable, optional, and evaluation-first. MODEL-003 is the next planned implementation and should introduce the first real MobileCLIP image classification only after preserving explicit installation, verification-before-Ready, Product Owner validation, and safe fallback behavior.
