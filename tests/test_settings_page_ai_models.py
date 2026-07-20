@@ -135,3 +135,61 @@ def test_ai_models_diagnostics_report_is_generated(monkeypatch, tmp_path):
     assert "AI metadata diagnostics" in page.ai_plan_box.toPlainText()
     page.close()
     page.deleteLater()
+
+
+def test_ai_models_source_orders_section_controls_before_evaluation():
+    source = Path("src/ui/settings_page.py").read_text(encoding="utf-8")
+    metadata_pos = source.index("card_layout.addWidget(self.ai_details_widget)")
+    description_pos = source.index("card_layout.addWidget(self.mobileclip_status)")
+    actions_text_pos = source.index("card_layout.addWidget(self.ai_actions_label)")
+    buttons_pos = source.index("card_layout.addLayout(action_layout)")
+    diagnostics_pos = source.index("card_layout.addWidget(self.dump_ai_metadata_button)")
+    environment_pos = source.index("card_layout.addLayout(env_layout)")
+    plan_pos = source.index("card_layout.addWidget(self.ai_plan_box)")
+    evaluation_pos = source.index('self.mobileclip_evaluation_title = QLabel("MobileCLIP Local Evaluation (evaluation-only)")')
+    assert metadata_pos < description_pos < actions_text_pos < buttons_pos < diagnostics_pos < environment_pos < plan_pos < evaluation_pos
+    assert "QScrollArea" in source
+    assert "setWidgetResizable(True)" in source
+    assert 'self.settings_scroll_area.setWidget(self.settings_scroll_content)' in source
+
+
+def test_ai_models_widget_order_has_no_overlap(monkeypatch, tmp_path):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    try:
+        from PySide6.QtWidgets import QApplication
+    except ImportError as exc:
+        pytest.skip(f"PySide6 unavailable in this environment: {exc}")
+    from ui.settings_page import SettingsPage
+
+    monkeypatch.setenv("FAMILY_MEMORY_APP_DATA_ROOT", str(tmp_path))
+    app = QApplication.instance() or QApplication([])
+    page = SettingsPage()
+    page.resize(640, 420)
+    page.show()
+    app.processEvents()
+
+    widgets = [
+        page.ai_details_widget,
+        page.mobileclip_status,
+        page.ai_actions_label,
+        page.install_button,
+        page.dump_ai_metadata_button,
+        page.ai_env_input,
+        page.ai_plan_box,
+    ]
+    bottoms = []
+    for widget in widgets:
+        assert widget.height() > 0
+        top = widget.mapTo(page.settings_scroll_content, widget.rect().topLeft()).y()
+        bottom = widget.mapTo(page.settings_scroll_content, widget.rect().bottomLeft()).y()
+        assert bottom >= top
+        bottoms.append((top, bottom))
+
+    for (_, previous_bottom), (next_top, _) in zip(bottoms, bottoms[1:]):
+        assert next_top > previous_bottom
+
+    card_bottom = page.ai_models_card.mapTo(page.settings_scroll_content, page.ai_models_card.rect().bottomLeft()).y()
+    evaluation_top = page.mobileclip_evaluation_title.mapTo(page.settings_scroll_content, page.mobileclip_evaluation_title.rect().topLeft()).y()
+    assert evaluation_top > card_bottom
+    page.close()
+    page.deleteLater()

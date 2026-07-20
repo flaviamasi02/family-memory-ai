@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QWidget,
     QSizePolicy,
     QLayout,
+    QScrollArea,
 )
 from vision.evaluation_sources import (
     EvaluationSourceResult,
@@ -88,10 +89,21 @@ class SettingsPage(QWidget):
             "font-size: 14px; color: #3f4752; border: 1px solid #d4d9df; border-radius: 8px; padding: 12px;"
         )
 
-        root = QVBoxLayout(self)
-        root.addWidget(self.header)
+        page_layout = QVBoxLayout(self)
+        page_layout.addWidget(self.header)
+
+        self.settings_scroll_area = QScrollArea()
+        self.settings_scroll_area.setObjectName("settingsScrollArea")
+        self.settings_scroll_area.setWidgetResizable(True)
+        self.settings_scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.settings_scroll_content = QWidget()
+        self.settings_scroll_content.setObjectName("settingsScrollContent")
+        root = QVBoxLayout(self.settings_scroll_content)
+        root.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         root.addWidget(self.info_panel)
         root.addWidget(self.description_label)
+        page_layout.addWidget(self.settings_scroll_area, 1)
+        self.settings_scroll_area.setWidget(self.settings_scroll_content)
 
         self.ai_models_title = QLabel("AI Models")
         self.ai_models_title.setStyleSheet("font-size: 16px; font-weight: 700;")
@@ -170,6 +182,10 @@ class SettingsPage(QWidget):
         self.library_radio.setChecked(True)
         controls = QHBoxLayout(); controls.addWidget(QLabel("Max sample size (default 100, cap 300):")); controls.addWidget(self.sample_limit); controls.addStretch(1)
         source_layout = QVBoxLayout(); source_layout.addWidget(QLabel("Evaluation source:")); source_layout.addWidget(self.library_radio); source_layout.addWidget(self.selected_radio); source_layout.addWidget(self.folder_radio)
+        env_layout = QHBoxLayout(); env_layout.addWidget(QLabel("Python environment:")); env_layout.addWidget(self.ai_env_input); env_layout.addWidget(self.inspect_env_button); env_layout.addWidget(self.plan_button)
+        action_layout = QHBoxLayout()
+        for action_button in (self.install_button, self.cancel_install_button, self.verify_button, self.test_button, self.open_model_folder_button, self.view_logs_button, self.remove_model_files_button):
+            action_layout.addWidget(action_button)
         root.addWidget(self.ai_models_title)
         card_layout = QVBoxLayout(self.ai_models_card)
         card_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
@@ -194,20 +210,17 @@ class SettingsPage(QWidget):
             details_layout.addWidget(value_label, row, 1)
         self._ai_details_grid_rows_inserted = details_layout.rowCount()
         card_layout.addWidget(self.ai_details_widget)
+        card_layout.addWidget(self.mobileclip_status)
         card_layout.addWidget(self.ai_actions_label)
+        card_layout.addLayout(action_layout)
+        card_layout.addWidget(self.dump_ai_metadata_button)
+        card_layout.addLayout(env_layout)
+        card_layout.addWidget(self.ai_plan_box)
+        card_layout.addWidget(self.runtime_step_label)
+        card_layout.addWidget(self.runtime_progress_bar)
         root.addWidget(self.ai_models_card, 0)
-        root.addWidget(self.mobileclip_status)
-        env_layout = QHBoxLayout(); env_layout.addWidget(QLabel("Python environment:")); env_layout.addWidget(self.ai_env_input); env_layout.addWidget(self.inspect_env_button); env_layout.addWidget(self.plan_button)
-        root.addLayout(env_layout)
-        action_layout = QHBoxLayout()
-        for action_button in (self.install_button, self.cancel_install_button, self.verify_button, self.test_button, self.open_model_folder_button, self.view_logs_button, self.remove_model_files_button):
-            action_layout.addWidget(action_button)
-        root.addLayout(action_layout)
-        root.addWidget(self.ai_plan_box)
-        root.addWidget(self.dump_ai_metadata_button)
-        root.addWidget(self.runtime_step_label)
-        root.addWidget(self.runtime_progress_bar)
-        root.addWidget(QLabel("MobileCLIP Local Evaluation (evaluation-only)"))
+        self.mobileclip_evaluation_title = QLabel("MobileCLIP Local Evaluation (evaluation-only)")
+        root.addWidget(self.mobileclip_evaluation_title)
         root.addLayout(controls)
         root.addLayout(source_layout)
         root.addWidget(self.select_folder_button)
