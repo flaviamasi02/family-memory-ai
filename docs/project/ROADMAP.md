@@ -113,17 +113,34 @@ Product-direction update:
 - Event Albums
 - Story Timeline
 
-
 ## AI Runtime and Model Roadmap Update — after MODEL-002E
 
-Completed:
+Implementation complete:
 - [x] MODEL-002A — Generic AI Runtime Manager foundation.
 - [x] MODEL-002B — Managed MobileCLIP installation and runtime validation improvements.
 - [x] MODEL-002C — Provider verification workflow.
 - [x] MODEL-002D — Runtime diagnostics for AI Models metadata investigation.
 - [x] MODEL-002E — Settings -> AI Models Qt layout sizing fix.
 
-Next planned implementation:
-- [ ] MODEL-003 — First real MobileCLIP image classification.
+Merge history clarification:
+- MODEL-002A and MODEL-002B merged in their original PRs.
+- MODEL-002C, MODEL-002D, and MODEL-002E work was consolidated and merged through PR #22.
+- PR #20 and PR #21 were closed without merge.
 
-MODEL-003 must begin from the completed runtime baseline: provider registration, explicit installation, verification-before-Ready, diagnostics, and visible Settings metadata are already in place. The next milestone should define how MobileCLIP classification evidence is used safely without silently replacing existing deterministic classification behavior.
+Validation state:
+- [x] Repaired Settings -> AI Models UI manually validated on Windows.
+- [ ] Real MobileCLIP dependency installation through the app.
+- [ ] `mobileclip_s0.pt` checkpoint download through the confirmed flow.
+- [ ] Runtime Ready confirmation.
+- [ ] One-image embedding confirmation.
+- [ ] 10-image smoke test.
+- [ ] 100-image benchmark and real CPU timing/memory observations.
+- [ ] Persistence after restart.
+
+Next milestone:
+- [ ] MODEL-002F — Product Owner-guided MobileCLIP installation and operational validation.
+
+Following planned milestone:
+- [ ] MODEL-003 — First real MobileCLIP classification integration, only after MODEL-002F succeeds.
+
+MODEL-002F must keep the production classifier unchanged while validating installation, verification, benchmark, and persistence behavior. MODEL-003 should define safe classification integration only after MobileCLIP is operationally validated.

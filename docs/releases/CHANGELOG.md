@@ -581,9 +581,10 @@
 
 ### DOCSYNC GITHUB FULL after MODEL-002E
 
-- Synchronized project documentation after merged MODEL-002A through MODEL-002E.
+- Synchronized project documentation after MODEL-002A and MODEL-002B merged in their original PRs and MODEL-002C, MODEL-002D, and MODEL-002E work was consolidated into merged PR #22; PR #20 and PR #21 were closed without merge.
 - Marked AI Runtime Manager foundation, runtime validation improvements, provider verification workflow, runtime diagnostics, and Settings -> AI Models metadata layout fix as complete.
 - Documented the current AI Runtime architecture, MobileCLIP provider lifecycle, explicit installation workflow, strict verification workflow, diagnostics workflow, current AI Models UI, current capabilities, and repository cleanup after PR #22.
 - Recorded the metadata rendering lesson learned: label data can be valid while Qt layout sizing hides rows, so diagnostics must inspect widget geometry and layout hierarchy before changing runtime behavior.
-- Identified MODEL-003 as the next planned implementation: first real MobileCLIP image classification.
+- Identified MODEL-002F as the next milestone for Product Owner-guided MobileCLIP installation and operational validation; MODEL-003 becomes the following planned classification-integration milestone, only after MODEL-002F succeeds.
+- Clarified that the repaired Settings -> AI Models UI was manually validated on Windows, but MobileCLIP remains Dependencies missing with torch, torchvision, PIL, mobileclip, and `mobileclip_s0.pt` absent; real installation, Ready status, embedding tests, benchmark, restart persistence, and CPU performance validation remain pending.
 - Documentation-only update; no application code, tests, runtime behavior, or requirements were modified.

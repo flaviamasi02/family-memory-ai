@@ -73,4 +73,4 @@ Consequences:
 - Keep AI Runtime provider state generic and data-oriented.
 - Inspect Qt widget hierarchy, grid rows, visibility, geometry, size hints, and layout ordering when metadata appears blank.
 - Preserve explicit row sizing/geometry refresh behavior in the AI Models card.
-- Use MODEL-003 for first real MobileCLIP image classification; do not mix classification behavior changes into runtime diagnostics or layout fixes.
+- Use MODEL-002F for Product Owner-guided MobileCLIP installation and operational validation before MODEL-003 classification integration; do not mix classification behavior changes into runtime diagnostics or layout fixes.

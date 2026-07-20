@@ -1040,7 +1040,22 @@ Next practical milestone: MODEL-002C Product Owner-guided MobileCLIP validation.
 
 ## DOCSYNC GITHUB FULL — after MODEL-002E (2026-07-20)
 
-Current status: MODEL-002A through MODEL-002E are completed and merged. Repository cleanup after PR #22 is complete: obsolete feature branches and superseded pull requests have been closed, and the active project state now moves from runtime enablement/diagnostics to MODEL-003 planning.
+Current status: MODEL-002A and MODEL-002B were merged in their original PRs. MODEL-002C, MODEL-002D, and MODEL-002E work was ultimately consolidated and merged through PR #22; PR #20 and PR #21 were closed without merge. Repository cleanup after PR #22 is complete: obsolete feature branches and superseded pull requests have been closed.
+
+Implementation and validation distinction:
+- Implementation complete: generic AI Runtime Manager foundation, managed MobileCLIP installation flow, stricter verification workflow, diagnostics workflow, and Settings -> AI Models metadata layout fix.
+- Manually validated: the repaired Settings -> AI Models UI on Windows, including visible provider metadata after the layout sizing fix.
+- Operational validation still pending: MobileCLIP itself is not fully installed or Ready on the Product Owner machine.
+
+Latest confirmed Product Owner runtime state:
+- Status: Dependencies missing.
+- Missing packages include `torch`, `torchvision`, `PIL`, and `mobileclip`.
+- Checkpoint `mobileclip_s0.pt` is missing.
+- Real installation through the application is not yet completed.
+- Runtime Ready has not been confirmed.
+- Real one-image embedding has not been confirmed.
+- 10-image and 100-image evaluations have not been completed.
+- Actual CPU performance has not been recorded.
 
 Current AI Runtime architecture:
 - `src/ai_runtime` is the canonical provider-agnostic runtime layer. The registry owns provider descriptors and capabilities; the manager owns status, installation plans, selected-interpreter persistence, verification, history, diagnostics, benchmark metadata, and safe removal of manager-owned cache paths.
@@ -1067,11 +1082,13 @@ Verification and diagnostics workflow:
 - Temporary diagnostics added during MODEL-002D were used to investigate the blank metadata rendering bug. The current UI includes a diagnostics dump for AI metadata layout geometry and widget hierarchy so future UI regressions can be diagnosed from actual widget state.
 - Lesson learned: a blank Qt metadata region can be a layout-sizing/geometry bug even when labels contain valid text. Root-cause work must inspect widget hierarchy, row counts, size hints, geometry, and placement before changing runtime state or provider logic.
 
-Completed milestones:
+Completed implementation milestones:
 - MODEL-002A — AI Runtime Manager foundation.
 - MODEL-002B — runtime validation and managed MobileCLIP installation improvements.
 - MODEL-002C — Product Owner-guided provider verification workflow.
 - MODEL-002D — temporary runtime diagnostics for metadata rendering investigation.
 - MODEL-002E — Qt layout sizing fix for Settings -> AI Models metadata.
 
-Next planned implementation: MODEL-003 — first real MobileCLIP image classification. Remaining work before MODEL-003 is planning and acceptance-scope definition: confirm how MobileCLIP outputs enter classification, define safety/fallback behavior, keep deterministic classification authoritative until explicitly changed, and specify Product Owner manual validation datasets.
+Next milestone: MODEL-002F — Product Owner-guided MobileCLIP installation and operational validation. Scope: select or confirm the dedicated `.venv-mobileclip` Python 3.10 interpreter; review the installation plan; install dependencies through the app; download the checkpoint through the confirmed flow; verify Ready; run one-image embedding; run 10-image smoke test; run 100-image benchmark; record real CPU timing and memory observations; verify persistence after restart; keep the production classifier unchanged.
+
+Following planned milestone: MODEL-003 — first real MobileCLIP classification integration, only after MODEL-002F succeeds.

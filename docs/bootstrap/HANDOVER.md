@@ -202,6 +202,6 @@ If new mandatory project documents are introduced in the future, this reading or
 
 ## Current handover update — after MODEL-002E
 
-As of 2026-07-20, MODEL-002A through MODEL-002E are complete and merged. The AI Runtime Manager baseline is current, the Settings -> AI Models metadata rendering issue has been diagnosed and fixed, and repository cleanup after PR #22 is complete.
+As of 2026-07-20, MODEL-002A and MODEL-002B were merged in their original PRs. MODEL-002C, MODEL-002D, and MODEL-002E work was consolidated and merged through PR #22; PR #20 and PR #21 were closed without merge. The AI Runtime Manager baseline is current, the Settings -> AI Models metadata rendering issue has been diagnosed and fixed, the repaired UI was manually validated on Windows, and repository cleanup after PR #22 is complete.
 
-For the next implementation handover, treat MODEL-003 — first real MobileCLIP image classification — as the next planned milestone. Do not reopen MODEL-002 diagnostics unless a new regression appears. Preserve the rule that MobileCLIP remains optional/local and that runtime Ready requires full provider verification, not just downloaded files.
+For the next implementation handover, treat MODEL-002F — Product Owner-guided MobileCLIP installation and operational validation — as the next milestone. MODEL-003 — first real MobileCLIP classification integration — follows only after MODEL-002F succeeds. Do not reopen MODEL-002 diagnostics unless a new regression appears. Preserve the rule that MobileCLIP remains optional/local and that runtime Ready requires full provider verification, not just downloaded files.
