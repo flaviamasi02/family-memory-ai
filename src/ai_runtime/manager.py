@@ -24,31 +24,44 @@ class AIRuntimeManager:
     def save_environment_selection(self, provider_id:str, interpreter:str|Path) -> PythonEnvironmentInfo:
         env=self.inspect_environment(interpreter); rec=self.installation_record(provider_id)
         rec.interpreter_path=env.interpreter_path; rec.python_version=env.python_version; rec.environment_path=env.environment_path; rec.environment_type=env.environment_type; rec.local_model_cache_path=str(self.storage.cache_dir_for(provider_id)); rec.local_installation_path=rec.local_model_cache_path; rec.last_validation_result=env.message or ('valid' if env.valid else 'invalid'); self.storage.save_installation(rec); return env
-    def status(self, provider_id:str) -> AIRuntimeStatus:
+    def _cached_environment(self, rec:AIRuntimeInstallationRecord) -> PythonEnvironmentInfo:
+        return PythonEnvironmentInfo(rec.interpreter_path or sys.executable, rec.python_version, "", rec.environment_path, rec.environment_type, bool(rec.interpreter_path), True, True, "cached; deep validation pending")
+
+    def status(self, provider_id:str, *, deep: bool=True) -> AIRuntimeStatus:
         d=self.registry.get(provider_id)
         if not d: return AIRuntimeStatus(provider_id,AIRuntimeState.NOT_REGISTERED.value,False,False,False,last_status_check=now_iso())
         rec=self.installation_record(provider_id); cache=Path(rec.local_model_cache_path or self.storage.cache_dir_for(provider_id))
-        env=self.inspect_environment(rec.interpreter_path) if rec.interpreter_path else self.inspect_environment(sys.executable)
-        if rec.interpreter_path:
-            missing_deps=self.executor.imports_available(rec.interpreter_path, tuple(dep.import_name for dep in d.required_python_packages))
+        env=(self.inspect_environment(rec.interpreter_path) if rec.interpreter_path else self.inspect_environment(sys.executable)) if deep else self._cached_environment(rec)
+        if deep:
+            if rec.interpreter_path:
+                missing_deps=self.executor.imports_available(rec.interpreter_path, tuple(dep.import_name for dep in d.required_python_packages))
+            else:
+                missing_deps=tuple(dep.import_name for dep in d.required_python_packages if importlib.util.find_spec(dep.import_name) is None)
         else:
-            missing_deps=tuple(dep.import_name for dep in d.required_python_packages if importlib.util.find_spec(dep.import_name) is None)
+            missing_deps=() if rec.installation_state in (AIRuntimeState.CHECKPOINT_MISSING.value, AIRuntimeState.VERIFYING.value, AIRuntimeState.READY.value) else tuple()
         missing_files=tuple(f.relative_path for f in d.required_model_files if not (cache/f.relative_path).exists())
         verified=rec.last_validation_result == 'provider verification passed'
         if not verified and d.verifier and not d.required_python_packages:
             try: verified=bool(d.verifier(cache))
             except Exception as exc: rec.last_error=str(exc)
         state=AIRuntimeState.READY.value if verified else AIRuntimeState.VERIFYING.value
+        if not deep and rec.installation_state:
+            state=rec.installation_state
         if d.planned: state=AIRuntimeState.UNSUPPORTED.value
         elif not env.valid: state=AIRuntimeState.DEPENDENCIES_MISSING.value
         elif missing_deps: state=AIRuntimeState.DEPENDENCIES_MISSING.value
         elif missing_files: state=AIRuntimeState.CHECKPOINT_MISSING.value
         elif not verified: state=AIRuntimeState.VERIFYING.value
+        if state == AIRuntimeState.CHECKPOINT_MISSING.value and (not missing_deps) and 'missing Python packages' in (rec.last_error or ''):
+            rec.last_error='Checkpoint Missing - missing model files: '+', '.join(missing_files)
+            rec.last_validation_result=rec.last_error
         rec.installation_state=state; rec.last_status_check=now_iso(); rec.installed_disk_usage_bytes=self.storage.disk_usage(cache); self.storage.save_installation(rec)
         return AIRuntimeStatus(provider_id,state,state==AIRuntimeState.READY.value,not missing_deps,not missing_files,'Unknown',rec.last_error,rec.last_status_check,missing_deps,missing_files,env)
     def build_installation_plan(self, provider_id:str, interpreter:str|Path|None=None, device:str='CPU') -> AIRuntimeInstallationPlan:
         d=self.registry.require(provider_id); env=self.inspect_environment(interpreter or self.installation_record(provider_id).interpreter_path or sys.executable); cache=self.storage.cache_dir_for(provider_id)
-        packages=tuple((dep.package_name or dep.import_name)+(dep.version_spec or '') for dep in d.required_python_packages if dep.package_name != '__transitive__')
+        package_state=self.executor.package_state(env.interpreter_path, tuple(dep.import_name for dep in d.required_python_packages)) if env.valid else {}
+        satisfied=tuple(dep.import_name for dep in d.required_python_packages if package_state.get(dep.import_name, {}).get('available'))
+        packages=tuple((dep.package_name or dep.import_name)+(dep.version_spec or '') for dep in d.required_python_packages if dep.package_name != '__transitive__' and not package_state.get(dep.import_name, {}).get('available'))
         version_script="""
 import importlib.metadata as md, json
 mods=['torch','torchvision','Pillow','mobileclip','open-clip-torch','timm']
@@ -60,7 +73,7 @@ print(json.dumps({m: (md.version(m) if m in {d.metadata['Name'] for d in md.dist
         actions += [AIRuntimePlanAction(AIRuntimeActionType.DOWNLOAD_MODEL_FILE, f'Download {f.relative_path}', destination=str(cache/f.relative_path), url=f.download_url, sha256=f.sha256, timeout_seconds=1800) for f in d.required_model_files]
         actions += [AIRuntimePlanAction(AIRuntimeActionType.VERIFY_IMPORT, f'Verify import {dep.import_name}', argv=(env.interpreter_path,'-c',f'import {dep.import_name}')) for dep in d.required_python_packages]
         actions += [AIRuntimePlanAction(AIRuntimeActionType.VERIFY_PROVIDER, f'Verify {d.display_name} provider'), AIRuntimePlanAction(AIRuntimeActionType.RECORD_INSTALLATION, 'Record installation metadata')]
-        warns=['No action runs until the Product Owner confirms this plan.','The active application environment is not modified; every package command uses the selected interpreter explicitly.','CPU-only inference is used; no NVIDIA GPU is required.','If no authoritative checksum is published, verification uses file size plus model load and embedding checks.']
+        warns=[('Already satisfied dependencies: '+', '.join(satisfied)) if satisfied else 'No dependencies are currently confirmed satisfied by import probing.','No action runs until the Product Owner confirms this plan.','The active application environment is not modified; every package command uses the selected interpreter explicitly.','CPU-only inference is used; no NVIDIA GPU is required.','If no authoritative checksum is published, verification uses file size plus model load and embedding checks.']
         if not env.valid: warns.append(env.message or 'Selected Python environment is not valid or pip is unavailable.')
         if env.environment_path and Path(env.environment_path).resolve() == Path(sys.prefix).resolve(): warns.append('Selected environment appears to be the active application environment; choose .venv-mobileclip to avoid modifying the app runtime.')
         return AIRuntimeInstallationPlan(d.provider_id,d.display_name,d.checkpoint_id,packages,tuple(f.relative_path for f in d.required_model_files),d.expected_download_size,str(cache),{'code':d.code_license,'model':d.model_license},device,env,False,True,'Resolver-selected CPU-capable PyTorch stack plus MobileCLIP package/cache and 216 MB checkpoint',tuple(warns),tuple(actions),False)

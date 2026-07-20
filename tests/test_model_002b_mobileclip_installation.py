@@ -260,3 +260,68 @@ def test_settings_restores_persisted_interpreter_and_shows_logs(monkeypatch, tmp
     page._show_ai_runtime_logs()
     assert "verification" in page.ai_plan_box.toPlainText()
     page.deleteLater()
+
+
+def test_cached_status_cleans_stale_dependency_error_without_deep_probe(tmp_path, monkeypatch):
+    m = create_default_runtime_manager(ApplicationDataPathService(tmp_path, tmp_path))
+    rec = m.installation_record("mobileclip")
+    rec.interpreter_path = sys.executable
+    rec.installation_state = AIRuntimeState.CHECKPOINT_MISSING.value
+    rec.last_error = "Not Installed - missing Python packages: torch, torchvision, PIL, mobileclip; missing model files: mobileclip_s0.pt"
+    rec.last_validation_result = rec.last_error
+    m.storage.save_installation(rec)
+    monkeypatch.setattr(m.executor, "validate_interpreter", lambda *a, **k: (_ for _ in ()).throw(AssertionError("deep env probe on cached status")))
+    monkeypatch.setattr(m.executor, "imports_available", lambda *a, **k: (_ for _ in ()).throw(AssertionError("import probe on cached status")))
+
+    status = m.status("mobileclip", deep=False)
+    rec = m.installation_record("mobileclip")
+
+    assert status.state == AIRuntimeState.CHECKPOINT_MISSING.value
+    assert status.dependencies_available
+    assert rec.last_error == "Checkpoint Missing - missing model files: mobileclip_s0.pt"
+
+
+def test_state_aware_plan_skips_already_importable_packages(tmp_path, monkeypatch):
+    m = create_default_runtime_manager(ApplicationDataPathService(tmp_path, tmp_path))
+    monkeypatch.setattr(
+        m.executor,
+        "package_state",
+        lambda *a, **k: {
+            "mobileclip": {"available": True, "version": "0.1.0"},
+            "torch": {"available": True, "version": "2.8.0"},
+            "torchvision": {"available": True, "version": "0.23.0"},
+            "PIL": {"available": True, "version": "10.4.0"},
+        },
+    )
+
+    plan = m.build_installation_plan("mobileclip", sys.executable)
+
+    assert plan.packages_to_install == ()
+    assert not [a for a in plan.actions if a.action_type == AIRuntimeActionType.INSTALL_PYTHON_PACKAGE]
+    assert any(a.action_type == AIRuntimeActionType.DOWNLOAD_MODEL_FILE for a in plan.actions)
+    assert any("Already satisfied dependencies" in warning for warning in plan.warnings)
+
+
+def test_settings_initial_status_uses_cached_metadata_not_deep_subprocess(monkeypatch, tmp_path):
+    try:
+        from PySide6.QtWidgets import QApplication
+    except ImportError as exc:
+        pytest.skip(f"PySide6 unavailable in this environment: {exc}")
+    from ai_runtime.executor import AIRuntimeCommandExecutor
+    from ai_runtime.models import AIRuntimeInstallationRecord
+    from ai_runtime.storage import AIRuntimeStorage
+    from ui.settings_page import SettingsPage
+
+    monkeypatch.setenv("FAMILY_MEMORY_APP_DATA_ROOT", str(tmp_path))
+    storage = AIRuntimeStorage(ApplicationDataPathService(tmp_path, tmp_path))
+    storage.save_installation(AIRuntimeInstallationRecord(provider_id="mobileclip", interpreter_path=sys.executable, python_version="3.10.11", installation_state=AIRuntimeState.CHECKPOINT_MISSING.value, local_model_cache_path=str(storage.cache_dir_for("mobileclip")), last_error="Not Installed - missing Python packages: torch, torchvision, PIL, mobileclip; missing model files: mobileclip_s0.pt"))
+    monkeypatch.setattr(AIRuntimeCommandExecutor, "validate_interpreter", lambda *a, **k: (_ for _ in ()).throw(AssertionError("startup interpreter subprocess")))
+    monkeypatch.setattr(AIRuntimeCommandExecutor, "imports_available", lambda *a, **k: (_ for _ in ()).throw(AssertionError("startup import subprocess")))
+
+    app = QApplication.instance() or QApplication([])
+    page = SettingsPage()
+
+    assert page.ai_env_input.text() == sys.executable
+    assert page.ai_detail_labels["Status"].text() == AIRuntimeState.CHECKPOINT_MISSING.value
+    assert "missing Python packages" not in page.ai_detail_labels["Last error"].text()
+    page.deleteLater()

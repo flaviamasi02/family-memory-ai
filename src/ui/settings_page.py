@@ -265,7 +265,7 @@ class SettingsPage(QWidget):
     def _refresh_mobileclip_status(self) -> None:
         logger.info("Refreshing AI Models metadata status")
         descriptor = self.ai_runtime_manager.registry.require("mobileclip")
-        status = self.ai_runtime_manager.status("mobileclip")
+        status = self.ai_runtime_manager.status("mobileclip", deep=False)
         record = self.ai_runtime_manager.installation_record("mobileclip")
         last_benchmark = next((b.date for b in reversed(self.ai_runtime_manager.storage.benchmarks()) if b.provider_id == "mobileclip"), "never")
         details = {

@@ -1,5 +1,5 @@
 from __future__ import annotations
-import os, platform, subprocess, sys, time
+import json, os, platform, subprocess, sys, time
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Event
@@ -40,16 +40,37 @@ class AIRuntimeCommandExecutor:
             elif major_minor < (3,10): msg='Python 3.10 or newer is required for MobileCLIP.'
             return PythonEnvironmentInfo(str(path), version, arch, env_path, env_type, bool(d.get('pip')), writable, valid, msg)
         except Exception as exc: return PythonEnvironmentInfo(str(path), valid=False, message=str(exc))
-    def imports_available(self, interpreter: str|Path, import_names: tuple[str, ...]) -> tuple[str, ...]:
-        missing=[]
+    def package_state(self, interpreter: str|Path, import_names: tuple[str, ...]) -> dict[str, dict[str, str | bool]]:
         path=Path(interpreter).expanduser()
-        for name in import_names:
-            try:
-                p=subprocess.run([str(path),'-c',f'import {name}'], text=True, capture_output=True, timeout=10, shell=False)
-                if p.returncode != 0: missing.append(name)
-            except Exception:
-                missing.append(name)
-        return tuple(missing)
+        code="""
+import importlib, importlib.metadata as md, json
+name_map={'PIL':'Pillow'}
+out={}
+for name in __import__('sys').argv[1:]:
+    try:
+        importlib.import_module(name)
+        dist=name_map.get(name, name)
+        try:
+            version=md.version(dist)
+        except Exception:
+            version=''
+        out[name]={'available': True, 'version': version}
+    except Exception as exc:
+        out[name]={'available': False, 'version': '', 'error': str(exc)[-500:]}
+print(json.dumps(out, sort_keys=True))
+"""
+        try:
+            p=subprocess.run([str(path),'-c',code,*import_names], text=True, capture_output=True, timeout=30, shell=False)
+            if p.returncode != 0:
+                return {name: {'available': False, 'version': '', 'error': (p.stderr or p.stdout)[-500:]} for name in import_names}
+            data=json.loads(p.stdout.strip() or '{}')
+            return {name: data.get(name, {'available': False, 'version': '', 'error': 'missing from probe output'}) for name in import_names}
+        except Exception as exc:
+            return {name: {'available': False, 'version': '', 'error': str(exc)} for name in import_names}
+
+    def imports_available(self, interpreter: str|Path, import_names: tuple[str, ...]) -> tuple[str, ...]:
+        state=self.package_state(interpreter, import_names)
+        return tuple(name for name, info in state.items() if not info.get('available'))
 
     def run_action(self, action: AIRuntimePlanAction, cancel_event: Event|None=None, run_log=None) -> CommandResult:
         start=time.perf_counter()
