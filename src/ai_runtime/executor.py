@@ -51,7 +51,7 @@ class AIRuntimeCommandExecutor:
                 missing.append(name)
         return tuple(missing)
 
-    def run_action(self, action: AIRuntimePlanAction, cancel_event: Event|None=None) -> CommandResult:
+    def run_action(self, action: AIRuntimePlanAction, cancel_event: Event|None=None, run_log=None) -> CommandResult:
         start=time.perf_counter()
         if cancel_event and cancel_event.is_set(): return CommandResult(action.action_type.value, -1, '', 'Cancelled before start', 0, cancelled=True)
         if action.action_type == AIRuntimeActionType.CREATE_DIRECTORY:
@@ -59,14 +59,18 @@ class AIRuntimeCommandExecutor:
         if action.action_type in (AIRuntimeActionType.VERIFY_IMPORT, AIRuntimeActionType.INSTALL_PYTHON_PACKAGE, AIRuntimeActionType.CLONE_OR_INSTALL_OFFICIAL_PACKAGE, AIRuntimeActionType.VERIFY_PROVIDER):
             argv=list(action.argv)
             if not argv or any(not isinstance(x,str) or not x for x in argv): raise ValueError('Typed command action requires argv tokens')
-            proc=subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=False)
+            try:
+                proc=subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=False)
+            except Exception as exc:
+                if run_log: run_log.exception(exc)
+                return CommandResult(action.action_type.value,1,'',str(exc),time.perf_counter()-start)
             try:
                 while proc.poll() is None:
-                    if cancel_event and cancel_event.is_set(): proc.terminate(); return CommandResult(action.action_type.value,-1,'','Cancelled',time.perf_counter()-start,cancelled=True)
-                    if time.perf_counter()-start > action.timeout_seconds: proc.kill(); out,err=proc.communicate(); return CommandResult(action.action_type.value,-1,out[-self.output_limit:],err[-self.output_limit:],time.perf_counter()-start,timed_out=True)
+                    if cancel_event and cancel_event.is_set(): proc.terminate(); res=CommandResult(action.action_type.value,-1,'','Cancelled',time.perf_counter()-start,cancelled=True); run_log.command(argv,res.stdout,res.stderr,res.returncode,res.duration_seconds) if run_log else None; return res
+                    if time.perf_counter()-start > action.timeout_seconds: proc.kill(); out,err=proc.communicate(); res=CommandResult(action.action_type.value,-1,out[-self.output_limit:],err[-self.output_limit:],time.perf_counter()-start,timed_out=True); run_log.command(argv,res.stdout,res.stderr,res.returncode,res.duration_seconds) if run_log else None; return res
                     time.sleep(0.05)
                 out,err=proc.communicate()
-                return CommandResult(action.action_type.value, proc.returncode, out[-self.output_limit:], err[-self.output_limit:], time.perf_counter()-start)
+                res=CommandResult(action.action_type.value, proc.returncode, out[-self.output_limit:], err[-self.output_limit:], time.perf_counter()-start); run_log.command(argv,res.stdout,res.stderr,res.returncode,res.duration_seconds) if run_log else None; return res
             finally:
                 if proc.poll() is None: proc.kill()
         raise NotImplementedError(f'Execution for {action.action_type.value} is intentionally not implemented in MODEL-002A')

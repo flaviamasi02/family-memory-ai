@@ -170,10 +170,11 @@ def test_verify_provider_not_installed_preflight_records_clear_status(tmp_path):
     rec = m.installation_record("mobileclip")
 
     assert result.returncode != 0
-    assert "Not Installed" in result.stderr
+    assert "Dependencies Missing" in result.stderr or "Checkpoint Missing" in result.stderr
     assert "missing" in result.stderr
-    assert rec.last_validation_result == "Not Installed"
-    assert rec.installation_state == AIRuntimeState.NOT_INSTALLED.value
+    assert rec.last_validation_result == result.stderr
+    assert rec.installation_state in (AIRuntimeState.DEPENDENCIES_MISSING.value, AIRuntimeState.CHECKPOINT_MISSING.value)
+    assert list(m.storage.logs_dir.glob("*.jsonl"))
     assert "MODEL-002A" not in result.stderr
 
 
@@ -198,4 +199,64 @@ def test_settings_installation_plan_remains_detailed(monkeypatch, tmp_path):
     assert "Typed actions (not executed until explicit confirmation):" in text
     assert "verify_provider" in text
     assert "Destination:" in text
+    page.deleteLater()
+
+
+def test_checkpoint_missing_is_distinct_when_imports_are_valid(tmp_path, monkeypatch):
+    m = create_default_runtime_manager(ApplicationDataPathService(tmp_path, tmp_path))
+    rec = m.installation_record("mobileclip")
+    rec.interpreter_path = sys.executable
+    m.storage.save_installation(rec)
+    monkeypatch.setattr(m.executor, "imports_available", lambda *a, **k: ())
+
+    result = m.verify_provider("mobileclip")
+    rec = m.installation_record("mobileclip")
+
+    assert result.returncode != 0
+    assert "Checkpoint Missing" in result.stderr
+    assert rec.installation_state == AIRuntimeState.CHECKPOINT_MISSING.value
+    assert rec.last_error == result.stderr
+
+
+def test_installation_subprocess_failure_is_logged_and_returned(tmp_path):
+    m = create_default_runtime_manager(ApplicationDataPathService(tmp_path, tmp_path))
+    plan = m.build_installation_plan("mobileclip", sys.executable)
+    bad = next(a for a in plan.actions if a.action_type == AIRuntimeActionType.INSTALL_PYTHON_PACKAGE)
+    bad = type(bad)(bad.action_type, "fail command", argv=(sys.executable, "-c", "import sys; print('out'); print('err', file=sys.stderr); sys.exit(7)"))
+    plan = AIRuntimeInstallationPlan(**{**plan.__dict__, "actions": (bad,), "confirmed": True})
+
+    results = m.execute_installation_plan(plan)
+    log_text = m.storage.recent_log_text()
+
+    assert results[0].returncode == 7
+    assert "out" in log_text and "err" in log_text and "exit_code" in log_text
+    assert "final_outcome" in log_text
+
+
+def test_dependency_plan_uses_mobileclip_resolver_not_conflicting_torch_pins(tmp_path):
+    m = create_default_runtime_manager(ApplicationDataPathService(tmp_path, tmp_path))
+    plan = m.build_installation_plan("mobileclip", sys.executable)
+
+    assert any(pkg.startswith("mobileclip @ git+https://github.com/apple/ml-mobileclip.git") for pkg in plan.packages_to_install)
+    assert not any(pkg.startswith("torch>=2.1,<2.4") or pkg.startswith("torchvision>=0.16,<0.19") for pkg in plan.packages_to_install)
+    assert any("Report installed package versions" in a.label for a in plan.actions)
+
+
+def test_settings_restores_persisted_interpreter_and_shows_logs(monkeypatch, tmp_path):
+    try:
+        from PySide6.QtWidgets import QApplication
+    except ImportError as exc:
+        pytest.skip(f"PySide6 unavailable in this environment: {exc}")
+    from ui.settings_page import SettingsPage
+
+    monkeypatch.setenv("FAMILY_MEMORY_APP_DATA_ROOT", str(tmp_path))
+    m = create_default_runtime_manager(ApplicationDataPathService(tmp_path, tmp_path))
+    m.save_environment_selection("mobileclip", sys.executable)
+    m.storage.start_run_log("mobileclip", "verification", sys.executable).finish("Checkpoint Missing")
+    app = QApplication.instance() or QApplication([])
+    page = SettingsPage()
+
+    assert page.ai_env_input.text() == sys.executable
+    page._show_ai_runtime_logs()
+    assert "verification" in page.ai_plan_box.toPlainText()
     page.deleteLater()

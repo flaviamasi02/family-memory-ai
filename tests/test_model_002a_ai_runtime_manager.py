@@ -34,7 +34,7 @@ def test_startup_with_no_ml_dependencies_and_mobileclip_registered(tmp_path):
 def test_runtime_status_ready_requires_dependencies_files_and_verification(tmp_path):
     m=manager(tmp_path)
     st=m.status('fake')
-    assert st.state == 'Model not downloaded'
+    assert st.state in ('Model not downloaded', 'Checkpoint Missing')
     cache=Path(m.installation_record('fake').local_model_cache_path); (cache/'model.bin').write_text('x')
     assert m.status('fake').state == 'Ready'
 
