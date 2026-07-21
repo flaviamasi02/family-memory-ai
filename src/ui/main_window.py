@@ -64,6 +64,8 @@ class MainWindow(QMainWindow):
         self.thumbnail_worker = None
         self.scan_thread = None
         self.scan_worker = None
+        self._scan_run_id = 0
+        self._active_scan_run_id = 0
         self.embedding_thread = None
         self.embedding_worker = None
         self._embedding_run_id = 0
@@ -309,22 +311,46 @@ class MainWindow(QMainWindow):
     def _start_scan(self, folder_path: str) -> None:
         """Launch folder scanning on a background thread via ScanWorker."""
         # Stop any in-progress scan before starting a new one.
-        if self.scan_thread is not None and self.scan_thread.isRunning():
+        if self.scan_thread is not None and self._scan_thread_is_running(self.scan_thread):
             self.scan_thread.quit()
             self.scan_thread.wait(2000)
 
-        self.scan_thread = QThread()
-        self.scan_worker = ScanWorker(folder_path)
-        self.scan_worker.moveToThread(self.scan_thread)
+        self._scan_run_id += 1
+        run_id = self._scan_run_id
+        self._active_scan_run_id = run_id
 
-        self.scan_thread.started.connect(self.scan_worker.run)
-        self.scan_worker.scan_complete.connect(self._on_scan_complete)
-        self.scan_worker.scan_error.connect(self._on_scan_error)
-        self.scan_worker.finished.connect(self.scan_thread.quit)
-        self.scan_worker.finished.connect(self.scan_worker.deleteLater)
-        self.scan_thread.finished.connect(self.scan_thread.deleteLater)
+        thread = QThread()
+        worker = ScanWorker(folder_path)
+        self.scan_thread = thread
+        self.scan_worker = worker
+        worker.moveToThread(thread)
 
-        self.scan_thread.start()
+        thread.started.connect(worker.run)
+        worker.scan_complete.connect(self._on_scan_complete)
+        worker.scan_error.connect(self._on_scan_error)
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(lambda rid=run_id, finished_thread=thread: self._on_scan_thread_finished(rid, finished_thread))
+        thread.finished.connect(thread.deleteLater)
+
+        thread.start()
+
+    def _scan_thread_is_running(self, thread) -> bool:
+        try:
+            return bool(thread.isRunning())
+        except RuntimeError:
+            if self.scan_thread is thread:
+                self.scan_thread = None
+                self.scan_worker = None
+                self._active_scan_run_id = 0
+            return False
+
+    def _on_scan_thread_finished(self, run_id: int, finished_thread) -> None:
+        if run_id != self._active_scan_run_id or self.scan_thread is not finished_thread:
+            return
+        self.scan_thread = None
+        self.scan_worker = None
+        self._active_scan_run_id = 0
 
     def _on_scan_complete(self, photos: list) -> None:
         stats = get_session_stats()

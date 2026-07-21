@@ -378,6 +378,10 @@ def test_second_import_during_embedding_waits_for_cancellation_before_scanning()
 
 def _embedding_window_for_lifecycle_tests():
     window = MainWindow.__new__(MainWindow)
+    window.scan_thread = None
+    window.scan_worker = None
+    window._scan_run_id = 0
+    window._active_scan_run_id = 0
     window.embedding_thread = None
     window.embedding_worker = None
     window._embedding_run_id = 0
@@ -395,3 +399,165 @@ class _StatusLabel:
 
     def setText(self, text):
         self.text = text
+
+
+def test_scan_thread_references_clear_after_matching_thread_finishes(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    threads = []
+    workers = []
+
+    class FakeThread:
+        def __init__(self):
+            self.started = _Signal()
+            self.finished = _Signal()
+            self.deleted = False
+            self.is_running_called = 0
+            threads.append(self)
+
+        def start(self):
+            pass
+
+        def isRunning(self):
+            self.is_running_called += 1
+            return False
+
+        def quit(self):
+            pass
+
+        def wait(self, _ms):
+            return True
+
+        def deleteLater(self):
+            self.deleted = True
+
+    class FakeScanWorker:
+        def __init__(self, folder_path):
+            self.folder_path = folder_path
+            self.scan_complete = _Signal()
+            self.scan_error = _Signal()
+            self.finished = _Signal()
+            workers.append(self)
+
+        def moveToThread(self, _thread):
+            pass
+
+        def run(self):
+            pass
+
+        def deleteLater(self):
+            pass
+
+    monkeypatch.setattr("ui.main_window.QThread", FakeThread)
+    monkeypatch.setattr("ui.main_window.ScanWorker", FakeScanWorker)
+
+    window._start_scan("/first")
+    first_thread = window.scan_thread
+    assert window.scan_worker is workers[0]
+
+    first_thread.finished.emit()
+
+    assert window.scan_thread is None
+    assert window.scan_worker is None
+    assert window._active_scan_run_id == 0
+    assert first_thread.deleted is True
+
+    window._start_scan("/second")
+    assert len(workers) == 2
+    assert workers[1].folder_path == "/second"
+    assert first_thread.is_running_called == 0
+
+
+def test_stale_scan_finished_signal_cannot_clear_newer_scan():
+    window = _embedding_window_for_lifecycle_tests()
+    old_thread = object()
+    new_thread = object()
+    new_worker = object()
+    window.scan_thread = new_thread
+    window.scan_worker = new_worker
+    window._active_scan_run_id = 2
+
+    window._on_scan_thread_finished(1, old_thread)
+
+    assert window.scan_thread is new_thread
+    assert window.scan_worker is new_worker
+    assert window._active_scan_run_id == 2
+
+
+def test_deleted_scan_thread_wrapper_is_not_reused_for_second_scan(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    workers = []
+
+    class DeletedThread:
+        def isRunning(self):
+            raise RuntimeError("Internal C++ object already deleted")
+
+    class FakeThread:
+        def __init__(self):
+            self.started = _Signal()
+            self.finished = _Signal()
+
+        def start(self):
+            pass
+
+        def isRunning(self):
+            return False
+
+        def quit(self):
+            pass
+
+        def wait(self, _ms):
+            return True
+
+        def deleteLater(self):
+            pass
+
+    class FakeScanWorker:
+        def __init__(self, folder_path):
+            self.folder_path = folder_path
+            self.scan_complete = _Signal()
+            self.scan_error = _Signal()
+            self.finished = _Signal()
+            workers.append(self)
+
+        def moveToThread(self, _thread):
+            pass
+
+        def run(self):
+            pass
+
+        def deleteLater(self):
+            pass
+
+    window.scan_thread = DeletedThread()
+    window.scan_worker = object()
+    window._active_scan_run_id = 1
+    monkeypatch.setattr("ui.main_window.QThread", FakeThread)
+    monkeypatch.setattr("ui.main_window.ScanWorker", FakeScanWorker)
+
+    window._start_scan("/second")
+
+    assert len(workers) == 1
+    assert workers[0].folder_path == "/second"
+    assert window._active_scan_run_id == 2
+
+
+def test_second_folder_scan_completion_updates_photo_list_after_first_scan_cleanup(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    displayed = []
+    thumbnails = []
+    deferred = []
+
+    window.photo_model = type("PhotoModel", (), {"set_photos": lambda self, photos: displayed.append(list(photos))})()
+    window._apply_browser_filter = lambda: None
+    window._start_embedding_indexing = lambda photos: None
+    window.start_thumbnail_loading = lambda photos: thumbnails.append(list(photos))
+    window._deferred_setup_cleanup_review = lambda: deferred.append(True)
+    monkeypatch.setattr("ui.main_window.QTimer.singleShot", lambda _ms, callback: callback())
+
+    window._on_scan_complete(["second-photo"])
+
+    assert window._all_photos == ["second-photo"]
+    assert displayed == [["second-photo"]]
+    assert thumbnails == [["second-photo"]]
+    assert deferred == [True]
+    assert window.status_label.text == "Scan complete — showing 1 photos. Loading thumbnails…"
