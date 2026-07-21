@@ -1074,7 +1074,7 @@ Current provider lifecycle:
 
 Current Settings -> AI Models UI:
 - Displays MobileCLIP provider metadata: provider, status, checkpoint/revision, capabilities, CPU device, Python environment/version, model path, download/disk usage, licenses, installed/updated timestamps, current step, package/checkpoint availability, verification, benchmark, and last error.
-- Exposes Inspect Python environment, View installation plan, Install, Cancel, Verify, Test, Open model folder, View logs, Remove model files, and Dump AI metadata diagnostics.
+- Exposes Inspect Python environment, View installation plan, Install, Cancel, Verify, Test Image, Open model folder, View logs, Remove model files, and Dump AI metadata diagnostics.
 - Uses a scrollable Settings page and explicit minimum row heights for metadata rows so later controls cannot overlap or hide provider metadata.
 
 Verification and diagnostics workflow:

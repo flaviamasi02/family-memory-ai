@@ -147,7 +147,7 @@ class SettingsPage(QWidget):
             label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
             label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
             self.ai_detail_labels[key] = label
-        self.ai_actions_label = QLabel("Actions: View details, verify, test, update, remove, open model folder, and view logs are surfaced according to runtime state. Install requires an explicitly confirmed plan.")
+        self.ai_actions_label = QLabel("Actions: View details, verify, Test Image, update, remove, open model folder, and view logs are surfaced according to runtime state. Install requires an explicitly confirmed plan.")
         self.ai_actions_label.setWordWrap(True)
         self.mobileclip_status = QLabel("MobileCLIP: checking optional local provider…")
         self.mobileclip_status.setWordWrap(True)
@@ -158,7 +158,8 @@ class SettingsPage(QWidget):
         self.install_button = QPushButton("Install")
         self.cancel_install_button = QPushButton("Cancel")
         self.verify_button = QPushButton("Verify")
-        self.test_button = QPushButton("Test")
+        self.test_button = QPushButton("Test Image")
+        self.test_button.setToolTip("Select one image file and run a MobileCLIP embedding test; folders are not selected here.")
         self.open_model_folder_button = QPushButton("Open model folder")
         self.view_logs_button = QPushButton("View logs")
         self.remove_model_files_button = QPushButton("Remove model files")
@@ -405,6 +406,7 @@ class SettingsPage(QWidget):
     def _show_ai_installation_plan(self) -> None:
         interpreter = self.ai_env_input.text().strip() or None
         self._last_installation_plan = None
+        self.plan_button.setStyleSheet("")
         self.ai_plan_box.setPlainText("Inspecting MobileCLIP environment and building installation plan...")
         self.runtime_step_label.setText("Current step: building installation plan")
         self._start_ai_runtime_operation("build_plan", interpreter=interpreter)
@@ -508,7 +510,9 @@ class SettingsPage(QWidget):
 
     def _confirm_and_install_mobileclip(self) -> None:
         if self._last_installation_plan is None:
-            self.ai_plan_box.setPlainText("View the MobileCLIP installation plan before installing.")
+            self.ai_plan_box.setPlainText("Generate an installation plan first by clicking ‘View installation plan’.")
+            self.plan_button.setFocus(Qt.FocusReason.OtherFocusReason)
+            self.plan_button.setStyleSheet("font-weight: 700; border: 2px solid #2f80ed;")
             return
         interpreter = self.ai_env_input.text().strip() or self._last_installation_plan.python_environment.interpreter_path
         if not interpreter:
@@ -542,10 +546,10 @@ class SettingsPage(QWidget):
         result = self._active_source_result()
         image_path = result.paths[0] if result.available and result.paths else None
         if image_path is None:
-            selected, _ = QFileDialog.getOpenFileName(self, "Select one image for MobileCLIP embedding test", "", "Images (*.jpg *.jpeg *.png *.bmp *.webp)")
+            selected, _ = QFileDialog.getOpenFileName(self, "Select an image to test MobileCLIP", "", "One image file (*.jpg *.jpeg *.png *.bmp *.webp);;All supported images (*.jpg *.jpeg *.png *.bmp *.webp)")
             image_path = Path(selected) if selected else None
         if image_path is None:
-            self.report_box.setPlainText("No image selected; MobileCLIP one-image test was not started.")
+            self.report_box.setPlainText("No image selected; MobileCLIP Test Image was not started.")
             return
         interpreter = self.ai_env_input.text().strip() or self.ai_runtime_manager.installation_record("mobileclip").interpreter_path
         if interpreter:
@@ -553,7 +557,7 @@ class SettingsPage(QWidget):
             if not env.valid:
                 self.report_box.setPlainText(f"Selected interpreter is invalid; test was not started.\n{env.message}")
                 return
-        self.report_box.setPlainText(f"Starting MobileCLIP one-image embedding test for {image_path}…")
+        self.report_box.setPlainText(f"Starting MobileCLIP Test Image embedding check for {image_path}…")
         self._start_ai_runtime_operation("test", image_path=Path(image_path))
 
     def _show_mobileclip_removal_plan(self) -> None:

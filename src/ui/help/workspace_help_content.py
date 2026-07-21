@@ -312,7 +312,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                         "Use Another folder only for an explicit external folder test, and keep the maximum sample cap small for CPU-only validation.",
                         "Treat MobileCLIP output as local-only evaluation evidence; it does not automatically change categories, original images, or the production classifier.",
                         "An installation plan is only a preview; installation starts only after explicit confirmation and uses the selected dedicated Python environment.",
-                        "Use Verify to check the runtime, Test for one-image embedding validation, and Remove model files only for manager-owned model files outside Git.",
+                        "Use Verify to check the runtime, Test Image to choose one image file for embedding validation, and Remove model files only for manager-owned model files outside Git.",
                         "Do not approve installation or removal unless the generated AI Models plan shows the expected interpreter, cache path, licenses, and warnings.",
                     ]
                 ),
