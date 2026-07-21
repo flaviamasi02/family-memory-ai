@@ -370,13 +370,15 @@ def test_install_without_plan_shows_clear_instruction_and_does_not_start(monkeyp
     page = SettingsPage()
     page._last_installation_plan = None
     started = []
+    focus_requests = []
     monkeypatch.setattr(page, '_start_ai_runtime_operation', lambda *a, **k: started.append((a, k)))
+    monkeypatch.setattr(page.plan_button, 'setFocus', lambda reason=None: focus_requests.append(reason))
 
     page._confirm_and_install_mobileclip()
 
     assert not started
     assert "Generate an installation plan first by clicking ‘View installation plan’." in page.ai_plan_box.toPlainText()
-    assert page.plan_button.hasFocus()
+    assert focus_requests
     assert "border: 2px solid" in page.plan_button.styleSheet()
     page.deleteLater()
 
