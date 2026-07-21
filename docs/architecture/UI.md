@@ -220,6 +220,6 @@ The documentation must always reflect the current implementation.
 
 Settings contains the current AI Models management surface. It must present runtime state as user-facing metadata, not as a developer console. The current MobileCLIP card shows provider, status, checkpoint, capabilities, CPU device, Python environment, model path, download/disk usage, licenses, verification, benchmark, and error state.
 
-Valid actions are Inspect Python environment, View installation plan, Install, Cancel, Verify, Test, Open model folder, View logs, Remove model files, Dump AI metadata diagnostics, and bounded MobileCLIP evaluation source selection. Installation must remain confirmation-gated, and runtime operations must remain outside the UI thread.
+Valid actions are Inspect Python environment, View installation plan, Install, Cancel, Verify, Test Image, Open model folder, View logs, Remove model files, Dump AI metadata diagnostics, and bounded MobileCLIP evaluation source selection. Installation must remain confirmation-gated, and runtime operations must remain outside the UI thread.
 
 MODEL-002E fixed a layout sizing issue where metadata labels contained text but could render as visually blank. Future UI changes must preserve explicit row sizing/geometry refresh behavior and keep diagnostics available for layout regressions.

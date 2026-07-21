@@ -356,3 +356,64 @@ def test_cached_status_does_not_scan_disk_usage_or_preserve_exact_old_error(tmp_
     assert rec.installed_disk_usage_bytes == 12345
     assert rec.last_error == "Checkpoint Missing - missing model files: mobileclip_s0.pt"
     assert rec.last_validation_result == rec.last_error
+
+
+def test_install_without_plan_shows_clear_instruction_and_does_not_start(monkeypatch, tmp_path):
+    try:
+        from PySide6.QtWidgets import QApplication
+    except ImportError as exc:
+        pytest.skip(f'PySide6 unavailable in this environment: {exc}')
+    from ui.settings_page import SettingsPage
+
+    monkeypatch.setenv('FAMILY_MEMORY_APP_DATA_ROOT', str(tmp_path))
+    app = QApplication.instance() or QApplication([])
+    page = SettingsPage()
+    page._last_installation_plan = None
+    started = []
+    monkeypatch.setattr(page, '_start_ai_runtime_operation', lambda *a, **k: started.append((a, k)))
+
+    page._confirm_and_install_mobileclip()
+
+    assert not started
+    assert "Generate an installation plan first by clicking ‘View installation plan’." in page.ai_plan_box.toPlainText()
+    assert page.plan_button.hasFocus()
+    assert "border: 2px solid" in page.plan_button.styleSheet()
+    page.deleteLater()
+
+
+def test_test_image_button_and_file_picker_copy(monkeypatch, tmp_path):
+    try:
+        from PySide6.QtWidgets import QApplication, QFileDialog
+    except ImportError as exc:
+        pytest.skip(f'PySide6 unavailable in this environment: {exc}')
+    from ui.settings_page import SettingsPage
+
+    monkeypatch.setenv('FAMILY_MEMORY_APP_DATA_ROOT', str(tmp_path))
+    app = QApplication.instance() or QApplication([])
+    page = SettingsPage()
+    page.ai_env_input.clear()
+    page._selected_folder = None
+    page.library_radio.setChecked(True)
+    monkeypatch.setattr(page, '_library_provider', lambda: [])
+    started = []
+    dialogs = []
+
+    def fake_get_open_file_name(parent, title, directory, file_filter):
+        dialogs.append((title, directory, file_filter))
+        return "", file_filter
+
+    monkeypatch.setattr(QFileDialog, 'getOpenFileName', fake_get_open_file_name)
+    monkeypatch.setattr(page, '_start_ai_runtime_operation', lambda *a, **k: started.append((a, k)))
+
+    assert page.test_button.text() == "Test Image"
+    assert "one image file" in page.test_button.toolTip()
+
+    page._test_mobileclip_one_image()
+
+    assert not started
+    assert dialogs
+    assert dialogs[0][0] == "Select an image to test MobileCLIP"
+    assert "One image file" in dialogs[0][2]
+    assert "*.jpg" in dialogs[0][2] and "*.webp" in dialogs[0][2]
+    assert "MobileCLIP Test Image was not started" in page.report_box.toPlainText()
+    page.deleteLater()
