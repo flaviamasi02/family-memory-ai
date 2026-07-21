@@ -7,7 +7,7 @@ from pathlib import Path
 from threading import Event
 from typing import Callable
 
-from PySide6.QtCore import Qt, Signal, QThread
+from PySide6.QtCore import Qt, Signal, QThread, Slot
 from PySide6.QtWidgets import (
     QFileDialog,
     QButtonGroup,
@@ -424,14 +424,14 @@ class SettingsPage(QWidget):
         worker = AIRuntimeOperationWorker(self.ai_runtime_manager, operation, plan=plan, image_path=image_path, interpreter=interpreter, cancel_event=self._active_cancel_event)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
-        worker.progress.connect(self._on_ai_runtime_progress)
-        worker.current_step.connect(lambda step: self.runtime_step_label.setText(f"Current step: {step}"))
-        worker.completed.connect(lambda result: self._on_ai_runtime_completed(operation, result))
-        worker.failed.connect(self._on_ai_runtime_failed)
-        worker.finished.connect(thread.quit)
-        worker.finished.connect(worker.deleteLater)
-        thread.finished.connect(thread.deleteLater)
-        thread.finished.connect(self._clear_ai_runtime_worker)
+        worker.progress.connect(self._on_ai_runtime_progress, Qt.ConnectionType.QueuedConnection)
+        worker.current_step.connect(self._on_ai_runtime_current_step, Qt.ConnectionType.QueuedConnection)
+        worker.completed.connect(self._on_ai_runtime_completed, Qt.ConnectionType.QueuedConnection)
+        worker.failed.connect(self._on_ai_runtime_failed, Qt.ConnectionType.QueuedConnection)
+        worker.finished.connect(thread.quit, Qt.ConnectionType.QueuedConnection)
+        worker.finished.connect(worker.deleteLater, Qt.ConnectionType.QueuedConnection)
+        thread.finished.connect(thread.deleteLater, Qt.ConnectionType.QueuedConnection)
+        thread.finished.connect(self._clear_ai_runtime_worker, Qt.ConnectionType.QueuedConnection)
         self._active_runtime_thread = thread
         self._active_runtime_worker = worker
         self._set_runtime_buttons_enabled(False)
@@ -446,6 +446,11 @@ class SettingsPage(QWidget):
         self.runtime_progress_bar.setRange(0, 1); self.runtime_progress_bar.setValue(1)
         self._refresh_mobileclip_status()
 
+    @Slot(str)
+    def _on_ai_runtime_current_step(self, step: str) -> None:
+        self.runtime_step_label.setText(f"Current step: {step}")
+
+    @Slot(str, str)
     def _on_ai_runtime_progress(self, step: str, message: str) -> None:
         self.ai_plan_box.append(f"[{step}] {message}")
         if step == "download" and "/" in message:
@@ -454,6 +459,7 @@ class SettingsPage(QWidget):
             if done_text.isdigit() and total_text.isdigit() and int(total_text) > 0:
                 self.runtime_progress_bar.setRange(0, int(total_text)); self.runtime_progress_bar.setValue(int(done_text))
 
+    @Slot(str, object)
     def _on_ai_runtime_completed(self, operation: str, result: object) -> None:
         self.runtime_step_label.setText(f"Current step: {operation} completed")
         if operation == "build_plan" and isinstance(result, AIRuntimeInstallationPlan):
@@ -477,6 +483,7 @@ class SettingsPage(QWidget):
                 self.report_box.setPlainText(f"MobileCLIP one-image test completed.\n{getattr(result, 'stdout', '')}\n{getattr(result, 'stderr', '')}")
         self._refresh_mobileclip_status()
 
+    @Slot(str)
     def _on_ai_runtime_failed(self, error: str) -> None:
         self.runtime_step_label.setText("Current step: failed")
         self.ai_plan_box.append(f"AI runtime operation failed: {error}")

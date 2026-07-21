@@ -221,8 +221,8 @@ def test_failure_path_restores_ui_state():
     start_body = source[source.index("def _start_ai_runtime_operation"):source.index("def _clear_ai_runtime_worker")]
 
     assert "self.ai_plan_box.append(f\"AI runtime operation failed: {error}\")" in failed_body
-    assert "worker.finished.connect(thread.quit)" in start_body
-    assert "thread.finished.connect(self._clear_ai_runtime_worker)" in start_body
+    assert "worker.finished.connect(thread.quit, Qt.ConnectionType.QueuedConnection)" in start_body
+    assert "thread.finished.connect(self._clear_ai_runtime_worker, Qt.ConnectionType.QueuedConnection)" in start_body
     assert "self._active_runtime_thread = None" in cleanup_body
     assert "self._active_runtime_worker = None" in cleanup_body
     assert "self._set_runtime_buttons_enabled(True)" in cleanup_body
@@ -237,3 +237,18 @@ def test_installation_plan_source_uses_existing_worker_thread_pattern():
     assert '_start_ai_runtime_operation("build_plan"' in show_body
     assert 'if self.operation == "build_plan"' in worker_source
     assert "manager.build_installation_plan(self.provider_id, self.interpreter)" in worker_source
+    assert "completed = Signal(str, object)" in worker_source
+    assert "self.completed.emit(self.operation, result)" in worker_source
+
+
+def test_ai_runtime_worker_signals_are_queued_to_prevent_windows_qtextdocument_thread_error():
+    source = Path("src/ui/settings_page.py").read_text(encoding="utf-8")
+    start_body = source[source.index("def _start_ai_runtime_operation"):source.index("def _clear_ai_runtime_worker")]
+
+    assert "QObject: Cannot create children for a parent that is in a different thread."
+    assert "worker.progress.connect(self._on_ai_runtime_progress, Qt.ConnectionType.QueuedConnection)" in start_body
+    assert "worker.current_step.connect(self._on_ai_runtime_current_step, Qt.ConnectionType.QueuedConnection)" in start_body
+    assert "worker.completed.connect(self._on_ai_runtime_completed, Qt.ConnectionType.QueuedConnection)" in start_body
+    assert "worker.failed.connect(self._on_ai_runtime_failed, Qt.ConnectionType.QueuedConnection)" in start_body
+    assert "lambda step: self.runtime_step_label.setText" not in start_body
+    assert "lambda result" not in start_body

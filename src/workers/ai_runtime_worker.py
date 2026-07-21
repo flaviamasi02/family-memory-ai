@@ -13,7 +13,7 @@ from ai_runtime.models import AIRuntimeInstallationPlan
 class AIRuntimeOperationWorker(QObject):
     progress = Signal(str, str)
     current_step = Signal(str)
-    completed = Signal(object)
+    completed = Signal(str, object)
     failed = Signal(str)
     finished = Signal()
 
@@ -60,7 +60,7 @@ class AIRuntimeOperationWorker(QObject):
                 result = self.manager.execute_removal_plan(self.plan, self.cancel_event, callback)
             else:
                 raise ValueError(f"Unsupported AI runtime operation: {self.operation}")
-            self.completed.emit(result)
+            self.completed.emit(self.operation, result)
         except Exception as exc:  # noqa: BLE001
             self.failed.emit(str(exc))
         finally:
