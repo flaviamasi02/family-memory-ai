@@ -135,30 +135,39 @@ def _path_for(image) -> Path:
 
 
 def _verify_loadable_image(path: Path) -> None:
+    decode_errors: list[str] = []
+
     try:
         from PIL import Image, ImageOps
-
-        with Image.open(path) as image:
-            ImageOps.exif_transpose(image).convert("RGB").load()
-        return
     except ImportError:
-        pass
-    except Exception as exc:
-        raise ValueError(str(exc)) from exc
+        Image = None
+        ImageOps = None
+
+    if Image is not None and ImageOps is not None:
+        try:
+            with Image.open(path) as image:
+                ImageOps.exif_transpose(image).convert("RGB").load()
+            return
+        except Exception as exc:
+            decode_errors.append(str(exc))
 
     try:
         from PySide6.QtGui import QImageReader
+    except ImportError:
+        QImageReader = None
 
+    if QImageReader is not None:
         reader = QImageReader(str(path))
         reader.setAutoTransform(True)
         image = reader.read()
-        if image.isNull():
-            raise ValueError(reader.errorString() or "Image could not be decoded.")
-        return
-    except ImportError:
-        pass
+        if not image.isNull():
+            return
+        decode_errors.append(reader.errorString() or "Image could not be decoded by Qt.")
 
-    header = path.read_bytes()[:12]
-    if header.startswith(b"\x89PNG\r\n\x1a\n") or header.startswith(b"\xff\xd8\xff") or header.startswith(b"RIFF"):
-        return
-    raise ValueError("Image could not be decoded by available image libraries.")
+    if not decode_errors:
+        header = path.read_bytes()[:12]
+        if header.startswith(b"\x89PNG\r\n\x1a\n") or header.startswith(b"\xff\xd8\xff") or header.startswith(b"RIFF"):
+            return
+        decode_errors.append("No image decoder is available in this environment.")
+
+    raise ValueError("; ".join(error for error in decode_errors if error))
