@@ -171,11 +171,16 @@ def test_image_verification_tries_qt_after_pillow_decode_failure(tmp_path, monke
             return "qt should not report an error"
 
     pil = ModuleType("PIL")
+    pyside = sys.modules.get("PySide6") or ModuleType("PySide6")
     qtgui = ModuleType("PySide6.QtGui")
+    pil.Image = FakePillowImage
+    pil.ImageOps = FakeImageOps
     qtgui.QImageReader = FakeQImageReader
+    pyside.QtGui = qtgui
     monkeypatch.setitem(sys.modules, "PIL", pil)
     monkeypatch.setitem(sys.modules, "PIL.Image", FakePillowImage)
     monkeypatch.setitem(sys.modules, "PIL.ImageOps", FakeImageOps)
+    monkeypatch.setitem(sys.modules, "PySide6", pyside)
     monkeypatch.setitem(sys.modules, "PySide6.QtGui", qtgui)
 
     service_module._verify_loadable_image(p)
@@ -217,11 +222,16 @@ def test_image_verification_reports_pillow_and_qt_errors_after_all_decoders_fail
             return "qt failure kept"
 
     pil = ModuleType("PIL")
+    pyside = sys.modules.get("PySide6") or ModuleType("PySide6")
     qtgui = ModuleType("PySide6.QtGui")
+    pil.Image = FakePillowImage
+    pil.ImageOps = FakeImageOps
     qtgui.QImageReader = FakeQImageReader
+    pyside.QtGui = qtgui
     monkeypatch.setitem(sys.modules, "PIL", pil)
     monkeypatch.setitem(sys.modules, "PIL.Image", FakePillowImage)
     monkeypatch.setitem(sys.modules, "PIL.ImageOps", FakeImageOps)
+    monkeypatch.setitem(sys.modules, "PySide6", pyside)
     monkeypatch.setitem(sys.modules, "PySide6.QtGui", qtgui)
 
     with pytest.raises(ValueError) as exc_info:
