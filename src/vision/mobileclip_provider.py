@@ -11,6 +11,7 @@ MOBILECLIP_S0 = ModelMetadata(
 class MobileCLIPEmbeddingProvider:
     def __init__(self, model_cache_dir: str | Path | None = None, batch_size:int=4):
         self.metadata=MOBILECLIP_S0; self.batch_size=max(1,min(16,int(batch_size)))
+        self.requires_image_decode_validation=True
         self.model_cache_dir=Path(model_cache_dir) if model_cache_dir else get_app_data_service().cache_dir('models') / 'mobileclip-s0'
         self._model=None; self._preprocess=None; self._tokenizer=None; self._torch=None; self.device='cpu'
     def availability(self):
@@ -33,13 +34,13 @@ class MobileCLIPEmbeddingProvider:
         self._model=model; self._preprocess=preprocess; self._tokenizer=mobileclip.get_tokenizer('mobileclip_s0')
     def embed_images(self, paths:list[Path], cancel_event:Event|None=None):
         self.load(cancel_event); out=[]
-        from PIL import Image
+        from PIL import Image, ImageOps
         for path in paths[:self.batch_size]:
             if cancel_event and cancel_event.is_set(): break
             try:
                 key,mt,sz,fp=source_identity(Path(path))
                 with Image.open(path) as img:
-                    tensor=self._preprocess(img.convert('RGB')).unsqueeze(0)
+                    tensor=self._preprocess(ImageOps.exif_transpose(img).convert('RGB')).unsqueeze(0)
                 with self._torch.no_grad(): vec=self._model.encode_image(tensor).squeeze(0).cpu().tolist()
                 emb=normalize(vec)
                 out.append(EmbeddingRecord(key,fp,mt,sz,self.metadata.provider_id,self.metadata.checkpoint_id,self.metadata.revision,len(emb),emb,now_iso()))

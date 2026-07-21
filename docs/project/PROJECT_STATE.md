@@ -1092,3 +1092,14 @@ Completed implementation milestones:
 Next milestone: MODEL-002F — Product Owner-guided MobileCLIP installation and operational validation. Scope: select or confirm the dedicated `.venv-mobileclip` Python 3.10 interpreter; review the installation plan; install dependencies through the app; download the checkpoint through the confirmed flow; verify Ready; run one-image embedding; run 10-image smoke test; run 100-image benchmark; record real CPU timing and memory observations; verify persistence after restart; keep the production classifier unchanged.
 
 Following planned milestone: MODEL-003 — first real MobileCLIP classification integration, only after MODEL-002F succeeds.
+
+### MODEL-003A — Persistent Batch Embedding Engine
+
+Status: implemented in PR branch; awaiting Product Owner manual validation before merge.
+
+- Backend service: `vision.batch_embedding_service.BatchEmbeddingService` processes supported image paths or `Photo`-like records sequentially, loads the embedding provider once per batch, skips unchanged cached images, validates 512-dimensional finite embeddings, records per-image failures, and exposes typed batch result/progress dataclasses.
+- Persistence: embeddings are stored in the existing application data cache at `cache/embeddings/semantic_embeddings.sqlite3` through `vision.embedding_provider.EmbeddingStore`. Embedding vectors are stored as compact little-endian float32 BLOBs instead of verbose JSON arrays. The migration preserves legacy JSON rows and adds model-key/blob/update/schema columns and lookup indexes.
+- Cache validity: a cached row is valid only when photo identity, source fingerprint, source file size, source modified timestamp, status `ok`, and model key all match the current image/provider.
+- Model key: `ModelMetadata.model_key` centralizes provider/model versioning as provider id, checkpoint id, revision, and embedding dimension. Changing provider, checkpoint, revision, or dimension forces regeneration.
+- Diagnostic command: `python scripts/embed_folder.py <folder> --limit 20` recursively selects existing supported image formats and prints discovered, processed, cached, failed, cancelled, elapsed time, and embedding dimension. Individual corrupt files are reported as per-image failures.
+- Current limitations: sequential CPU-first backend only; no semantic search, classification, duplicate detection, clustering, face recognition, automatic import analysis, or permanent UI entry point is included.
