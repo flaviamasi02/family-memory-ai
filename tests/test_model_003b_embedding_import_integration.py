@@ -157,3 +157,204 @@ class _Signal:
     def emit(self, *args):
         for callback in list(self._callbacks):
             callback(*args)
+
+
+def test_slow_worker_is_not_abandoned_and_second_import_waits_for_finish(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    threads = []
+    workers = []
+
+    class FakeThread:
+        def __init__(self):
+            self.started = _Signal()
+            self.finished = _Signal()
+            self.deleted = False
+            self.running = False
+            threads.append(self)
+
+        def start(self):
+            self.running = True
+
+        def isRunning(self):
+            return self.running
+
+        def quit(self):
+            self.running = False
+            self.finished.emit()
+
+        def wait(self, _ms):
+            return not self.running
+
+        def deleteLater(self):
+            self.deleted = True
+
+    class FakeWorker:
+        def __init__(self, photos):
+            self.photos = list(photos)
+            self.progress = _Signal()
+            self.complete = _Signal()
+            self.error = _Signal()
+            self.finished = _Signal()
+            self.cancelled = False
+            workers.append(self)
+
+        def moveToThread(self, _thread):
+            pass
+
+        def run(self):
+            pass
+
+        def cancel(self):
+            self.cancelled = True
+
+        def deleteLater(self):
+            pass
+
+    monkeypatch.setattr("ui.main_window.QThread", FakeThread)
+    monkeypatch.setattr("ui.main_window.EmbeddingWorker", FakeWorker)
+
+    window._start_embedding_indexing(["first"])
+    first_thread = window.embedding_thread
+    first_worker = window.embedding_worker
+    window._start_embedding_indexing(["second"])
+
+    assert len(workers) == 1
+    assert first_worker.cancelled is True
+    assert window.embedding_thread is first_thread
+    assert window.embedding_worker is first_worker
+    assert window._pending_embedding_photos == ["second"]
+
+    first_worker.finished.emit()
+
+    assert len(workers) == 2
+    assert workers[1].photos == ["second"]
+    assert window.embedding_thread is threads[1]
+    assert window.embedding_worker is workers[1]
+
+
+def test_stale_embedding_progress_and_completion_do_not_update_newer_import(capsys):
+    window = _embedding_window_for_lifecycle_tests()
+    window._active_embedding_run_id = 2
+    progress = type(
+        "Progress",
+        (),
+        {
+            "current_index": 1,
+            "total_count": 1,
+            "processed_count": 1,
+            "cached_count": 0,
+            "failed_count": 0,
+        },
+    )()
+    result = type(
+        "Result",
+        (),
+        {
+            "total_images_received": 1,
+            "processed_successfully": 1,
+            "skipped_cached": 0,
+            "failed": 0,
+            "cancelled": 0,
+            "elapsed_seconds": 0.1,
+        },
+    )()
+
+    window._on_embedding_progress(1, progress)
+    window._on_embedding_complete(1, result)
+    window._on_embedding_error(1, "old error")
+
+    assert window.status_label.text == "initial"
+    assert "EmbeddingIndex" not in capsys.readouterr().err
+
+
+def test_close_event_waits_for_running_embedding_thread_before_destroying(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    waited = []
+
+    class FakeApp:
+        def processEvents(self):
+            pass
+
+    class FakeThread:
+        def __init__(self):
+            self.running = True
+            self.quit_called = False
+
+        def isRunning(self):
+            return self.running
+
+        def wait(self, ms):
+            waited.append(ms)
+            self.running = False
+            return True
+
+        def quit(self):
+            self.quit_called = True
+
+    class FakeWorker:
+        def __init__(self):
+            self.cancelled = False
+
+        def cancel(self):
+            self.cancelled = True
+
+    class FakeBase:
+        closed = False
+
+        def closeEvent(self, event):
+            FakeBase.closed = True
+
+    thread = FakeThread()
+    worker = FakeWorker()
+    window.embedding_thread = thread
+    window.embedding_worker = worker
+    monkeypatch.setattr("ui.main_window.QCoreApplication.instance", lambda: FakeApp())
+    monkeypatch.setattr("ui.main_window.QMainWindow.closeEvent", FakeBase.closeEvent)
+
+    window.closeEvent(object())
+
+    assert worker.cancelled is True
+    assert waited == [250]
+    assert thread.quit_called is False
+    assert FakeBase.closed is True
+
+
+def test_thread_and_worker_references_clear_only_after_thread_completion():
+    window = _embedding_window_for_lifecycle_tests()
+    thread = object()
+    worker = type("Worker", (), {"cancel": lambda self: None})()
+    window.embedding_thread = thread
+    window.embedding_worker = worker
+    window._active_embedding_run_id = 3
+
+    window._request_embedding_worker_cancel()
+    assert window.embedding_thread is thread
+    assert window.embedding_worker is worker
+
+    window._on_embedding_thread_finished(2)
+    assert window.embedding_thread is thread
+    assert window.embedding_worker is worker
+
+    window._on_embedding_thread_finished(3)
+    assert window.embedding_thread is None
+    assert window.embedding_worker is None
+
+
+def _embedding_window_for_lifecycle_tests():
+    window = MainWindow.__new__(MainWindow)
+    window.embedding_thread = None
+    window.embedding_worker = None
+    window._embedding_run_id = 0
+    window._active_embedding_run_id = 0
+    window._pending_embedding_photos = None
+    window._embedding_close_requested = False
+    window.status_label = _StatusLabel()
+    return window
+
+
+class _StatusLabel:
+    def __init__(self):
+        self.text = "initial"
+
+    def setText(self, text):
+        self.text = text

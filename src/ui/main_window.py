@@ -2,7 +2,7 @@ import sys
 import time
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QThread, QTimer
+from PySide6.QtCore import QCoreApplication, Qt, QThread, QTimer
 from PySide6.QtGui import QGuiApplication, QImage, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
@@ -66,6 +66,10 @@ class MainWindow(QMainWindow):
         self.scan_worker = None
         self.embedding_thread = None
         self.embedding_worker = None
+        self._embedding_run_id = 0
+        self._active_embedding_run_id = 0
+        self._pending_embedding_photos = None
+        self._embedding_close_requested = False
         self.selected_photo = None
         self._review_cache_signature = None
         self._review_cache_payload = None
@@ -187,7 +191,15 @@ class MainWindow(QMainWindow):
         self._on_tab_changed(self.tabs.currentIndex())
 
     def closeEvent(self, event):
-        self._stop_embedding_worker()
+        self._embedding_close_requested = True
+        self._request_embedding_worker_cancel()
+        app = QCoreApplication.instance()
+        while self.embedding_thread is not None and self.embedding_thread.isRunning():
+            self.embedding_thread.wait(250)
+            if app is not None:
+                app.processEvents()
+        if app is not None:
+            app.processEvents()
         super().closeEvent(event)
 
     def _mobileclip_library_photos(self) -> list:
@@ -334,39 +346,66 @@ class MainWindow(QMainWindow):
 
     def _start_embedding_indexing(self, photos: list) -> None:
         """Launch import/index embedding generation without blocking the UI."""
-        self._stop_embedding_worker()
+        requested_photos = list(photos or [])
+        if self.embedding_thread is not None and self.embedding_thread.isRunning():
+            self._pending_embedding_photos = requested_photos
+            self._request_embedding_worker_cancel()
+            return
 
-        self.embedding_thread = QThread()
-        self.embedding_worker = EmbeddingWorker(photos)
-        self.embedding_worker.moveToThread(self.embedding_thread)
+        self._launch_embedding_worker(requested_photos)
 
-        self.embedding_thread.started.connect(self.embedding_worker.run)
-        self.embedding_worker.progress.connect(self._on_embedding_progress)
-        self.embedding_worker.complete.connect(self._on_embedding_complete)
-        self.embedding_worker.error.connect(self._on_embedding_error)
-        self.embedding_worker.finished.connect(self.embedding_thread.quit)
-        self.embedding_worker.finished.connect(self.embedding_worker.deleteLater)
-        self.embedding_thread.finished.connect(self.embedding_thread.deleteLater)
+    def _launch_embedding_worker(self, photos: list) -> None:
+        self._embedding_run_id += 1
+        run_id = self._embedding_run_id
+        self._active_embedding_run_id = run_id
 
-        self.embedding_thread.start()
+        thread = QThread()
+        worker = EmbeddingWorker(photos)
+        self.embedding_thread = thread
+        self.embedding_worker = worker
+        worker.moveToThread(thread)
 
-    def _stop_embedding_worker(self) -> None:
-        """Cancel any in-flight embedding worker and wait briefly for shutdown."""
+        thread.started.connect(worker.run)
+        worker.progress.connect(lambda progress, rid=run_id: self._on_embedding_progress(rid, progress))
+        worker.complete.connect(lambda result, rid=run_id: self._on_embedding_complete(rid, result))
+        worker.error.connect(lambda message, rid=run_id: self._on_embedding_error(rid, message))
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(lambda rid=run_id: self._on_embedding_thread_finished(rid))
+        thread.finished.connect(thread.deleteLater)
+
+        thread.start()
+
+    def _request_embedding_worker_cancel(self) -> None:
+        """Cooperatively request cancellation without destroying a running QThread."""
         if self.embedding_worker is not None:
             self.embedding_worker.cancel()
-        if self.embedding_thread is not None and self.embedding_thread.isRunning():
-            self.embedding_thread.quit()
-            self.embedding_thread.wait(2000)
-        self.embedding_thread = None
-        self.embedding_worker = None
 
-    def _on_embedding_progress(self, progress) -> None:
+    def _on_embedding_thread_finished(self, run_id: int) -> None:
+        if run_id == self._active_embedding_run_id:
+            self.embedding_thread = None
+            self.embedding_worker = None
+            self._active_embedding_run_id = 0
+
+        if self._embedding_close_requested:
+            return
+
+        pending_photos = self._pending_embedding_photos
+        self._pending_embedding_photos = None
+        if pending_photos is not None:
+            self._launch_embedding_worker(pending_photos)
+
+    def _on_embedding_progress(self, run_id: int, progress) -> None:
+        if run_id != self._active_embedding_run_id:
+            return
         self.status_label.setText(
             f"Indexing semantic embeddings {progress.current_index}/{progress.total_count} "
             f"(new={progress.processed_count}, skipped={progress.cached_count}, failed={progress.failed_count})…"
         )
 
-    def _on_embedding_complete(self, result) -> None:
+    def _on_embedding_complete(self, run_id: int, result) -> None:
+        if run_id != self._active_embedding_run_id:
+            return
         if getattr(result, "total_images_received", 0) <= 0:
             return
         print(
@@ -380,7 +419,9 @@ class MainWindow(QMainWindow):
             flush=True,
         )
 
-    def _on_embedding_error(self, error_message: str) -> None:
+    def _on_embedding_error(self, run_id: int, error_message: str) -> None:
+        if run_id != self._active_embedding_run_id:
+            return
         print(f"[EmbeddingIndex] error: {error_message}", file=sys.stderr, flush=True)
 
     def _deferred_setup_cleanup_review(self) -> None:
