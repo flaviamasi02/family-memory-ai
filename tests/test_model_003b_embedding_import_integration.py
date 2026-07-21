@@ -484,20 +484,32 @@ def test_stale_scan_finished_signal_cannot_clear_newer_scan():
 
 
 def test_deleted_scan_thread_wrapper_is_not_reused_for_second_scan(monkeypatch):
-    window = _embedding_window_for_lifecycle_tests()
+    window = _scan_lifecycle_harness()
     workers = []
 
     class DeletedThread:
+        def __init__(self):
+            self.quit_called = False
+            self.wait_called = False
+
         def isRunning(self):
             raise RuntimeError("Internal C++ object already deleted")
+
+        def quit(self):
+            self.quit_called = True
+
+        def wait(self, _ms):
+            self.wait_called = True
+            return True
 
     class FakeThread:
         def __init__(self):
             self.started = _Signal()
             self.finished = _Signal()
+            self.started_called = False
 
         def start(self):
-            pass
+            self.started_called = True
 
         def isRunning(self):
             return False
@@ -528,7 +540,8 @@ def test_deleted_scan_thread_wrapper_is_not_reused_for_second_scan(monkeypatch):
         def deleteLater(self):
             pass
 
-    window.scan_thread = DeletedThread()
+    deleted_thread = DeletedThread()
+    window.scan_thread = deleted_thread
     window.scan_worker = object()
     window._active_scan_run_id = 1
     monkeypatch.setattr("ui.main_window.QThread", FakeThread)
@@ -538,7 +551,29 @@ def test_deleted_scan_thread_wrapper_is_not_reused_for_second_scan(monkeypatch):
 
     assert len(workers) == 1
     assert workers[0].folder_path == "/second"
-    assert window._active_scan_run_id == 2
+    assert window.scan_thread is not deleted_thread
+    assert isinstance(window.scan_thread, FakeThread)
+    assert window.scan_thread.started_called is True
+    assert window.scan_worker is workers[0]
+    assert deleted_thread.quit_called is False
+    assert deleted_thread.wait_called is False
+
+
+def _scan_lifecycle_harness():
+    class Harness:
+        pass
+
+    window = Harness()
+    window.scan_thread = None
+    window.scan_worker = None
+    window._scan_run_id = 0
+    window._active_scan_run_id = 0
+    window._start_scan = MainWindow._start_scan.__get__(window, Harness)
+    window._scan_thread_is_running = MainWindow._scan_thread_is_running.__get__(window, Harness)
+    window._on_scan_thread_finished = MainWindow._on_scan_thread_finished.__get__(window, Harness)
+    window._on_scan_complete = lambda photos: None
+    window._on_scan_error = lambda error: None
+    return window
 
 
 def test_second_folder_scan_completion_updates_photo_list_after_first_scan_cleanup(monkeypatch):
