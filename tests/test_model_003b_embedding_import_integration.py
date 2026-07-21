@@ -340,6 +340,42 @@ def test_thread_and_worker_references_clear_only_after_thread_completion():
     assert window.embedding_worker is None
 
 
+def test_second_import_during_embedding_waits_for_cancellation_before_scanning():
+    window = _embedding_window_for_lifecycle_tests()
+    scans_started = []
+
+    class RunningThread:
+        def isRunning(self):
+            return True
+
+    class RunningWorker:
+        def __init__(self):
+            self.cancelled = False
+
+        def cancel(self):
+            self.cancelled = True
+
+    worker = RunningWorker()
+    window.embedding_thread = RunningThread()
+    window.embedding_worker = worker
+    window._active_embedding_run_id = 7
+    window._start_scan = scans_started.append
+
+    window._queue_or_start_scan("/second-folder")
+
+    assert worker.cancelled is True
+    assert scans_started == []
+    assert window._pending_import_folder_path == "/second-folder"
+    assert window.status_label.text == "Cancelling previous embedding job before scanning next folder…"
+
+    window._on_embedding_thread_finished(7)
+
+    assert scans_started == ["/second-folder"]
+    assert window.status_label.text == "Scanning folder…"
+    assert window.embedding_thread is None
+    assert window.embedding_worker is None
+
+
 def _embedding_window_for_lifecycle_tests():
     window = MainWindow.__new__(MainWindow)
     window.embedding_thread = None
@@ -347,6 +383,7 @@ def _embedding_window_for_lifecycle_tests():
     window._embedding_run_id = 0
     window._active_embedding_run_id = 0
     window._pending_embedding_photos = None
+    window._pending_import_folder_path = None
     window._embedding_close_requested = False
     window.status_label = _StatusLabel()
     return window

@@ -69,6 +69,7 @@ class MainWindow(QMainWindow):
         self._embedding_run_id = 0
         self._active_embedding_run_id = 0
         self._pending_embedding_photos = None
+        self._pending_import_folder_path = None
         self._embedding_close_requested = False
         self.selected_photo = None
         self._review_cache_signature = None
@@ -291,6 +292,18 @@ class MainWindow(QMainWindow):
         self._imported_folder = folder_path
         self.status_label.setText("Scanning folder…")
 
+        self._queue_or_start_scan(folder_path)
+
+    def _queue_or_start_scan(self, folder_path: str) -> None:
+        """Start scanning now unless an embedding run must finish cancellation first."""
+        if self.embedding_thread is not None and self.embedding_thread.isRunning():
+            self._pending_import_folder_path = folder_path
+            self._pending_embedding_photos = None
+            self._request_embedding_worker_cancel()
+            self.status_label.setText("Cancelling previous embedding job before scanning next folder…")
+            return
+
+        self.status_label.setText("Scanning folder…")
         self._start_scan(folder_path)
 
     def _start_scan(self, folder_path: str) -> None:
@@ -388,6 +401,13 @@ class MainWindow(QMainWindow):
             self._active_embedding_run_id = 0
 
         if self._embedding_close_requested:
+            return
+
+        pending_folder = self._pending_import_folder_path
+        self._pending_import_folder_path = None
+        if pending_folder is not None:
+            self.status_label.setText("Scanning folder…")
+            self._start_scan(pending_folder)
             return
 
         pending_photos = self._pending_embedding_photos
