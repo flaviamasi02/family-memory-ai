@@ -190,8 +190,16 @@ def test_settings_installation_plan_remains_detailed(monkeypatch, tmp_path):
     app = QApplication.instance() or QApplication([])
     page = SettingsPage()
     page.ai_env_input.setText(sys.executable)
+    started = []
+    monkeypatch.setattr(page, "_start_ai_runtime_operation", lambda *a, **k: started.append((a, k)))
 
     page._show_ai_installation_plan()
+
+    assert "Inspecting MobileCLIP environment" in page.ai_plan_box.toPlainText()
+    assert started == [(("build_plan",), {"interpreter": sys.executable})]
+
+    plan = page.ai_runtime_manager.build_installation_plan("mobileclip", sys.executable)
+    page._on_ai_runtime_completed("build_plan", plan)
     text = page.ai_plan_box.toPlainText()
 
     assert "Installation plan for MobileCLIP" in text
