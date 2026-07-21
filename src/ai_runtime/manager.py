@@ -61,8 +61,21 @@ class AIRuntimeManager:
         rec.installation_state=state; rec.last_status_check=now_iso(); self.storage.save_installation(rec)
         return AIRuntimeStatus(provider_id,state,state==AIRuntimeState.READY.value,not missing_deps,not missing_files,'Unknown',rec.last_error,rec.last_status_check,missing_deps,missing_files,env)
     def build_installation_plan(self, provider_id:str, interpreter:str|Path|None=None, device:str='CPU') -> AIRuntimeInstallationPlan:
-        d=self.registry.require(provider_id); env=self.inspect_environment(interpreter or self.installation_record(provider_id).interpreter_path or sys.executable); cache=self.storage.cache_dir_for(provider_id)
-        package_state=self.executor.package_state(env.interpreter_path, tuple(dep.import_name for dep in d.required_python_packages)) if env.valid else {}
+        start=time.perf_counter(); rec=self.installation_record(provider_id); selected_interpreter=interpreter or rec.interpreter_path or sys.executable
+        logger.info("AI runtime installation-plan build started provider=%s interpreter=%s", provider_id, selected_interpreter)
+        d=self.registry.require(provider_id); env=self.inspect_environment(selected_interpreter); cache=self.storage.cache_dir_for(provider_id)
+        package_state={}
+        if env.valid:
+            try:
+                package_state=self.executor.package_state(env.interpreter_path, tuple(dep.import_name for dep in d.required_python_packages))
+                available=tuple(name for name, info in package_state.items() if info.get('available'))
+                missing=tuple(name for name, info in package_state.items() if not info.get('available'))
+                logger.info("AI runtime package probe completed provider=%s interpreter=%s available=%s missing=%s", provider_id, env.interpreter_path, available, missing)
+            except Exception as exc:
+                logger.exception("AI runtime package probe failed provider=%s interpreter=%s", provider_id, env.interpreter_path)
+                raise RuntimeError(f"Package probe failed for selected interpreter {env.interpreter_path}: {exc}") from exc
+        else:
+            logger.warning("AI runtime package probe skipped provider=%s interpreter=%s valid=False message=%s", provider_id, env.interpreter_path, env.message)
         satisfied=tuple(dep.import_name for dep in d.required_python_packages if package_state.get(dep.import_name, {}).get('available'))
         packages=tuple((dep.package_name or dep.import_name)+(dep.version_spec or '') for dep in d.required_python_packages if dep.package_name != '__transitive__' and not package_state.get(dep.import_name, {}).get('available'))
         version_script="""
@@ -79,6 +92,7 @@ print(json.dumps({m: (md.version(m) if m in {d.metadata['Name'] for d in md.dist
         warns=[('Already satisfied dependencies: '+', '.join(satisfied)) if satisfied else 'No dependencies are currently confirmed satisfied by import probing.','No action runs until the Product Owner confirms this plan.','The active application environment is not modified; every package command uses the selected interpreter explicitly.','CPU-only inference is used; no NVIDIA GPU is required.','If no authoritative checksum is published, verification uses file size plus model load and embedding checks.']
         if not env.valid: warns.append(env.message or 'Selected Python environment is not valid or pip is unavailable.')
         if env.environment_path and Path(env.environment_path).resolve() == Path(sys.prefix).resolve(): warns.append('Selected environment appears to be the active application environment; choose .venv-mobileclip to avoid modifying the app runtime.')
+        logger.info("AI runtime installation-plan build finished provider=%s interpreter=%s elapsed_seconds=%.3f packages=%s", provider_id, env.interpreter_path, time.perf_counter()-start, packages)
         return AIRuntimeInstallationPlan(d.provider_id,d.display_name,d.checkpoint_id,packages,tuple(f.relative_path for f in d.required_model_files),d.expected_download_size,str(cache),{'code':d.code_license,'model':d.model_license},device,env,False,True,'Resolver-selected CPU-capable PyTorch stack plus MobileCLIP package/cache and 216 MB checkpoint',tuple(warns),tuple(actions),False)
     def _download(self, action:AIRuntimePlanAction, cancel_event:Event|None=None, progress=None, minimum_size_bytes:int|None=None) -> CommandResult:
         start=time.perf_counter(); dst=Path(action.destination); dst.parent.mkdir(parents=True, exist_ok=True); part=dst.with_suffix(dst.suffix+'.partial')

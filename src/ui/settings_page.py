@@ -7,7 +7,7 @@ from pathlib import Path
 from threading import Event
 from typing import Callable
 
-from PySide6.QtCore import Qt, Signal, QThread
+from PySide6.QtCore import Qt, Signal, QThread, Slot
 from PySide6.QtWidgets import (
     QFileDialog,
     QButtonGroup,
@@ -387,13 +387,10 @@ class SettingsPage(QWidget):
         )
         self._refresh_mobileclip_status()
 
-    def _show_ai_installation_plan(self) -> None:
-        interpreter = self.ai_env_input.text().strip() or None
-        plan = self.ai_runtime_manager.build_installation_plan("mobileclip", interpreter)
-        self._last_installation_plan = plan
+    def _format_ai_installation_plan(self, plan: AIRuntimeInstallationPlan) -> str:
         actions = "\n".join(f"- {a.action_type.value}: {a.label}" for a in plan.actions)
         warnings = "\n".join(f"- {w}" for w in plan.warnings)
-        self.ai_plan_box.setPlainText(
+        return (
             f"Installation plan for {plan.provider_name}\n"
             f"Checkpoint: {plan.checkpoint_id}\n"
             f"Python environment:\n{plan.python_environment.interpreter_path}\n"
@@ -404,7 +401,13 @@ class SettingsPage(QWidget):
             f"Device: {plan.device}\nAdmin rights expected: {plan.administrator_rights_expected}\nRestart may be required: {plan.restart_may_be_required}\n"
             f"Warnings:\n{warnings}\nTyped actions (not executed until explicit confirmation):\n{actions}"
         )
-        QMessageBox.information(self, "AI Models installation plan", "Plan generated only. Nothing was installed or downloaded.")
+
+    def _show_ai_installation_plan(self) -> None:
+        interpreter = self.ai_env_input.text().strip() or None
+        self._last_installation_plan = None
+        self.ai_plan_box.setPlainText("Inspecting MobileCLIP environment and building installation plan...")
+        self.runtime_step_label.setText("Current step: building installation plan")
+        self._start_ai_runtime_operation("build_plan", interpreter=interpreter)
 
 
     def _set_runtime_buttons_enabled(self, enabled: bool) -> None:
@@ -412,23 +415,23 @@ class SettingsPage(QWidget):
             button.setEnabled(enabled)
         self.cancel_install_button.setEnabled(not enabled)
 
-    def _start_ai_runtime_operation(self, operation: str, *, plan: AIRuntimeInstallationPlan | None = None, image_path: Path | None = None) -> None:
+    def _start_ai_runtime_operation(self, operation: str, *, plan: AIRuntimeInstallationPlan | None = None, image_path: Path | None = None, interpreter: str | None = None) -> None:
         if self._active_runtime_thread is not None:
             self.ai_plan_box.setPlainText("Another AI runtime operation is already running.")
             return
         self._active_cancel_event = Event()
         thread = QThread(self)
-        worker = AIRuntimeOperationWorker(self.ai_runtime_manager, operation, plan=plan, image_path=image_path, cancel_event=self._active_cancel_event)
+        worker = AIRuntimeOperationWorker(self.ai_runtime_manager, operation, plan=plan, image_path=image_path, interpreter=interpreter, cancel_event=self._active_cancel_event)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
-        worker.progress.connect(self._on_ai_runtime_progress)
-        worker.current_step.connect(lambda step: self.runtime_step_label.setText(f"Current step: {step}"))
-        worker.completed.connect(lambda result: self._on_ai_runtime_completed(operation, result))
-        worker.failed.connect(self._on_ai_runtime_failed)
-        worker.finished.connect(thread.quit)
-        worker.finished.connect(worker.deleteLater)
-        thread.finished.connect(thread.deleteLater)
-        thread.finished.connect(self._clear_ai_runtime_worker)
+        worker.progress.connect(self._on_ai_runtime_progress, Qt.ConnectionType.QueuedConnection)
+        worker.current_step.connect(self._on_ai_runtime_current_step, Qt.ConnectionType.QueuedConnection)
+        worker.completed.connect(self._on_ai_runtime_completed, Qt.ConnectionType.QueuedConnection)
+        worker.failed.connect(self._on_ai_runtime_failed, Qt.ConnectionType.QueuedConnection)
+        worker.finished.connect(thread.quit, Qt.ConnectionType.QueuedConnection)
+        worker.finished.connect(worker.deleteLater, Qt.ConnectionType.QueuedConnection)
+        thread.finished.connect(thread.deleteLater, Qt.ConnectionType.QueuedConnection)
+        thread.finished.connect(self._clear_ai_runtime_worker, Qt.ConnectionType.QueuedConnection)
         self._active_runtime_thread = thread
         self._active_runtime_worker = worker
         self._set_runtime_buttons_enabled(False)
@@ -443,6 +446,11 @@ class SettingsPage(QWidget):
         self.runtime_progress_bar.setRange(0, 1); self.runtime_progress_bar.setValue(1)
         self._refresh_mobileclip_status()
 
+    @Slot(str)
+    def _on_ai_runtime_current_step(self, step: str) -> None:
+        self.runtime_step_label.setText(f"Current step: {step}")
+
+    @Slot(str, str)
     def _on_ai_runtime_progress(self, step: str, message: str) -> None:
         self.ai_plan_box.append(f"[{step}] {message}")
         if step == "download" and "/" in message:
@@ -451,8 +459,14 @@ class SettingsPage(QWidget):
             if done_text.isdigit() and total_text.isdigit() and int(total_text) > 0:
                 self.runtime_progress_bar.setRange(0, int(total_text)); self.runtime_progress_bar.setValue(int(done_text))
 
+    @Slot(str, object)
     def _on_ai_runtime_completed(self, operation: str, result: object) -> None:
         self.runtime_step_label.setText(f"Current step: {operation} completed")
+        if operation == "build_plan" and isinstance(result, AIRuntimeInstallationPlan):
+            self._last_installation_plan = result
+            self.ai_plan_box.setPlainText(self._format_ai_installation_plan(result))
+            QMessageBox.information(self, "AI Models installation plan", "Plan generated only. Nothing was installed or downloaded.")
+            return
         self.ai_plan_box.append(f"{operation.title()} completed.")
         if hasattr(result, "stdout") or hasattr(result, "stderr"):
             out = getattr(result, "stdout", "") or ""
@@ -469,6 +483,7 @@ class SettingsPage(QWidget):
                 self.report_box.setPlainText(f"MobileCLIP one-image test completed.\n{getattr(result, 'stdout', '')}\n{getattr(result, 'stderr', '')}")
         self._refresh_mobileclip_status()
 
+    @Slot(str)
     def _on_ai_runtime_failed(self, error: str) -> None:
         self.runtime_step_label.setText("Current step: failed")
         self.ai_plan_box.append(f"AI runtime operation failed: {error}")

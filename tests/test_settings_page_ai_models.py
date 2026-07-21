@@ -112,10 +112,8 @@ def test_ai_models_card_uses_targeted_stylesheet_and_diagnostics_source_is_prese
 
 def test_ai_models_diagnostics_report_is_generated(monkeypatch, tmp_path):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    try:
-        from PySide6.QtWidgets import QApplication
-    except ImportError as exc:
-        pytest.skip(f"PySide6 unavailable in this environment: {exc}")
+    widgets = pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
+    QApplication = widgets.QApplication
     from ui.settings_page import SettingsPage
 
     monkeypatch.setenv("FAMILY_MEMORY_APP_DATA_ROOT", str(tmp_path))
@@ -155,10 +153,8 @@ def test_ai_models_source_orders_section_controls_before_evaluation():
 
 def test_ai_models_widget_order_has_no_overlap(monkeypatch, tmp_path):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    try:
-        from PySide6.QtWidgets import QApplication
-    except ImportError as exc:
-        pytest.skip(f"PySide6 unavailable in this environment: {exc}")
+    widgets = pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
+    QApplication = widgets.QApplication
     from ui.settings_page import SettingsPage
 
     monkeypatch.setenv("FAMILY_MEMORY_APP_DATA_ROOT", str(tmp_path))
@@ -193,3 +189,66 @@ def test_ai_models_widget_order_has_no_overlap(monkeypatch, tmp_path):
     assert evaluation_top > card_bottom
     page.close()
     page.deleteLater()
+
+
+
+def test_view_installation_plan_starts_worker_instead_of_building_on_ui_thread():
+    source = Path("src/ui/settings_page.py").read_text(encoding="utf-8")
+    show_body = source[source.index("def _show_ai_installation_plan"):source.index("def _set_runtime_buttons_enabled")]
+
+    assert "Inspecting MobileCLIP environment and building installation plan" in show_body
+    assert "build_installation_plan" not in show_body
+    assert '_start_ai_runtime_operation("build_plan", interpreter=interpreter)' in show_body
+
+
+def test_worker_completion_displays_final_installation_plan():
+    source = Path("src/ui/settings_page.py").read_text(encoding="utf-8")
+    completed_body = source[source.index("def _on_ai_runtime_completed"):source.index("def _on_ai_runtime_failed")]
+    formatter_body = source[source.index("def _format_ai_installation_plan"):source.index("def _show_ai_installation_plan")]
+
+    assert 'operation == "build_plan" and isinstance(result, AIRuntimeInstallationPlan)' in completed_body
+    assert "self._last_installation_plan = result" in completed_body
+    assert "self.ai_plan_box.setPlainText(self._format_ai_installation_plan(result))" in completed_body
+    assert "Packages: {', '.join(plan.packages_to_install) or 'none'}" in formatter_body
+    assert "Model files: {', '.join(plan.model_files_to_download) or 'none'}" in formatter_body
+    assert "Warnings:" in formatter_body
+
+
+def test_failure_path_restores_ui_state():
+    source = Path("src/ui/settings_page.py").read_text(encoding="utf-8")
+    failed_body = source[source.index("def _on_ai_runtime_failed"):source.index("def _cancel_ai_runtime_operation")]
+    cleanup_body = source[source.index("def _clear_ai_runtime_worker"):source.index("def _on_ai_runtime_progress")]
+    start_body = source[source.index("def _start_ai_runtime_operation"):source.index("def _clear_ai_runtime_worker")]
+
+    assert "self.ai_plan_box.append(f\"AI runtime operation failed: {error}\")" in failed_body
+    assert "worker.finished.connect(thread.quit, Qt.ConnectionType.QueuedConnection)" in start_body
+    assert "thread.finished.connect(self._clear_ai_runtime_worker, Qt.ConnectionType.QueuedConnection)" in start_body
+    assert "self._active_runtime_thread = None" in cleanup_body
+    assert "self._active_runtime_worker = None" in cleanup_body
+    assert "self._set_runtime_buttons_enabled(True)" in cleanup_body
+
+def test_installation_plan_source_uses_existing_worker_thread_pattern():
+    source = Path("src/ui/settings_page.py").read_text(encoding="utf-8")
+    worker_source = Path("src/workers/ai_runtime_worker.py").read_text(encoding="utf-8")
+    show_body = source[source.index("def _show_ai_installation_plan"):source.index("def _set_runtime_buttons_enabled")]
+
+    assert "Inspecting MobileCLIP environment and building installation plan" in show_body
+    assert "build_installation_plan" not in show_body
+    assert '_start_ai_runtime_operation("build_plan"' in show_body
+    assert 'if self.operation == "build_plan"' in worker_source
+    assert "manager.build_installation_plan(self.provider_id, self.interpreter)" in worker_source
+    assert "completed = Signal(str, object)" in worker_source
+    assert "self.completed.emit(self.operation, result)" in worker_source
+
+
+def test_ai_runtime_worker_signals_are_queued_to_prevent_windows_qtextdocument_thread_error():
+    source = Path("src/ui/settings_page.py").read_text(encoding="utf-8")
+    start_body = source[source.index("def _start_ai_runtime_operation"):source.index("def _clear_ai_runtime_worker")]
+
+    assert "QObject: Cannot create children for a parent that is in a different thread."
+    assert "worker.progress.connect(self._on_ai_runtime_progress, Qt.ConnectionType.QueuedConnection)" in start_body
+    assert "worker.current_step.connect(self._on_ai_runtime_current_step, Qt.ConnectionType.QueuedConnection)" in start_body
+    assert "worker.completed.connect(self._on_ai_runtime_completed, Qt.ConnectionType.QueuedConnection)" in start_body
+    assert "worker.failed.connect(self._on_ai_runtime_failed, Qt.ConnectionType.QueuedConnection)" in start_body
+    assert "lambda step: self.runtime_step_label.setText" not in start_body
+    assert "lambda result" not in start_body
