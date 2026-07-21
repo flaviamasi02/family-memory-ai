@@ -25,6 +25,7 @@ class AIRuntimeOperationWorker(QObject):
         plan: AIRuntimeInstallationPlan | None = None,
         provider_id: str = "mobileclip",
         image_path: str | Path | None = None,
+        interpreter: str | Path | None = None,
         cancel_event: Event | None = None,
     ) -> None:
         super().__init__()
@@ -33,6 +34,7 @@ class AIRuntimeOperationWorker(QObject):
         self.plan = plan
         self.provider_id = provider_id
         self.image_path = Path(image_path) if image_path else None
+        self.interpreter = str(interpreter) if interpreter else None
         self.cancel_event = cancel_event or Event()
 
     def run(self) -> None:
@@ -40,7 +42,9 @@ class AIRuntimeOperationWorker(QObject):
             def callback(step, message):
                 self.current_step.emit(str(step))
                 self.progress.emit(str(step), str(message))
-            if self.operation == "install":
+            if self.operation == "build_plan":
+                result = self.manager.build_installation_plan(self.provider_id, self.interpreter)
+            elif self.operation == "install":
                 if self.plan is None:
                     raise ValueError("Installation plan is required.")
                 result: Any = self.manager.execute_installation_plan(self.plan, self.cancel_event, callback)

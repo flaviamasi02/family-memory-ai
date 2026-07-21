@@ -387,13 +387,10 @@ class SettingsPage(QWidget):
         )
         self._refresh_mobileclip_status()
 
-    def _show_ai_installation_plan(self) -> None:
-        interpreter = self.ai_env_input.text().strip() or None
-        plan = self.ai_runtime_manager.build_installation_plan("mobileclip", interpreter)
-        self._last_installation_plan = plan
+    def _format_ai_installation_plan(self, plan: AIRuntimeInstallationPlan) -> str:
         actions = "\n".join(f"- {a.action_type.value}: {a.label}" for a in plan.actions)
         warnings = "\n".join(f"- {w}" for w in plan.warnings)
-        self.ai_plan_box.setPlainText(
+        return (
             f"Installation plan for {plan.provider_name}\n"
             f"Checkpoint: {plan.checkpoint_id}\n"
             f"Python environment:\n{plan.python_environment.interpreter_path}\n"
@@ -404,7 +401,13 @@ class SettingsPage(QWidget):
             f"Device: {plan.device}\nAdmin rights expected: {plan.administrator_rights_expected}\nRestart may be required: {plan.restart_may_be_required}\n"
             f"Warnings:\n{warnings}\nTyped actions (not executed until explicit confirmation):\n{actions}"
         )
-        QMessageBox.information(self, "AI Models installation plan", "Plan generated only. Nothing was installed or downloaded.")
+
+    def _show_ai_installation_plan(self) -> None:
+        interpreter = self.ai_env_input.text().strip() or None
+        self._last_installation_plan = None
+        self.ai_plan_box.setPlainText("Inspecting MobileCLIP environment and building installation plan...")
+        self.runtime_step_label.setText("Current step: building installation plan")
+        self._start_ai_runtime_operation("build_plan", interpreter=interpreter)
 
 
     def _set_runtime_buttons_enabled(self, enabled: bool) -> None:
@@ -412,13 +415,13 @@ class SettingsPage(QWidget):
             button.setEnabled(enabled)
         self.cancel_install_button.setEnabled(not enabled)
 
-    def _start_ai_runtime_operation(self, operation: str, *, plan: AIRuntimeInstallationPlan | None = None, image_path: Path | None = None) -> None:
+    def _start_ai_runtime_operation(self, operation: str, *, plan: AIRuntimeInstallationPlan | None = None, image_path: Path | None = None, interpreter: str | None = None) -> None:
         if self._active_runtime_thread is not None:
             self.ai_plan_box.setPlainText("Another AI runtime operation is already running.")
             return
         self._active_cancel_event = Event()
         thread = QThread(self)
-        worker = AIRuntimeOperationWorker(self.ai_runtime_manager, operation, plan=plan, image_path=image_path, cancel_event=self._active_cancel_event)
+        worker = AIRuntimeOperationWorker(self.ai_runtime_manager, operation, plan=plan, image_path=image_path, interpreter=interpreter, cancel_event=self._active_cancel_event)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
         worker.progress.connect(self._on_ai_runtime_progress)
@@ -453,6 +456,11 @@ class SettingsPage(QWidget):
 
     def _on_ai_runtime_completed(self, operation: str, result: object) -> None:
         self.runtime_step_label.setText(f"Current step: {operation} completed")
+        if operation == "build_plan" and isinstance(result, AIRuntimeInstallationPlan):
+            self._last_installation_plan = result
+            self.ai_plan_box.setPlainText(self._format_ai_installation_plan(result))
+            QMessageBox.information(self, "AI Models installation plan", "Plan generated only. Nothing was installed or downloaded.")
+            return
         self.ai_plan_box.append(f"{operation.title()} completed.")
         if hasattr(result, "stdout") or hasattr(result, "stderr"):
             out = getattr(result, "stdout", "") or ""

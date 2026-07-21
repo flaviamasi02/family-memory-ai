@@ -86,3 +86,18 @@ def test_app_data_paths_outside_repository_and_no_download_in_ci(tmp_path):
     m=manager(tmp_path); plan=m.build_installation_plan('fake')
     assert str(m.storage.root).startswith(str(tmp_path))
     assert all(a.action_type != AIRuntimeActionType.DOWNLOAD_MODEL_FILE or not plan.confirmed for a in plan.actions)
+
+
+def test_mobileclip_product_owner_state_generates_no_reinstall_actions(tmp_path):
+    from ai_runtime.manager import create_default_runtime_manager
+
+    manager = create_default_runtime_manager(ApplicationDataPathService(tmp_path, tmp_path))
+    manager.save_environment_selection('mobileclip', sys.executable)
+    manager.executor.package_state = lambda interpreter, names: {name: {'available': True, 'version': 'ok'} for name in names}
+
+    plan = manager.build_installation_plan('mobileclip', sys.executable)
+
+    assert plan.packages_to_install == ()
+    assert any('Already satisfied dependencies: mobileclip, torch, torchvision, PIL' in warning for warning in plan.warnings)
+    assert any(action.action_type == AIRuntimeActionType.DOWNLOAD_MODEL_FILE and action.destination.endswith('mobileclip_s0.pt') for action in plan.actions)
+    assert all(action.action_type != AIRuntimeActionType.INSTALL_PYTHON_PACKAGE for action in plan.actions)
