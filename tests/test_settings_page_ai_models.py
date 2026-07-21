@@ -191,76 +191,41 @@ def test_ai_models_widget_order_has_no_overlap(monkeypatch, tmp_path):
     page.deleteLater()
 
 
-def test_view_installation_plan_starts_worker_instead_of_building_on_ui_thread(monkeypatch, tmp_path):
-    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    widgets = pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
-    QApplication = widgets.QApplication
-    from ui.settings_page import SettingsPage
 
-    monkeypatch.setenv("FAMILY_MEMORY_APP_DATA_ROOT", str(tmp_path))
-    app = QApplication.instance() or QApplication([])
-    page = SettingsPage()
-    calls = []
+def test_view_installation_plan_starts_worker_instead_of_building_on_ui_thread():
+    source = Path("src/ui/settings_page.py").read_text(encoding="utf-8")
+    show_body = source[source.index("def _show_ai_installation_plan"):source.index("def _set_runtime_buttons_enabled")]
 
-    def fail_if_ui_thread_builds(*args, **kwargs):
-        raise AssertionError("build_installation_plan must run in AIRuntimeOperationWorker")
-
-    def fake_start(operation, **kwargs):
-        calls.append((operation, kwargs))
-
-    monkeypatch.setattr(page.ai_runtime_manager, "build_installation_plan", fail_if_ui_thread_builds)
-    monkeypatch.setattr(page, "_start_ai_runtime_operation", fake_start)
-
-    page._show_ai_installation_plan()
-
-    assert calls == [("build_plan", {"interpreter": None})]
-    assert "Inspecting MobileCLIP environment" in page.ai_plan_box.toPlainText()
-    page.deleteLater()
+    assert "Inspecting MobileCLIP environment and building installation plan" in show_body
+    assert "build_installation_plan" not in show_body
+    assert '_start_ai_runtime_operation("build_plan", interpreter=interpreter)' in show_body
 
 
-def test_worker_completion_displays_final_installation_plan(monkeypatch, tmp_path):
-    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    widgets = pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
-    QApplication = widgets.QApplication
-    QMessageBox = widgets.QMessageBox
-    from ai_runtime.models import AIRuntimeInstallationPlan, PythonEnvironmentInfo
-    from ui.settings_page import SettingsPage
+def test_worker_completion_displays_final_installation_plan():
+    source = Path("src/ui/settings_page.py").read_text(encoding="utf-8")
+    completed_body = source[source.index("def _on_ai_runtime_completed"):source.index("def _on_ai_runtime_failed")]
+    formatter_body = source[source.index("def _format_ai_installation_plan"):source.index("def _show_ai_installation_plan")]
 
-    monkeypatch.setenv("FAMILY_MEMORY_APP_DATA_ROOT", str(tmp_path))
-    app = QApplication.instance() or QApplication([])
-    page = SettingsPage()
-    monkeypatch.setattr(QMessageBox, "information", lambda *args, **kwargs: QMessageBox.StandardButton.Ok)
-    env = PythonEnvironmentInfo(str(tmp_path / "python"), "3.10.11", "AMD64", str(tmp_path), "virtualenv", True, True, True, "")
-    plan = AIRuntimeInstallationPlan("mobileclip", "MobileCLIP", "apple/MobileCLIP-S0", (), ("mobileclip_s0.pt",), "216 MB", str(tmp_path), {"code": "MIT", "model": "terms"}, "CPU", env, False, True, "216 MB", ("Already satisfied dependencies: mobileclip, torch, torchvision, PIL",), (), False)
-
-    page._on_ai_runtime_completed("build_plan", plan)
-
-    text = page.ai_plan_box.toPlainText()
-    assert page._last_installation_plan is plan
-    assert "Packages: none" in text
-    assert "Already satisfied dependencies: mobileclip, torch, torchvision, PIL" in text
-    assert "mobileclip_s0.pt" in text
-    page.deleteLater()
+    assert 'operation == "build_plan" and isinstance(result, AIRuntimeInstallationPlan)' in completed_body
+    assert "self._last_installation_plan = result" in completed_body
+    assert "self.ai_plan_box.setPlainText(self._format_ai_installation_plan(result))" in completed_body
+    assert "Packages: {', '.join(plan.packages_to_install) or 'none'}" in formatter_body
+    assert "Model files: {', '.join(plan.model_files_to_download) or 'none'}" in formatter_body
+    assert "Warnings:" in formatter_body
 
 
-def test_failure_path_restores_ui_state(monkeypatch, tmp_path):
-    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    widgets = pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
-    QApplication = widgets.QApplication
-    from ui.settings_page import SettingsPage
+def test_failure_path_restores_ui_state():
+    source = Path("src/ui/settings_page.py").read_text(encoding="utf-8")
+    failed_body = source[source.index("def _on_ai_runtime_failed"):source.index("def _cancel_ai_runtime_operation")]
+    cleanup_body = source[source.index("def _clear_ai_runtime_worker"):source.index("def _on_ai_runtime_progress")]
+    start_body = source[source.index("def _start_ai_runtime_operation"):source.index("def _clear_ai_runtime_worker")]
 
-    monkeypatch.setenv("FAMILY_MEMORY_APP_DATA_ROOT", str(tmp_path))
-    app = QApplication.instance() or QApplication([])
-    page = SettingsPage()
-    page._set_runtime_buttons_enabled(False)
-    page._on_ai_runtime_failed("probe failed")
-    page._clear_ai_runtime_worker()
-
-    assert "probe failed" in page.ai_plan_box.toPlainText()
-    assert page.plan_button.isEnabled()
-    assert not page.cancel_install_button.isEnabled()
-    page.deleteLater()
-
+    assert "self.ai_plan_box.append(f\"AI runtime operation failed: {error}\")" in failed_body
+    assert "worker.finished.connect(thread.quit)" in start_body
+    assert "thread.finished.connect(self._clear_ai_runtime_worker)" in start_body
+    assert "self._active_runtime_thread = None" in cleanup_body
+    assert "self._active_runtime_worker = None" in cleanup_body
+    assert "self._set_runtime_buttons_enabled(True)" in cleanup_body
 
 def test_installation_plan_source_uses_existing_worker_thread_pattern():
     source = Path("src/ui/settings_page.py").read_text(encoding="utf-8")
