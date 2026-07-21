@@ -11,6 +11,7 @@ MOBILECLIP_S0 = ModelMetadata(
 class MobileCLIPEmbeddingProvider:
     def __init__(self, model_cache_dir: str | Path | None = None, batch_size:int=4):
         self.metadata=MOBILECLIP_S0; self.batch_size=max(1,min(16,int(batch_size)))
+        self.requires_image_decode_validation=True
         self.model_cache_dir=Path(model_cache_dir) if model_cache_dir else get_app_data_service().cache_dir('models') / 'mobileclip-s0'
         self._model=None; self._preprocess=None; self._tokenizer=None; self._torch=None; self.device='cpu'
     def availability(self):

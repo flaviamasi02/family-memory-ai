@@ -92,7 +92,10 @@ class BatchEmbeddingService:
                     result.skipped_cached += 1
                     result.outcomes.append(BatchImageEmbeddingOutcome(str(path), EMBEDDING_STATUS_CACHED, embedding_dimension=cached.embedding_dimension))
                 else:
-                    _verify_loadable_image(path)
+                    if _provider_requires_image_decode_validation(self.provider):
+                        _verify_loadable_image(path)
+                    else:
+                        _verify_supported_image_signature(path)
                     if not loaded:
                         self.provider.load(cancellation_token)
                         loaded = True
@@ -134,6 +137,10 @@ def _path_for(image) -> Path:
     return Path(getattr(image, "path", image))
 
 
+def _provider_requires_image_decode_validation(provider: VisionEmbeddingProvider) -> bool:
+    return bool(getattr(provider, "requires_image_decode_validation", isinstance(provider, MobileCLIPEmbeddingProvider)))
+
+
 def _verify_loadable_image(path: Path) -> None:
     decode_errors: list[str] = []
 
@@ -171,3 +178,15 @@ def _verify_loadable_image(path: Path) -> None:
         decode_errors.append("No image decoder is available in this environment.")
 
     raise ValueError("; ".join(error for error in decode_errors if error))
+
+
+def _verify_supported_image_signature(path: Path) -> None:
+    header = path.read_bytes()[:32]
+    if (
+        header.startswith(b"\xff\xd8\xff")
+        or header.startswith(b"\x89PNG\r\n\x1a\n")
+        or header.startswith(b"RIFF")
+        or b"ftyp" in header[:16]
+    ):
+        return
+    raise ValueError("Image file signature is not recognized.")
