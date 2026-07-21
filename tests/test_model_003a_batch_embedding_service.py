@@ -131,3 +131,102 @@ def test_diagnostic_folder_uses_existing_supported_image_extensions(tmp_path):
     (tmp_path / "note.txt").write_text("x")
     paths = folder_image_paths(tmp_path, 20)
     assert {p.suffix for p in paths} == {".jpg", ".png"}
+
+
+def test_image_verification_tries_qt_after_pillow_decode_failure(tmp_path, monkeypatch):
+    from types import ModuleType
+    import sys
+    from vision import batch_embedding_service as service_module
+
+    p = tmp_path / "fallback.heic"
+    p.write_bytes(b"not decoded by pillow but accepted by fake qt")
+
+    class FakePillowImage:
+        @staticmethod
+        def open(path):
+            raise ValueError("pillow cannot decode heic")
+
+    class FakeImageOps:
+        @staticmethod
+        def exif_transpose(image):
+            return image
+
+    class FakeQtImage:
+        def isNull(self):
+            return False
+
+    class FakeQImageReader:
+        def __init__(self, path):
+            self.path = path
+            self.auto_transform = False
+
+        def setAutoTransform(self, enabled):
+            self.auto_transform = enabled
+
+        def read(self):
+            assert self.auto_transform is True
+            return FakeQtImage()
+
+        def errorString(self):
+            return "qt should not report an error"
+
+    pil = ModuleType("PIL")
+    qtgui = ModuleType("PySide6.QtGui")
+    qtgui.QImageReader = FakeQImageReader
+    monkeypatch.setitem(sys.modules, "PIL", pil)
+    monkeypatch.setitem(sys.modules, "PIL.Image", FakePillowImage)
+    monkeypatch.setitem(sys.modules, "PIL.ImageOps", FakeImageOps)
+    monkeypatch.setitem(sys.modules, "PySide6.QtGui", qtgui)
+
+    service_module._verify_loadable_image(p)
+
+
+def test_image_verification_reports_pillow_and_qt_errors_after_all_decoders_fail(tmp_path, monkeypatch):
+    from types import ModuleType
+    import sys
+    from vision import batch_embedding_service as service_module
+
+    p = tmp_path / "bad.heic"
+    p.write_bytes(b"not an image")
+
+    class FakePillowImage:
+        @staticmethod
+        def open(path):
+            raise ValueError("pillow failure kept")
+
+    class FakeImageOps:
+        @staticmethod
+        def exif_transpose(image):
+            return image
+
+    class FakeQtImage:
+        def isNull(self):
+            return True
+
+    class FakeQImageReader:
+        def __init__(self, path):
+            pass
+
+        def setAutoTransform(self, enabled):
+            pass
+
+        def read(self):
+            return FakeQtImage()
+
+        def errorString(self):
+            return "qt failure kept"
+
+    pil = ModuleType("PIL")
+    qtgui = ModuleType("PySide6.QtGui")
+    qtgui.QImageReader = FakeQImageReader
+    monkeypatch.setitem(sys.modules, "PIL", pil)
+    monkeypatch.setitem(sys.modules, "PIL.Image", FakePillowImage)
+    monkeypatch.setitem(sys.modules, "PIL.ImageOps", FakeImageOps)
+    monkeypatch.setitem(sys.modules, "PySide6.QtGui", qtgui)
+
+    with pytest.raises(ValueError) as exc_info:
+        service_module._verify_loadable_image(p)
+
+    message = str(exc_info.value)
+    assert "pillow failure kept" in message
+    assert "qt failure kept" in message
