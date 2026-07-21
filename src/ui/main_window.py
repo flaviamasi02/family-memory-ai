@@ -2,7 +2,7 @@ import sys
 import time
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QThread, QTimer
+from PySide6.QtCore import QCoreApplication, Qt, QThread, QTimer
 from PySide6.QtGui import QGuiApplication, QImage, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
@@ -37,6 +37,7 @@ from ui.irrelevant_media_page import IrrelevantMediaPage
 from ui.photo_details_panel import PhotoDetailsPanel
 from ui.photo_grid_widget import PhotoGridWidget
 from ui.settings_page import SettingsPage
+from workers.embedding_worker import EmbeddingWorker
 from workers.scan_worker import ScanWorker
 from workers.thumbnail_worker import ThumbnailWorker
 
@@ -63,6 +64,15 @@ class MainWindow(QMainWindow):
         self.thumbnail_worker = None
         self.scan_thread = None
         self.scan_worker = None
+        self._scan_run_id = 0
+        self._active_scan_run_id = 0
+        self.embedding_thread = None
+        self.embedding_worker = None
+        self._embedding_run_id = 0
+        self._active_embedding_run_id = 0
+        self._pending_embedding_photos = None
+        self._pending_import_folder_path = None
+        self._embedding_close_requested = False
         self.selected_photo = None
         self._review_cache_signature = None
         self._review_cache_payload = None
@@ -183,6 +193,17 @@ class MainWindow(QMainWindow):
         self._build_workspace_help_dock()
         self._on_tab_changed(self.tabs.currentIndex())
 
+    def closeEvent(self, event):
+        self._embedding_close_requested = True
+        self._request_embedding_worker_cancel()
+        app = QCoreApplication.instance()
+        while self.embedding_thread is not None and self.embedding_thread.isRunning():
+            self.embedding_thread.wait(250)
+            if app is not None:
+                app.processEvents()
+        if app is not None:
+            app.processEvents()
+        super().closeEvent(event)
 
     def _mobileclip_library_photos(self) -> list:
         return list(self._all_photos or [])
@@ -273,27 +294,63 @@ class MainWindow(QMainWindow):
         self._imported_folder = folder_path
         self.status_label.setText("Scanning folder…")
 
+        self._queue_or_start_scan(folder_path)
+
+    def _queue_or_start_scan(self, folder_path: str) -> None:
+        """Start scanning now unless an embedding run must finish cancellation first."""
+        if self.embedding_thread is not None and self.embedding_thread.isRunning():
+            self._pending_import_folder_path = folder_path
+            self._pending_embedding_photos = None
+            self._request_embedding_worker_cancel()
+            self.status_label.setText("Cancelling previous embedding job before scanning next folder…")
+            return
+
+        self.status_label.setText("Scanning folder…")
         self._start_scan(folder_path)
 
     def _start_scan(self, folder_path: str) -> None:
         """Launch folder scanning on a background thread via ScanWorker."""
         # Stop any in-progress scan before starting a new one.
-        if self.scan_thread is not None and self.scan_thread.isRunning():
+        if self.scan_thread is not None and self._scan_thread_is_running(self.scan_thread):
             self.scan_thread.quit()
             self.scan_thread.wait(2000)
 
-        self.scan_thread = QThread()
-        self.scan_worker = ScanWorker(folder_path)
-        self.scan_worker.moveToThread(self.scan_thread)
+        self._scan_run_id += 1
+        run_id = self._scan_run_id
+        self._active_scan_run_id = run_id
 
-        self.scan_thread.started.connect(self.scan_worker.run)
-        self.scan_worker.scan_complete.connect(self._on_scan_complete)
-        self.scan_worker.scan_error.connect(self._on_scan_error)
-        self.scan_worker.finished.connect(self.scan_thread.quit)
-        self.scan_worker.finished.connect(self.scan_worker.deleteLater)
-        self.scan_thread.finished.connect(self.scan_thread.deleteLater)
+        thread = QThread()
+        worker = ScanWorker(folder_path)
+        self.scan_thread = thread
+        self.scan_worker = worker
+        worker.moveToThread(thread)
 
-        self.scan_thread.start()
+        thread.started.connect(worker.run)
+        worker.scan_complete.connect(self._on_scan_complete)
+        worker.scan_error.connect(self._on_scan_error)
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(lambda rid=run_id, finished_thread=thread: self._on_scan_thread_finished(rid, finished_thread))
+        thread.finished.connect(thread.deleteLater)
+
+        thread.start()
+
+    def _scan_thread_is_running(self, thread) -> bool:
+        try:
+            return bool(thread.isRunning())
+        except RuntimeError:
+            if self.scan_thread is thread:
+                self.scan_thread = None
+                self.scan_worker = None
+                self._active_scan_run_id = 0
+            return False
+
+    def _on_scan_thread_finished(self, run_id: int, finished_thread) -> None:
+        if run_id != self._active_scan_run_id or self.scan_thread is not finished_thread:
+            return
+        self.scan_thread = None
+        self.scan_worker = None
+        self._active_scan_run_id = 0
 
     def _on_scan_complete(self, photos: list) -> None:
         stats = get_session_stats()
@@ -313,6 +370,9 @@ class MainWindow(QMainWindow):
             f"Scan complete — showing {n} photos. Loading thumbnails…"
         )
 
+        # Start background embedding generation for missing/outdated images.
+        self._start_embedding_indexing(photos)
+
         # Start the thumbnail worker *immediately* so thumbnails begin arriving
         # in the browser before Cleanup Review and Memory Review are prepared.
         self.start_thumbnail_loading(photos)
@@ -322,6 +382,93 @@ class MainWindow(QMainWindow):
         # views.  Each phase defers the next one the same way so the event loop
         # remains responsive throughout.
         QTimer.singleShot(0, self._deferred_setup_cleanup_review)
+
+    def _start_embedding_indexing(self, photos: list) -> None:
+        """Launch import/index embedding generation without blocking the UI."""
+        requested_photos = list(photos or [])
+        if self.embedding_thread is not None and self.embedding_thread.isRunning():
+            self._pending_embedding_photos = requested_photos
+            self._request_embedding_worker_cancel()
+            return
+
+        self._launch_embedding_worker(requested_photos)
+
+    def _launch_embedding_worker(self, photos: list) -> None:
+        self._embedding_run_id += 1
+        run_id = self._embedding_run_id
+        self._active_embedding_run_id = run_id
+
+        thread = QThread()
+        worker = EmbeddingWorker(photos)
+        self.embedding_thread = thread
+        self.embedding_worker = worker
+        worker.moveToThread(thread)
+
+        thread.started.connect(worker.run)
+        worker.progress.connect(lambda progress, rid=run_id: self._on_embedding_progress(rid, progress))
+        worker.complete.connect(lambda result, rid=run_id: self._on_embedding_complete(rid, result))
+        worker.error.connect(lambda message, rid=run_id: self._on_embedding_error(rid, message))
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(lambda rid=run_id: self._on_embedding_thread_finished(rid))
+        thread.finished.connect(thread.deleteLater)
+
+        thread.start()
+
+    def _request_embedding_worker_cancel(self) -> None:
+        """Cooperatively request cancellation without destroying a running QThread."""
+        if self.embedding_worker is not None:
+            self.embedding_worker.cancel()
+
+    def _on_embedding_thread_finished(self, run_id: int) -> None:
+        if run_id == self._active_embedding_run_id:
+            self.embedding_thread = None
+            self.embedding_worker = None
+            self._active_embedding_run_id = 0
+
+        if self._embedding_close_requested:
+            return
+
+        pending_folder = self._pending_import_folder_path
+        self._pending_import_folder_path = None
+        if pending_folder is not None:
+            self.status_label.setText("Scanning folder…")
+            self._start_scan(pending_folder)
+            return
+
+        pending_photos = self._pending_embedding_photos
+        self._pending_embedding_photos = None
+        if pending_photos is not None:
+            self._launch_embedding_worker(pending_photos)
+
+    def _on_embedding_progress(self, run_id: int, progress) -> None:
+        if run_id != self._active_embedding_run_id:
+            return
+        self.status_label.setText(
+            f"Indexing semantic embeddings {progress.current_index}/{progress.total_count} "
+            f"(new={progress.processed_count}, skipped={progress.cached_count}, failed={progress.failed_count})…"
+        )
+
+    def _on_embedding_complete(self, run_id: int, result) -> None:
+        if run_id != self._active_embedding_run_id:
+            return
+        if getattr(result, "total_images_received", 0) <= 0:
+            return
+        print(
+            "[EmbeddingIndex] "
+            f"processed={getattr(result, 'processed_successfully', 0)} "
+            f"cached={getattr(result, 'skipped_cached', 0)} "
+            f"failed={getattr(result, 'failed', 0)} "
+            f"cancelled={getattr(result, 'cancelled', 0)} "
+            f"elapsed={getattr(result, 'elapsed_seconds', 0.0):.3f}s",
+            file=sys.stderr,
+            flush=True,
+        )
+
+    def _on_embedding_error(self, run_id: int, error_message: str) -> None:
+        if run_id != self._active_embedding_run_id:
+            return
+        print(f"[EmbeddingIndex] error: {error_message}", file=sys.stderr, flush=True)
 
     def _deferred_setup_cleanup_review(self) -> None:
         """Populate Cleanup Review — deferred from _on_scan_complete."""
@@ -359,6 +506,7 @@ class MainWindow(QMainWindow):
         self._all_photos = list(photos or [])
         self.photo_model.set_photos(photos)
         self._apply_browser_filter()
+        self._start_embedding_indexing(self._all_photos)
         self._load_irrelevant_media_data(self._all_photos)
         relevant_photos = [photo for photo in self._all_photos if self._is_album_relevant(photo)]
         self._load_album_review_data(relevant_photos=relevant_photos, imported_photos=self._all_photos)
