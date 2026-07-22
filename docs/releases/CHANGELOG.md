@@ -588,3 +588,11 @@
 - Identified MODEL-002F as the next milestone for Product Owner-guided MobileCLIP installation and operational validation; MODEL-003 becomes the following planned classification-integration milestone, only after MODEL-002F succeeds.
 - Clarified that the repaired Settings -> AI Models UI was manually validated on Windows, but MobileCLIP remains Dependencies missing with torch, torchvision, PIL, mobileclip, and `mobileclip_s0.pt` absent; real installation, Ready status, embedding tests, benchmark, restart persistence, and CPU performance validation remain pending.
 - Documentation-only update; no application code, tests, runtime behavior, or requirements were modified.
+
+### MODEL-003C — Semantic image similarity service
+
+- Added a reusable UI-independent semantic similarity service that reads existing valid `EmbeddingStore` records, computes cosine similarity over stored vectors, returns typed image/score results, supports source exclusion, top-N limits, optional minimum thresholds, missing-embedding handling, and deterministic equal-score ordering.
+- Enforced exact provider/checkpoint/revision/dimension compatibility for comparisons so embeddings from incompatible model keys or dimensions are rejected rather than silently mixed.
+- Added developer diagnostics with `python scripts/similar_images.py <source-image> <folder> --limit 10` to print similar already-embedded images and scores without recomputing embeddings.
+- Added MODEL-003C automated tests for cosine reference values, ordering, filtering, source exclusion, missing rows, incompatible model metadata/dimensions, empty libraries, deterministic ties, and no recomputation.
+- Updated project documentation to mark MODEL-002F operational MobileCLIP validation and MODEL-003A/003B complete, while keeping automatic classification deferred.

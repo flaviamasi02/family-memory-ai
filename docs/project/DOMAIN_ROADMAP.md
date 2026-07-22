@@ -368,18 +368,20 @@ Merge history clarification:
 
 Validation state:
 - [x] Repaired Settings -> AI Models UI manually validated on Windows.
-- [ ] Real MobileCLIP dependency installation through the app.
-- [ ] `mobileclip_s0.pt` checkpoint download through the confirmed flow.
-- [ ] Runtime Ready confirmation.
-- [ ] One-image embedding confirmation.
-- [ ] 10-image smoke test.
-- [ ] 100-image benchmark and real CPU timing/memory observations.
-- [ ] Persistence after restart.
+- [x] Real MobileCLIP dependency installation through the app.
+- [x] `mobileclip_s0.pt` checkpoint download through the confirmed flow.
+- [x] Runtime Ready confirmation.
+- [x] One-image embedding confirmation.
+- [x] 10-image smoke test.
+- [x] 100-image benchmark and real CPU timing/memory observations.
+- [x] Persistence after restart.
 
-Next milestone:
-- [ ] MODEL-002F — Product Owner-guided MobileCLIP installation and operational validation.
+Completed milestone:
+- [x] MODEL-002F — Product Owner-guided MobileCLIP installation and operational validation.
 
-Following planned milestone:
-- [ ] MODEL-003 — First real MobileCLIP classification integration, only after MODEL-002F succeeds.
+Current MODEL-003 milestones:
+- [x] MODEL-003A — Persistent batch image embeddings.
+- [x] MODEL-003B — Automatic background embedding generation during import/index.
+- [x] MODEL-003C — Reusable semantic image similarity service over stored embeddings.
 
-MODEL-002F must keep the production classifier unchanged while validating installation, verification, benchmark, and persistence behavior. MODEL-003 should define safe classification integration only after MobileCLIP is operationally validated.
+MODEL-003C keeps the production classifier unchanged and adds a reusable non-UI service for future category suggestions, near-duplicate detection, semantic search, clustering, and learning from corrections. Automatic classification remains deferred until explicitly approved.

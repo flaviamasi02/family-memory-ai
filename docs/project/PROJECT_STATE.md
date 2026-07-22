@@ -1089,9 +1089,9 @@ Completed implementation milestones:
 - MODEL-002D — temporary runtime diagnostics for metadata rendering investigation.
 - MODEL-002E — Qt layout sizing fix for Settings -> AI Models metadata.
 
-Next milestone: MODEL-002F — Product Owner-guided MobileCLIP installation and operational validation. Scope: select or confirm the dedicated `.venv-mobileclip` Python 3.10 interpreter; review the installation plan; install dependencies through the app; download the checkpoint through the confirmed flow; verify Ready; run one-image embedding; run 10-image smoke test; run 100-image benchmark; record real CPU timing and memory observations; verify persistence after restart; keep the production classifier unchanged.
+Completed operational milestone: MODEL-002F — Product Owner-guided MobileCLIP installation and operational validation. Operational MobileCLIP validation, one-image embedding checks, smoke/benchmark validation, and persistence validation are now complete; the production classifier remains unchanged.
 
-Following planned milestone: MODEL-003 — first real MobileCLIP classification integration, only after MODEL-002F succeeds.
+Current MODEL-003 direction: reuse validated local MobileCLIP embeddings safely before any automatic classification integration.
 
 ### MODEL-003A — Persistent Batch Embedding Engine
 
@@ -1103,4 +1103,6 @@ Status: implemented in PR branch; awaiting Product Owner manual validation befor
 - Model key: `ModelMetadata.model_key` centralizes provider/model versioning as provider id, checkpoint id, revision, and embedding dimension. Changing provider, checkpoint, revision, or dimension forces regeneration.
 - Diagnostic command: `python scripts/embed_folder.py <folder> --limit 20` recursively selects existing supported image formats and prints discovered, processed, cached, failed, cancelled, elapsed time, and embedding dimension. Individual corrupt files are reported as per-image failures.
 - MODEL-003B integration: imports and in-memory indexing now automatically start a background semantic embedding worker after scans complete. The worker reuses `BatchEmbeddingService`, filters to images with missing or outdated cache records, uses the persistent embedding cache, processes sequentially, reports progress to callers, supports cooperative cancellation with safe QThread lifecycle handoff, queues replacement imports until the cancelled embedding thread actually finishes, clears completed scan threads through matching finished callbacks, and keeps MobileCLIP provider loading scoped to one service instance per run without adding UI tabs, dialogs, or manual generation buttons.
-- Current limitations: sequential CPU-first backend only; no semantic search, classification, duplicate detection, clustering, face recognition, or category replacement is included.
+- MODEL-003C similarity service: `vision.semantic_similarity_service.SemanticSimilarityService` reads existing valid `EmbeddingStore` records, compares stored vectors with cosine similarity, returns typed image/score results ordered highest-to-lowest, supports source exclusion, top-N limits, optional minimum thresholds, and safe handling of missing embeddings. It rejects mismatched provider/checkpoint/revision/dimension model keys and invalid dimensions rather than silently comparing incompatible vectors. The service does not recompute embeddings, decode image pixels, modify image files, or change categories.
+- MODEL-003C diagnostic command: `python scripts/similar_images.py <source-image> <folder> --limit 10` prints the most similar already-embedded images and cosine scores for developer validation.
+- Current limitations: sequential CPU-first embedding generation and exact O(n*d) similarity scans over stored vectors only; no automatic semantic classification, duplicate detection workflow, clustering workflow, face recognition, or category replacement is included.
