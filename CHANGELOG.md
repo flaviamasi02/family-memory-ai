@@ -4,12 +4,8 @@
 
 ### DOCSYNC GITHUB FULL after MODEL-003C
 
-- Recorded PR #28 / MODEL-003B automatic background embedding generation as merged and Product Owner validated.
-- Recorded PR #29 / MODEL-003C stored-vector semantic image similarity as merged and Product Owner validated.
-- Clarified the managed-runtime correction: the main app runs in the normal `.venv`, while MobileCLIP inference uses the Generic AI Runtime Manager's configured dedicated interpreter.
-- Documented grouped runtime-level embedding diagnostics, isolated per-image failures, stale-source filtering, model-key/dimension rejection, and no similarity-time embedding recomputation.
-- Recorded successful Product Owner end-to-end validation: import -> managed MobileCLIP embedding generation -> persistent embedding storage -> stored-vector retrieval -> semantic cosine similarity -> ordered top-N results.
-- Documentation-only update; no production code or tests were changed.
+- Root changelog is transitional; the canonical detailed implementation history is `docs/releases/CHANGELOG.md`.
+- Documentation-only PR #30 updates current state after PR #28 / MODEL-003B and PR #29 / MODEL-003C, corrects the managed-runtime boundary, and records Product Owner validation without changing production code or tests.
 
 ### DOCSYNC GITHUB FULL after MODEL-002E (historical pre-MODEL-002F record)
 

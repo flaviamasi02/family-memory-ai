@@ -404,6 +404,6 @@ Real AI runtime installation is allowed only through the generic AI Runtime Mana
 
 ### MODEL chain completion and next prioritization
 
-MODEL-001 established the evaluation/provider direction. MODEL-002A through MODEL-002F completed the generic runtime architecture, managed MobileCLIP installation, diagnostics, and operational validation. MODEL-003A completed persistent batch embeddings. MODEL-003B completed automatic import/index embedding integration and was merged in PR #28. MODEL-003C completed stored-vector semantic similarity and was merged in PR #29.
+The MODEL-001 through MODEL-003C chain has reached stored-vector semantic similarity; detailed current completion and validation status is owned by `docs/project/PROJECT_STATE.md`.
 
 The next model milestone is not committed. Product Owner prioritization is required among possible consumers of semantic embeddings, such as explainable category suggestions, similar-photo UI, duplicate/near-duplicate assistance, learning from corrections, and semantic search. Production automatic category classification remains deferred until explicitly approved.

@@ -37,7 +37,7 @@ Start here for project context and current status:
 
 Settings includes an **AI Models** section backed by the generic AI Runtime Manager. MobileCLIP is the first managed local AI provider and runs through a configured dedicated Python interpreter, not through provider-specific dependencies installed in the main application `.venv`. The main PySide6 application starts from the normal project environment with `python src/main.py`; MobileCLIP inference runs across the managed runtime boundary selected and verified in Settings.
 
-The Product Owner manually validated the Windows CPU workflow after PR #28 and PR #29: Settings -> AI Models verification completed with exit code 0, reported `embedding_dimension = 512` and `tokenizer = true`, automatic import embedding processed 20/20 images with 0 failures in about 31.6 seconds, and the similarity diagnostic returned ordered top-N results from stored embeddings. This is observed validation evidence, not a universal performance guarantee.
+The Product Owner manually validated the Windows CPU end-to-end workflow after PR #28 and PR #29. See `docs/project/PROJECT_STATE.md` for canonical current operational status and validation evidence.
 
 Developer diagnostics remain available when needed:
 

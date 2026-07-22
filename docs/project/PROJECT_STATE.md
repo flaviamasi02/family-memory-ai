@@ -32,13 +32,15 @@
 
 ## MODEL chain current validation update
 
-Completed and validated chain:
+Completed chain and validation scope:
 
 - [x] MODEL-001 — evaluation and provider direction.
 - [x] MODEL-002A through MODEL-002F — runtime architecture, installation, diagnostics, and operational validation.
-- [x] MODEL-003A — persistent batch embedding engine.
-- [x] MODEL-003B — automatic import/index embedding integration, merged in PR #28 and manually validated.
-- [x] MODEL-003C — stored-vector semantic similarity service, merged in PR #29 and manually validated.
+- [x] MODEL-003A — persistent batch embedding foundation, completed and merged. Do not treat this as a claim that every internal MODEL-003A requirement was separately manually validated beyond the later end-to-end validation evidence below.
+- [x] MODEL-003B — automatic import-time embedding generation, completed, merged in PR #28, and manually validated.
+- [x] MODEL-003C — stored-vector semantic similarity diagnostic, completed, merged in PR #29, and manually validated.
+
+End-to-end Product Owner validation confirmed: import -> managed runtime embedding generation -> persistent storage -> stored-vector retrieval -> cosine similarity -> ordered top-N results.
 
 Product Owner observed evidence on Windows CPU: app launched from the normal `.venv` with `python src\main.py`; MobileCLIP was verified through Settings -> AI Models with exit code 0, `embedding_dimension = 512`, and `tokenizer = true`; importing `C:\Projects\test 20` produced `[EmbeddingIndex] processed=20 cached=0 failed=0 cancelled=0 elapsed=31.581s`; and `python scripts\similar_images.py "C:\Projects\test 20\20210214_112224.jpg" "C:\Projects\test 20" --limit 10` returned 10 ordered results from 20 candidates while excluding the source image. The folder path is a validation record only, not a reusable setup requirement.
 
@@ -1058,31 +1060,32 @@ Historical next practical milestone at that date: MODEL-002C Product Owner-guide
 
 ---
 
-## DOCSYNC GITHUB FULL — after MODEL-002E (2026-07-20)
+## DOCSYNC GITHUB FULL — after MODEL-002E (2026-07-20, historical and superseded)
 
-Current status: MODEL-002A and MODEL-002B were merged in their original PRs. MODEL-002C, MODEL-002D, and MODEL-002E work was ultimately consolidated and merged through PR #22; PR #20 and PR #21 were closed without merge. Repository cleanup after PR #22 is complete: obsolete feature branches and superseded pull requests have been closed.
+Historical status at that date: MODEL-002A and MODEL-002B were merged in their original PRs. MODEL-002C, MODEL-002D, and MODEL-002E work was ultimately consolidated and merged through PR #22; PR #20 and PR #21 were closed without merge. Repository cleanup after PR #22 is complete: obsolete feature branches and superseded pull requests have been closed.
 
 Implementation and validation distinction:
 - Implementation complete: generic AI Runtime Manager foundation, managed MobileCLIP installation flow, stricter verification workflow, diagnostics workflow, and Settings -> AI Models metadata layout fix.
 - Manually validated: the repaired Settings -> AI Models UI on Windows, including visible provider metadata after the layout sizing fix.
-- Operational validation still pending: MobileCLIP itself is not fully installed or Ready on the Product Owner machine.
+- Historical note: operational validation was still pending at that date; this was superseded by the 2026-07-22 current-state validation record above.
 
-Latest confirmed Product Owner runtime state:
-- Status: Dependencies missing.
-- Missing packages include `torch`, `torchvision`, `PIL`, and `mobileclip`.
-- Checkpoint `mobileclip_s0.pt` is missing.
-- Real installation through the application is not yet completed.
-- Runtime Ready has not been confirmed.
-- Real one-image embedding has not been confirmed.
-- 10-image and 100-image evaluations have not been completed.
-- Actual CPU performance has not been recorded.
+Historical Product Owner runtime state at that date:
+- Status was Dependencies missing.
+- Missing packages included `torch`, `torchvision`, `PIL`, and `mobileclip`.
+- Checkpoint `mobileclip_s0.pt` was missing.
+- Real installation through the application was not yet completed.
+- Runtime Ready had not been confirmed.
+- Real one-image embedding had not been confirmed.
+- 10-image and 100-image evaluations had not been completed.
+- Actual CPU performance had not been recorded.
+- These historical limitations are superseded by the MODEL-002F, MODEL-003B, and MODEL-003C validation records in the current section above.
 
-Current AI Runtime architecture:
+AI Runtime architecture recorded by that historical section:
 - `src/ai_runtime` is the canonical provider-agnostic runtime layer. The registry owns provider descriptors and capabilities; the manager owns status, installation plans, selected-interpreter persistence, verification, history, diagnostics, benchmark metadata, and safe removal of manager-owned cache paths.
 - MobileCLIP is the first registered provider. It is local-only, CPU-capable, optional, and evaluation-only. It does not replace deterministic production classification or modify source photos, thumbnails, categories, or cleanup decisions.
 - Runtime files and model weights remain outside Git through the app-data path service. The base application continues to run when MobileCLIP is absent.
 
-Current provider lifecycle:
+Provider lifecycle recorded by that historical section:
 1. Register provider descriptor.
 2. Inspect/select a dedicated Python interpreter.
 3. Generate an explicit installation plan.
