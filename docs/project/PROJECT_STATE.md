@@ -17,11 +17,32 @@
 - Performance state: asynchronous thumbnail loading, responsive import, deferred secondary workspace setup, and JPEG warning suppression are now part of the current baseline.
 - UX state: reusable `WorkspaceInfoPanel` is integrated in all main workspaces with collapsible per-workspace persisted state (default expanded).
 - Memory Review state: asynchronous loading diagnosis and root-cause fix are complete; manual Product Owner validation confirmed expected behavior.
-- Current focus: continue domain milestones on top of the stabilized import/workspace UX baseline.
+- Current focus: MODEL-001 through MODEL-003C are complete through stored-vector semantic similarity; the next product milestone is not committed and requires Product Owner prioritization among possible semantic-embedding consumers.
+- PR #28 is merged: MODEL-003B automatic background embedding generation during import/index is complete and manually validated.
+- PR #29 is merged: MODEL-003C semantic image similarity over stored embeddings is complete and manually validated.
+- MobileCLIP managed runtime is operational on the Product Owner Windows CPU machine through Settings -> AI Models.
+- Persistent embeddings, automatic background embedding generation, and developer semantic similarity diagnostics are operational.
+- Production automatic category classification is still not implemented. Semantic similarity is currently available through `scripts/similar_images.py`, not through the production UI.
+- Near-duplicate workflow, clustering, similar-photo UI, automatic category suggestions, semantic search UI, and learning from corrections remain future work.
 
 ## Last Updated
 
-- 2026-07-12
+- 2026-07-22
+
+
+## MODEL chain current validation update
+
+Completed and validated chain:
+
+- [x] MODEL-001 — evaluation and provider direction.
+- [x] MODEL-002A through MODEL-002F — runtime architecture, installation, diagnostics, and operational validation.
+- [x] MODEL-003A — persistent batch embedding engine.
+- [x] MODEL-003B — automatic import/index embedding integration, merged in PR #28 and manually validated.
+- [x] MODEL-003C — stored-vector semantic similarity service, merged in PR #29 and manually validated.
+
+Product Owner observed evidence on Windows CPU: app launched from the normal `.venv` with `python src\main.py`; MobileCLIP was verified through Settings -> AI Models with exit code 0, `embedding_dimension = 512`, and `tokenizer = true`; importing `C:\Projects\test 20` produced `[EmbeddingIndex] processed=20 cached=0 failed=0 cancelled=0 elapsed=31.581s`; and `python scripts\similar_images.py "C:\Projects\test 20\20210214_112224.jpg" "C:\Projects\test 20" --limit 10` returned 10 ordered results from 20 candidates while excluding the source image. The folder path is a validation record only, not a reusable setup requirement.
+
+Reusable validation procedure: launch the app from the main `.venv`, verify MobileCLIP through Settings -> AI Models, import an image folder, wait for the embedding summary, confirm processed/cached/failed counts, run `python scripts\similar_images.py <source-image> <folder> --limit 10`, and confirm ordered similarity results. The 20-image run took about 31.6 seconds in one CPU-only Windows environment and is not a universal performance guarantee.
 
 ## UX-001 Update
 
@@ -997,11 +1018,11 @@ MobileCLIP is registered as the first provider through this generic registry. It
 
 ## MODEL-002B Real MobileCLIP Runtime Installation
 
-Status: implemented for Product Owner manual validation.
+Status: completed and superseded by MODEL-002F operational validation.
 
-MobileCLIP is the first real managed AI runtime supported by the canonical AI Runtime Manager installation flow. The selected dedicated Python interpreter is persisted and revalidated; the Windows Product Owner path is expected to be `C:\Projects\family-memory-ai\.venv-mobileclip\Scripts\python.exe` using Python 3.10 on a CPU-only machine. The base app still starts and works without MobileCLIP installed, and repository evidence does not show MobileCLIP installed on the Product Owner machine yet.
+MobileCLIP is the first real managed AI runtime supported by the canonical AI Runtime Manager installation flow. The selected dedicated Python interpreter is persisted, revalidated, and used through runtime configuration. The base app still starts and works without provider-specific ML dependencies in the main `.venv`.
 
-Installation is explicit: no packages or checkpoints are installed/downloaded until the Product Owner reviews and confirms the plan. Runtime files and model weights are stored through `ApplicationDataPathService` outside the Git repository. Ready is recorded only after full provider verification, including checkpoint load, model/transforms, tokenizer, and a finite synthetic image embedding. Manual Product Owner testing and post-merge repository cleanup are required before merge completion.
+Installation is explicit: no packages or checkpoints are installed/downloaded until the Product Owner reviews and confirms the plan. Runtime files and model weights are stored through `ApplicationDataPathService` outside the Git repository. Ready is recorded only after full provider verification, including checkpoint load, model/transforms, tokenizer, and a finite synthetic image embedding. MODEL-002F later confirmed this flow on the Product Owner Windows CPU machine.
 
 ### MODEL-002B review correction status
 
@@ -1009,26 +1030,25 @@ Critical review findings were addressed after PR #17 review. Root causes were th
 
 ---
 
-## DOCSYNC GITHUB FULL — AI Runtime Status Update (2026-07-15)
+## DOCSYNC GITHUB FULL — AI Runtime Status Update (2026-07-15, historical)
 
 Completed and merged:
 - MODEL-001 MobileCLIP foundation is merged as an optional, local-only, evaluation-only vision provider foundation.
 - MODEL-002A Generic AI Runtime Manager is merged. The repository contains a provider-agnostic AI Runtime Manager with runtime registration, environment inspection, installation plans, confirmation-gated execution, model storage outside Git, status/history/benchmark records, verification hooks, and safe removal planning.
 - MODEL-002B managed MobileCLIP installation architecture and UI flow is merged. MobileCLIP is registered as the first managed runtime and Settings includes an AI Models section with action buttons, progress area, background-worker execution, dependency installation/checkpoint download flow, verification, one-image embedding test, and model-file removal support.
 
-Manual validation status:
-- Product Owner detailed manual validation of MODEL-002B is deferred.
-- Do not claim MobileCLIP is installed, Ready, or performance-validated from repository evidence alone.
-- Not yet manually validated: real dependency installation through the app, real checkpoint download, Ready status, one-image embedding result, 10-image evaluation, 100-image benchmark, restart persistence after successful installation, and real CPU performance on the Product Owner computer.
-- Latest UI observation: AI Models action buttons and progress area appeared, but some MobileCLIP/provider metadata fields appeared visually empty. This is a known unresolved UI investigation item, not a resolved issue.
+Historical manual validation status at that date:
+- Product Owner detailed manual validation of MODEL-002B was deferred at the time. This is superseded by the 2026-07-22 current-state section, where MODEL-002F, MODEL-003B, and MODEL-003C are recorded as manually validated.
+- At that date, documentation could not yet claim MobileCLIP installed, Ready, or performance-validated from repository evidence alone.
+- At that date, real dependency installation through the app, real checkpoint download, Ready status, one-image embedding result, 10-image evaluation, 100-image benchmark, restart persistence after successful installation, and real CPU performance on the Product Owner computer were not yet manually validated.
+- The blank AI Models metadata observation was later fixed and validated through MODEL-002E.
 
-Environment facts to preserve:
-- Main application environment: `C:\Projects\family-memory-ai\.venv`.
-- MobileCLIP runtime environment: `C:\Projects\family-memory-ai\.venv-mobileclip`.
-- MobileCLIP target interpreter: Python 3.10, 64-bit, CPU-only, explicit selected interpreter, no reliance on shell activation, package commands via `python.exe -m pip ...`.
+Historical environment observation at that date:
+- Main application environment used the normal project `.venv`.
+- MobileCLIP runtime was represented by an explicit selected interpreter; current architecture does not hard-code a runtime path and resolves it through runtime configuration.
 - The Product Owner computer is CPU-only with no NVIDIA GPU.
 
-Next practical milestone: MODEL-002C Product Owner-guided MobileCLIP validation.
+Historical next practical milestone at that date: MODEL-002C Product Owner-guided MobileCLIP validation.
 - Validate MobileCLIP installation through Settings -> AI Models.
 - Fix or confirm AI Models metadata rendering if the blank-field observation is still present.
 - Verify runtime Ready only after full provider verification succeeds.

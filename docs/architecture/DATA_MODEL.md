@@ -25,12 +25,15 @@ Cache validity requires all of the following to match the current source image a
 
 `BatchEmbeddingService.embed_images(...)` returns typed batch results with total received, processed, cached, failed, cancelled, elapsed time, and per-image outcomes. Progress callbacks receive the current index, total count, current image, processed count, cached count, and failed count. Cancellation is checked between images so no partial embedding row is written for an in-flight image.
 
-Future import, background AI analysis, manual selected-photo analysis, and maintenance tools should call `BatchEmbeddingService` rather than touching the SQLite table directly. This PR intentionally does not add semantic search, similarity UI, classification, duplicate detection, clustering, face recognition, automatic post-import analysis, or permanent UI controls.
+Import/index integration and maintenance tools should call `BatchEmbeddingService` rather than touching the SQLite table directly. MODEL-003B adds automatic background embedding generation for missing or outdated images during import/index while reusing unchanged valid cache rows.
+
+MODEL-003C adds semantic image similarity over stored embeddings. The similarity service reads current stored vectors, rejects stale/deleted/replaced/modified sources, rejects incompatible model keys or dimensions, excludes the source image, applies optional minimum thresholds, and returns deterministic top-N cosine-similarity results. It does not decode images, generate embeddings, alter categories, implement duplicate detection, or expose production semantic search UI.
 
 Developer diagnostic command:
 
 ```bash
 python scripts/embed_folder.py <folder> --limit 20
+python scripts/similar_images.py <source-image> <folder> --limit 10
 ```
 
 The command uses the existing supported metadata image extensions, reports individual corrupt images as failures, and leaves original photo files unchanged.

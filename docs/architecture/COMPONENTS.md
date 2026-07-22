@@ -106,4 +106,4 @@ Each step has a single primary owner component. Current deterministic implementa
 
 ### Current AI runtime validation boundary
 
-The AI Runtime Manager and Settings AI Models UI are implemented, and MobileCLIP is registered as the first managed runtime. Repository evidence supports the architecture and automated tests around planning, workers, verification boundaries, and UI actions. Product Owner validation of real installation, checkpoint download, Ready state, one-image embedding, 10-image evaluation, 100-image benchmark, restart persistence, and CPU-only performance is still pending. The production classifier remains unchanged.
+The AI Runtime Manager and Settings AI Models UI are implemented, and MobileCLIP is registered as the first managed runtime. Product Owner validation confirmed the managed MobileCLIP runtime is Ready on Windows CPU, automatic embedding generation works from the normal app environment, persistent embeddings are written and reused, and stored-vector semantic similarity returns ordered diagnostic results. The production classifier remains unchanged, and semantic similarity is not yet exposed in the production UI.

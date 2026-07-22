@@ -2,12 +2,21 @@
 
 ## Unreleased
 
-### DOCSYNC GITHUB FULL after MODEL-002E
+### DOCSYNC GITHUB FULL after MODEL-003C
+
+- Recorded PR #28 / MODEL-003B automatic background embedding generation as merged and Product Owner validated.
+- Recorded PR #29 / MODEL-003C stored-vector semantic image similarity as merged and Product Owner validated.
+- Clarified the managed-runtime correction: the main app runs in the normal `.venv`, while MobileCLIP inference uses the Generic AI Runtime Manager's configured dedicated interpreter.
+- Documented grouped runtime-level embedding diagnostics, isolated per-image failures, stale-source filtering, model-key/dimension rejection, and no similarity-time embedding recomputation.
+- Recorded successful Product Owner end-to-end validation: import -> managed MobileCLIP embedding generation -> persistent embedding storage -> stored-vector retrieval -> semantic cosine similarity -> ordered top-N results.
+- Documentation-only update; no production code or tests were changed.
+
+### DOCSYNC GITHUB FULL after MODEL-002E (historical pre-MODEL-002F record)
 
 - Synchronized documentation after MODEL-002A and MODEL-002B merged in their original PRs and MODEL-002C, MODEL-002D, and MODEL-002E work was consolidated into merged PR #22; PR #20 and PR #21 were closed without merge.
 - Marked AI Runtime Manager foundation, managed MobileCLIP installation/runtime validation, provider verification, runtime diagnostics, and Settings -> AI Models layout sizing fix as complete.
 - Documented current AI Runtime architecture, provider lifecycle, installation, verification, diagnostics, AI Models UI, repository cleanup after PR #22, MODEL-002F as the next operational-validation milestone, and MODEL-003 as the following classification milestone.
-- Clarified that the Settings -> AI Models UI fix was manually validated on Windows, while real MobileCLIP installation, Ready status, one-image embedding, 10-image/100-image evaluations, and CPU performance records remain pending.
+- Historical note: at the time of the MODEL-002E docsync, the Settings -> AI Models UI fix was manually validated on Windows, while real MobileCLIP installation, Ready status, one-image embedding, 10-image/100-image evaluations, and CPU performance records were still pending; this was superseded by later MODEL-002F, MODEL-003B, and MODEL-003C validation records.
 - Documentation-only update; no application code, tests, runtime behavior, or requirements were modified.
 
 

@@ -200,8 +200,12 @@ Each information type has one official location. Reference these documents inste
 If new mandatory project documents are introduced in the future, this reading order must be updated so that every new ChatGPT conversation starts with a complete and consistent project context.
 
 
-## Current handover update — after MODEL-002E
+## Current handover update — after MODEL-003C
 
-As of 2026-07-20, MODEL-002A and MODEL-002B were merged in their original PRs. MODEL-002C, MODEL-002D, and MODEL-002E work was consolidated and merged through PR #22; PR #20 and PR #21 were closed without merge. The AI Runtime Manager baseline is current, the Settings -> AI Models metadata rendering issue has been diagnosed and fixed, the repaired UI was manually validated on Windows, and repository cleanup after PR #22 is complete.
+As of 2026-07-22, PR #28 and PR #29 are merged. MODEL-002F is complete and manually validated; MODEL-003A persistent batch embeddings are complete; MODEL-003B automatic import/index embedding integration is complete, merged, and manually validated; and MODEL-003C stored-vector semantic image similarity is complete, merged, and manually validated.
 
-For the next implementation handover, treat MODEL-002F — Product Owner-guided MobileCLIP installation and operational validation — as the next milestone. MODEL-003 — first real MobileCLIP classification integration — follows only after MODEL-002F succeeds. Do not reopen MODEL-002 diagnostics unless a new regression appears. Preserve the rule that MobileCLIP remains optional/local and that runtime Ready requires full provider verification, not just downloaded files.
+Runtime boundary: start the main PySide6 application from the normal project `.venv` with `python src\main.py`. MobileCLIP does not run by importing torch/mobileclip in the main application environment. It runs through the Generic AI Runtime Manager's configured dedicated Python interpreter, selected and verified in Settings -> AI Models. The interpreter path comes from runtime configuration rather than a hard-coded environment path.
+
+Validation handover: verify MobileCLIP through Settings -> AI Models, import an image folder, wait for the `[EmbeddingIndex]` summary, then run `python scripts\similar_images.py <source-image> <folder> --limit 10` against a source image that has already been embedded. The Product Owner observed 20/20 images embedded successfully in about 31.6 seconds on a Windows CPU machine, then received 10 ordered similarity results from stored embeddings with no new embedding generation. This is evidence from one environment, not a performance guarantee.
+
+Current limits: production automatic category classification is not implemented; semantic similarity is available only through the developer diagnostic script, not the production UI; near-duplicate workflow, clustering, similar-photo UI, automatic category suggestions, semantic search UI, and learning from corrections remain future work. The next product milestone requires Product Owner selection among these possible consumers of semantic embeddings.

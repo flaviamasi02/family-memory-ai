@@ -33,20 +33,17 @@ Start here for project context and current status:
 - docs/releases/CHANGELOG.md: Sprint-by-sprint implementation history
 - docs/project/PROJECT_STATE.md: Current operational state (single source of truth for current sprint and status)
 - docs/project/PROJECT_CONTEXT.md: Long-term development context and collaboration model
-### Optional MobileCLIP evaluation dependencies
-
-The base app does not require ML packages.  To evaluate MobileCLIP locally, explicitly install compatible CPU PyTorch, torchvision, Pillow, and Apple's official MobileCLIP package/checkpoint into your environment and place the selected `apple/MobileCLIP-S0` `.pt` checkpoint in the app-data model cache shown in Settings.  The app never downloads model weights automatically.
-
-In Settings, choose an explicit MobileCLIP evaluation source before pressing **Run MobileCLIP evaluation**: the current imported library, the photos selected in a supported workspace, or another folder.  The preview shows available images and the configured sample cap before any evaluation starts.  MobileCLIP remains local-only and evaluation-only; it does not modify originals, thumbnails, categories, cleanup decisions, or the normal import workflow.
-
 ### AI Models runtime management
 
-Settings includes an **AI Models** section backed by the generic AI Runtime Manager. It can show registered providers such as MobileCLIP, inspect the selected Python interpreter, and generate an explicit installation plan with dependencies, model files, destination, licenses, and warnings. MODEL-002A provides the provider-agnostic runtime foundation; MODEL-002B adds the managed MobileCLIP installation and verification flow. MODEL-002A and MODEL-002B merged in their original PRs; MODEL-002C, MODEL-002D, and MODEL-002E work was consolidated and merged through PR #22, while PR #20 and PR #21 were closed without merge. The generic runtime foundation, managed installation flow, stricter verification workflow, diagnostics workflow, and AI Models metadata layout fix are implemented. The repaired Settings -> AI Models UI was manually validated on Windows, but real MobileCLIP installation and operational validation are still pending.
+Settings includes an **AI Models** section backed by the generic AI Runtime Manager. MobileCLIP is the first managed local AI provider and runs through a configured dedicated Python interpreter, not through provider-specific dependencies installed in the main application `.venv`. The main PySide6 application starts from the normal project environment with `python src/main.py`; MobileCLIP inference runs across the managed runtime boundary selected and verified in Settings.
 
-### MODEL-002B managed MobileCLIP installation
+The Product Owner manually validated the Windows CPU workflow after PR #28 and PR #29: Settings -> AI Models verification completed with exit code 0, reported `embedding_dimension = 512` and `tokenizer = true`, automatic import embedding processed 20/20 images with 0 failures in about 31.6 seconds, and the similarity diagnostic returned ordered top-N results from stored embeddings. This is observed validation evidence, not a universal performance guarantee.
 
-MobileCLIP is now the first real managed AI runtime. Use **Settings → AI Models** to select the dedicated interpreter, normally `C:\Projects\family-memory-ai\.venv-mobileclip\Scripts\python.exe` on the Product Owner Windows machine. The app validates that interpreter, persists it, and revalidates it after restart.
+Developer diagnostics remain available when needed:
 
-The installation plan is explicit and must be reviewed before anything runs. It shows the selected Python path/version, 64-bit/writable/pip validation, CPU-only device, package commands using `python.exe -m pip`, the official Apple MobileCLIP GitHub source, `apple/MobileCLIP-S0`, the app-data checkpoint destination outside Git, estimated size/disk usage, code/model licenses, restart note, warnings, and verification steps. There are no automatic downloads or silent package installs.
+```bash
+python scripts/embed_folder.py <folder> --limit 20
+python scripts/similar_images.py <source-image> <folder> --limit 10
+```
 
-Verification requires imports, the checkpoint file, model/transforms creation, tokenizer creation, and one synthetic image embedding with finite numeric output before Ready is recorded. Ready is recorded only after full provider verification: imports, checkpoint load, provider/model/transforms construction, tokenizer creation, and finite embedding output. The latest confirmed runtime state is Dependencies missing: torch, torchvision, PIL, mobileclip, and `mobileclip_s0.pt` are missing; real installation through the app, Ready status, one-image embedding, 10-image and 100-image evaluations, restart persistence, and CPU performance measurements are not yet confirmed. The production classifier has not been replaced by MobileCLIP. Repository cleanup after PR #22 is complete. The next milestone is MODEL-002F for Product Owner-guided installation and operational validation; MODEL-003 classification integration follows only after MODEL-002F succeeds.
+Current limits: production automatic category classification is not implemented, semantic similarity is not exposed in the production UI, and similar-photo UI, near-duplicate assistance, clustering, automatic category suggestions, and learning from corrections remain future Product Owner-prioritized work.

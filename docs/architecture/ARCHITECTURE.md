@@ -832,9 +832,9 @@ Permanent runtime rules:
 - Automated tests must not install packages or download real models.
 
 Current environment strategy:
-- Main app: `C:\Projects\family-memory-ai\.venv`.
-- MobileCLIP runtime: `C:\Projects\family-memory-ai\.venv-mobileclip`.
-- MobileCLIP target: Python 3.10, 64-bit, CPU-only, explicit selected interpreter, no shell-activation dependency, and package commands using `python.exe -m pip ...`.
+- Main application: PySide6 desktop application running from the normal project `.venv`; it orchestrates work and persists results.
+- Managed MobileCLIP runtime: a dedicated configured Python interpreter managed by the Generic AI Runtime Manager; it contains torch, MobileCLIP dependencies, and model access.
+- Runtime boundary: inference runs across a managed subprocess boundary; interpreter discovery comes from runtime configuration, with no hard-coded environment path and no dependency leakage into the main application environment.
 
 
 ## Current AI Runtime Architecture
@@ -843,4 +843,12 @@ The current optional local-model architecture is provider-agnostic. `src/ai_runt
 
 MobileCLIP is registered in `src/ai_runtime/mobileclip_registration.py` as the first provider with image embeddings, text embeddings, and zero-shot classification capabilities. It uses official Apple MobileCLIP code and the `apple/MobileCLIP-S0` checkpoint, but remains optional and local-only. The production deterministic classifier remains authoritative until a later milestone explicitly changes classification behavior.
 
-Provider lifecycle is register -> inspect/select interpreter -> generate plan -> Product Owner confirmation -> worker-thread install/download -> strict provider verification -> Ready/history records -> optional testing/evaluation/removal. MODEL-002F is the next milestone for Product Owner-guided MobileCLIP installation and operational validation. MODEL-003 classification integration follows only after MODEL-002F succeeds.
+Provider lifecycle is register -> inspect/select interpreter -> generate plan -> Product Owner confirmation -> worker-thread install/download -> strict provider verification -> Ready/history records -> optional testing/evaluation/removal. MODEL-002F operational validation is complete. MODEL-003A persistent embeddings, MODEL-003B automatic import/index embedding integration, and MODEL-003C stored-vector semantic similarity are complete. The next product milestone is uncommitted and requires Product Owner prioritization; production automatic classification remains deferred until explicitly approved.
+
+## MODEL-003 Embedding and Similarity Architecture
+
+Embedding persistence uses the SQLite-based `EmbeddingStore` under application data. Records are separate from original image files and include exact model-key compatibility plus source fingerprint, file size, and modified-time validity. Unchanged valid embeddings are reused, while stale records are not returned as current similarity candidates.
+
+Automatic embedding generation runs after import/index work and uses the configured managed MobileCLIP interpreter. Embedding work remains outside the UI thread. A non-Ready runtime produces one clear grouped runtime-level error; individual unreadable images remain isolated per-image failures; and embedding failures include limited grouped diagnostics rather than repetitive tracebacks.
+
+Semantic similarity compares stored vectors with cosine similarity. The current implementation performs an exact O(n*d) scan, supports top-N ordering, optional minimum threshold, source exclusion, deterministic equal-score handling, stale/deleted/replaced/modified source filtering, and rejection of incompatible model keys or embedding dimensions. It does not decode images, recompute embeddings, modify categories, or expose a production UI workflow.
