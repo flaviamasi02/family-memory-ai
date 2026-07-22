@@ -598,3 +598,4 @@
 - Updated project documentation to mark MODEL-002F operational MobileCLIP validation and MODEL-003A/003B complete, while keeping automatic classification deferred.
 - Fixed stale-source handling so similarity scans exclude deleted, modified, replaced, or otherwise non-current source files before returning matches.
 - Improved embedding failure diagnostics so import/index completion preserves the existing summary and prints a limited, grouped stderr sample with image path, exception type, and concise error message.
+- Changed automatic MODEL-003B embedding generation to use the AI Runtime Manager's configured dedicated MobileCLIP interpreter through a managed subprocess boundary, avoiding torch/mobileclip imports in the main application environment and reporting non-Ready runtime state as one grouped runtime-level failure.
