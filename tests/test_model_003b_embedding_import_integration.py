@@ -267,6 +267,59 @@ def test_stale_embedding_progress_and_completion_do_not_update_newer_import(caps
     assert "EmbeddingIndex" not in capsys.readouterr().err
 
 
+def test_embedding_completion_prints_limited_grouped_failure_diagnostics(capsys):
+    window = _embedding_window_for_lifecycle_tests()
+    window._active_embedding_run_id = 1
+    outcomes = [
+        type("Outcome", (), {"status": "failed", "image": f"/photos/{index}.jpg", "error_type": "RuntimeError", "error": "model load failed"})()
+        for index in range(4)
+    ]
+    result = type(
+        "Result",
+        (),
+        {
+            "total_images_received": 4,
+            "processed_successfully": 0,
+            "skipped_cached": 0,
+            "failed": 4,
+            "cancelled": 0,
+            "elapsed_seconds": 0.1,
+            "outcomes": outcomes,
+        },
+    )()
+
+    window._on_embedding_complete(1, result)
+
+    err = capsys.readouterr().err
+    assert "[EmbeddingIndex] processed=0 cached=0 failed=4 cancelled=0" in err
+    assert "failure 1/1 x4" in err
+    assert "/photos/0.jpg :: RuntimeError: model load failed" in err
+
+
+def test_embedding_completion_success_does_not_print_failure_diagnostics(capsys):
+    window = _embedding_window_for_lifecycle_tests()
+    window._active_embedding_run_id = 1
+    result = type(
+        "Result",
+        (),
+        {
+            "total_images_received": 1,
+            "processed_successfully": 1,
+            "skipped_cached": 0,
+            "failed": 0,
+            "cancelled": 0,
+            "elapsed_seconds": 0.1,
+            "outcomes": [],
+        },
+    )()
+
+    window._on_embedding_complete(1, result)
+
+    err = capsys.readouterr().err
+    assert "[EmbeddingIndex] processed=1 cached=0 failed=0 cancelled=0" in err
+    assert "failure 1/" not in err
+
+
 def test_close_event_waits_for_running_embedding_thread_before_destroying(monkeypatch):
     window = _embedding_window_for_lifecycle_tests()
     waited = []

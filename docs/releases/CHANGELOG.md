@@ -597,3 +597,4 @@
 - Added MODEL-003C automated tests for cosine reference values, ordering, filtering, source exclusion, missing rows, incompatible model metadata/dimensions, empty libraries, deterministic ties, and no recomputation.
 - Updated project documentation to mark MODEL-002F operational MobileCLIP validation and MODEL-003A/003B complete, while keeping automatic classification deferred.
 - Fixed stale-source handling so similarity scans exclude deleted, modified, replaced, or otherwise non-current source files before returning matches.
+- Improved embedding failure diagnostics so import/index completion preserves the existing summary and prints a limited, grouped stderr sample with image path, exception type, and concise error message.

@@ -9,7 +9,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from vision.batch_embedding_service import BatchEmbeddingService
+from vision.batch_embedding_service import BatchEmbeddingService, embedding_failure_diagnostic_lines
 from vision.embedding_provider import FakeEmbeddingProvider
 from vision.evaluation_sources import folder_image_paths
 
@@ -21,8 +21,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--provider", choices=("mobileclip", "fake"), default="mobileclip", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     paths = folder_image_paths(args.folder, max(1, min(300, args.limit)))
-    service = BatchEmbeddingService(provider=FakeEmbeddingProvider() if args.provider == "fake" else None)
-    result = service.embed_images(paths)
+    try:
+        service = BatchEmbeddingService(provider=FakeEmbeddingProvider() if args.provider == "fake" else None)
+        result = service.embed_images(paths)
+    except Exception as exc:
+        print(f"embedding_diagnostic_error={type(exc).__name__}: {exc}", file=sys.stderr)
+        return 1
     print(f"total_discovered={len(paths)}")
     print(f"processed={result.processed_successfully}")
     print(f"cached={result.skipped_cached}")
@@ -32,7 +36,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"embedding_dimension={service.provider.metadata.embedding_dimension}")
     for outcome in result.outcomes:
         if outcome.status == "failed":
-            print(f"failed_image={outcome.image}: {outcome.error}")
+            error_type = f"{outcome.error_type}: " if outcome.error_type else ""
+            print(f"failed_image={outcome.image}: {error_type}{outcome.error}")
+    for line in embedding_failure_diagnostic_lines(result, limit=5):
+        print(line, file=sys.stderr)
     return 0
 
 

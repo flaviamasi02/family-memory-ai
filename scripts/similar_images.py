@@ -25,16 +25,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--provider", choices=("mobileclip", "fake"), default="mobileclip", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
 
-    provider = FakeEmbeddingProvider() if args.provider == "fake" else MobileCLIPEmbeddingProvider()
-    candidates = folder_image_paths(args.folder, 1_000_000) if args.folder.is_dir() else [args.folder]
-    results = SemanticSimilarityService(EmbeddingStore()).most_similar(
-        args.source,
-        provider.metadata,
-        candidates=candidates,
-        limit=max(1, args.limit),
-        exclude_source=not args.include_source,
-        minimum_similarity=args.min_similarity,
-    )
+    try:
+        provider = FakeEmbeddingProvider() if args.provider == "fake" else MobileCLIPEmbeddingProvider()
+        candidates = folder_image_paths(args.folder, 1_000_000) if args.folder.is_dir() else [args.folder]
+        results = SemanticSimilarityService(EmbeddingStore()).most_similar(
+            args.source,
+            provider.metadata,
+            candidates=candidates,
+            limit=max(1, args.limit),
+            exclude_source=not args.include_source,
+            minimum_similarity=args.min_similarity,
+        )
+    except Exception as exc:
+        print(f"similar_images_error={type(exc).__name__}: {exc}", file=sys.stderr)
+        return 1
 
     print(f"source={args.source}")
     print(f"model_key={provider.metadata.model_key}")
