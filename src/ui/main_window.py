@@ -38,6 +38,7 @@ from ui.photo_details_panel import PhotoDetailsPanel
 from ui.photo_grid_widget import PhotoGridWidget
 from ui.settings_page import SettingsPage
 from workers.embedding_worker import EmbeddingWorker
+from vision.batch_embedding_service import embedding_failure_diagnostic_lines
 from workers.scan_worker import ScanWorker
 from workers.thumbnail_worker import ThumbnailWorker
 
@@ -464,6 +465,8 @@ class MainWindow(QMainWindow):
             file=sys.stderr,
             flush=True,
         )
+        for line in embedding_failure_diagnostic_lines(result, limit=3):
+            print(line, file=sys.stderr, flush=True)
 
     def _on_embedding_error(self, run_id: int, error_message: str) -> None:
         if run_id != self._active_embedding_run_id:

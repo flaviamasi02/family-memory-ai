@@ -185,6 +185,51 @@ class EmbeddingStore:
             embedding = [float(v) for v in json.loads(row[2])]
         return EmbeddingRecord(photo_key, source_fingerprint, source_mtime_ns, source_size, metadata.provider_id, metadata.checkpoint_id, metadata.revision, dimension, embedding, row[3], row[4], row[5])
 
+    def iter_valid_for_model(self, metadata: ModelMetadata) -> Iterable[EmbeddingRecord]:
+        """Yield current valid embeddings for one exact provider/checkpoint/revision/dimension.
+
+        Persisted rows are returned only when the source file still exists and
+        its current identity matches the stored size, mtime, and fingerprint.
+        """
+        with self._lock, sqlite3.connect(self.db_path) as con:
+            rows = con.execute(
+                """
+                SELECT photo_key, source_fingerprint, source_mtime_ns, source_size, embedding_dimension,
+                       embedding_blob, embedding_json, generated_at, status, error
+                FROM embeddings
+                WHERE model_key=? AND status='ok'
+                ORDER BY photo_key
+                """,
+                (metadata.model_key,),
+            ).fetchall()
+        for row in rows:
+            photo_key = str(row[0])
+            source_fingerprint = str(row[1])
+            source_mtime_ns = int(row[2])
+            source_size = int(row[3])
+            try:
+                path = Path(photo_key)
+                st = path.stat()
+                if int(st.st_size) != source_size or int(st.st_mtime_ns) != source_mtime_ns:
+                    continue
+                current_key, current_mtime_ns, current_size, current_fingerprint = source_identity(path)
+                if (
+                    current_key != photo_key
+                    or current_fingerprint != source_fingerprint
+                    or current_mtime_ns != source_mtime_ns
+                    or current_size != source_size
+                ):
+                    continue
+            except Exception:
+                continue
+            dimension = int(row[4])
+            if row[5] is not None:
+                embedding = _blob_to_embedding(row[5], dimension)
+            else:
+                import json
+                embedding = [float(v) for v in json.loads(row[6])]
+            yield EmbeddingRecord(photo_key, source_fingerprint, source_mtime_ns, source_size, metadata.provider_id, metadata.checkpoint_id, metadata.revision, dimension, embedding, str(row[7]), str(row[8]), str(row[9]))
+
     def put(self, rec: EmbeddingRecord) -> None:
         updated_at = now_iso()
         blob = _embedding_to_blob(rec.embedding) if rec.embedding else None

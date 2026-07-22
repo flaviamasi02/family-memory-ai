@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from vision.batch_embedding_service import BatchEmbeddingService
+from vision.batch_embedding_service import BatchEmbeddingService, embedding_failure_diagnostic_lines
 from vision.embedding_provider import EmbeddingRecord, EmbeddingStore, FakeEmbeddingProvider, ModelMetadata, now_iso, source_identity
 from vision.evaluation_sources import folder_image_paths
 
@@ -80,6 +80,42 @@ def test_invalid_embedding_dimension_or_non_finite_rejected(tmp_path, values):
     result = BatchEmbeddingService(BadProvider(values), EmbeddingStore(tmp_path / "e.sqlite3")).embed_images([p])
     assert result.failed == 1
     assert "Expected" in result.outcomes[0].error or "NaN" in result.outcomes[0].error
+
+
+def test_embedding_failure_diagnostics_include_path_type_and_message(tmp_path):
+    bad = tmp_path / "bad.txt"
+    bad.write_text("not a supported image")
+
+    result = BatchEmbeddingService(FakeEmbeddingProvider(), EmbeddingStore(tmp_path / "e.sqlite3")).embed_images([bad])
+    lines = embedding_failure_diagnostic_lines(result)
+
+    assert result.failed == 1
+    assert str(bad) in lines[0]
+    assert "ValueError" in lines[0]
+    assert "Unsupported image extension" in lines[0]
+
+
+def test_repeated_embedding_failure_diagnostics_are_grouped_and_limited(tmp_path):
+    paths = []
+    for index in range(4):
+        path = tmp_path / f"bad{index}.txt"
+        path.write_text("not a supported image")
+        paths.append(path)
+
+    result = BatchEmbeddingService(FakeEmbeddingProvider(), EmbeddingStore(tmp_path / "e.sqlite3")).embed_images(paths)
+    lines = embedding_failure_diagnostic_lines(result, limit=3)
+
+    assert len(lines) == 1
+    assert "x4" in lines[0]
+    assert "Unsupported image extension" in lines[0]
+
+
+def test_successful_embedding_run_has_no_failure_diagnostics(tmp_path):
+    p = image(tmp_path / "ok.jpg")
+    result = BatchEmbeddingService(FakeEmbeddingProvider(), EmbeddingStore(tmp_path / "e.sqlite3")).embed_images([p])
+
+    assert result.failed == 0
+    assert embedding_failure_diagnostic_lines(result) == []
 
 
 def test_corrupt_image_does_not_stop_batch_and_progress_counts(tmp_path):

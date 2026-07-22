@@ -10,6 +10,7 @@ from typing import Callable, Iterable
 
 from vision.evaluation_sources import EVALUATION_IMAGE_EXTENSIONS as IMAGE_EXTENSIONS
 from vision.embedding_provider import EmbeddingRecord, EmbeddingStore, VisionEmbeddingProvider, now_iso, source_identity
+from vision.managed_mobileclip_provider import ManagedMobileCLIPEmbeddingProvider
 from vision.mobileclip_provider import MobileCLIPEmbeddingProvider
 
 EMBEDDING_STATUS_PROCESSED = "processed"
@@ -33,7 +34,9 @@ class BatchImageEmbeddingOutcome:
     image: str
     status: str
     error: str = ""
+    error_type: str = ""
     embedding_dimension: int = 0
+    repeat_count: int = 1
 
 
 @dataclass
@@ -52,7 +55,7 @@ ProgressCallback = Callable[[BatchEmbeddingProgress], None]
 
 class BatchEmbeddingService:
     def __init__(self, provider: VisionEmbeddingProvider | None = None, store: EmbeddingStore | None = None):
-        self.provider = provider or MobileCLIPEmbeddingProvider()
+        self.provider = provider or ManagedMobileCLIPEmbeddingProvider()
         self.store = store or EmbeddingStore()
 
     @property
@@ -79,6 +82,24 @@ class BatchEmbeddingService:
         result = BatchEmbeddingResult(total_images_received=len(paths))
         start = time.perf_counter()
         loaded = False
+        try:
+            prepare_batch = getattr(self.provider, "prepare_batch", None)
+            if paths and callable(prepare_batch):
+                prepare_batch(paths, cancellation_token)
+        except Exception as exc:
+            result.failed = len(paths)
+            result.elapsed_seconds = time.perf_counter() - start
+            result.outcomes.append(
+                BatchImageEmbeddingOutcome(
+                    "<runtime>",
+                    EMBEDDING_STATUS_FAILED,
+                    str(exc),
+                    type(exc).__name__,
+                    self.provider.metadata.embedding_dimension,
+                    repeat_count=len(paths),
+                )
+            )
+            return result
         for idx, path in enumerate(paths, start=1):
             if cancellation_token and cancellation_token.is_set():
                 result.cancelled = len(paths) - idx + 1
@@ -115,7 +136,7 @@ class BatchEmbeddingService:
                 result.failed += 1
                 error = str(exc)
                 self.store.put_failure(path, self.provider.metadata, error)
-                result.outcomes.append(BatchImageEmbeddingOutcome(str(path), EMBEDDING_STATUS_FAILED, error=error, embedding_dimension=self.provider.metadata.embedding_dimension))
+                result.outcomes.append(BatchImageEmbeddingOutcome(str(path), EMBEDDING_STATUS_FAILED, error=error, error_type=type(exc).__name__, embedding_dimension=self.provider.metadata.embedding_dimension))
             finally:
                 result.elapsed_seconds = time.perf_counter() - start
                 if progress_callback:
@@ -131,6 +152,42 @@ class BatchEmbeddingService:
             raise ValueError(f"Expected {expected}-dimensional embedding, got {record.embedding_dimension}/{len(record.embedding)}.")
         if not all(math.isfinite(float(v)) for v in record.embedding):
             raise ValueError("Embedding contains NaN or infinite values.")
+
+
+def embedding_failure_diagnostic_lines(result: BatchEmbeddingResult, limit: int = 3) -> list[str]:
+    """Return concise grouped per-image embedding failure diagnostics."""
+    if limit <= 0:
+        return []
+    groups: dict[tuple[str, str], dict[str, object]] = {}
+    for outcome in result.outcomes:
+        if outcome.status != EMBEDDING_STATUS_FAILED:
+            continue
+        error_type = outcome.error_type or "Error"
+        error = _concise_error(outcome.error)
+        key = (error_type, error)
+        if key not in groups:
+            groups[key] = {"count": 0, "image": outcome.image}
+        groups[key]["count"] = int(groups[key]["count"]) + max(1, int(getattr(outcome, "repeat_count", 1)))
+
+    lines: list[str] = []
+    for index, ((error_type, error), info) in enumerate(groups.items(), start=1):
+        if index > limit:
+            remaining = sum(int(item["count"]) for item in list(groups.values())[index - 1 :])
+            lines.append(f"[EmbeddingIndex] additional failure causes omitted: {remaining}")
+            break
+        count = int(info["count"])
+        repeat = f" x{count}" if count > 1 else ""
+        lines.append(f"[EmbeddingIndex] failure {index}/{len(groups)}{repeat}: {info['image']} :: {error_type}: {error}")
+    return lines
+
+
+def _concise_error(error: str, max_chars: int = 240) -> str:
+    text = " ".join(str(error or "").split())
+    if not text:
+        text = "No error message provided."
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 1].rstrip() + "…"
 
 
 def _path_for(image) -> Path:
