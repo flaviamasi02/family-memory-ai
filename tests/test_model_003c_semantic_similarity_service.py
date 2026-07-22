@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+import time
 from pathlib import Path
 
 import pytest
@@ -118,3 +119,79 @@ def test_no_embedding_recomputation(tmp_path):
 
     assert provider.load_count == 0
     assert provider.embed_call_count == 0
+
+
+def test_deleted_candidate_file_is_excluded(tmp_path):
+    store = EmbeddingStore(tmp_path / "e.sqlite3")
+    meta = FakeEmbeddingProvider(dimension=2).metadata
+    source = image(tmp_path / "source.jpg", b"s")
+    deleted = image(tmp_path / "deleted.jpg", b"d")
+    kept = image(tmp_path / "kept.jpg", b"k")
+    put(store, source, meta, [1, 0])
+    put(store, deleted, meta, [1, 0])
+    put(store, kept, meta, [1, 0])
+    deleted.unlink()
+
+    results = SemanticSimilarityService(store).most_similar(source, meta)
+
+    assert [Path(r.photo_key).name for r in results] == ["kept.jpg"]
+
+
+def test_modified_candidate_file_is_excluded_even_when_size_is_unchanged(tmp_path):
+    store = EmbeddingStore(tmp_path / "e.sqlite3")
+    meta = FakeEmbeddingProvider(dimension=2).metadata
+    source = image(tmp_path / "source.jpg", b"s")
+    modified = image(tmp_path / "modified.jpg", b"old")
+    kept = image(tmp_path / "kept.jpg", b"k")
+    put(store, source, meta, [1, 0])
+    put(store, modified, meta, [1, 0])
+    put(store, kept, meta, [1, 0])
+    time.sleep(0.01)
+    modified.write_bytes(JPEG_BYTES + b"new")
+
+    results = SemanticSimilarityService(store).most_similar(source, meta)
+
+    assert [Path(r.photo_key).name for r in results] == ["kept.jpg"]
+
+
+def test_replaced_candidate_file_with_changed_size_is_excluded(tmp_path):
+    store = EmbeddingStore(tmp_path / "e.sqlite3")
+    meta = FakeEmbeddingProvider(dimension=2).metadata
+    source = image(tmp_path / "source.jpg", b"s")
+    replaced = image(tmp_path / "replaced.jpg", b"old")
+    kept = image(tmp_path / "kept.jpg", b"k")
+    put(store, source, meta, [1, 0])
+    put(store, replaced, meta, [1, 0])
+    put(store, kept, meta, [1, 0])
+    time.sleep(0.01)
+    replaced.write_bytes(JPEG_BYTES + b"replacement-with-different-size")
+
+    results = SemanticSimilarityService(store).most_similar(source, meta)
+
+    assert [Path(r.photo_key).name for r in results] == ["kept.jpg"]
+
+
+def test_stale_source_image_embedding_causes_no_results(tmp_path):
+    store = EmbeddingStore(tmp_path / "e.sqlite3")
+    meta = FakeEmbeddingProvider(dimension=2).metadata
+    source = image(tmp_path / "source.jpg", b"old")
+    candidate = image(tmp_path / "candidate.jpg", b"c")
+    put(store, source, meta, [1, 0])
+    put(store, candidate, meta, [1, 0])
+    time.sleep(0.01)
+    source.write_bytes(JPEG_BYTES + b"new")
+
+    assert SemanticSimilarityService(store).most_similar(source, meta) == []
+
+
+def test_unchanged_current_files_remain_included_after_freshness_check(tmp_path):
+    store = EmbeddingStore(tmp_path / "e.sqlite3")
+    meta = FakeEmbeddingProvider(dimension=2).metadata
+    source = image(tmp_path / "source.jpg", b"s")
+    candidate = image(tmp_path / "candidate.jpg", b"c")
+    put(store, source, meta, [1, 0])
+    put(store, candidate, meta, [1, 0])
+
+    results = SemanticSimilarityService(store).most_similar(source, meta)
+
+    assert [Path(r.photo_key).name for r in results] == ["candidate.jpg"]
