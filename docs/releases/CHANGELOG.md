@@ -615,3 +615,15 @@
 - Fixed stale-source handling so similarity scans exclude deleted, modified, replaced, or otherwise non-current source files before returning matches.
 - Improved embedding failure diagnostics so import/index completion preserves the existing summary and prints a limited, grouped stderr sample with image path, exception type, and concise error message.
 - Changed automatic MODEL-003B embedding generation to use the AI Runtime Manager's configured dedicated MobileCLIP interpreter through a managed subprocess boundary, avoiding torch/mobileclip imports in the main application environment and reporting non-Ready runtime state as one grouped runtime-level failure.
+
+### MODEL-003D - Explainable Category Suggestions
+
+- Added an advisory category suggestion service over stored semantic embeddings, trusted labeled evidence, eligible existing content categories, and deterministic classification agreement.
+- Added a compact Memory Review AI Suggestion section with confidence, explanation, evidence count, explicit Apply suggestion, and Reject / Not useful actions, with rejection feedback persisted in existing photo sidecars.
+- Documented that confidence is a deterministic heuristic, manual categories remain authoritative, local stored vectors are used only, and automatic category replacement is not included.
+
+- Fixed MODEL-003D Memory Review refresh after embedding indexing completion: the status banner now leaves the indexing state, suggestion cache is invalidated, and the selected photo suggestion is recomputed without restarting the app.
+
+- Fixed MODEL-003D manual evidence capture so Apply Category to Selected records confirmed category evidence, updates pending rows to Keep, persists confirmation metadata, and allows highly similar photos to use that trusted manual evidence for suggestions.
+
+- Improved MODEL-003D trusted evidence consumption by normalizing category labels/IDs before matching eligible categories and adding opt-in `FAMILY_MEMORY_DEBUG_SUGGESTIONS=1` diagnostics for semantic matches, trusted evidence, category IDs, evidence counts, and final status reason.

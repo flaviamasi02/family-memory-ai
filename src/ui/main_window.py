@@ -468,6 +468,32 @@ class MainWindow(QMainWindow):
         for line in embedding_failure_diagnostic_lines(result, limit=3):
             print(line, file=sys.stderr, flush=True)
 
+        processed = int(getattr(result, "processed_successfully", 0) or 0)
+        cached = int(getattr(result, "skipped_cached", 0) or 0)
+        failed = int(getattr(result, "failed", 0) or 0)
+        cancelled = int(getattr(result, "cancelled", 0) or 0)
+        if cancelled:
+            self.status_label.setText(
+                f"Semantic embedding indexing cancelled (processed={processed}, cached={cached}, failed={failed})."
+            )
+        elif failed:
+            self.status_label.setText(
+                f"Semantic embedding indexing finished with {failed} failures (processed={processed}, cached={cached})."
+            )
+        else:
+            self.status_label.setText(
+                f"Semantic embeddings indexed — processed={processed}, cached={cached}, failed=0."
+            )
+        self._on_embedding_index_updated(result)
+
+    def _on_embedding_index_updated(self, result) -> None:
+        _ = result
+        review_page = getattr(self, "review_page", None)
+        if review_page is not None and hasattr(
+            review_page, "on_embedding_index_updated"
+        ):
+            review_page.on_embedding_index_updated()
+
     def _on_embedding_error(self, run_id: int, error_message: str) -> None:
         if run_id != self._active_embedding_run_id:
             return

@@ -78,3 +78,7 @@ Consequences:
 - Inspect Qt widget hierarchy, grid rows, visibility, geometry, size hints, and layout ordering when metadata appears blank.
 - Preserve explicit row sizing/geometry refresh behavior in the AI Models card.
 - Preserve the completed MODEL-002F validation record, keep runtime diagnostics separate from classification behavior, and require explicit Product Owner approval before any production classification integration.
+
+## MODEL-003D — Advisory explainable category suggestions
+
+Decision: category suggestions may use stored MobileCLIP embeddings only as advisory evidence in Memory Review. The service must use current valid embeddings, existing content categories, trusted category corrections/confirmations, and deterministic classifier agreement/disagreement to produce a bounded heuristic confidence. It must not overwrite manual categories or perform automatic replacement during import, indexing, embedding generation, or suggestion calculation.

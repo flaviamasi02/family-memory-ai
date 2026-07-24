@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 
 from album.album_scoring_engine import AlbumScoreBreakdown
 from core.category_registry import get_category_registry
+from core.category_suggestion_service import CategorySuggestionService
 from core.media_classifier import (
     DecisionHistory,
     MediaCategory,
@@ -47,6 +48,7 @@ from ui.components.workspace_info_panel import WorkspaceInfoPanel
 from ui.image_preview_dialog import ImagePreviewDialog
 from ui.learning_summary_dialog import LearningSummaryDialog
 from ui.help.workspace_help_content import MEMORY_REVIEW_WORKSPACE
+from vision.managed_mobileclip_provider import ManagedMobileCLIPEmbeddingProvider
 
 
 @dataclass
@@ -62,7 +64,13 @@ class AlbumReviewCardWidget(QFrame):
     clicked = Signal(str, int)
     double_clicked = Signal(str)
 
-    def __init__(self, row: AlbumReviewRow, key: str, thumbnail: Optional[QPixmap] = None, parent=None):
+    def __init__(
+        self,
+        row: AlbumReviewRow,
+        key: str,
+        thumbnail: Optional[QPixmap] = None,
+        parent=None,
+    ):
         super().__init__(parent)
         self.row = row
         self.key = key
@@ -77,7 +85,9 @@ class AlbumReviewCardWidget(QFrame):
         self.thumbnail_label = QLabel("No thumbnail")
         self.thumbnail_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.thumbnail_label.setFixedSize(140, 140)
-        self.thumbnail_label.setStyleSheet("border: 1px solid #bbb; background: #f6f6f6;")
+        self.thumbnail_label.setStyleSheet(
+            "border: 1px solid #bbb; background: #f6f6f6;"
+        )
 
         self.filename_label = QLabel("")
         self.filename_label.setWordWrap(False)
@@ -89,7 +99,9 @@ class AlbumReviewCardWidget(QFrame):
         self.category_badge = QLabel("")
         self.decision_badge = QLabel("")
         for badge in (self.score_badge, self.category_badge, self.decision_badge):
-            badge.setStyleSheet("background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 6px; padding: 2px 6px;")
+            badge.setStyleSheet(
+                "background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 6px; padding: 2px 6px;"
+            )
             badge.setMaximumHeight(22)
 
         self.category_label = QLabel("")
@@ -122,7 +134,11 @@ class AlbumReviewCardWidget(QFrame):
         breakdown = self.row.breakdown
         photo = breakdown.photo
 
-        pixmap = thumbnail if isinstance(thumbnail, QPixmap) else getattr(photo, "thumbnail", None)
+        pixmap = (
+            thumbnail
+            if isinstance(thumbnail, QPixmap)
+            else getattr(photo, "thumbnail", None)
+        )
         if isinstance(pixmap, QPixmap):
             self.thumbnail_label.setPixmap(pixmap)
             self.thumbnail_label.setText("")
@@ -133,19 +149,33 @@ class AlbumReviewCardWidget(QFrame):
         full_name = photo.display_name()
         self.filename_label.setToolTip(full_name)
         metrics = QFontMetrics(self.filename_label.font())
-        self.filename_label.setText(metrics.elidedText(full_name, Qt.TextElideMode.ElideRight, self.filename_label.width()))
+        self.filename_label.setText(
+            metrics.elidedText(
+                full_name, Qt.TextElideMode.ElideRight, self.filename_label.width()
+            )
+        )
 
         confidence = float(getattr(photo, "classification_confidence", 0.0) or 0.0)
-        category_value = str(getattr(photo, "effective_media_category", "") or getattr(photo, "media_category", "unknown") or "unknown")
+        category_value = str(
+            getattr(photo, "effective_media_category", "")
+            or getattr(photo, "media_category", "unknown")
+            or "unknown"
+        )
         category_text = media_category_label(category_value)
         decision_text = self.row.user_decision.replace("_", " ").title()
         self.score_badge.setText(f"S {breakdown.total_score:.0f}")
-        short_category = category_text if len(category_text) <= 10 else category_text[:9] + ".."
-        short_decision = decision_text if len(decision_text) <= 10 else decision_text[:9] + ".."
+        short_category = (
+            category_text if len(category_text) <= 10 else category_text[:9] + ".."
+        )
+        short_decision = (
+            decision_text if len(decision_text) <= 10 else decision_text[:9] + ".."
+        )
         self.category_badge.setText(short_category)
         self.decision_badge.setText(short_decision)
         self.category_label.setText(f"Category: {category_text}")
-        self.confidence_label.setText(f"Confidence: {max(0, min(100, int(round(confidence * 100))))}%")
+        self.confidence_label.setText(
+            f"Confidence: {max(0, min(100, int(round(confidence * 100))))}%"
+        )
         self.decision_label.setText(f"Decision: {decision_text}")
 
         state_text = self.row.review_state.capitalize()
@@ -155,7 +185,9 @@ class AlbumReviewCardWidget(QFrame):
                 f"Review: {state_text} | Pipeline: {pipeline_text} ({self.row.rejection_reason})"
             )
         else:
-            self.pipeline_label.setText(f"Review: {state_text} | Pipeline: {pipeline_text}")
+            self.pipeline_label.setText(
+                f"Review: {state_text} | Pipeline: {pipeline_text}"
+            )
 
     def set_selected(self, selected: bool) -> None:
         self._selected = bool(selected)
@@ -229,6 +261,13 @@ class AlbumReviewPage(QWidget):
         self._category_learning_engine = get_category_learning_engine()
         self._preference_learning_engine = get_preference_learning_engine()
         self._media_classifier = MediaClassifier()
+        self._category_suggestion_service = CategorySuggestionService(
+            category_registry=self._category_registry,
+            media_classifier=self._media_classifier,
+        )
+        self._suggestion_request_id = 0
+        self._current_suggestion = None
+        self._suggestion_metadata = ManagedMobileCLIPEmbeddingProvider().metadata
 
         self.header = WorkspaceHeader("Memory Review")
         self.header.help_clicked.connect(self._on_help_clicked)
@@ -291,7 +330,9 @@ class AlbumReviewPage(QWidget):
         self.learning_summary_button = QPushButton("Learning Summary")
         self.learning_summary_button.clicked.connect(self._on_learning_summary)
         self.reclassify_unknowns_button = QPushButton("Reclassify Unknowns")
-        self.reclassify_unknowns_button.clicked.connect(self.reclassify_unknowns_from_learning)
+        self.reclassify_unknowns_button.clicked.connect(
+            self.reclassify_unknowns_from_learning
+        )
         controls_layout.addWidget(self.selection_count_label)
         controls_layout.addWidget(self.user_saved_label)
         controls_layout.addWidget(self.manage_categories_button)
@@ -306,13 +347,17 @@ class AlbumReviewPage(QWidget):
         self.grid_scroll.setWidgetResizable(True)
 
         self.grid_content = QWidget(self.grid_scroll)
-        self.grid_content.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.grid_content.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
         self.grid_layout = QGridLayout(self.grid_content)
         self.grid_layout.setContentsMargins(10, 10, 10, 10)
         self.grid_layout.setSpacing(8)
         self.grid_scroll.setWidget(self.grid_content)
         self.grid_scroll.viewport().installEventFilter(self)
-        self.grid_scroll.verticalScrollBar().valueChanged.connect(self._on_scroll_value_changed)
+        self.grid_scroll.verticalScrollBar().valueChanged.connect(
+            self._on_scroll_value_changed
+        )
 
         self.preview_label = QLabel("No preview")
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -332,6 +377,20 @@ class AlbumReviewPage(QWidget):
         self.user_decision_value = QLabel("-")
         self.date_value = QLabel("-")
         self.date_source_value = QLabel("-")
+        self.ai_suggestion_title = QLabel("AI Suggestion")
+        self.ai_suggestion_title.setStyleSheet("font-weight: 700; margin-top: 8px;")
+        self.ai_suggestion_value = QLabel(
+            "Select one photo to check for an advisory suggestion."
+        )
+        self.ai_suggestion_value.setWordWrap(True)
+        self.ai_suggestion_reasons = QListWidget()
+        self.ai_suggestion_reasons.setMaximumHeight(110)
+        self.apply_suggestion_button = QPushButton("Apply suggestion")
+        self.apply_suggestion_button.clicked.connect(self._apply_current_suggestion)
+        self.reject_suggestion_button = QPushButton("Reject / Not useful")
+        self.reject_suggestion_button.clicked.connect(self._reject_current_suggestion)
+        self.apply_suggestion_button.setEnabled(False)
+        self.reject_suggestion_button.setEnabled(False)
 
         details_form = QFormLayout()
         details_form.addRow("Filename:", self.filename_value)
@@ -356,10 +415,14 @@ class AlbumReviewPage(QWidget):
         self.decision_selector = QComboBox()
         for decision in UserDecision:
             self.decision_selector.addItem(decision.value)
-        self.decision_selector.currentTextChanged.connect(self._on_decision_selector_changed)
+        self.decision_selector.currentTextChanged.connect(
+            self._on_decision_selector_changed
+        )
 
         self.category_selector = QComboBox()
-        self.category_selector.currentTextChanged.connect(self._on_category_selector_changed)
+        self.category_selector.currentTextChanged.connect(
+            self._on_category_selector_changed
+        )
 
         self.apply_decision_button = QPushButton("Apply Decision to Selected")
         self.apply_decision_button.clicked.connect(self._apply_selector_decision)
@@ -379,6 +442,13 @@ class AlbumReviewPage(QWidget):
         details_layout.addWidget(QLabel("Preview"))
         details_layout.addWidget(self.preview_label)
         details_layout.addLayout(details_form)
+        details_layout.addWidget(self.ai_suggestion_title)
+        details_layout.addWidget(self.ai_suggestion_value)
+        details_layout.addWidget(self.ai_suggestion_reasons)
+        suggestion_actions = QHBoxLayout()
+        suggestion_actions.addWidget(self.apply_suggestion_button)
+        suggestion_actions.addWidget(self.reject_suggestion_button)
+        details_layout.addLayout(suggestion_actions)
         details_layout.addWidget(QLabel("Score explanation"))
         details_layout.addWidget(self.explanations_list, 1)
         details_layout.addLayout(actions_layout)
@@ -412,21 +482,29 @@ class AlbumReviewPage(QWidget):
         self.help_requested.emit(self.WORKSPACE_ID)
 
     def _reload_category_controls(self) -> None:
-        current_filter = self.category_filter_combo.currentText().strip() or self.CATEGORY_FILTER_ALL
+        current_filter = (
+            self.category_filter_combo.currentText().strip() or self.CATEGORY_FILTER_ALL
+        )
         self.category_filter_combo.blockSignals(True)
         self.category_filter_combo.clear()
         self.category_filter_combo.addItem(self.CATEGORY_FILTER_ALL)
         for category_value in ordered_media_category_values():
-            self.category_filter_combo.addItem(media_category_label(category_value), category_value)
+            self.category_filter_combo.addItem(
+                media_category_label(category_value), category_value
+            )
         filter_index = self.category_filter_combo.findText(current_filter)
-        self.category_filter_combo.setCurrentIndex(filter_index if filter_index >= 0 else 0)
+        self.category_filter_combo.setCurrentIndex(
+            filter_index if filter_index >= 0 else 0
+        )
         self.category_filter_combo.blockSignals(False)
 
         current_category_id = str(self.category_selector.currentData() or "").strip()
         self.category_selector.blockSignals(True)
         self.category_selector.clear()
         for category_value in ordered_media_category_values():
-            self.category_selector.addItem(media_category_label(category_value), category_value)
+            self.category_selector.addItem(
+                media_category_label(category_value), category_value
+            )
         if current_category_id:
             selector_index = self.category_selector.findData(current_category_id)
             if selector_index >= 0:
@@ -465,11 +543,15 @@ class AlbumReviewPage(QWidget):
             photo = row.breakdown.photo
             metadata = dict(getattr(photo, "metadata", {}) or {})
 
-            user_corrected = str(
-                metadata.get("user_corrected_media_category", "")
-                or getattr(photo, "user_corrected_media_category", "")
-                or ""
-            ).strip().lower()
+            user_corrected = (
+                str(
+                    metadata.get("user_corrected_media_category", "")
+                    or getattr(photo, "user_corrected_media_category", "")
+                    or ""
+                )
+                .strip()
+                .lower()
+            )
 
             current_effective = self._effective_category_for_photo(photo)
 
@@ -508,7 +590,9 @@ class AlbumReviewPage(QWidget):
             counts[category_id] = counts.get(category_id, 0) + 1
         return counts
 
-    def _reassign_deleted_category(self, old_category_id: str, new_category_id: str) -> None:
+    def _reassign_deleted_category(
+        self, old_category_id: str, new_category_id: str
+    ) -> None:
         old_id = str(old_category_id or "").strip().lower()
         new_id = str(new_category_id or "").strip().lower()
         if not old_id or not new_id or old_id == new_id:
@@ -518,9 +602,33 @@ class AlbumReviewPage(QWidget):
             photo = row.breakdown.photo
             metadata = dict(getattr(photo, "metadata", {}) or {})
 
-            corrected = str(metadata.get("user_corrected_media_category", "") or getattr(photo, "user_corrected_media_category", "") or "").strip().lower()
-            effective = str(metadata.get("effective_media_category", "") or getattr(photo, "effective_media_category", "") or "").strip().lower()
-            automatic = str(metadata.get("automatic_media_category", "") or getattr(photo, "automatic_media_category", "") or "").strip().lower()
+            corrected = (
+                str(
+                    metadata.get("user_corrected_media_category", "")
+                    or getattr(photo, "user_corrected_media_category", "")
+                    or ""
+                )
+                .strip()
+                .lower()
+            )
+            effective = (
+                str(
+                    metadata.get("effective_media_category", "")
+                    or getattr(photo, "effective_media_category", "")
+                    or ""
+                )
+                .strip()
+                .lower()
+            )
+            automatic = (
+                str(
+                    metadata.get("automatic_media_category", "")
+                    or getattr(photo, "automatic_media_category", "")
+                    or ""
+                )
+                .strip()
+                .lower()
+            )
 
             changed = False
             if corrected == old_id:
@@ -551,7 +659,9 @@ class AlbumReviewPage(QWidget):
         self._all_rows = [
             AlbumReviewRow(
                 breakdown=item,
-                review_state=self._review_state_from_decision(self._initial_user_decision_for_photo(item.photo)),
+                review_state=self._review_state_from_decision(
+                    self._initial_user_decision_for_photo(item.photo)
+                ),
                 user_decision=self._initial_user_decision_for_photo(item.photo),
                 pipeline_state="selected",
                 rejection_reason=None,
@@ -579,8 +689,12 @@ class AlbumReviewPage(QWidget):
         self._empty_reason_text = ""
         self._candidate_count = len(candidate_photos or [])
         self._rejection_reasons_summary = dict(rejection_reasons or {})
-        selected_keys = {str(getattr(photo, "path", "")) for photo in selected_photos or []}
-        rejected_keys = {str(getattr(photo, "path", "")) for photo in rejected_photos or []}
+        selected_keys = {
+            str(getattr(photo, "path", "")) for photo in selected_photos or []
+        }
+        rejected_keys = {
+            str(getattr(photo, "path", "")) for photo in rejected_photos or []
+        }
 
         rows: List[AlbumReviewRow] = []
         for photo in imported_photos or []:
@@ -590,7 +704,10 @@ class AlbumReviewPage(QWidget):
             if breakdown is None:
                 inferred_total = 0.0
                 intelligence = getattr(photo, "intelligence", None)
-                if intelligence is not None and intelligence.album_candidate_score is not None:
+                if (
+                    intelligence is not None
+                    and intelligence.album_candidate_score is not None
+                ):
                     inferred_total = float(intelligence.album_candidate_score)
 
                 breakdown = AlbumScoreBreakdown(
@@ -611,12 +728,16 @@ class AlbumReviewPage(QWidget):
             elif key in rejected_keys:
                 pipeline_state = "rejected"
                 if intelligence is not None:
-                    rejection_reason = getattr(intelligence, "album_rejection_reason", None)
+                    rejection_reason = getattr(
+                        intelligence, "album_rejection_reason", None
+                    )
 
             rows.append(
                 AlbumReviewRow(
                     breakdown=breakdown,
-                    review_state=self._review_state_from_decision(self._initial_user_decision_for_photo(photo)),
+                    review_state=self._review_state_from_decision(
+                        self._initial_user_decision_for_photo(photo)
+                    ),
                     user_decision=self._initial_user_decision_for_photo(photo),
                     pipeline_state=pipeline_state,
                     rejection_reason=rejection_reason,
@@ -653,7 +774,9 @@ class AlbumReviewPage(QWidget):
 
         self._visible_rows = self._filtered_sorted_rows()
         self._selected_keys = {
-            key for key in self._selected_keys if key in {self._row_key(row) for row in self._visible_rows}
+            key
+            for key in self._selected_keys
+            if key in {self._row_key(row) for row in self._visible_rows}
         }
         if self._selected_key not in {self._row_key(row) for row in self._visible_rows}:
             self._selected_key = None
@@ -662,7 +785,9 @@ class AlbumReviewPage(QWidget):
         self._cards_by_key = {}
         self._rendered_keys = []
         self._pending_render_index = 0
-        self._target_render_count = min(self._initial_render_count, len(self._visible_rows))
+        self._target_render_count = min(
+            self._initial_render_count, len(self._visible_rows)
+        )
         self._grid_columns = self._calculate_columns()
         self._grid_rebuild_count += 1
 
@@ -681,8 +806,12 @@ class AlbumReviewPage(QWidget):
             return self._empty_reason_text
 
         if self._candidate_count or self._rejection_reasons_summary:
-            selected = sum(1 for row in self._all_rows if row.pipeline_state == "selected")
-            rejected = sum(1 for row in self._all_rows if row.pipeline_state == "rejected")
+            selected = sum(
+                1 for row in self._all_rows if row.pipeline_state == "selected"
+            )
+            rejected = sum(
+                1 for row in self._all_rows if row.pipeline_state == "rejected"
+            )
             reasons = ", ".join(
                 f"{reason}:{count}"
                 for reason, count in sorted(self._rejection_reasons_summary.items())
@@ -715,24 +844,42 @@ class AlbumReviewPage(QWidget):
         if category_filter_text != self.CATEGORY_FILTER_ALL and category_filter_data:
             wanted = str(category_filter_data).strip().lower()
             rows = [
-                row for row in rows
+                row
+                for row in rows
                 if self._effective_category_for_photo(row.breakdown.photo) == wanted
             ]
 
         search_text = self.search_input.text().strip().lower()
         if search_text:
             rows = [
-                row for row in rows
+                row
+                for row in rows
                 if search_text in row.breakdown.photo.display_name().lower()
             ]
 
         sort_mode = self.sort_combo.currentText()
         if sort_mode == self.SORT_LOWEST:
-            rows.sort(key=lambda row: (row.breakdown.total_score, self._photo_date_sort_value(row.breakdown.photo)))
+            rows.sort(
+                key=lambda row: (
+                    row.breakdown.total_score,
+                    self._photo_date_sort_value(row.breakdown.photo),
+                )
+            )
         elif sort_mode == self.SORT_DATE:
-            rows.sort(key=lambda row: (self._photo_date_sort_value(row.breakdown.photo), row.breakdown.total_score), reverse=True)
+            rows.sort(
+                key=lambda row: (
+                    self._photo_date_sort_value(row.breakdown.photo),
+                    row.breakdown.total_score,
+                ),
+                reverse=True,
+            )
         else:
-            rows.sort(key=lambda row: (-row.breakdown.total_score, self._photo_date_sort_value(row.breakdown.photo)))
+            rows.sort(
+                key=lambda row: (
+                    -row.breakdown.total_score,
+                    self._photo_date_sort_value(row.breakdown.photo),
+                )
+            )
 
         return rows
 
@@ -766,7 +913,10 @@ class AlbumReviewPage(QWidget):
 
         end_index = min(
             len(self._visible_rows),
-            max(self._target_render_count, self._pending_render_index + self._render_batch_size),
+            max(
+                self._target_render_count,
+                self._pending_render_index + self._render_batch_size,
+            ),
         )
 
         for index in range(self._pending_render_index, end_index):
@@ -805,7 +955,11 @@ class AlbumReviewPage(QWidget):
 
     def eventFilter(self, watched, event):
         grid_scroll = getattr(self, "grid_scroll", None)
-        if grid_scroll is not None and watched is grid_scroll.viewport() and event.type() == QEvent.Type.Resize:
+        if (
+            grid_scroll is not None
+            and watched is grid_scroll.viewport()
+            and event.type() == QEvent.Type.Resize
+        ):
             new_columns = self._calculate_columns()
             if new_columns != self._grid_columns:
                 self._relayout_existing_cards(new_columns)
@@ -834,7 +988,9 @@ class AlbumReviewPage(QWidget):
         range_select = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
         self._select_key(key, additive=additive, range_select=range_select)
 
-    def _select_key(self, key: str, additive: bool = False, range_select: bool = False) -> None:
+    def _select_key(
+        self, key: str, additive: bool = False, range_select: bool = False
+    ) -> None:
         visible_keys = [self._row_key(row) for row in self._visible_rows]
         if key not in visible_keys:
             return
@@ -846,7 +1002,7 @@ class AlbumReviewPage(QWidget):
                 start, end = end, start
             if not additive:
                 self._selected_keys.clear()
-            self._selected_keys.update(visible_keys[start:end + 1])
+            self._selected_keys.update(visible_keys[start : end + 1])
         elif additive:
             if key in self._selected_keys:
                 self._selected_keys.remove(key)
@@ -943,7 +1099,9 @@ class AlbumReviewPage(QWidget):
         return normalized
 
     def _photo_key(self, photo) -> str:
-        return self._normalize_photo_key_from_path(str(getattr(photo, "path", "") or ""))
+        return self._normalize_photo_key_from_path(
+            str(getattr(photo, "path", "") or "")
+        )
 
     def _show_details(self, row: AlbumReviewRow, force: bool = False) -> None:
         key = self._row_key(row)
@@ -964,15 +1122,21 @@ class AlbumReviewPage(QWidget):
 
         category_value = self._effective_category_for_photo(photo)
         self.media_category_value.setText(media_category_label(category_value))
-        self.classification_reason_value.setText(str(getattr(photo, "classification_reason", "") or "-"))
+        self.classification_reason_value.setText(
+            str(getattr(photo, "classification_reason", "") or "-")
+        )
         visual_parts = [
             str(photo.metadata.get("visual_signals_summary", "") or "").strip(),
             str(photo.metadata.get("visual_evidence", "") or "").strip(),
         ]
-        self.visual_summary_value.setText(" | ".join(part for part in visual_parts if part) or "-")
+        self.visual_summary_value.setText(
+            " | ".join(part for part in visual_parts if part) or "-"
+        )
 
         confidence = float(getattr(photo, "classification_confidence", 0.0) or 0.0)
-        self.confidence_value.setText(f"{max(0, min(100, int(round(confidence * 100))))}%")
+        self.confidence_value.setText(
+            f"{max(0, min(100, int(round(confidence * 100))))}%"
+        )
         self.user_decision_value.setText(row.user_decision.replace("_", " ").title())
 
         intelligence = getattr(photo, "intelligence", None)
@@ -993,6 +1157,13 @@ class AlbumReviewPage(QWidget):
         self.rejection_reason_value.setText(row.rejection_reason or "-")
 
         self.explanations_list.clear()
+        self._current_suggestion = None
+        self.ai_suggestion_value.setText(
+            "Select one photo to check for an advisory suggestion."
+        )
+        self.ai_suggestion_reasons.clear()
+        self.apply_suggestion_button.setEnabled(False)
+        self.reject_suggestion_button.setEnabled(False)
         for explanation in breakdown.explanation or []:
             self.explanations_list.addItem(str(explanation))
 
@@ -1008,6 +1179,7 @@ class AlbumReviewPage(QWidget):
             self.preview_label.setText("Preview unavailable")
 
         self._sync_selectors_to_row(row)
+        self._request_category_suggestion(row)
 
     def _clear_details(self) -> None:
         self._details_key = None
@@ -1025,17 +1197,127 @@ class AlbumReviewPage(QWidget):
         self.pipeline_value.setText("-")
         self.rejection_reason_value.setText("-")
         self.explanations_list.clear()
+        self._current_suggestion = None
+        self.ai_suggestion_value.setText(
+            "Select one photo to check for an advisory suggestion."
+        )
+        self.ai_suggestion_reasons.clear()
+        self.apply_suggestion_button.setEnabled(False)
+        self.reject_suggestion_button.setEnabled(False)
+
+    def on_embedding_index_updated(self) -> None:
+        """Refresh advisory suggestions after background embeddings are committed."""
+        self._category_suggestion_service.invalidate_cache()
+        self._suggestion_request_id += 1
+        row = self._selected_row()
+        if row is not None and self._details_key == self._row_key(row):
+            self._request_category_suggestion(row)
+
+    def _request_category_suggestion(self, row: AlbumReviewRow) -> None:
+        self._suggestion_request_id += 1
+        request_id = self._suggestion_request_id
+        self._current_suggestion = None
+        self.ai_suggestion_value.setText("Checking stored visual evidence…")
+        self.ai_suggestion_reasons.clear()
+        self.apply_suggestion_button.setEnabled(False)
+        self.reject_suggestion_button.setEnabled(False)
+
+        def compute() -> None:
+            if request_id != self._suggestion_request_id:
+                return
+            result = self._category_suggestion_service.suggest(
+                row.breakdown.photo,
+                [r.breakdown.photo for r in self._all_rows],
+                self._suggestion_metadata,
+            )
+            if (
+                request_id != self._suggestion_request_id
+                or self._details_key != self._row_key(row)
+            ):
+                return
+            self._render_category_suggestion(result)
+
+        QTimer.singleShot(0, compute)
+
+    def _render_category_suggestion(self, result) -> None:
+        self._current_suggestion = result if result.status == "suggested" else None
+        self.ai_suggestion_reasons.clear()
+        if result.status == "suggested":
+            self.ai_suggestion_value.setText(
+                f"Suggested category: {result.suggested_category_name}\nConfidence: {int(round(result.confidence * 100))}%\nSupporting evidence: {result.evidence_counts.get(result.suggested_category_id, 0)} photos"
+            )
+            for reason in result.reasons:
+                self.ai_suggestion_reasons.addItem(reason)
+            self.apply_suggestion_button.setEnabled(True)
+            self.reject_suggestion_button.setEnabled(True)
+        else:
+            label = result.status.replace("_", " ").title()
+            detail = (
+                result.reasons[0]
+                if result.reasons
+                else "No safe advisory suggestion is available."
+            )
+            self.ai_suggestion_value.setText(f"No suggestion ({label}). {detail}")
+            self.apply_suggestion_button.setEnabled(False)
+            self.reject_suggestion_button.setEnabled(
+                result.status not in {"no_embedding", "error"}
+            )
+
+    def _apply_current_suggestion(self) -> None:
+        result = self._current_suggestion
+        row = self._selected_row()
+        if result is None or row is None or result.status != "suggested":
+            return
+        self._suggestion_request_id += 1
+        self._apply_category_to_rows(
+            [row], result.suggested_category_id, source="ai_suggestion_accepted"
+        )
+        metadata = dict(getattr(row.breakdown.photo, "metadata", {}) or {})
+        metadata["category_suggestion_state"] = "accepted"
+        metadata["category_suggestion_model_key"] = result.model_key
+        metadata["category_suggestion_applied_category"] = result.suggested_category_id
+        row.breakdown.photo.metadata = metadata
+        self._save_photo_user_metadata(row.breakdown.photo)
+        self._current_suggestion = None
+        self.apply_suggestion_button.setEnabled(False)
+        self.reject_suggestion_button.setEnabled(False)
+        self.ai_suggestion_value.setText(
+            "Suggestion applied through the category correction workflow."
+        )
+        self.ai_suggestion_reasons.clear()
+        self._category_suggestion_service.invalidate_cache()
+
+    def _reject_current_suggestion(self) -> None:
+        self._suggestion_request_id += 1
+        result = self._current_suggestion
+        row = self._selected_row()
+        if result is not None:
+            self._category_suggestion_service.record_rejection(
+                result,
+                source="user",
+                photo=row.breakdown.photo if row is not None else None,
+            )
+        self._current_suggestion = None
+        self.apply_suggestion_button.setEnabled(False)
+        self.reject_suggestion_button.setEnabled(False)
+        self.ai_suggestion_value.setText(
+            "Suggestion marked not useful. Category was not changed."
+        )
 
     def _sync_selectors_to_row(self, row: AlbumReviewRow) -> None:
         self._decision_selector_syncing = True
         decision_index = self.decision_selector.findText(row.user_decision)
-        self.decision_selector.setCurrentIndex(decision_index if decision_index >= 0 else 0)
+        self.decision_selector.setCurrentIndex(
+            decision_index if decision_index >= 0 else 0
+        )
         self._decision_selector_syncing = False
 
         category_value = self._effective_category_for_photo(row.breakdown.photo)
         self._category_selector_syncing = True
         category_index = self.category_selector.findData(category_value)
-        self.category_selector.setCurrentIndex(category_index if category_index >= 0 else 0)
+        self.category_selector.setCurrentIndex(
+            category_index if category_index >= 0 else 0
+        )
         self._category_selector_syncing = False
 
     def _on_decision_selector_changed(self, value: str) -> None:
@@ -1063,16 +1345,36 @@ class AlbumReviewPage(QWidget):
 
         self._apply_decision_to_rows(rows, decision, source="user_bulk")
 
+    def _normalize_category_id(self, value) -> str:
+        raw = str(getattr(value, "value", value) or "").strip().lower()
+        if not raw:
+            return ""
+        compact = raw.replace("-", "_").replace(" ", "_")
+        if self._category_registry.has_category(compact):
+            return compact
+        for category in self._category_registry.all_categories():
+            if raw == category.display_name.strip().lower():
+                return category.id
+            if compact == category.display_name.strip().lower().replace(" ", "_"):
+                return category.id
+        return compact
+
     def _apply_selector_category(self) -> None:
-        category = str(self.category_selector.currentData() or self.category_selector.currentText()).strip().lower()
+        category = self._normalize_category_id(
+            self.category_selector.currentData() or self.category_selector.currentText()
+        )
         rows = self._selected_rows()
         if not rows or not category:
             return
 
-        if not self._confirm_bulk_if_needed(len(rows), f"apply category {media_category_label(category)}"):
+        if not self._confirm_bulk_if_needed(
+            len(rows), f"apply category {media_category_label(category)}"
+        ):
             return
 
-        self._apply_category_to_rows(rows, category, source="user_bulk" if len(rows) > 1 else "user")
+        self._apply_category_to_rows(
+            rows, category, source="user_bulk" if len(rows) > 1 else "user"
+        )
 
     def _confirm_bulk_if_needed(self, count: int, action_text: str) -> bool:
         if count <= 20:
@@ -1085,7 +1387,9 @@ class AlbumReviewPage(QWidget):
         )
         return response == QMessageBox.StandardButton.Yes
 
-    def _apply_decision_to_rows(self, rows: List[AlbumReviewRow], decision: str, source: str) -> None:
+    def _apply_decision_to_rows(
+        self, rows: List[AlbumReviewRow], decision: str, source: str
+    ) -> None:
         for row in rows:
             previous = row.user_decision
             row.user_decision = str(decision)
@@ -1123,37 +1427,80 @@ class AlbumReviewPage(QWidget):
         self.review_state_changed.emit()
         self._trigger_refresh(force=True)
 
-    def _apply_category_to_rows(self, rows: List[AlbumReviewRow], category: str, source: str) -> None:
-        category = str(category or "").strip().lower()
+    def _apply_category_to_rows(
+        self, rows: List[AlbumReviewRow], category: str, source: str
+    ) -> None:
+        category = self._normalize_category_id(category)
         if not category:
             return
 
         affected_keys = [self._row_key(row) for row in rows]
-        preferred_key = self._selected_key or (affected_keys[0] if affected_keys else None)
+        preferred_key = self._selected_key or (
+            affected_keys[0] if affected_keys else None
+        )
         previous_visible_keys = [self._row_key(row) for row in self._visible_rows]
         previous_scroll = self.grid_scroll.verticalScrollBar().value()
-        previous_render_count = max(len(self._rendered_keys), self._initial_render_count)
+        previous_render_count = max(
+            len(self._rendered_keys), self._initial_render_count
+        )
 
         for row in rows:
             photo = row.breakdown.photo
             previous = self._effective_category_for_photo(photo)
 
             metadata = dict(getattr(photo, "metadata", {}) or {})
-            automatic = str(metadata.get("automatic_media_category", "") or getattr(photo, "automatic_media_category", "") or previous).strip().lower()
+            previous_decision = row.user_decision
+            decision_changed = False
+            automatic = (
+                str(
+                    metadata.get("automatic_media_category", "")
+                    or getattr(photo, "automatic_media_category", "")
+                    or previous
+                )
+                .strip()
+                .lower()
+            )
 
             metadata["automatic_media_category"] = automatic
             metadata["user_corrected_media_category"] = category
             metadata["effective_media_category"] = category
             metadata["media_category"] = category
-            metadata["classification_reason"] = metadata.get("classification_reason", "") or "User corrected category."
+            metadata["category_confirmation_state"] = "manual_confirmed"
+            metadata["category_confirmation_source"] = source
+            metadata["category_confirmation_category"] = category
+            if row.user_decision == UserDecision.Pending.value:
+                row.user_decision = UserDecision.Keep.value
+                row.review_state = self._review_state_from_decision(row.user_decision)
+                photo.user_decision = row.user_decision
+                metadata["user_decision"] = row.user_decision
+                decision_changed = True
+            metadata["classification_reason"] = (
+                metadata.get("classification_reason", "") or "User corrected category."
+            )
             photo.metadata = metadata
 
             photo.automatic_media_category = automatic
             photo.user_corrected_media_category = category
             photo.effective_media_category = category
             photo.media_category = category
-            photo.classification_reason = str(metadata.get("classification_reason", "") or "")
+            photo.classification_reason = str(
+                metadata.get("classification_reason", "") or ""
+            )
             photo.sync_intelligence_from_metadata()
+
+            if decision_changed:
+                self._decision_history.record_decision_change(
+                    photo,
+                    previous_value=previous_decision,
+                    new_value=row.user_decision,
+                    source=source,
+                )
+                self._preference_learning_engine.record_decision(
+                    photo,
+                    previous_decision=previous_decision,
+                    new_decision=row.user_decision,
+                    source=source,
+                )
 
             self._decision_history.record_category_correction(
                 photo,
@@ -1167,7 +1514,9 @@ class AlbumReviewPage(QWidget):
                 corrected_category=category,
                 source=source,
             )
-            self._category_learning_engine.start_pending_visual_analysis_worker(limit=25)
+            self._category_learning_engine.start_pending_visual_analysis_worker(
+                limit=25
+            )
             self._preference_learning_engine.record_category_correction(
                 photo,
                 previous_category=previous,
@@ -1181,6 +1530,7 @@ class AlbumReviewPage(QWidget):
                 card.refresh_from_row(thumbnail=self._get_cached_card_thumbnail(row))
 
         self._category_learning_engine.start_pending_visual_analysis_worker(limit=25)
+        self._category_suggestion_service.invalidate_cache()
         self._show_user_saved_indicator("User category saved")
         self.review_state_changed.emit()
         self._refresh_after_category_change(
@@ -1208,7 +1558,9 @@ class AlbumReviewPage(QWidget):
                 row = self._row_for_key(key)
                 card = self._cards_by_key.get(key)
                 if row is not None and card is not None:
-                    card.refresh_from_row(thumbnail=self._get_cached_card_thumbnail(row))
+                    card.refresh_from_row(
+                        thumbnail=self._get_cached_card_thumbnail(row)
+                    )
                     card.set_selected(key in self._selected_keys)
             selected = self._selected_row()
             if selected is not None:
@@ -1224,7 +1576,9 @@ class AlbumReviewPage(QWidget):
         )
 
         visible_key_set = set(new_visible_keys)
-        self._selected_keys = {key for key in self._selected_keys if key in visible_key_set}
+        self._selected_keys = {
+            key for key in self._selected_keys if key in visible_key_set
+        }
         if selected_key:
             self._selected_key = selected_key
             self._selected_keys = {selected_key}
@@ -1262,12 +1616,17 @@ class AlbumReviewPage(QWidget):
 
         return new_visible_keys[min(previous_index, len(new_visible_keys) - 1)]
 
-    def _rebuild_grid_preserving_scroll(self, scroll_value: int, render_count: int) -> None:
+    def _rebuild_grid_preserving_scroll(
+        self, scroll_value: int, render_count: int
+    ) -> None:
         self._clear_grid()
         self._cards_by_key = {}
         self._rendered_keys = []
         self._pending_render_index = 0
-        self._target_render_count = min(max(self._initial_render_count, int(render_count or 0)), len(self._visible_rows))
+        self._target_render_count = min(
+            max(self._initial_render_count, int(render_count or 0)),
+            len(self._visible_rows),
+        )
         self._grid_columns = self._calculate_columns()
         self._grid_rebuild_count += 1
         self.results_label.setText(self._results_label_text())
@@ -1301,19 +1660,27 @@ class AlbumReviewPage(QWidget):
 
     def _ensure_category_fields(self, photo) -> None:
         metadata = dict(getattr(photo, "metadata", {}) or {})
-        automatic = str(
-            metadata.get("automatic_media_category", "")
-            or getattr(photo, "automatic_media_category", "")
-            or metadata.get("media_category", "")
-            or getattr(photo, "media_category", "")
-            or MediaCategory.Unknown.value
-        ).strip().lower()
+        automatic = (
+            str(
+                metadata.get("automatic_media_category", "")
+                or getattr(photo, "automatic_media_category", "")
+                or metadata.get("media_category", "")
+                or getattr(photo, "media_category", "")
+                or MediaCategory.Unknown.value
+            )
+            .strip()
+            .lower()
+        )
 
-        user_corrected = str(
-            metadata.get("user_corrected_media_category", "")
-            or getattr(photo, "user_corrected_media_category", "")
-            or ""
-        ).strip().lower()
+        user_corrected = (
+            str(
+                metadata.get("user_corrected_media_category", "")
+                or getattr(photo, "user_corrected_media_category", "")
+                or ""
+            )
+            .strip()
+            .lower()
+        )
 
         effective = user_corrected or automatic or MediaCategory.Unknown.value
 
@@ -1329,23 +1696,31 @@ class AlbumReviewPage(QWidget):
         photo.media_category = effective
 
         if not getattr(photo, "classification_reason", None):
-            photo.classification_reason = str(metadata.get("classification_reason", "") or "")
+            photo.classification_reason = str(
+                metadata.get("classification_reason", "") or ""
+            )
         if not getattr(photo, "classification_confidence", None):
-            photo.classification_confidence = float(metadata.get("classification_confidence", 0.0) or 0.0)
+            photo.classification_confidence = float(
+                metadata.get("classification_confidence", 0.0) or 0.0
+            )
 
     def _effective_category_for_photo(self, photo) -> str:
         metadata = dict(getattr(photo, "metadata", {}) or {})
-        return str(
-            metadata.get("effective_media_category", "")
-            or getattr(photo, "effective_media_category", "")
-            or metadata.get("user_corrected_media_category", "")
-            or getattr(photo, "user_corrected_media_category", "")
-            or metadata.get("automatic_media_category", "")
-            or getattr(photo, "automatic_media_category", "")
-            or metadata.get("media_category", "")
-            or getattr(photo, "media_category", "")
-            or MediaCategory.Unknown.value
-        ).strip().lower()
+        return (
+            str(
+                metadata.get("effective_media_category", "")
+                or getattr(photo, "effective_media_category", "")
+                or metadata.get("user_corrected_media_category", "")
+                or getattr(photo, "user_corrected_media_category", "")
+                or metadata.get("automatic_media_category", "")
+                or getattr(photo, "automatic_media_category", "")
+                or metadata.get("media_category", "")
+                or getattr(photo, "media_category", "")
+                or MediaCategory.Unknown.value
+            )
+            .strip()
+            .lower()
+        )
 
     def _initial_user_decision_for_photo(self, photo) -> str:
         metadata = dict(getattr(photo, "metadata", {}) or {})
@@ -1374,7 +1749,11 @@ class AlbumReviewPage(QWidget):
 
     def _photo_date_sort_value(self, photo) -> datetime:
         intelligence = getattr(photo, "intelligence", None)
-        date_value = getattr(intelligence, "date_taken", None) if intelligence is not None else None
+        date_value = (
+            getattr(intelligence, "date_taken", None)
+            if intelligence is not None
+            else None
+        )
         if isinstance(date_value, datetime):
             return date_value
 
@@ -1440,7 +1819,9 @@ class AlbumReviewPage(QWidget):
         self._thumbnail_source_by_key[key] = "retained"
 
         self._thumbnail_cache = {
-            cache_key: value for cache_key, value in self._thumbnail_cache.items() if not cache_key.startswith(f"{key}|")
+            cache_key: value
+            for cache_key, value in self._thumbnail_cache.items()
+            if not cache_key.startswith(f"{key}|")
         }
 
         preview_cache_key = self._thumbnail_cache_key(key, QSize(280, 160))

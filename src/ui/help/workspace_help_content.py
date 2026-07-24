@@ -135,7 +135,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                     why_this_workspace_exists="Memory Review is the core workspace for teaching which moments should contribute to family memories and future album quality.",
                     problem_it_solves="Raw imported photos contain noise, ambiguity, and mixed quality that must be resolved through guided category correction.",
                     ai_automation="The system pre-scores candidates, predicts categories, keeps explainable reasoning visible, and can use locally stored visual/content signals when those profiles are available.",
-                    user_interaction="Correct Media Category values in small batches; every correction is captured immediately and teaches from local visual content when evidence is available; missing visual analysis may finish in the background.",
+                    user_interaction="Correct Media Category values in small batches; review advisory AI suggestions when stored-vector evidence is available; every accepted correction is captured immediately and teaches from local visual content when evidence is available; missing visual analysis may finish in the background.",
                     expected_outcome="A cleaner, higher-confidence reviewed set that teaches future classification and recommendation behavior without mixing in album-decision editing.",
                 ),
                 _workflow_section(

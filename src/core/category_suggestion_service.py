@@ -1,0 +1,544 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+import hashlib
+import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Iterable, Optional
+
+from core.category_registry import CategoryRegistry, get_category_registry
+from core.user_metadata_service import UserMetadataService
+from vision.embedding_provider import EmbeddingStore, ModelMetadata
+from vision.semantic_similarity_service import SemanticSimilarityService
+
+
+@dataclass(frozen=True)
+class CategorySuggestionEvidence:
+    photo_key: str
+    category_id: str
+    category_name: str
+    similarity: float
+    trust_level: str
+    trust_weight: float
+
+
+@dataclass(frozen=True)
+class CategorySuggestionResult:
+    source_photo_key: str
+    status: str
+    suggested_category_id: str = ""
+    suggested_category_name: str = ""
+    confidence: float = 0.0
+    reasons: list[str] = field(default_factory=list)
+    evidence_counts: dict[str, int] = field(default_factory=dict)
+    supporting_photos: list[CategorySuggestionEvidence] = field(default_factory=list)
+    model_key: str = ""
+    provenance: str = "stored_vectors+trusted_labels+deterministic_rules"
+    evidence_signature: str = ""
+
+
+@dataclass(frozen=True)
+class CategorySuggestionConfig:
+    minimum_similarity: float = 0.72
+    similar_limit: int = 40
+    minimum_support_count: int = 2
+    minimum_winning_margin: float = 0.22
+    conflict_margin: float = 0.12
+    minimum_confidence: float = 0.52
+
+
+class CategorySuggestionService:
+    """UI-independent explainable category suggestion service.
+
+    Confidence is a deterministic 0.0-1.0 heuristic from trusted similar-photo
+    support, average/strongest similarity, category agreement, deterministic
+    classifier agreement, and conflicts. It is not a probability.
+    """
+
+    TRUST_WEIGHTS = {
+        "manual_confirmed": 1.0,
+        "user_correction": 1.0,
+        "accepted_suggestion": 0.85,
+        "deterministic_classification": 0.55,
+        "machine_unreviewed": 0.0,
+    }
+
+    def __init__(
+        self,
+        *,
+        similarity_service: SemanticSimilarityService | None = None,
+        embedding_store: EmbeddingStore | None = None,
+        category_registry: CategoryRegistry | None = None,
+        media_classifier=None,
+        config: CategorySuggestionConfig | None = None,
+    ):
+        self.embedding_store = embedding_store or EmbeddingStore()
+        self.similarity_service = similarity_service or SemanticSimilarityService(
+            self.embedding_store
+        )
+        self.category_registry = category_registry or get_category_registry()
+        if media_classifier is None:
+            from core.media_classifier import MediaClassifier
+
+            media_classifier = MediaClassifier(enable_visual_content_analysis=False)
+        self.media_classifier = media_classifier
+        self.config = config or CategorySuggestionConfig()
+        self._cache: dict[tuple[str, str, str], CategorySuggestionResult] = {}
+        self._feedback: list[dict[str, str]] = []
+        self._user_metadata_service = UserMetadataService()
+
+    def suggest(
+        self, source_photo, all_photos: Iterable, metadata: ModelMetadata
+    ) -> CategorySuggestionResult:
+        source_key = str(Path(getattr(source_photo, "path", source_photo)).resolve())
+        try:
+            if (
+                self.embedding_store.get_valid(
+                    Path(getattr(source_photo, "path", source_photo)), metadata
+                )
+                is None
+            ):
+                return self._result(
+                    source_key,
+                    "no_embedding",
+                    model_key=metadata.model_key,
+                    reasons=[
+                        "No current stored embedding is available for this photo."
+                    ],
+                )
+            eligible = self._eligible_category_ids()
+            if not eligible:
+                return self._result(
+                    source_key,
+                    "no_eligible_categories",
+                    model_key=metadata.model_key,
+                    reasons=["No content categories are eligible for AI suggestions."],
+                )
+            by_key = {str(Path(getattr(p, "path", p)).resolve()): p for p in all_photos}
+            signature_key = self._evidence_signature(by_key.values())
+            cache_key = (source_key, metadata.model_key, signature_key)
+            if cache_key in self._cache:
+                return self._cache[cache_key]
+            sims = self.similarity_service.most_similar(
+                source_photo,
+                metadata,
+                candidates=by_key.values(),
+                limit=self.config.similar_limit,
+                exclude_source=True,
+                minimum_similarity=self.config.minimum_similarity,
+            )
+            evidence: list[CategorySuggestionEvidence] = []
+            scores: dict[str, float] = {}
+            counts: dict[str, int] = {}
+            for sim in sims:
+                photo = by_key.get(str(Path(sim.photo_key).resolve()))
+                if photo is None:
+                    continue
+                cat, trust = self._trusted_category(photo)
+                cat = self._normalize_category_id(cat)
+                if not cat or cat not in eligible:
+                    continue
+                weight = self.TRUST_WEIGHTS[trust]
+                if weight <= 0:
+                    continue
+                ev = CategorySuggestionEvidence(
+                    sim.photo_key,
+                    cat,
+                    self.category_registry.label_for(cat),
+                    sim.similarity,
+                    trust,
+                    weight,
+                )
+                evidence.append(ev)
+                scores[cat] = scores.get(cat, 0.0) + sim.similarity * weight
+                counts[cat] = counts.get(cat, 0) + 1
+            if not evidence:
+                result = self._result(
+                    source_key,
+                    "insufficient_evidence",
+                    model_key=metadata.model_key,
+                    reasons=[
+                        "No similar photos have trustworthy confirmed category evidence."
+                    ],
+                )
+                self._debug_suggestion(
+                    result,
+                    semantic_matches=len(sims),
+                    trusted_evidence=0,
+                    category_ids=[],
+                    evidence_counts={},
+                )
+                self._cache[cache_key] = result
+                return result
+            ranked = sorted(
+                scores.items(),
+                key=lambda x: (-x[1], self.category_registry.label_for(x[0]), x[0]),
+            )
+            winner, win_score = ranked[0]
+            runner_score = ranked[1][1] if len(ranked) > 1 else 0.0
+            winning_evidence = [e for e in evidence if e.category_id == winner]
+            has_strong_manual_support = self._has_strong_manual_support(
+                winning_evidence
+            )
+            if (
+                counts.get(winner, 0) < self.config.minimum_support_count
+                and not has_strong_manual_support
+            ):
+                result = self._result(
+                    source_key,
+                    "insufficient_evidence",
+                    model_key=metadata.model_key,
+                    evidence_counts=counts,
+                    reasons=[
+                        "Not enough trusted similar photos support one category yet."
+                    ],
+                )
+                self._debug_suggestion(
+                    result,
+                    semantic_matches=len(sims),
+                    trusted_evidence=len(evidence),
+                    category_ids=sorted(counts),
+                    evidence_counts=counts,
+                )
+                self._cache[cache_key] = result
+                return result
+            margin = (win_score - runner_score) / max(win_score, 0.0001)
+            if runner_score and margin < self.config.conflict_margin:
+                result = self._result(
+                    source_key,
+                    "conflicting_evidence",
+                    model_key=metadata.model_key,
+                    evidence_counts=counts,
+                    reasons=[
+                        "Trusted similar photos support multiple categories too evenly."
+                    ],
+                )
+                self._debug_suggestion(
+                    result,
+                    semantic_matches=len(sims),
+                    trusted_evidence=len(evidence),
+                    category_ids=sorted(counts),
+                    evidence_counts=counts,
+                )
+                self._cache[cache_key] = result
+                return result
+            avg_sim = sum(e.similarity for e in winning_evidence) / len(
+                winning_evidence
+            )
+            strongest = max(e.similarity for e in winning_evidence)
+            support_factor = min(1.0, len(winning_evidence) / 6.0)
+            agreement = win_score / max(sum(scores.values()), 0.0001)
+            trust_avg = sum(e.trust_weight for e in winning_evidence) / len(
+                winning_evidence
+            )
+            confidence = (
+                0.18
+                + 0.26 * support_factor
+                + 0.22 * avg_sim
+                + 0.12 * strongest
+                + 0.16 * agreement
+                + 0.06 * trust_avg
+            )
+            deterministic = self.media_classifier.classify(
+                getattr(source_photo, "path", source_photo),
+                getattr(source_photo, "metadata", {}) or {},
+                allow_visual_analysis=False,
+            )
+            det_cat = getattr(
+                deterministic.media_category, "value", str(deterministic.media_category)
+            )
+            if det_cat == winner and deterministic.classification_confidence >= 0.55:
+                confidence += 0.08
+                det_reason = "Existing deterministic signals agree."
+            elif det_cat != "unknown" and det_cat in eligible:
+                confidence -= 0.10
+                det_reason = "Existing deterministic signals point to another category, so confidence is reduced."
+            else:
+                det_reason = "Existing deterministic signals are inconclusive."
+            confidence = max(0.0, min(1.0, round(confidence, 4)))
+            if self._has_persisted_rejection(
+                source_photo, winner, metadata.model_key, signature_key
+            ):
+                result = self._result(
+                    source_key,
+                    "insufficient_evidence",
+                    model_key=metadata.model_key,
+                    evidence_counts=counts,
+                    reasons=[
+                        "This suggestion was previously marked not useful for the current evidence."
+                    ],
+                    evidence_signature=signature_key,
+                )
+                self._debug_suggestion(
+                    result,
+                    semantic_matches=len(sims),
+                    trusted_evidence=len(evidence),
+                    category_ids=sorted(counts),
+                    evidence_counts=counts,
+                )
+                self._cache[cache_key] = result
+                return result
+            if confidence < self.config.minimum_confidence or (
+                runner_score and margin < self.config.minimum_winning_margin
+            ):
+                status = (
+                    "conflicting_evidence" if runner_score else "insufficient_evidence"
+                )
+                result = self._result(
+                    source_key,
+                    status,
+                    model_key=metadata.model_key,
+                    evidence_counts=counts,
+                    reasons=[
+                        "Evidence is not strong enough for a clear advisory suggestion.",
+                        det_reason,
+                    ],
+                    evidence_signature=signature_key,
+                )
+                self._debug_suggestion(
+                    result,
+                    semantic_matches=len(sims),
+                    trusted_evidence=len(evidence),
+                    category_ids=sorted(counts),
+                    evidence_counts=counts,
+                )
+                self._cache[cache_key] = result
+                return result
+            reasons = [
+                f"Similar to {len(winning_evidence)} photos previously confirmed as {self.category_registry.label_for(winner)}.",
+                "Visual similarity supports this category.",
+                det_reason,
+            ]
+            result = self._result(
+                source_key,
+                "suggested",
+                winner,
+                self.category_registry.label_for(winner),
+                confidence,
+                reasons,
+                counts,
+                sorted(winning_evidence, key=lambda e: (-e.similarity, e.photo_key))[
+                    :8
+                ],
+                metadata.model_key,
+                signature_key,
+            )
+            self._debug_suggestion(
+                result,
+                semantic_matches=len(sims),
+                trusted_evidence=len(evidence),
+                category_ids=sorted(counts),
+                evidence_counts=counts,
+            )
+            self._cache[cache_key] = result
+            return result
+        except Exception as exc:
+            return self._result(
+                source_key,
+                "error",
+                model_key=metadata.model_key,
+                reasons=[f"Suggestion failed safely: {exc}"],
+            )
+
+    def record_rejection(
+        self,
+        result: CategorySuggestionResult,
+        source: str = "user",
+        *,
+        photo=None,
+        chooser_identity: str = "",
+    ) -> dict[str, str]:
+        event = {
+            "photo_key": result.source_photo_key,
+            "category_id": result.suggested_category_id,
+            "suggested_category_id": result.suggested_category_id,
+            "suggested_category_name": result.suggested_category_name,
+            "source": source,
+            "chooser_identity": str(chooser_identity or source or "user"),
+            "action": "rejected",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "model_key": result.model_key,
+            "provenance": result.provenance,
+            "evidence_signature": result.evidence_signature,
+        }
+        self._feedback.append(event)
+        if photo is not None:
+            metadata = dict(getattr(photo, "metadata", {}) or {})
+            events = [
+                item
+                for item in metadata.get("category_suggestion_feedback", [])
+                if isinstance(item, dict)
+            ]
+            events.append(event)
+            metadata["category_suggestion_feedback"] = events[-50:]
+            metadata["category_suggestion_state"] = "rejected"
+            metadata["category_suggestion_last_rejected_category"] = (
+                result.suggested_category_id
+            )
+            metadata["category_suggestion_last_feedback_at"] = event["timestamp"]
+            photo.metadata = metadata
+            try:
+                self._user_metadata_service.save_photo_metadata(photo)
+            except Exception:
+                pass
+        self.invalidate_cache()
+        return event
+
+    @property
+    def feedback_events(self) -> list[dict[str, str]]:
+        return list(self._feedback)
+
+    def invalidate_cache(self) -> None:
+        self._cache.clear()
+
+    def _eligible_category_ids(self) -> set[str]:
+        return {
+            c.id
+            for c in self.category_registry.all_categories()
+            if c.is_album_candidate and c.id != "unknown"
+        }
+
+    def _normalize_category_id(self, value: str) -> str:
+        raw = str(getattr(value, "value", value) or "").strip().lower()
+        if not raw:
+            return ""
+        compact = raw.replace("-", "_").replace(" ", "_")
+        if self.category_registry.has_category(compact):
+            return compact
+        for category in self.category_registry.all_categories():
+            if raw == category.display_name.strip().lower():
+                return category.id
+            if compact == category.display_name.strip().lower().replace(" ", "_"):
+                return category.id
+        return compact
+
+    def _trusted_category(self, photo) -> tuple[str, str]:
+        md = dict(getattr(photo, "metadata", {}) or {})
+        user = (
+            str(
+                md.get("user_corrected_media_category")
+                or getattr(photo, "user_corrected_media_category", "")
+                or ""
+            )
+            .strip()
+            .lower()
+        )
+        if user:
+            return self._normalize_category_id(user), "user_correction"
+        if str(md.get("category_confirmation_state", "")).lower() in {
+            "confirmed",
+            "manual_confirmed",
+        }:
+            value = str(
+                md.get("effective_media_category")
+                or getattr(photo, "effective_media_category", "")
+                or ""
+            )
+            return self._normalize_category_id(value), "manual_confirmed"
+        if str(md.get("category_suggestion_state", "")).lower() == "accepted":
+            value = str(
+                md.get("effective_media_category")
+                or getattr(photo, "effective_media_category", "")
+                or ""
+            )
+            return self._normalize_category_id(value), "accepted_suggestion"
+        if bool(md.get("deterministic_category_trusted", False)):
+            value = str(
+                md.get("automatic_media_category")
+                or getattr(photo, "automatic_media_category", "")
+                or ""
+            )
+            return self._normalize_category_id(value), "deterministic_classification"
+        return "", "machine_unreviewed"
+
+    def _has_strong_manual_support(
+        self, evidence: list[CategorySuggestionEvidence]
+    ) -> bool:
+        return any(
+            item.trust_level in {"manual_confirmed", "user_correction"}
+            and item.similarity >= 0.90
+            for item in evidence
+        )
+
+    def _has_persisted_rejection(
+        self, photo, category_id: str, model_key: str, evidence_signature: str
+    ) -> bool:
+        metadata = dict(getattr(photo, "metadata", {}) or {})
+        for item in metadata.get("category_suggestion_feedback", []) or []:
+            if not isinstance(item, dict):
+                continue
+            if (
+                str(item.get("action", "")).lower() == "rejected"
+                and str(
+                    item.get("suggested_category_id") or item.get("category_id") or ""
+                )
+                == str(category_id)
+                and str(item.get("model_key", "")) == str(model_key)
+                and str(item.get("evidence_signature", "")) == str(evidence_signature)
+            ):
+                return True
+        return False
+
+    def _evidence_signature(self, photos: Iterable) -> str:
+        parts = []
+        for p in photos:
+            category_id, trust = self._trusted_category(p)
+            parts.append(
+                f"{Path(getattr(p, 'path', p)).resolve()}|{category_id}|{trust}"
+            )
+        payload = "\n".join(sorted(parts))
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def _debug_suggestion(
+        self,
+        result: CategorySuggestionResult,
+        *,
+        semantic_matches: int,
+        trusted_evidence: int,
+        category_ids: list[str],
+        evidence_counts: dict[str, int],
+    ) -> None:
+        if os.environ.get("FAMILY_MEMORY_DEBUG_SUGGESTIONS") not in {
+            "1",
+            "true",
+            "yes",
+        }:
+            return
+        reason = result.reasons[0] if result.reasons else result.status
+        print(
+            "[CategorySuggestion] "
+            f"source={result.source_photo_key} status={result.status} "
+            f"semantic_matches={semantic_matches} trusted_evidence={trusted_evidence} "
+            f"category_ids={category_ids} evidence_counts={dict(evidence_counts)} "
+            f"reason={reason}",
+            file=sys.stderr,
+            flush=True,
+        )
+
+    def _result(
+        self,
+        source_key: str,
+        status: str,
+        suggested_category_id: str = "",
+        suggested_category_name: str = "",
+        confidence: float = 0.0,
+        reasons: Optional[list[str]] = None,
+        evidence_counts: Optional[dict[str, int]] = None,
+        supporting_photos: Optional[list[CategorySuggestionEvidence]] = None,
+        model_key: str = "",
+        evidence_signature: str = "",
+    ) -> CategorySuggestionResult:
+        return CategorySuggestionResult(
+            source_key,
+            status,
+            suggested_category_id,
+            suggested_category_name,
+            confidence,
+            reasons or [],
+            evidence_counts or {},
+            supporting_photos or [],
+            model_key,
+            evidence_signature=evidence_signature,
+        )

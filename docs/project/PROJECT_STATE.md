@@ -1132,3 +1132,15 @@ Status: implemented in PR branch; awaiting Product Owner manual validation befor
 - MODEL-003C diagnostic command: `python scripts/similar_images.py <source-image> <folder> --limit 10` prints the most similar already-embedded images and cosine scores for developer validation.
 - Product Owner validation path for PR #29: launch the app from the normal main environment with `python src\main.py`; confirm Settings -> AI Models reports MobileCLIP Ready; import `C:\Projects\test 20`; confirm valid images produce embeddings even when torch is absent from the main `.venv`; confirm unreadable images are reported separately; then run `python scripts\similar_images.py "C:\Projects\test 20\20210214_112224.jpg" "C:\Projects\test 20" --limit 10` and confirm similarity results for successfully embedded images.
 - Current limitations: sequential CPU-first embedding generation and exact O(n*d) similarity scans over stored vectors only; no automatic semantic classification, duplicate detection workflow, clustering workflow, face recognition, or category replacement is included.
+
+## MODEL-003D Explainable Category Suggestions
+
+- MODEL-003D adds a reusable UI-independent `CategorySuggestionService` that consumes `SemanticSimilarityService`, `EmbeddingStore`, existing category metadata, deterministic classification, and current trusted category evidence. It returns one advisory typed result or a safe no-suggestion status; it never recomputes embeddings or changes categories during suggestion generation.
+- Memory Review now shows a compact AI Suggestion section in the existing details panel for one selected photo, with suggested category, heuristic confidence, explanation reasons, evidence count, and explicit Apply / Reject controls. Applying uses the existing category-change workflow with learning/history signals; rejecting records persistent sidecar feedback and does not change category or count as acceptance.
+- Suggestions use only existing album-candidate content categories, exclude Unknown/workflow cleanup categories, require current valid stored embeddings and multiple trustworthy similar labeled photos, and treat manual/user-corrected labels as authoritative. Automatic category replacement remains out of scope.
+
+- MODEL-003D follow-up: when background embedding indexing completes, MainWindow clears the indexing banner, notifies Memory Review, invalidates cached suggestions, and refreshes the selected photo suggestion so a stale No Embedding state cannot persist after successful stored-vector indexing.
+
+- MODEL-003D follow-up: manual category application in Memory Review now records category confirmation metadata and moves pending rows to a non-pending Keep decision so user-applied categories are available as trusted evidence for later suggestions.
+
+- MODEL-003D follow-up: suggestion evidence now normalizes category IDs/display labels such as `Family Photo`, `family photo`, and `family_photo` before eligibility checks, and opt-in developer diagnostics can explain evidence counts when suggestions are unavailable.
