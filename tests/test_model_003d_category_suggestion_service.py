@@ -41,7 +41,7 @@ def photo(
     user=False,
     confirmed=False,
     accepted=False,
-    deterministic=False
+    deterministic=False,
 ):
     if not path.exists():
         path.write_bytes(path.name.encode())
@@ -397,3 +397,37 @@ def test_category_confirmation_fields_persist_in_sidecar(tmp_path):
     assert reloaded.metadata["category_confirmation_source"] == "user"
     assert reloaded.metadata["category_confirmation_category"] == "family_photo"
     assert reloaded.user_corrected_media_category == "family_photo"
+
+
+def test_three_manual_family_photo_labels_with_display_names_feed_suggestion(tmp_path):
+    store = EmbeddingStore(tmp_path / "e.sqlite3")
+    src = photo(tmp_path / "src.jpg")
+    confirmed = [
+        photo(tmp_path / f"confirmed_{index}.jpg", "Family Photo", user=True)
+        for index in range(3)
+    ]
+    put(store, src, [1, 0, 0])
+    for index, item in enumerate(confirmed):
+        put(store, item, [0.99 - index * 0.01, 0.01, 0])
+
+    result = service(tmp_path, store).suggest(src, [src, *confirmed], META)
+
+    assert result.status == "suggested"
+    assert result.suggested_category_id == "family_photo"
+    assert result.evidence_counts["family_photo"] >= 2
+    assert 0.0 <= result.confidence <= 1.0
+    assert any(
+        "previously confirmed as Family Photo" in reason for reason in result.reasons
+    )
+
+
+def test_album_review_category_apply_normalizes_display_label_before_persisting():
+    ui = Path("src/ui/album_review_page.py").read_text()
+    assert "def _normalize_category_id" in ui
+    assert "category = self._normalize_category_id(" in ui
+    apply_block = ui[
+        ui.index("def _apply_category_to_rows") : ui.index(
+            "def _refresh_after_category_change"
+        )
+    ]
+    assert "category = self._normalize_category_id(category)" in apply_block

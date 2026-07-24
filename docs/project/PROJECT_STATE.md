@@ -1142,3 +1142,5 @@ Status: implemented in PR branch; awaiting Product Owner manual validation befor
 - MODEL-003D follow-up: when background embedding indexing completes, MainWindow clears the indexing banner, notifies Memory Review, invalidates cached suggestions, and refreshes the selected photo suggestion so a stale No Embedding state cannot persist after successful stored-vector indexing.
 
 - MODEL-003D follow-up: manual category application in Memory Review now records category confirmation metadata and moves pending rows to a non-pending Keep decision so user-applied categories are available as trusted evidence for later suggestions.
+
+- MODEL-003D follow-up: suggestion evidence now normalizes category IDs/display labels such as `Family Photo`, `family photo`, and `family_photo` before eligibility checks, and opt-in developer diagnostics can explain evidence counts when suggestions are unavailable.

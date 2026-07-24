@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import hashlib
+import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Optional
@@ -135,6 +137,7 @@ class CategorySuggestionService:
                 if photo is None:
                     continue
                 cat, trust = self._trusted_category(photo)
+                cat = self._normalize_category_id(cat)
                 if not cat or cat not in eligible:
                     continue
                 weight = self.TRUST_WEIGHTS[trust]
@@ -159,6 +162,13 @@ class CategorySuggestionService:
                     reasons=[
                         "No similar photos have trustworthy confirmed category evidence."
                     ],
+                )
+                self._debug_suggestion(
+                    result,
+                    semantic_matches=len(sims),
+                    trusted_evidence=0,
+                    category_ids=[],
+                    evidence_counts={},
                 )
                 self._cache[cache_key] = result
                 return result
@@ -185,6 +195,13 @@ class CategorySuggestionService:
                         "Not enough trusted similar photos support one category yet."
                     ],
                 )
+                self._debug_suggestion(
+                    result,
+                    semantic_matches=len(sims),
+                    trusted_evidence=len(evidence),
+                    category_ids=sorted(counts),
+                    evidence_counts=counts,
+                )
                 self._cache[cache_key] = result
                 return result
             margin = (win_score - runner_score) / max(win_score, 0.0001)
@@ -197,6 +214,13 @@ class CategorySuggestionService:
                     reasons=[
                         "Trusted similar photos support multiple categories too evenly."
                     ],
+                )
+                self._debug_suggestion(
+                    result,
+                    semantic_matches=len(sims),
+                    trusted_evidence=len(evidence),
+                    category_ids=sorted(counts),
+                    evidence_counts=counts,
                 )
                 self._cache[cache_key] = result
                 return result
@@ -247,6 +271,13 @@ class CategorySuggestionService:
                     ],
                     evidence_signature=signature_key,
                 )
+                self._debug_suggestion(
+                    result,
+                    semantic_matches=len(sims),
+                    trusted_evidence=len(evidence),
+                    category_ids=sorted(counts),
+                    evidence_counts=counts,
+                )
                 self._cache[cache_key] = result
                 return result
             if confidence < self.config.minimum_confidence or (
@@ -265,6 +296,13 @@ class CategorySuggestionService:
                         det_reason,
                     ],
                     evidence_signature=signature_key,
+                )
+                self._debug_suggestion(
+                    result,
+                    semantic_matches=len(sims),
+                    trusted_evidence=len(evidence),
+                    category_ids=sorted(counts),
+                    evidence_counts=counts,
                 )
                 self._cache[cache_key] = result
                 return result
@@ -286,6 +324,13 @@ class CategorySuggestionService:
                 ],
                 metadata.model_key,
                 signature_key,
+            )
+            self._debug_suggestion(
+                result,
+                semantic_matches=len(sims),
+                trusted_evidence=len(evidence),
+                category_ids=sorted(counts),
+                evidence_counts=counts,
             )
             self._cache[cache_key] = result
             return result
@@ -355,6 +400,20 @@ class CategorySuggestionService:
             if c.is_album_candidate and c.id != "unknown"
         }
 
+    def _normalize_category_id(self, value: str) -> str:
+        raw = str(getattr(value, "value", value) or "").strip().lower()
+        if not raw:
+            return ""
+        compact = raw.replace("-", "_").replace(" ", "_")
+        if self.category_registry.has_category(compact):
+            return compact
+        for category in self.category_registry.all_categories():
+            if raw == category.display_name.strip().lower():
+                return category.id
+            if compact == category.display_name.strip().lower().replace(" ", "_"):
+                return category.id
+        return compact
+
     def _trusted_category(self, photo) -> tuple[str, str]:
         md = dict(getattr(photo, "metadata", {}) or {})
         user = (
@@ -367,43 +426,31 @@ class CategorySuggestionService:
             .lower()
         )
         if user:
-            return user, "user_correction"
+            return self._normalize_category_id(user), "user_correction"
         if str(md.get("category_confirmation_state", "")).lower() in {
             "confirmed",
             "manual_confirmed",
         }:
-            return (
-                str(
-                    md.get("effective_media_category")
-                    or getattr(photo, "effective_media_category", "")
-                    or ""
-                )
-                .strip()
-                .lower(),
-                "manual_confirmed",
+            value = str(
+                md.get("effective_media_category")
+                or getattr(photo, "effective_media_category", "")
+                or ""
             )
+            return self._normalize_category_id(value), "manual_confirmed"
         if str(md.get("category_suggestion_state", "")).lower() == "accepted":
-            return (
-                str(
-                    md.get("effective_media_category")
-                    or getattr(photo, "effective_media_category", "")
-                    or ""
-                )
-                .strip()
-                .lower(),
-                "accepted_suggestion",
+            value = str(
+                md.get("effective_media_category")
+                or getattr(photo, "effective_media_category", "")
+                or ""
             )
+            return self._normalize_category_id(value), "accepted_suggestion"
         if bool(md.get("deterministic_category_trusted", False)):
-            return (
-                str(
-                    md.get("automatic_media_category")
-                    or getattr(photo, "automatic_media_category", "")
-                    or ""
-                )
-                .strip()
-                .lower(),
-                "deterministic_classification",
+            value = str(
+                md.get("automatic_media_category")
+                or getattr(photo, "automatic_media_category", "")
+                or ""
             )
+            return self._normalize_category_id(value), "deterministic_classification"
         return "", "machine_unreviewed"
 
     def _has_strong_manual_support(
@@ -443,6 +490,32 @@ class CategorySuggestionService:
             )
         payload = "\n".join(sorted(parts))
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def _debug_suggestion(
+        self,
+        result: CategorySuggestionResult,
+        *,
+        semantic_matches: int,
+        trusted_evidence: int,
+        category_ids: list[str],
+        evidence_counts: dict[str, int],
+    ) -> None:
+        if os.environ.get("FAMILY_MEMORY_DEBUG_SUGGESTIONS") not in {
+            "1",
+            "true",
+            "yes",
+        }:
+            return
+        reason = result.reasons[0] if result.reasons else result.status
+        print(
+            "[CategorySuggestion] "
+            f"source={result.source_photo_key} status={result.status} "
+            f"semantic_matches={semantic_matches} trusted_evidence={trusted_evidence} "
+            f"category_ids={category_ids} evidence_counts={dict(evidence_counts)} "
+            f"reason={reason}",
+            file=sys.stderr,
+            flush=True,
+        )
 
     def _result(
         self,

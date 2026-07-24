@@ -1345,14 +1345,23 @@ class AlbumReviewPage(QWidget):
 
         self._apply_decision_to_rows(rows, decision, source="user_bulk")
 
+    def _normalize_category_id(self, value) -> str:
+        raw = str(getattr(value, "value", value) or "").strip().lower()
+        if not raw:
+            return ""
+        compact = raw.replace("-", "_").replace(" ", "_")
+        if self._category_registry.has_category(compact):
+            return compact
+        for category in self._category_registry.all_categories():
+            if raw == category.display_name.strip().lower():
+                return category.id
+            if compact == category.display_name.strip().lower().replace(" ", "_"):
+                return category.id
+        return compact
+
     def _apply_selector_category(self) -> None:
-        category = (
-            str(
-                self.category_selector.currentData()
-                or self.category_selector.currentText()
-            )
-            .strip()
-            .lower()
+        category = self._normalize_category_id(
+            self.category_selector.currentData() or self.category_selector.currentText()
         )
         rows = self._selected_rows()
         if not rows or not category:
@@ -1421,7 +1430,7 @@ class AlbumReviewPage(QWidget):
     def _apply_category_to_rows(
         self, rows: List[AlbumReviewRow], category: str, source: str
     ) -> None:
-        category = str(category or "").strip().lower()
+        category = self._normalize_category_id(category)
         if not category:
             return
 
