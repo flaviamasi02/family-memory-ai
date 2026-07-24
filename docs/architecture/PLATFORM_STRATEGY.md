@@ -4,6 +4,8 @@
 
 Approved by the Product Owner on 2026-07-24.
 
+Formal decision record: `docs/development/DEC-0049.md`.
+
 ## Decision
 
 Family Memory AI will follow a **desktop-first, mobile-ready** product strategy.
@@ -119,21 +121,15 @@ Full mobile implementation may begin when the Product Owner and ChatGPT Quality 
 
 The desktop application does not need to be commercially polished before mobile work starts. It must, however, have a validated and reusable core workflow.
 
-## Impacted documentation
+## Documentation ownership
 
-This decision must be reflected in:
+- This file is the canonical detailed platform strategy.
+- `docs/development/DEC-0049.md` is the formal approved decision record.
+- `docs/project/PROJECT_STATE.md` owns current operational adoption status.
+- `docs/project/ROADMAP.md` owns transitional platform delivery phases.
 
-- `docs/development/DECISIONS.md`;
-- `docs/project/PROJECT_CONTEXT.md`;
-- `docs/project/PROJECT_STATE.md`;
-- `docs/project/MASTER_DEVELOPMENT_PLAN.md`;
-- `docs/project/DOMAIN_ROADMAP.md`;
-- `docs/project/ROADMAP.md`;
-- `docs/architecture/ARCHITECTURE.md`;
-- `docs/development/AI_PROJECT_PLAYBOOK.md`;
-- `docs/bootstrap/HANDOVER.md`;
-- `docs/releases/CHANGELOG.md`.
+Future architecture, planning, bootstrap, and workflow documentation must reference this strategy rather than redefining it independently.
 
 ## Decision identifier
 
-Proposed ledger identifier: **DEC-0049 - Desktop-First, Mobile-Ready Platform Strategy**.
+**DEC-0049 - Desktop-First, Mobile-Ready Platform Strategy**.
