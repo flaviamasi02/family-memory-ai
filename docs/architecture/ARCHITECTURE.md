@@ -90,6 +90,10 @@ When introduced, it may support:
 
 The architecture should allow this without forcing a rewrite of the desktop application.
 
+## 7. Platform Strategy
+
+DEC-0049 approves a desktop-first, mobile-ready platform strategy. The Windows PySide6 desktop application is the only active implementation target until the core workflow is validated on a representative real family photo library. PySide6 is a presentation layer, not the product core: reusable business rules, photo intelligence, people/profile logic, album decisions, persistence contracts, and stable identifiers should remain platform-neutral wherever practical. Android is the planned second client after the desktop workflow and reusable boundaries are sufficiently validated; no full parallel mobile build, immediate Dart rewrite, or mandatory cloud upload is approved. The canonical detailed strategy is `docs/architecture/PLATFORM_STRATEGY.md`.
+
 ---
 
 # Folder Structure

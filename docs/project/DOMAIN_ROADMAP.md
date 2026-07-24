@@ -37,6 +37,8 @@ Instead, new work should create or continue milestones inside the appropriate fu
 
 MASTER_DEVELOPMENT_PLAN.md defines the product-level purpose of the domains.
 
+DEC-0049 platform rule: domain milestones target the Windows desktop application first while preserving reusable core boundaries for a later Android companion. Roadmap items must not assume parallel full desktop/mobile delivery, mandatory cloud upload, or a large mobile-preparation rewrite.
+
 ---
 
 ## FOUNDATION

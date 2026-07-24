@@ -25,9 +25,11 @@
 - Production automatic category classification is still not implemented. Semantic similarity is currently available through `scripts/similar_images.py`, not through the production UI.
 - Near-duplicate workflow, clustering, similar-photo UI, automatic category suggestions, semantic search UI, and learning from corrections remain future work.
 
+- DEC-0049 is approved and active: the project is desktop-first and mobile-ready. The Windows desktop app remains the only active implementation target until the representative desktop workflow is validated, while new reusable business/domain logic should stay independent from PySide6 wherever practical for a later focused Android companion.
+
 ## Last Updated
 
-- 2026-07-22
+- 2026-07-24
 
 
 ## MODEL chain current validation update
