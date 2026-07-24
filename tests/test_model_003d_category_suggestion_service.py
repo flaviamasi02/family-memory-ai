@@ -349,3 +349,51 @@ def test_embedding_index_refresh_does_not_assume_review_page_exists():
     assert 'getattr(self, "review_page", None)' in refresh_block
     assert "self.review_page.on_embedding_index_updated()" not in refresh_block
     assert "review_page.on_embedding_index_updated()" in refresh_block
+
+
+def test_single_strong_manual_category_evidence_can_suggest_for_similar_photo(tmp_path):
+    store = EmbeddingStore(tmp_path / "e.sqlite3")
+    src = photo(tmp_path / "src.jpg")
+    confirmed = photo(tmp_path / "confirmed.jpg", "family_photo", user=True)
+    put(store, src, [1, 0, 0])
+    put(store, confirmed, [0.99, 0, 0])
+
+    result = service(tmp_path, store).suggest(src, [src, confirmed], META)
+
+    assert result.status == "suggested"
+    assert result.suggested_category_id == "family_photo"
+    assert result.evidence_counts["family_photo"] == 1
+
+
+def test_manual_category_apply_records_confirmed_evidence_and_decision():
+    ui = Path("src/ui/album_review_page.py").read_text()
+    apply_block = ui[
+        ui.index("def _apply_category_to_rows") : ui.index(
+            "def _refresh_after_category_change"
+        )
+    ]
+    assert 'metadata["category_confirmation_state"] = "manual_confirmed"' in apply_block
+    assert 'metadata["category_confirmation_source"] = source' in apply_block
+    assert 'metadata["category_confirmation_category"] = category' in apply_block
+    assert "row.user_decision = UserDecision.Keep.value" in apply_block
+    assert "record_decision_change" in apply_block
+    assert "record_category_correction" in apply_block
+
+
+def test_category_confirmation_fields_persist_in_sidecar(tmp_path):
+    p = photo(tmp_path / "confirmed.jpg", "family_photo", user=True)
+    p.user_decision = "keep"
+    p.metadata["user_decision"] = "keep"
+    p.metadata["category_confirmation_state"] = "manual_confirmed"
+    p.metadata["category_confirmation_source"] = "user"
+    p.metadata["category_confirmation_category"] = "family_photo"
+
+    UserMetadataService().save_photo_metadata(p)
+    reloaded = photo(tmp_path / "confirmed.jpg")
+    UserMetadataService().apply_for_photo(reloaded)
+
+    assert reloaded.user_decision == "keep"
+    assert reloaded.metadata["category_confirmation_state"] == "manual_confirmed"
+    assert reloaded.metadata["category_confirmation_source"] == "user"
+    assert reloaded.metadata["category_confirmation_category"] == "family_photo"
+    assert reloaded.user_corrected_media_category == "family_photo"

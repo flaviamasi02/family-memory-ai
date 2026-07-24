@@ -100,6 +100,15 @@ class UserMetadataService:
         suggestion_last_feedback_at = str(
             data.get("category_suggestion_last_feedback_at", "") or ""
         ).strip()
+        category_confirmation_state = str(
+            data.get("category_confirmation_state", "") or ""
+        ).strip()
+        category_confirmation_source = str(
+            data.get("category_confirmation_source", "") or ""
+        ).strip()
+        category_confirmation_category = str(
+            data.get("category_confirmation_category", "") or ""
+        ).strip()
 
         if automatic:
             metadata["automatic_media_category"] = automatic
@@ -154,6 +163,12 @@ class UserMetadataService:
             metadata["category_suggestion_last_feedback_at"] = (
                 suggestion_last_feedback_at
             )
+        if category_confirmation_state:
+            metadata["category_confirmation_state"] = category_confirmation_state
+        if category_confirmation_source:
+            metadata["category_confirmation_source"] = category_confirmation_source
+        if category_confirmation_category:
+            metadata["category_confirmation_category"] = category_confirmation_category
 
         if not identity_match:
             metadata["user_metadata_warning"] = "identity_mismatch"
@@ -267,6 +282,15 @@ class UserMetadataService:
             ).strip(),
             "category_suggestion_last_feedback_at": str(
                 metadata.get("category_suggestion_last_feedback_at", "") or ""
+            ).strip(),
+            "category_confirmation_state": str(
+                metadata.get("category_confirmation_state", "") or ""
+            ).strip(),
+            "category_confirmation_source": str(
+                metadata.get("category_confirmation_source", "") or ""
+            ).strip(),
+            "category_confirmation_category": str(
+                metadata.get("category_confirmation_category", "") or ""
             ).strip(),
             "updated_at": datetime.now(timezone.utc).isoformat(),
             "app_version": app_version or self._app_version,

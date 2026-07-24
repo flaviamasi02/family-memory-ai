@@ -1440,6 +1440,8 @@ class AlbumReviewPage(QWidget):
             previous = self._effective_category_for_photo(photo)
 
             metadata = dict(getattr(photo, "metadata", {}) or {})
+            previous_decision = row.user_decision
+            decision_changed = False
             automatic = (
                 str(
                     metadata.get("automatic_media_category", "")
@@ -1454,6 +1456,15 @@ class AlbumReviewPage(QWidget):
             metadata["user_corrected_media_category"] = category
             metadata["effective_media_category"] = category
             metadata["media_category"] = category
+            metadata["category_confirmation_state"] = "manual_confirmed"
+            metadata["category_confirmation_source"] = source
+            metadata["category_confirmation_category"] = category
+            if row.user_decision == UserDecision.Pending.value:
+                row.user_decision = UserDecision.Keep.value
+                row.review_state = self._review_state_from_decision(row.user_decision)
+                photo.user_decision = row.user_decision
+                metadata["user_decision"] = row.user_decision
+                decision_changed = True
             metadata["classification_reason"] = (
                 metadata.get("classification_reason", "") or "User corrected category."
             )
@@ -1467,6 +1478,20 @@ class AlbumReviewPage(QWidget):
                 metadata.get("classification_reason", "") or ""
             )
             photo.sync_intelligence_from_metadata()
+
+            if decision_changed:
+                self._decision_history.record_decision_change(
+                    photo,
+                    previous_value=previous_decision,
+                    new_value=row.user_decision,
+                    source=source,
+                )
+                self._preference_learning_engine.record_decision(
+                    photo,
+                    previous_decision=previous_decision,
+                    new_decision=row.user_decision,
+                    source=source,
+                )
 
             self._decision_history.record_category_correction(
                 photo,

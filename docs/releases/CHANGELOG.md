@@ -623,3 +623,5 @@
 - Documented that confidence is a deterministic heuristic, manual categories remain authoritative, local stored vectors are used only, and automatic category replacement is not included.
 
 - Fixed MODEL-003D Memory Review refresh after embedding indexing completion: the status banner now leaves the indexing state, suggestion cache is invalidated, and the selected photo suggestion is recomputed without restarting the app.
+
+- Fixed MODEL-003D manual evidence capture so Apply Category to Selected records confirmed category evidence, updates pending rows to Keep, persists confirmation metadata, and allows highly similar photos to use that trusted manual evidence for suggestions.

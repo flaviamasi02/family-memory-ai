@@ -168,7 +168,14 @@ class CategorySuggestionService:
             )
             winner, win_score = ranked[0]
             runner_score = ranked[1][1] if len(ranked) > 1 else 0.0
-            if counts.get(winner, 0) < self.config.minimum_support_count:
+            winning_evidence = [e for e in evidence if e.category_id == winner]
+            has_strong_manual_support = self._has_strong_manual_support(
+                winning_evidence
+            )
+            if (
+                counts.get(winner, 0) < self.config.minimum_support_count
+                and not has_strong_manual_support
+            ):
                 result = self._result(
                     source_key,
                     "insufficient_evidence",
@@ -193,7 +200,6 @@ class CategorySuggestionService:
                 )
                 self._cache[cache_key] = result
                 return result
-            winning_evidence = [e for e in evidence if e.category_id == winner]
             avg_sim = sum(e.similarity for e in winning_evidence) / len(
                 winning_evidence
             )
@@ -399,6 +405,15 @@ class CategorySuggestionService:
                 "deterministic_classification",
             )
         return "", "machine_unreviewed"
+
+    def _has_strong_manual_support(
+        self, evidence: list[CategorySuggestionEvidence]
+    ) -> bool:
+        return any(
+            item.trust_level in {"manual_confirmed", "user_correction"}
+            and item.similarity >= 0.90
+            for item in evidence
+        )
 
     def _has_persisted_rejection(
         self, photo, category_id: str, model_key: str, evidence_signature: str

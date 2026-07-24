@@ -1140,3 +1140,5 @@ Status: implemented in PR branch; awaiting Product Owner manual validation befor
 - Suggestions use only existing album-candidate content categories, exclude Unknown/workflow cleanup categories, require current valid stored embeddings and multiple trustworthy similar labeled photos, and treat manual/user-corrected labels as authoritative. Automatic category replacement remains out of scope.
 
 - MODEL-003D follow-up: when background embedding indexing completes, MainWindow clears the indexing banner, notifies Memory Review, invalidates cached suggestions, and refreshes the selected photo suggestion so a stale No Embedding state cannot persist after successful stored-vector indexing.
+
+- MODEL-003D follow-up: manual category application in Memory Review now records category confirmation metadata and moves pending rows to a non-pending Keep decision so user-applied categories are available as trusted evidence for later suggestions.
