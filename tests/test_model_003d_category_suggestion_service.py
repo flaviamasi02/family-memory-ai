@@ -5,6 +5,7 @@ from core.category_suggestion_service import (
     CategorySuggestionService,
 )
 from core.category_registry import CategoryRegistry
+from core.user_metadata_service import UserMetadataService
 from types import SimpleNamespace
 
 
@@ -42,8 +43,17 @@ def photo(
     accepted=False,
     deterministic=False
 ):
-    path.write_bytes(path.name.encode())
-    p = SimpleNamespace(path=path, filename=path.name)
+    if not path.exists():
+        path.write_bytes(path.name.encode())
+    p = SimpleNamespace(
+        path=path,
+        filename=path.name,
+        file_size=path.stat().st_size,
+        user_decision="pending",
+        classification_reason="",
+        sync_intelligence_from_metadata=lambda: None,
+        sync_visual_features_from_metadata=lambda: None,
+    )
     p.media_category = p.effective_media_category = p.automatic_media_category = (
         category
     )
@@ -217,3 +227,79 @@ def test_stale_async_result_guard_and_cache_reuse_are_present():
     assert "self._details_key != self._row_key(row)" in ui
     assert "if cache_key in self._cache" in svc
     assert "invalidate_cache" in ui
+
+
+def test_rejection_persists_and_suppresses_unchanged_suggestion(tmp_path):
+    store = EmbeddingStore(tmp_path / "e.sqlite3")
+    src = photo(tmp_path / "src.jpg")
+    a = photo(tmp_path / "a.jpg", "family_photo", user=True)
+    b = photo(tmp_path / "b.jpg", "family_photo", user=True)
+    put(store, src, [1, 0, 0])
+    put(store, a, [0.99, 0, 0])
+    put(store, b, [0.98, 0, 0])
+    svc = service(tmp_path, store)
+    result = svc.suggest(src, [src, a, b], META)
+    before = src.effective_media_category
+    event = svc.record_rejection(
+        result, source="user", photo=src, chooser_identity="profile:user"
+    )
+    assert src.effective_media_category == before
+    assert event["action"] == "rejected"
+    assert event["chooser_identity"] == "profile:user"
+    assert UserMetadataService().sidecar_path_for(src.path).exists()
+
+    reloaded = photo(tmp_path / "src.jpg")
+    UserMetadataService().apply_for_photo(reloaded)
+    assert reloaded.effective_media_category == before
+    assert reloaded.metadata["category_suggestion_feedback"][-1]["action"] == "rejected"
+    suppressed = service(tmp_path, store).suggest(reloaded, [reloaded, a, b], META)
+    assert suppressed.status == "insufficient_evidence"
+    assert "previously marked not useful" in suppressed.reasons[0]
+
+
+def test_rejected_suggestion_can_resurface_after_evidence_changes(tmp_path):
+    store = EmbeddingStore(tmp_path / "e.sqlite3")
+    src = photo(tmp_path / "src.jpg")
+    a = photo(tmp_path / "a.jpg", "family_photo", user=True)
+    b = photo(tmp_path / "b.jpg", "family_photo", user=True)
+    put(store, src, [1, 0, 0])
+    put(store, a, [0.99, 0, 0])
+    put(store, b, [0.98, 0, 0])
+    svc = service(tmp_path, store)
+    result = svc.suggest(src, [src, a, b], META)
+    svc.record_rejection(result, photo=src)
+    assert svc.suggest(src, [src, a, b], META).status == "insufficient_evidence"
+
+    c = photo(tmp_path / "c.jpg", "family_photo", user=True)
+    put(store, c, [0.97, 0, 0])
+    changed = service(tmp_path, store).suggest(src, [src, a, b, c], META)
+    assert changed.status == "suggested"
+
+
+def test_apply_suggestion_source_uses_existing_category_workflow_and_clears_panel():
+    ui = Path("src/ui/album_review_page.py").read_text()
+    apply_block = ui[
+        ui.index("def _apply_current_suggestion") : ui.index(
+            "def _reject_current_suggestion"
+        )
+    ]
+    assert "self._apply_category_to_rows" in apply_block
+    assert 'source="ai_suggestion_accepted"' in apply_block
+    assert "user_corrected_media_category" not in apply_block
+    assert "record_category_correction" not in apply_block
+    assert "Suggestion applied through the category correction workflow." in apply_block
+    assert "self._suggestion_request_id += 1" in apply_block
+
+
+def test_reject_path_persists_feedback_and_blocks_stale_result_restore():
+    ui = Path("src/ui/album_review_page.py").read_text()
+    reject_block = ui[
+        ui.index("def _reject_current_suggestion") : ui.index(
+            "def _sync_selectors_to_row"
+        )
+    ]
+    assert "record_rejection" in reject_block
+    assert "photo=row.breakdown.photo" in reject_block
+    assert "Suggestion marked not useful. Category was not changed." in reject_block
+    assert "self._suggestion_request_id += 1" in reject_block
+    assert "_apply_category_to_rows" not in reject_block

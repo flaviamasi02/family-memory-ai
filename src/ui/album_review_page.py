@@ -1260,20 +1260,35 @@ class AlbumReviewPage(QWidget):
         row = self._selected_row()
         if result is None or row is None or result.status != "suggested":
             return
+        self._suggestion_request_id += 1
         self._apply_category_to_rows(
             [row], result.suggested_category_id, source="ai_suggestion_accepted"
         )
         metadata = dict(getattr(row.breakdown.photo, "metadata", {}) or {})
         metadata["category_suggestion_state"] = "accepted"
         metadata["category_suggestion_model_key"] = result.model_key
+        metadata["category_suggestion_applied_category"] = result.suggested_category_id
         row.breakdown.photo.metadata = metadata
         self._save_photo_user_metadata(row.breakdown.photo)
+        self._current_suggestion = None
+        self.apply_suggestion_button.setEnabled(False)
+        self.reject_suggestion_button.setEnabled(False)
+        self.ai_suggestion_value.setText(
+            "Suggestion applied through the category correction workflow."
+        )
+        self.ai_suggestion_reasons.clear()
         self._category_suggestion_service.invalidate_cache()
 
     def _reject_current_suggestion(self) -> None:
+        self._suggestion_request_id += 1
         result = self._current_suggestion
+        row = self._selected_row()
         if result is not None:
-            self._category_suggestion_service.record_rejection(result, source="user")
+            self._category_suggestion_service.record_rejection(
+                result,
+                source="user",
+                photo=row.breakdown.photo if row is not None else None,
+            )
         self._current_suggestion = None
         self.apply_suggestion_button.setEnabled(False)
         self.reject_suggestion_button.setEnabled(False)

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import hashlib
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Optional
 
 from core.category_registry import CategoryRegistry, get_category_registry
+from core.user_metadata_service import UserMetadataService
 from vision.embedding_provider import EmbeddingStore, ModelMetadata
 from vision.semantic_similarity_service import SemanticSimilarityService
 
@@ -31,6 +34,7 @@ class CategorySuggestionResult:
     supporting_photos: list[CategorySuggestionEvidence] = field(default_factory=list)
     model_key: str = ""
     provenance: str = "stored_vectors+trusted_labels+deterministic_rules"
+    evidence_signature: str = ""
 
 
 @dataclass(frozen=True)
@@ -79,8 +83,9 @@ class CategorySuggestionService:
             media_classifier = MediaClassifier(enable_visual_content_analysis=False)
         self.media_classifier = media_classifier
         self.config = config or CategorySuggestionConfig()
-        self._cache: dict[tuple[str, str, int], CategorySuggestionResult] = {}
+        self._cache: dict[tuple[str, str, str], CategorySuggestionResult] = {}
         self._feedback: list[dict[str, str]] = []
+        self._user_metadata_service = UserMetadataService()
 
     def suggest(
         self, source_photo, all_photos: Iterable, metadata: ModelMetadata
@@ -110,8 +115,8 @@ class CategorySuggestionService:
                     reasons=["No content categories are eligible for AI suggestions."],
                 )
             by_key = {str(Path(getattr(p, "path", p)).resolve()): p for p in all_photos}
-            signature = self._evidence_signature(by_key.values())
-            cache_key = (source_key, metadata.model_key, signature)
+            signature_key = self._evidence_signature(by_key.values())
+            cache_key = (source_key, metadata.model_key, signature_key)
             if cache_key in self._cache:
                 return self._cache[cache_key]
             sims = self.similarity_service.most_similar(
@@ -223,6 +228,21 @@ class CategorySuggestionService:
             else:
                 det_reason = "Existing deterministic signals are inconclusive."
             confidence = max(0.0, min(1.0, round(confidence, 4)))
+            if self._has_persisted_rejection(
+                source_photo, winner, metadata.model_key, signature_key
+            ):
+                result = self._result(
+                    source_key,
+                    "insufficient_evidence",
+                    model_key=metadata.model_key,
+                    evidence_counts=counts,
+                    reasons=[
+                        "This suggestion was previously marked not useful for the current evidence."
+                    ],
+                    evidence_signature=signature_key,
+                )
+                self._cache[cache_key] = result
+                return result
             if confidence < self.config.minimum_confidence or (
                 runner_score and margin < self.config.minimum_winning_margin
             ):
@@ -238,6 +258,7 @@ class CategorySuggestionService:
                         "Evidence is not strong enough for a clear advisory suggestion.",
                         det_reason,
                     ],
+                    evidence_signature=signature_key,
                 )
                 self._cache[cache_key] = result
                 return result
@@ -258,6 +279,7 @@ class CategorySuggestionService:
                     :8
                 ],
                 metadata.model_key,
+                signature_key,
             )
             self._cache[cache_key] = result
             return result
@@ -270,16 +292,48 @@ class CategorySuggestionService:
             )
 
     def record_rejection(
-        self, result: CategorySuggestionResult, source: str = "user"
-    ) -> None:
-        self._feedback.append(
-            {
-                "photo_key": result.source_photo_key,
-                "category_id": result.suggested_category_id,
-                "source": source,
-                "action": "rejected",
-            }
-        )
+        self,
+        result: CategorySuggestionResult,
+        source: str = "user",
+        *,
+        photo=None,
+        chooser_identity: str = "",
+    ) -> dict[str, str]:
+        event = {
+            "photo_key": result.source_photo_key,
+            "category_id": result.suggested_category_id,
+            "suggested_category_id": result.suggested_category_id,
+            "suggested_category_name": result.suggested_category_name,
+            "source": source,
+            "chooser_identity": str(chooser_identity or source or "user"),
+            "action": "rejected",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "model_key": result.model_key,
+            "provenance": result.provenance,
+            "evidence_signature": result.evidence_signature,
+        }
+        self._feedback.append(event)
+        if photo is not None:
+            metadata = dict(getattr(photo, "metadata", {}) or {})
+            events = [
+                item
+                for item in metadata.get("category_suggestion_feedback", [])
+                if isinstance(item, dict)
+            ]
+            events.append(event)
+            metadata["category_suggestion_feedback"] = events[-50:]
+            metadata["category_suggestion_state"] = "rejected"
+            metadata["category_suggestion_last_rejected_category"] = (
+                result.suggested_category_id
+            )
+            metadata["category_suggestion_last_feedback_at"] = event["timestamp"]
+            photo.metadata = metadata
+            try:
+                self._user_metadata_service.save_photo_metadata(photo)
+            except Exception:
+                pass
+        self.invalidate_cache()
+        return event
 
     @property
     def feedback_events(self) -> list[dict[str, str]]:
@@ -346,18 +400,34 @@ class CategorySuggestionService:
             )
         return "", "machine_unreviewed"
 
-    def _evidence_signature(self, photos: Iterable) -> int:
-        return hash(
-            tuple(
-                sorted(
-                    (
-                        str(Path(getattr(p, "path", p)).resolve()),
-                        self._trusted_category(p),
-                    )
-                    for p in photos
+    def _has_persisted_rejection(
+        self, photo, category_id: str, model_key: str, evidence_signature: str
+    ) -> bool:
+        metadata = dict(getattr(photo, "metadata", {}) or {})
+        for item in metadata.get("category_suggestion_feedback", []) or []:
+            if not isinstance(item, dict):
+                continue
+            if (
+                str(item.get("action", "")).lower() == "rejected"
+                and str(
+                    item.get("suggested_category_id") or item.get("category_id") or ""
                 )
+                == str(category_id)
+                and str(item.get("model_key", "")) == str(model_key)
+                and str(item.get("evidence_signature", "")) == str(evidence_signature)
+            ):
+                return True
+        return False
+
+    def _evidence_signature(self, photos: Iterable) -> str:
+        parts = []
+        for p in photos:
+            category_id, trust = self._trusted_category(p)
+            parts.append(
+                f"{Path(getattr(p, 'path', p)).resolve()}|{category_id}|{trust}"
             )
-        )
+        payload = "\n".join(sorted(parts))
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     def _result(
         self,
@@ -370,6 +440,7 @@ class CategorySuggestionService:
         evidence_counts: Optional[dict[str, int]] = None,
         supporting_photos: Optional[list[CategorySuggestionEvidence]] = None,
         model_key: str = "",
+        evidence_signature: str = "",
     ) -> CategorySuggestionResult:
         return CategorySuggestionResult(
             source_key,
@@ -381,4 +452,5 @@ class CategorySuggestionService:
             evidence_counts or {},
             supporting_photos or [],
             model_key,
+            evidence_signature=evidence_signature,
         )

@@ -29,17 +29,23 @@ class UserMetadataService:
         path = Path(file_path)
         return path.with_name(f"{path.stem}{self.SIDE_CAR_SUFFIX}")
 
-    def save_for_photo(self, photo, app_version: Optional[str] = None) -> Optional[Path]:
+    def save_for_photo(
+        self, photo, app_version: Optional[str] = None
+    ) -> Optional[Path]:
         photo_path = Path(getattr(photo, "path", ""))
         if not photo_path:
             return None
 
         payload = self._build_payload(photo, app_version=app_version)
         sidecar_path = self.sidecar_path_for(photo_path)
-        sidecar_path.write_text(json.dumps(payload, indent=2, ensure_ascii=True), encoding="utf-8")
+        sidecar_path.write_text(
+            json.dumps(payload, indent=2, ensure_ascii=True), encoding="utf-8"
+        )
         return sidecar_path
 
-    def save_photo_metadata(self, photo, app_version: Optional[str] = None) -> Optional[Path]:
+    def save_photo_metadata(
+        self, photo, app_version: Optional[str] = None
+    ) -> Optional[Path]:
         return self.save_for_photo(photo, app_version=app_version)
 
     def apply_for_photo(self, photo) -> UserMetadataLoadResult:
@@ -59,23 +65,41 @@ class UserMetadataService:
         current_identity = self._current_identity(photo_path)
         identity_match = self._identity_matches(data, current_identity)
         stored_filename = str(data.get("file_name", "") or "").strip()
-        filename_matches = stored_filename.lower() == str(photo_path.name).strip().lower()
+        filename_matches = (
+            stored_filename.lower() == str(photo_path.name).strip().lower()
+        )
 
         if not identity_match and not filename_matches:
             return UserMetadataLoadResult(True, False, True, sidecar_path)
 
         metadata = dict(getattr(photo, "metadata", {}) or {})
         automatic = str(data.get("automatic_media_category", "") or "").strip()
-        user_corrected = str(data.get("user_corrected_media_category", "") or "").strip()
-        effective_from_sidecar = str(data.get("effective_media_category", "") or "").strip()
+        user_corrected = str(
+            data.get("user_corrected_media_category", "") or ""
+        ).strip()
+        effective_from_sidecar = str(
+            data.get("effective_media_category", "") or ""
+        ).strip()
         user_decision = str(data.get("user_decision", "") or "").strip()
         classification_reason = str(data.get("classification_reason", "") or "").strip()
         face_count = data.get("face_count", data.get("faces_count", 0))
         has_faces = data.get("has_faces", False)
         face_detection_confidence = data.get("face_detection_confidence", 0.0)
-        face_detection_detector = str(data.get("face_detection_detector", "") or "").strip()
+        face_detection_detector = str(
+            data.get("face_detection_detector", "") or ""
+        ).strip()
         face_detection_explanation = data.get("face_detection_explanation", [])
-        visual_profile = VisualFeatureProfile.from_dict(data.get("visual_feature_profile"))
+        visual_profile = VisualFeatureProfile.from_dict(
+            data.get("visual_feature_profile")
+        )
+        suggestion_feedback = data.get("category_suggestion_feedback", [])
+        suggestion_state = str(data.get("category_suggestion_state", "") or "").strip()
+        suggestion_last_rejected = str(
+            data.get("category_suggestion_last_rejected_category", "") or ""
+        ).strip()
+        suggestion_last_feedback_at = str(
+            data.get("category_suggestion_last_feedback_at", "") or ""
+        ).strip()
 
         if automatic:
             metadata["automatic_media_category"] = automatic
@@ -83,8 +107,14 @@ class UserMetadataService:
         if user_corrected:
             metadata["user_corrected_media_category"] = user_corrected
 
-        effective = user_corrected or effective_from_sidecar or automatic or str(
-            metadata.get("effective_media_category", "") or metadata.get("media_category", "unknown")
+        effective = (
+            user_corrected
+            or effective_from_sidecar
+            or automatic
+            or str(
+                metadata.get("effective_media_category", "")
+                or metadata.get("media_category", "unknown")
+            )
         )
         metadata["effective_media_category"] = effective
         metadata["media_category"] = effective
@@ -102,9 +132,28 @@ class UserMetadataService:
         if face_detection_detector:
             metadata["face_detection_detector"] = face_detection_detector
         if isinstance(face_detection_explanation, list):
-            metadata["face_detection_explanation"] = [str(item) for item in face_detection_explanation]
-        if visual_profile.extraction_status not in {"missing", "corrupted"} or data.get("visual_feature_profile") is not None:
+            metadata["face_detection_explanation"] = [
+                str(item) for item in face_detection_explanation
+            ]
+        if (
+            visual_profile.extraction_status not in {"missing", "corrupted"}
+            or data.get("visual_feature_profile") is not None
+        ):
             metadata["visual_feature_profile"] = visual_profile.to_dict()
+        if isinstance(suggestion_feedback, list):
+            metadata["category_suggestion_feedback"] = [
+                item for item in suggestion_feedback if isinstance(item, dict)
+            ]
+        if suggestion_state:
+            metadata["category_suggestion_state"] = suggestion_state
+        if suggestion_last_rejected:
+            metadata["category_suggestion_last_rejected_category"] = (
+                suggestion_last_rejected
+            )
+        if suggestion_last_feedback_at:
+            metadata["category_suggestion_last_feedback_at"] = (
+                suggestion_last_feedback_at
+            )
 
         if not identity_match:
             metadata["user_metadata_warning"] = "identity_mismatch"
@@ -112,18 +161,32 @@ class UserMetadataService:
             metadata.pop("user_metadata_warning", None)
 
         photo.metadata = metadata
-        photo.automatic_media_category = str(metadata.get("automatic_media_category", "") or photo.automatic_media_category)
-        photo.user_corrected_media_category = str(metadata.get("user_corrected_media_category", "") or "")
-        photo.effective_media_category = str(metadata.get("effective_media_category", "") or photo.effective_media_category)
-        photo.media_category = str(metadata.get("media_category", "") or photo.media_category)
+        photo.automatic_media_category = str(
+            metadata.get("automatic_media_category", "")
+            or photo.automatic_media_category
+        )
+        photo.user_corrected_media_category = str(
+            metadata.get("user_corrected_media_category", "") or ""
+        )
+        photo.effective_media_category = str(
+            metadata.get("effective_media_category", "")
+            or photo.effective_media_category
+        )
+        photo.media_category = str(
+            metadata.get("media_category", "") or photo.media_category
+        )
         if user_decision:
             photo.user_decision = user_decision
         photo.sync_intelligence_from_metadata()
         photo.sync_visual_features_from_metadata()
 
-        return UserMetadataLoadResult(True, identity_match, not identity_match, sidecar_path)
+        return UserMetadataLoadResult(
+            True, identity_match, not identity_match, sidecar_path
+        )
 
-    def _build_payload(self, photo, app_version: Optional[str] = None) -> dict[str, Any]:
+    def _build_payload(
+        self, photo, app_version: Optional[str] = None
+    ) -> dict[str, Any]:
         path = Path(getattr(photo, "path", ""))
         stat = path.stat() if path.exists() else None
         metadata = dict(getattr(photo, "metadata", {}) or {})
@@ -164,19 +227,47 @@ class UserMetadataService:
         payload = {
             "file_path": str(path),
             "file_name": path.name,
-            "file_size": int(stat.st_size) if stat is not None else int(getattr(photo, "file_size", 0) or 0),
+            "file_size": (
+                int(stat.st_size)
+                if stat is not None
+                else int(getattr(photo, "file_size", 0) or 0)
+            ),
             "last_modified": float(stat.st_mtime) if stat is not None else 0.0,
             "automatic_media_category": automatic,
             "user_corrected_media_category": user_corrected,
             "effective_media_category": effective,
             "user_decision": user_decision,
             "classification_reason": classification_reason,
-            "face_count": int(metadata.get("face_count", metadata.get("faces_count", 0)) or 0),
+            "face_count": int(
+                metadata.get("face_count", metadata.get("faces_count", 0)) or 0
+            ),
             "has_faces": bool(metadata.get("has_faces", False)),
-            "face_detection_confidence": float(metadata.get("face_detection_confidence", 0.0) or 0.0),
-            "face_detection_detector": str(metadata.get("face_detection_detector", "") or "").strip(),
-            "face_detection_explanation": list(metadata.get("face_detection_explanation", []) or []),
-            "visual_feature_profile": VisualFeatureProfile.from_dict(metadata.get("visual_feature_profile")).to_dict(),
+            "face_detection_confidence": float(
+                metadata.get("face_detection_confidence", 0.0) or 0.0
+            ),
+            "face_detection_detector": str(
+                metadata.get("face_detection_detector", "") or ""
+            ).strip(),
+            "face_detection_explanation": list(
+                metadata.get("face_detection_explanation", []) or []
+            ),
+            "visual_feature_profile": VisualFeatureProfile.from_dict(
+                metadata.get("visual_feature_profile")
+            ).to_dict(),
+            "category_suggestion_feedback": [
+                item
+                for item in metadata.get("category_suggestion_feedback", [])
+                if isinstance(item, dict)
+            ],
+            "category_suggestion_state": str(
+                metadata.get("category_suggestion_state", "") or ""
+            ).strip(),
+            "category_suggestion_last_rejected_category": str(
+                metadata.get("category_suggestion_last_rejected_category", "") or ""
+            ).strip(),
+            "category_suggestion_last_feedback_at": str(
+                metadata.get("category_suggestion_last_feedback_at", "") or ""
+            ).strip(),
             "updated_at": datetime.now(timezone.utc).isoformat(),
             "app_version": app_version or self._app_version,
         }
@@ -190,7 +281,9 @@ class UserMetadataService:
             "last_modified": float(stat.st_mtime),
         }
 
-    def _identity_matches(self, stored: dict[str, Any], current: dict[str, Any]) -> bool:
+    def _identity_matches(
+        self, stored: dict[str, Any], current: dict[str, Any]
+    ) -> bool:
         stored_name = str(stored.get("file_name", "") or "").strip().lower()
         current_name = str(current.get("file_name", "") or "").strip().lower()
         if not stored_name or stored_name != current_name:
@@ -210,4 +303,6 @@ class UserMetadataService:
         except Exception:
             return False
 
-        return abs(stored_mtime - current_mtime) <= self.IDENTITY_MTIME_TOLERANCE_SECONDS
+        return (
+            abs(stored_mtime - current_mtime) <= self.IDENTITY_MTIME_TOLERANCE_SECONDS
+        )
