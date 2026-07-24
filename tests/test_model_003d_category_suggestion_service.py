@@ -337,3 +337,15 @@ def test_no_embedding_results_are_not_cached_so_later_indexing_can_be_observed(
     after_indexing = svc.suggest(src, [src, a, b], META)
     assert after_indexing.status == "suggested"
     assert after_indexing.suggested_category_id == "family_photo"
+
+
+def test_embedding_index_refresh_does_not_assume_review_page_exists():
+    main = Path("src/ui/main_window.py").read_text()
+    refresh_block = main[
+        main.index("def _on_embedding_index_updated") : main.index(
+            "def _on_embedding_error"
+        )
+    ]
+    assert 'getattr(self, "review_page", None)' in refresh_block
+    assert "self.review_page.on_embedding_index_updated()" not in refresh_block
+    assert "review_page.on_embedding_index_updated()" in refresh_block

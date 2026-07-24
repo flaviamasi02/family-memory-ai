@@ -488,8 +488,11 @@ class MainWindow(QMainWindow):
 
     def _on_embedding_index_updated(self, result) -> None:
         _ = result
-        if hasattr(self.review_page, "on_embedding_index_updated"):
-            self.review_page.on_embedding_index_updated()
+        review_page = getattr(self, "review_page", None)
+        if review_page is not None and hasattr(
+            review_page, "on_embedding_index_updated"
+        ):
+            review_page.on_embedding_index_updated()
 
     def _on_embedding_error(self, run_id: int, error_message: str) -> None:
         if run_id != self._active_embedding_run_id:
