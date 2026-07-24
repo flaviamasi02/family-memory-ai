@@ -12,9 +12,11 @@
 
 ## Safety note
 
-The GitHub connector returned partial views for some large canonical documents. Those documents were not overwritten because doing so would risk deleting valid history. Their remaining cross-references must be applied through a repository-aware editing environment that can patch files without replacing unread content.
+The GitHub connector returned partial views for some large canonical documents. Those documents were not overwritten because doing so would risk deleting valid history. Full-file replacement was avoided in favor of repository-aware targeted patches that can update specific sections without replacing unread content.
 
-## Required remaining propagation
+## Completed propagation
+
+DEC-0049 propagation has now been completed through repository-aware targeted patches. The synchronization updated:
 
 - `docs/development/DECISIONS.md`
 - `docs/project/PROJECT_CONTEXT.md`
@@ -24,6 +26,7 @@ The GitHub connector returned partial views for some large canonical documents. 
 - `docs/architecture/ARCHITECTURE.md`
 - `docs/development/AI_PROJECT_PLAYBOOK.md`
 - `docs/bootstrap/HANDOVER.md`
+- `CHANGELOG.md`
 - `docs/releases/CHANGELOG.md`
 
 The approved strategy itself is unchanged: desktop first, mobile ready, no complete parallel desktop/mobile development, reusable core outside PySide6 wherever practical, Android later as a focused companion, and local-first privacy by default.
