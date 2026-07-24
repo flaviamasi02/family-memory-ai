@@ -7,8 +7,8 @@ Consequences:
 - Providers register descriptors and factories; the manager/UI must not be rewritten for every model.
 - Installation uses explicit, typed plans and Product Owner confirmation; no silent dependency/model download is allowed.
 - Runtime files, history, benchmarks, logs, and model cache live outside Git through `ApplicationDataPathService`.
-- Runtime records can point to the current app environment, an existing environment such as `.venv-mobileclip`, or a future dedicated environment.
-- MobileCLIP is registered first, remains evaluation-only, and managed installation/verification flow is implemented by MODEL-002B; Product Owner validation is still pending.
+- Runtime records point to configured interpreters; optional providers use managed dedicated runtimes when they require large provider-specific dependencies.
+- MobileCLIP is registered first, remains local-only, and its managed installation/verification flow has been Product Owner validated through MODEL-002F.
 
 ## MODEL-002B — MobileCLIP installation and verification
 
@@ -19,7 +19,9 @@ Consequences:
 - Official Apple MobileCLIP source and `apple/MobileCLIP-S0` checkpoint metadata are recorded in the plan.
 - Checkpoints live under application data outside Git and are downloaded only after confirmation.
 - Ready requires full provider verification, not package presence.
-- MobileCLIP stays evaluation-only; no original photos are modified or uploaded.
+- MobileCLIP provider dependencies such as torch, torchvision, and mobileclip must stay in the configured managed runtime rather than being absorbed into the main application environment merely to execute an optional model.
+- Inference must use configured runtime boundaries, not `sys.path` manipulation or hard-coded environment paths.
+- MobileCLIP stays evaluation-only for classification; no original photos are modified or uploaded.
 
 ## IDEA 3 — Generic AI Runtime Manager approved
 
@@ -42,7 +44,7 @@ Permanent rules:
 
 ## MODEL validation and production-classifier policy
 
-Decision: MobileCLIP remains evaluation-only until Product Owner-guided validation produces measured local evidence.
+Decision: MobileCLIP runtime readiness and embedding/similarity behavior may be documented as validated only after Product Owner-guided measured local evidence. Automatic classification remains deferred until explicitly approved.
 
 Consequences:
 - MobileCLIP is the first managed runtime, but the production classifier has not been replaced.
@@ -50,6 +52,8 @@ Consequences:
 - CPU-only compatibility is required.
 - No black-box production classifier replacement is approved.
 - Manual validation is required before documentation may claim runtime Ready status, installation success, real embedding quality, or performance results.
+- Persisted embeddings are separate from original image files.
+- Similarity must reject stale source records and model-incompatible embeddings before returning candidates.
 
 ## Repository workflow, prompt, and cleanup decisions
 
@@ -59,7 +63,7 @@ Permanent workflow:
 Product Owner -> ChatGPT specification -> Codex implementation -> ChatGPT review -> Product Owner manual test -> Product Owner approval -> merge -> repository cleanup.
 
 Rules:
-- Every code modification must be manually tested by the Product Owner before merge; automated tests do not replace Product Owner testing.
+- Every code modification requires Product Owner manual validation before merge; automated tests do not replace Product Owner testing.
 - Documentation-only PRs require documentation review but do not require launching the application unless they alter user-visible application help generated from code.
 - Every GitHub/Codex implementation prompt must include the Codex link `https://chatgpt.com/codex`, repository link `https://github.com/flaviamasi02/family-memory-ai`, execution environment, estimated task size, purpose, expected outcome, base branch, instruction not to merge automatically, and Product Owner manual-test requirement.
 - When correcting an existing PR, Codex must update the same PR and must not create a new PR unless explicitly instructed.
@@ -73,4 +77,4 @@ Consequences:
 - Keep AI Runtime provider state generic and data-oriented.
 - Inspect Qt widget hierarchy, grid rows, visibility, geometry, size hints, and layout ordering when metadata appears blank.
 - Preserve explicit row sizing/geometry refresh behavior in the AI Models card.
-- Use MODEL-002F for Product Owner-guided MobileCLIP installation and operational validation before MODEL-003 classification integration; do not mix classification behavior changes into runtime diagnostics or layout fixes.
+- Preserve the completed MODEL-002F validation record, keep runtime diagnostics separate from classification behavior, and require explicit Product Owner approval before any production classification integration.

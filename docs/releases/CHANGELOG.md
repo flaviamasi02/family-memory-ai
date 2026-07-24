@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### DOCSYNC GITHUB FULL after MODEL-003C
+
+- Recorded PR #28 / MODEL-003B automatic import-time embedding generation as merged and Product Owner validated.
+- Recorded PR #29 / MODEL-003C stored-vector semantic similarity diagnostic as merged and Product Owner validated.
+- Clarified the managed-runtime correction: the main app runs in the normal `.venv`, while MobileCLIP inference uses the Generic AI Runtime Manager's configured dedicated interpreter.
+- Documented grouped runtime-level embedding diagnostics, isolated per-image failures, stale-source filtering, model-key/dimension rejection, and no similarity-time embedding recomputation.
+- Recorded successful Product Owner end-to-end validation: import -> managed MobileCLIP embedding generation -> persistent embedding storage -> stored-vector retrieval -> semantic cosine similarity -> ordered top-N results. MODEL-003A is recorded as the completed persistent foundation, not as a separate claim that every internal MODEL-003A requirement was independently manually validated.
+- Documentation-only update; no production code or tests were changed.
+
 ### DOCSYNC — AI Runtime and Workflow Documentation
 
 - Synchronized documentation for merged MODEL-001, MODEL-002A Generic AI Runtime Manager, and MODEL-002B managed MobileCLIP installation foundation.
@@ -579,14 +588,14 @@
 - Updated Settings and Learning Summary surfaces to expose MobileCLIP status without replacing the production classifier.
 
 
-### DOCSYNC GITHUB FULL after MODEL-002E
+### DOCSYNC GITHUB FULL after MODEL-002E (historical pre-MODEL-002F record)
 
 - Synchronized project documentation after MODEL-002A and MODEL-002B merged in their original PRs and MODEL-002C, MODEL-002D, and MODEL-002E work was consolidated into merged PR #22; PR #20 and PR #21 were closed without merge.
 - Marked AI Runtime Manager foundation, runtime validation improvements, provider verification workflow, runtime diagnostics, and Settings -> AI Models metadata layout fix as complete.
 - Documented the current AI Runtime architecture, MobileCLIP provider lifecycle, explicit installation workflow, strict verification workflow, diagnostics workflow, current AI Models UI, current capabilities, and repository cleanup after PR #22.
 - Recorded the metadata rendering lesson learned: label data can be valid while Qt layout sizing hides rows, so diagnostics must inspect widget geometry and layout hierarchy before changing runtime behavior.
 - Identified MODEL-002F as the next milestone for Product Owner-guided MobileCLIP installation and operational validation; MODEL-003 becomes the following planned classification-integration milestone, only after MODEL-002F succeeds.
-- Clarified that the repaired Settings -> AI Models UI was manually validated on Windows, but MobileCLIP remains Dependencies missing with torch, torchvision, PIL, mobileclip, and `mobileclip_s0.pt` absent; real installation, Ready status, embedding tests, benchmark, restart persistence, and CPU performance validation remain pending.
+- Historical note: at the time of this MODEL-002E docsync, the repaired Settings -> AI Models UI was manually validated on Windows, but MobileCLIP dependencies/checkpoint, Ready status, embedding tests, benchmark, restart persistence, and CPU performance validation were still pending. This was superseded by later MODEL-002F, MODEL-003B, and MODEL-003C validation records.
 - Documentation-only update; no application code, tests, runtime behavior, or requirements were modified.
 
 ### MODEL-003C — Semantic image similarity service

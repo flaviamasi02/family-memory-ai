@@ -2,12 +2,17 @@
 
 ## Unreleased
 
-### DOCSYNC GITHUB FULL after MODEL-002E
+### DOCSYNC GITHUB FULL after MODEL-003C
+
+- Root changelog is transitional; the canonical detailed implementation history is `docs/releases/CHANGELOG.md`.
+- Documentation-only PR #30 updates current state after PR #28 / MODEL-003B and PR #29 / MODEL-003C, corrects the managed-runtime boundary, and records Product Owner validation without changing production code or tests.
+
+### DOCSYNC GITHUB FULL after MODEL-002E (historical pre-MODEL-002F record)
 
 - Synchronized documentation after MODEL-002A and MODEL-002B merged in their original PRs and MODEL-002C, MODEL-002D, and MODEL-002E work was consolidated into merged PR #22; PR #20 and PR #21 were closed without merge.
 - Marked AI Runtime Manager foundation, managed MobileCLIP installation/runtime validation, provider verification, runtime diagnostics, and Settings -> AI Models layout sizing fix as complete.
 - Documented current AI Runtime architecture, provider lifecycle, installation, verification, diagnostics, AI Models UI, repository cleanup after PR #22, MODEL-002F as the next operational-validation milestone, and MODEL-003 as the following classification milestone.
-- Clarified that the Settings -> AI Models UI fix was manually validated on Windows, while real MobileCLIP installation, Ready status, one-image embedding, 10-image/100-image evaluations, and CPU performance records remain pending.
+- Historical note: at the time of the MODEL-002E docsync, the Settings -> AI Models UI fix was manually validated on Windows, while real MobileCLIP installation, Ready status, one-image embedding, 10-image/100-image evaluations, and CPU performance records were still pending; this was superseded by later MODEL-002F, MODEL-003B, and MODEL-003C validation records.
 - Documentation-only update; no application code, tests, runtime behavior, or requirements were modified.
 
 

@@ -402,6 +402,8 @@ Build a generic AI Runtime Manager before production model adoption. Required po
 
 Real AI runtime installation is allowed only through the generic AI Runtime Manager. MobileCLIP uses a dedicated environment, explicit typed commands, official source disclosure, local app-data model storage, cancellation, logs/history, safe removal plans, and full verification. It remains evaluation-only and must not replace production classification until a later approved milestone.
 
-### MODEL-002F operational validation direction
+### MODEL chain completion and next prioritization
 
-The next practical model milestone is MODEL-002F Product Owner-guided MobileCLIP installation and operational validation, not production replacement. MODEL-002A and MODEL-002B merged in their original PRs; MODEL-002C, MODEL-002D, and MODEL-002E work was consolidated through PR #22. The repaired Settings -> AI Models UI has been manually validated on Windows, but MobileCLIP is not yet operationally validated: dependencies (`torch`, `torchvision`, `PIL`, `mobileclip`) and `mobileclip_s0.pt` are missing, Ready is not confirmed, one-image embedding and 10-image/100-image evaluations are not complete, restart persistence is not confirmed, and CPU performance is not recorded. Production classifier migration remains a later MODEL-003 decision that requires successful MODEL-002F evidence and explicit Product Owner approval.
+The MODEL-001 through MODEL-003C chain has reached stored-vector semantic similarity; detailed current completion and validation status is owned by `docs/project/PROJECT_STATE.md`.
+
+The next model milestone is not committed. Product Owner prioritization is required among possible consumers of semantic embeddings, such as explainable category suggestions, similar-photo UI, duplicate/near-duplicate assistance, learning from corrections, and semantic search. Production automatic category classification remains deferred until explicitly approved.
