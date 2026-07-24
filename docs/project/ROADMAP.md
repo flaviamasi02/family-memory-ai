@@ -106,12 +106,54 @@ Product-direction update:
 
 ---
 
+## Platform Delivery Roadmap
+
+The approved platform strategy is **desktop first, mobile ready**.
+
+The project will not build complete desktop and mobile applications in parallel. The Windows desktop application remains the active product implementation while the reusable Family Memory Engine is validated and incrementally separated from PySide6.
+
+### Platform Phase A - Validated Windows Desktop
+
+- Complete a reliable end-to-end desktop workflow on a representative real library.
+- Prioritize performance, Cleanup Review, Memory Review, People Intelligence, scoring, persistence, album generation, and export.
+- Keep heavy historical-library processing on desktop.
+
+### Platform Phase B - Incremental Reusable Core
+
+- Move or keep business logic outside UI widgets.
+- Establish portable service contracts, stable identifiers, and migratable persistence.
+- Isolate Windows-specific photo and file access behind platform boundaries.
+- Avoid a disruptive one-time rewrite; improve separation during normal feature work.
+
+### Platform Phase C - Android Companion MVP
+
+- Start only after the desktop core workflow is validated and sufficiently UI-independent.
+- Focus on recent-photo review, category corrections, decisions, people teaching, and lightweight album review.
+- Prove Android photo access and responsive touch-first thumbnail navigation before expanding scope.
+
+### Platform Phase D - Desktop/Mobile Exchange
+
+- Exchange or synchronize decisions, profiles, album state, and selected metadata.
+- Do not require synchronization of every original photo for the first connected workflow.
+
+### Platform Phase E - Greater Mobile Independence
+
+- Add heavier classification, similarity, duplicate analysis, and complete album generation only after the companion workflow is stable.
+- iPhone and web remain future options, not current parallel workstreams.
+
+The canonical decision and detailed gates are defined in `docs/architecture/PLATFORM_STRATEGY.md`.
+
+---
+
 ## Future Roadmap (Post Version 1)
 
 - Vacation Albums
 - Gift Albums
 - Event Albums
 - Story Timeline
+- Android companion application
+- Desktop/mobile synchronization
+- Greater mobile independence
 
 ## AI Runtime and Model Roadmap Update — after MODEL-002E
 
