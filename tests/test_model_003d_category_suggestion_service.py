@@ -303,3 +303,37 @@ def test_reject_path_persists_feedback_and_blocks_stale_result_restore():
     assert "Suggestion marked not useful. Category was not changed." in reject_block
     assert "self._suggestion_request_id += 1" in reject_block
     assert "_apply_category_to_rows" not in reject_block
+
+
+def test_embedding_completion_refresh_contract_is_wired_to_memory_review():
+    main = Path("src/ui/main_window.py").read_text()
+    ui = Path("src/ui/album_review_page.py").read_text()
+    complete_block = main[
+        main.index("def _on_embedding_complete") : main.index("def _on_embedding_error")
+    ]
+    assert "self.status_label.setText" in complete_block
+    assert "Semantic embeddings indexed" in complete_block
+    assert "Indexing semantic embeddings" not in complete_block
+    assert "self._on_embedding_index_updated(result)" in complete_block
+    assert "def _on_embedding_index_updated" in main
+    assert "review_page.on_embedding_index_updated()" in main
+    assert "def on_embedding_index_updated" in ui
+    assert "self._category_suggestion_service.invalidate_cache()" in ui
+    assert "self._request_category_suggestion(row)" in ui
+
+
+def test_no_embedding_results_are_not_cached_so_later_indexing_can_be_observed(
+    tmp_path,
+):
+    store = EmbeddingStore(tmp_path / "e.sqlite3")
+    src = photo(tmp_path / "src.jpg")
+    a = photo(tmp_path / "a.jpg", "family_photo", user=True)
+    b = photo(tmp_path / "b.jpg", "family_photo", user=True)
+    put(store, a, [0.99, 0, 0])
+    put(store, b, [0.98, 0, 0])
+    svc = service(tmp_path, store)
+    assert svc.suggest(src, [src, a, b], META).status == "no_embedding"
+    put(store, src, [1, 0, 0])
+    after_indexing = svc.suggest(src, [src, a, b], META)
+    assert after_indexing.status == "suggested"
+    assert after_indexing.suggested_category_id == "family_photo"

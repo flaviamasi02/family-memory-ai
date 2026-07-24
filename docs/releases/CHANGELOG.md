@@ -621,3 +621,5 @@
 - Added an advisory category suggestion service over stored semantic embeddings, trusted labeled evidence, eligible existing content categories, and deterministic classification agreement.
 - Added a compact Memory Review AI Suggestion section with confidence, explanation, evidence count, explicit Apply suggestion, and Reject / Not useful actions, with rejection feedback persisted in existing photo sidecars.
 - Documented that confidence is a deterministic heuristic, manual categories remain authoritative, local stored vectors are used only, and automatic category replacement is not included.
+
+- Fixed MODEL-003D Memory Review refresh after embedding indexing completion: the status banner now leaves the indexing state, suggestion cache is invalidated, and the selected photo suggestion is recomputed without restarting the app.

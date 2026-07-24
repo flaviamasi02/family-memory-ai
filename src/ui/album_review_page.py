@@ -1205,6 +1205,14 @@ class AlbumReviewPage(QWidget):
         self.apply_suggestion_button.setEnabled(False)
         self.reject_suggestion_button.setEnabled(False)
 
+    def on_embedding_index_updated(self) -> None:
+        """Refresh advisory suggestions after background embeddings are committed."""
+        self._category_suggestion_service.invalidate_cache()
+        self._suggestion_request_id += 1
+        row = self._selected_row()
+        if row is not None and self._details_key == self._row_key(row):
+            self._request_category_suggestion(row)
+
     def _request_category_suggestion(self, row: AlbumReviewRow) -> None:
         self._suggestion_request_id += 1
         request_id = self._suggestion_request_id
