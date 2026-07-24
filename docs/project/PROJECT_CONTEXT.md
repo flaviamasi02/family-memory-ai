@@ -77,6 +77,8 @@ Small incremental improvements are preferred over large rewrites.
 
 Architecture should evolve continuously.
 
+Platform strategy is governed by DEC-0049: Family Memory AI is desktop-first and mobile-ready. The Windows desktop application is the only active implementation target until the core workflow is validated on a representative real family photo library, while reusable domain and business logic must stay independent from PySide6 wherever practical so a later focused Android companion can consume the same Family Memory Engine.
+
 ---
 
 # Collaboration Workflow

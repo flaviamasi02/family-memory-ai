@@ -132,6 +132,8 @@ DEV-007 (Photo Cleanup & Relevance Engine) has been completed.
 
 Current active domain and current milestone are defined in docs/project/PROJECT_STATE.md and docs/project/DOMAIN_ROADMAP.md.
 
+DEC-0049 platform strategy is approved: continue validating the Windows desktop product first, keep new domain/business logic independent from PySide6 wherever practical, and treat Android as a later focused companion client. Do not plan full desktop and mobile delivery in parallel, mandate cloud upload, or perform large mobile-preparation rewrites without explicit approval.
+
 For detailed operational status, always refer to docs/project/PROJECT_STATE.md.
 
 Current status:
