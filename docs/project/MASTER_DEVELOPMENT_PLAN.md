@@ -41,6 +41,8 @@ The long-term mission is:
 
 "Help families preserve, organize, understand and rediscover the memories that matter most while continuously learning what is important for each family."
 
+Platform strategy: DEC-0049 defines Family Memory AI as a desktop-first, mobile-ready platform. Product planning must prioritize the validated Windows desktop workflow first, keep reusable Family Memory Intelligence logic separate from PySide6 presentation code wherever practical, and treat Android as a later focused companion client rather than a parallel full-product implementation.
+
 Current strategic priority order:
 
 1. Reliable AI-assisted media classification

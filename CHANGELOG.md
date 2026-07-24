@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+
+### DOCSYNC DEC-0049 platform strategy propagation
+
+- Propagated the approved desktop-first, mobile-ready platform strategy into canonical project, architecture, roadmap, playbook, handover, and release documentation.
+- Registered DEC-0049 in the canonical decision ledger.
+- Documentation-only update; no application code, runtime behavior, dependencies, or tests were changed.
+
 ### DOCSYNC GITHUB FULL after MODEL-003C
 
 - Root changelog is transitional; the canonical detailed implementation history is `docs/releases/CHANGELOG.md`.

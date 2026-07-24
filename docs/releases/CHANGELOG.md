@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+
+### DOCSYNC DEC-0049 platform strategy propagation
+
+- Propagated DEC-0049 consistently across canonical documentation: Windows desktop remains the only active implementation target until the real-library desktop workflow is validated, while reusable core logic stays mobile-ready for a later focused Android companion.
+- Registered DEC-0049 in the canonical decision ledger and aligned project context, state, master plan, domain roadmap, architecture, playbook, and handover guidance with `docs/architecture/PLATFORM_STRATEGY.md`.
+- Documentation-only update; no application code, runtime behavior, dependencies, or tests were changed.
+
 ### DOCSYNC GITHUB FULL after MODEL-003C
 
 - Recorded PR #28 / MODEL-003B automatic import-time embedding generation as merged and Product Owner validated.

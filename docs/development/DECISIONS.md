@@ -685,3 +685,28 @@ AI Models metadata rendering bugs require layout diagnostics first.
 **Impact:** Medium
 
 Approved. If Settings -> AI Models metadata appears blank, future agents must inspect Qt widget hierarchy, row counts, size hints, geometry, visibility, and layout order before changing provider data or runtime verification logic. MODEL-002D/002E showed that valid label text can be hidden by layout sizing.
+
+
+### DEC-0049
+Desktop-First, Mobile-Ready Platform Strategy
+
+**Value:** Both
+**Impact:** High
+
+Approved by the Product Owner on 2026-07-24. Family Memory AI is a reusable Family Memory platform whose first client is the Windows desktop application. The Windows desktop app remains the only active implementation target until the representative desktop workflow is validated; full desktop and mobile applications must not be built in parallel. New work must keep reusable business and domain logic independent from PySide6 wherever practical, keep Windows-specific access behind platform boundaries, preserve portable or migratable persistence with stable identifiers, and prepare incrementally for a later focused Android companion application without a large mobile-preparation rewrite or mandatory cloud upload.
+
+Canonical detailed strategy: `docs/architecture/PLATFORM_STRATEGY.md`.
+
+**Impacted documents:**
+- docs/architecture/PLATFORM_STRATEGY.md
+- docs/architecture/ARCHITECTURE.md
+- docs/project/PROJECT_CONTEXT.md
+- docs/project/PROJECT_STATE.md
+- docs/project/MASTER_DEVELOPMENT_PLAN.md
+- docs/project/DOMAIN_ROADMAP.md
+- docs/development/AI_PROJECT_PLAYBOOK.md
+- docs/bootstrap/HANDOVER.md
+- docs/releases/CHANGELOG.md
+
+**Impacted Sprints:**
+All future implementation, architecture, planning, and documentation cycles.

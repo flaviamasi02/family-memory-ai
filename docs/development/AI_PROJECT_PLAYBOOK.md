@@ -23,6 +23,8 @@ It allows any future AI to immediately understand how the project is managed.
 - Contextual Workspace Help is a mandatory product feature.
 - Every Family Memory AI response must end with a clear **Next Step** section.
 
+- DEC-0049 is the approved platform strategy: build desktop-first, keep reusable core logic mobile-ready, and do not start full parallel mobile implementation without explicit Product Owner approval.
+
 ---
 
 # Prompt Standards
