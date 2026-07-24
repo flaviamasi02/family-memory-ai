@@ -107,3 +107,11 @@ Each step has a single primary owner component. Current deterministic implementa
 ### Current AI runtime validation boundary
 
 The AI Runtime Manager and Settings AI Models UI are implemented, and MobileCLIP is registered as the first managed runtime. Product Owner validation confirmed the managed MobileCLIP runtime is Ready on Windows CPU, automatic embedding generation works from the normal app environment, persistent embeddings are written and reused, and stored-vector semantic similarity returns ordered diagnostic results. The production classifier remains unchanged, and semantic similarity is not yet exposed in the production UI.
+
+## Explainable Category Suggestions (MODEL-003D)
+
+`core.category_suggestion_service.CategorySuggestionService` is the reusable, UI-independent boundary for advisory category suggestions. It consumes `vision.semantic_similarity_service.SemanticSimilarityService`, `vision.embedding_provider.EmbeddingStore`, the existing category registry, current photo metadata, and deterministic media classification. It does not create a category store, recompute embeddings, read image pixels, upload images, or mutate photo categories during suggestion generation.
+
+The service returns a typed result with source identity, status, suggested category id/name when available, bounded heuristic confidence, evidence counts, supporting similar-photo references, model key provenance, and user-facing reason strings. Eligible categories are existing content/album-candidate categories only; Unknown and workflow cleanup categories are excluded. Manual/user-corrected labels are strongest evidence, accepted prior suggestions and explicitly trusted deterministic labels are lower-ranked evidence, and unreviewed machine labels are not treated as trustworthy support.
+
+Current performance is an exact stored-vector scan through the semantic similarity service: O(n*d) for n current valid embeddings and d embedding dimensions. Results are cached by source/model/evidence signature and invalidated after category changes; future ANN indexing can be added behind the similarity service boundary.

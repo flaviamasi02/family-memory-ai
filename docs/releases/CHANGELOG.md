@@ -615,3 +615,9 @@
 - Fixed stale-source handling so similarity scans exclude deleted, modified, replaced, or otherwise non-current source files before returning matches.
 - Improved embedding failure diagnostics so import/index completion preserves the existing summary and prints a limited, grouped stderr sample with image path, exception type, and concise error message.
 - Changed automatic MODEL-003B embedding generation to use the AI Runtime Manager's configured dedicated MobileCLIP interpreter through a managed subprocess boundary, avoiding torch/mobileclip imports in the main application environment and reporting non-Ready runtime state as one grouped runtime-level failure.
+
+### MODEL-003D - Explainable Category Suggestions
+
+- Added an advisory category suggestion service over stored semantic embeddings, trusted labeled evidence, eligible existing content categories, and deterministic classification agreement.
+- Added a compact Memory Review AI Suggestion section with confidence, explanation, evidence count, explicit Apply suggestion, and Reject / Not useful actions.
+- Documented that confidence is a deterministic heuristic, manual categories remain authoritative, local stored vectors are used only, and automatic category replacement is not included.

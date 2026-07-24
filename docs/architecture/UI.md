@@ -223,3 +223,7 @@ Settings contains the current AI Models management surface. It must present runt
 Valid actions are Inspect Python environment, View installation plan, Install, Cancel, Verify, Test Image, Open model folder, View logs, Remove model files, Dump AI metadata diagnostics, and bounded MobileCLIP evaluation source selection. Installation must remain confirmation-gated, and runtime operations must remain outside the UI thread.
 
 MODEL-002E fixed a layout sizing issue where metadata labels contained text but could render as visually blank. Future UI changes must preserve explicit row sizing/geometry refresh behavior and keep diagnostics available for layout regressions.
+
+## Memory Review AI Suggestion Entry Point
+
+Memory Review includes a compact “AI Suggestion” section in the existing right-side details panel. Suggestions load lazily after selection so the grid selection path remains responsive. The section displays either a safe no-suggestion status or one advisory category suggestion with confidence, explanation, and supporting evidence count. “Apply suggestion” is an explicit user action that routes through the existing category-correction workflow; “Reject / Not useful” records local rejection feedback and leaves the category unchanged. No new top-level tab or normal-use modal is introduced.
