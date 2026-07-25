@@ -303,10 +303,17 @@ class CategorySuggestionService:
                     item.trust_level in {"manual_confirmed", "user_correction"}
                     for item in winning_evidence
                 )
-                and avg_sim >= 0.85
-                and not runner_score
+                and avg_sim >= self.config.minimum_similarity
+                and (
+                    not runner_score
+                    or margin >= self.config.minimum_winning_margin
+                )
             )
-            if avg_sim < 0.80 and strongest < 0.85:
+            if (
+                not strong_manual_consensus
+                and avg_sim < 0.80
+                and strongest < 0.85
+            ):
                 result = self._result(
                     source_key,
                     "insufficient_evidence",
@@ -408,8 +415,9 @@ class CategorySuggestionService:
                 )
                 self._cache[cache_key] = result
                 return result
-            if confidence < self.config.minimum_confidence or (
-                runner_score and margin < self.config.minimum_winning_margin
+            if not strong_manual_consensus and (
+                confidence < self.config.minimum_confidence
+                or (runner_score and margin < self.config.minimum_winning_margin)
             ):
                 status = (
                     "conflicting_evidence" if runner_score else "insufficient_evidence"

@@ -510,6 +510,29 @@ def test_three_manual_confirmed_strong_matches_override_inconclusive_rules(tmp_p
     assert "inconclusive" in result.reasons[-1].lower()
 
 
+def test_three_manual_matches_just_above_similarity_threshold_suggest_advisory_only(
+    tmp_path,
+):
+    store = EmbeddingStore(tmp_path / "e.sqlite3")
+    src = photo(tmp_path / "source.jpg")
+    confirmed = [
+        photo(tmp_path / f"threshold_{index}.jpg", "family_photo", confirmed=True)
+        for index in range(3)
+    ]
+    put(store, src, [1, 0, 0])
+    put(store, confirmed[0], [0.73, 0.683447, 0])
+    put(store, confirmed[1], [0.72, 0.693974, 0])
+    put(store, confirmed[2], [0.71, 0.704202, 0])
+
+    result = service(tmp_path, store).suggest(src, [src, *confirmed], META)
+
+    assert result.status == "suggested"
+    assert result.suggested_category_id == "family_photo"
+    assert result.evidence_counts["family_photo"] == 3
+    assert src.effective_media_category == "unknown"
+    assert src.user_corrected_media_category == ""
+
+
 def test_two_weak_manual_matches_remain_insufficient(tmp_path):
     store = EmbeddingStore(tmp_path / "e.sqlite3")
     src = photo(tmp_path / "source.jpg")
