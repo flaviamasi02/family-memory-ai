@@ -73,7 +73,11 @@ class SemanticSimilarityService:
             score = _cosine_similarity(source.embedding, candidate.embedding)
             if minimum_similarity is not None and score < minimum_similarity:
                 continue
-            results.append(SemanticSimilarityResult(candidate.photo_key, score, candidate.model_key))
+            results.append(
+                SemanticSimilarityResult(
+                    canonical_photo_key(candidate.photo_key), score, candidate.model_key
+                )
+            )
 
         results.sort(key=lambda r: (-r.similarity, r.photo_key))
         return results[:limit]
@@ -99,9 +103,11 @@ def canonical_photo_key(photo_or_path) -> str:
     raw = str(getattr(photo_or_path, "path", photo_or_path) or "").strip()
     if not raw:
         return ""
-    if (len(raw) >= 2 and raw[1] == ":") or "\\" in raw:
-        return ntpath.normcase(ntpath.normpath(raw))
-    return os.path.normcase(os.path.realpath(os.path.abspath(raw)))
+    drive, _tail = ntpath.splitdrive(raw)
+    if drive or raw.startswith(("\\\\", "//")):
+        return ntpath.normcase(ntpath.normpath(raw.replace("/", "\\")))
+    native = raw.replace("\\", os.sep)
+    return os.path.normcase(os.path.normpath(os.path.abspath(native)))
 
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
