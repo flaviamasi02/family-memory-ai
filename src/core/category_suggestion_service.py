@@ -297,6 +297,35 @@ class CategorySuggestionService:
                 winning_evidence
             )
             strongest = max(e.similarity for e in winning_evidence)
+            strong_manual_consensus = bool(
+                len(winning_evidence) >= 3
+                and all(
+                    item.trust_level in {"manual_confirmed", "user_correction"}
+                    for item in winning_evidence
+                )
+                and avg_sim >= 0.85
+                and not runner_score
+            )
+            if avg_sim < 0.80 and strongest < 0.85:
+                result = self._result(
+                    source_key,
+                    "insufficient_evidence",
+                    model_key=metadata.model_key,
+                    evidence_counts=counts,
+                    reasons=[
+                        "Trusted matches are not visually similar enough for a clear advisory suggestion."
+                    ],
+                    evidence_signature=signature_key,
+                )
+                self._debug_suggestion(
+                    result,
+                    semantic_matches=len(sims),
+                    trusted_evidence=len(evidence),
+                    category_ids=sorted(counts),
+                    evidence_counts=counts,
+                )
+                self._cache[cache_key] = result
+                return result
             support_factor = min(1.0, len(winning_evidence) / 6.0)
             agreement = win_score / max(sum(scores.values()), 0.0001)
             trust_avg = sum(e.trust_weight for e in winning_evidence) / len(
@@ -327,9 +356,39 @@ class CategorySuggestionService:
             else:
                 det_reason = "Existing deterministic signals are inconclusive."
             confidence = max(0.0, min(1.0, round(confidence, 4)))
-            if self._has_persisted_rejection(
+            if strong_manual_consensus:
+                # Three strongly similar, highest-trust confirmations with no
+                # competing category are sufficient regardless of an inconclusive
+                # deterministic classifier. This is an explainable confidence floor,
+                # not an automatic category assignment.
+                confidence = max(
+                    confidence,
+                    min(1.0, self.config.minimum_confidence + 0.08),
+                )
+            persisted_rejection = self._has_persisted_rejection(
                 source_photo, winner, metadata.model_key, signature_key
-            ):
+            )
+            self._debug_scoring(
+                winner=winner,
+                evidence_count=len(evidence),
+                winning_count=len(winning_evidence),
+                win_score=win_score,
+                runner_score=runner_score,
+                margin=margin,
+                average_similarity=avg_sim,
+                strongest_similarity=strongest,
+                support_factor=support_factor,
+                agreement=agreement,
+                trust_average=trust_avg,
+                deterministic_category=det_cat,
+                deterministic_confidence=float(
+                    getattr(deterministic, "classification_confidence", 0.0) or 0.0
+                ),
+                confidence=confidence,
+                strong_manual_consensus=strong_manual_consensus,
+                persisted_rejection=persisted_rejection,
+            )
+            if persisted_rejection:
                 result = self._result(
                     source_key,
                     "insufficient_evidence",
@@ -627,6 +686,27 @@ class CategorySuggestionService:
             f"semantic_matches={semantic_matches} trusted_evidence={trusted_evidence} "
             f"category_ids={category_ids} evidence_counts={dict(evidence_counts)} "
             f"reason={reason}",
+            file=sys.stderr,
+            flush=True,
+        )
+
+    def _debug_scoring(self, **values) -> None:
+        if os.environ.get("FAMILY_MEMORY_DEBUG_SUGGESTIONS", "").lower() not in {
+            "1",
+            "true",
+            "yes",
+        }:
+            return
+        thresholds = {
+            "minimum_confidence": self.config.minimum_confidence,
+            "minimum_support_count": self.config.minimum_support_count,
+            "minimum_winning_margin": self.config.minimum_winning_margin,
+            "conflict_margin": self.config.conflict_margin,
+        }
+        details = " ".join(f"{key}={value}" for key, value in values.items())
+        limits = " ".join(f"{key}={value}" for key, value in thresholds.items())
+        print(
+            f"[CategorySuggestionScoring] {details} {limits}",
             file=sys.stderr,
             flush=True,
         )

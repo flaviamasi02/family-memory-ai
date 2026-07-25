@@ -488,6 +488,46 @@ def test_three_manual_family_photo_labels_with_display_names_feed_suggestion(tmp
     )
 
 
+def test_three_manual_confirmed_strong_matches_override_inconclusive_rules(tmp_path):
+    store = EmbeddingStore(tmp_path / "e.sqlite3")
+    src = photo(tmp_path / "source.jpg")
+    confirmed = [
+        photo(tmp_path / f"manual_{index}.jpg", "family_photo", confirmed=True)
+        for index in range(3)
+    ]
+    put(store, src, [1, 0, 0])
+    for index, item in enumerate(confirmed):
+        put(store, item, [0.99 - 0.01 * index, 0.01, 0])
+
+    result = service(tmp_path, store).suggest(src, [src, *confirmed], META)
+
+    assert result.status == "suggested"
+    assert result.suggested_category_id == "family_photo"
+    assert result.evidence_counts["family_photo"] == 3
+    assert all(
+        item.trust_level == "manual_confirmed" for item in result.supporting_photos
+    )
+    assert "inconclusive" in result.reasons[-1].lower()
+
+
+def test_two_weak_manual_matches_remain_insufficient(tmp_path):
+    store = EmbeddingStore(tmp_path / "e.sqlite3")
+    src = photo(tmp_path / "source.jpg")
+    weak = [
+        photo(tmp_path / f"weak_{index}.jpg", "family_photo", confirmed=True)
+        for index in range(2)
+    ]
+    put(store, src, [1, 0, 0])
+    put(store, weak[0], [0.74, 0.672606, 0])
+    put(store, weak[1], [0.73, 0.683447, 0])
+
+    result = service(tmp_path, store).suggest(src, [src, *weak], META)
+
+    assert result.status == "insufficient_evidence"
+    assert result.evidence_counts["family_photo"] == 2
+    assert "not visually similar enough" in result.reasons[0]
+
+
 def test_cached_insufficient_result_is_replaced_after_immediate_manual_updates(tmp_path):
     store = EmbeddingStore(tmp_path / "e.sqlite3")
     src = photo(tmp_path / "20210117_155357.jpg")
