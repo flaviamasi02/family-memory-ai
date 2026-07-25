@@ -354,6 +354,7 @@ class AlbumReviewPageTests(unittest.TestCase):
                 page._all_rows[:3], "Family Photo", source="user_bulk"
             )
             self.assertTrue(applied)
+            self.assertFalse(page._category_suggestion_service._cache)
 
             signature_after = page._category_suggestion_service._evidence_signature(
                 row.breakdown.photo for row in page._all_rows
@@ -378,13 +379,32 @@ class AlbumReviewPageTests(unittest.TestCase):
                 )
             )
             self.assertGreaterEqual(len(semantic_matches), 3)
+            self.assertFalse(
+                page._category_suggestion_service._has_persisted_rejection(
+                    target,
+                    "family_photo",
+                    provider.metadata.model_key,
+                    signature_after,
+                )
+            )
 
             after = page._category_suggestion_service.suggest(
                 target,
                 [row.breakdown.photo for row in page._all_rows],
                 provider.metadata,
             )
-            self.assertEqual(after.status, "suggested")
+            self.assertEqual(
+                after.status,
+                "suggested",
+                msg=(
+                    f"reasons={after.reasons!r} "
+                    f"evidence_counts={after.evidence_counts!r} "
+                    f"confidence={after.confidence!r} "
+                    f"evidence_signature={after.evidence_signature!r} "
+                    f"supporting_photos={len(after.supporting_photos)} "
+                    f"cache_keys={list(page._category_suggestion_service._cache)!r}"
+                ),
+            )
             self.assertEqual(after.suggested_category_id, "family_photo")
             self.assertEqual(after.evidence_counts["family_photo"], 3)
             self.assertEqual(target.effective_media_category, "unknown")

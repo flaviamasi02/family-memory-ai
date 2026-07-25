@@ -233,7 +233,8 @@ def test_stale_async_result_guard_and_cache_reuse_are_present():
     svc = Path("src/core/category_suggestion_service.py").read_text()
     assert "request_id != self._suggestion_request_id" in ui
     assert "self._details_key != self._row_key(row)" in ui
-    assert "if cache_key in self._cache" in svc
+    assert "cached = self._cache.get(cache_key)" in svc
+    assert "cached.evidence_signature == signature_key" in svc
     assert "invalidate_cache" in ui
 
 
@@ -569,6 +570,8 @@ def test_cached_insufficient_result_is_replaced_after_immediate_manual_updates(t
 
     before = svc.suggest(src, [src, *evidence], META)
     assert before.status == "insufficient_evidence"
+    signature_before = svc._evidence_signature([src, *evidence])
+    assert before.evidence_signature == signature_before
 
     for index, item in enumerate(evidence):
         category = "Family Photo" if index == 0 else "family_photo"
@@ -587,12 +590,14 @@ def test_cached_insufficient_result_is_replaced_after_immediate_manual_updates(t
                 "user_decision": "keep",
             }
         )
-    svc.invalidate_cache()
+    signature_after = svc._evidence_signature([src, *evidence])
+    assert signature_after != signature_before
 
     after = svc.suggest(src, [src, *evidence], META)
 
     assert after.status == "suggested"
     assert after.suggested_category_id == "family_photo"
+    assert after.evidence_signature == signature_after
     assert after.evidence_counts["family_photo"] == 3
     assert {item.photo_key for item in after.supporting_photos} == {
         str(item.path.resolve()) for item in evidence

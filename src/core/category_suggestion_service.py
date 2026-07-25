@@ -142,8 +142,9 @@ class CategorySuggestionService:
             by_key = {self._photo_identity_key(p): p for p in all_photos}
             signature_key = self._evidence_signature(by_key.values())
             cache_key = (source_key, metadata.model_key, signature_key)
-            if cache_key in self._cache:
-                return self._cache[cache_key]
+            cached = self._cache.get(cache_key)
+            if cached is not None and cached.evidence_signature == signature_key:
+                return cached
             sims = self.similarity_service.most_similar(
                 source_photo,
                 metadata,
@@ -231,6 +232,7 @@ class CategorySuggestionService:
                     reasons=[
                         "No similar photos have trustworthy confirmed category evidence."
                     ],
+                    evidence_signature=signature_key,
                 )
                 self._debug_suggestion(
                     result,
@@ -263,6 +265,7 @@ class CategorySuggestionService:
                     reasons=[
                         "Not enough trusted similar photos support one category yet."
                     ],
+                    evidence_signature=signature_key,
                 )
                 self._debug_suggestion(
                     result,
@@ -283,6 +286,7 @@ class CategorySuggestionService:
                     reasons=[
                         "Trusted similar photos support multiple categories too evenly."
                     ],
+                    evidence_signature=signature_key,
                 )
                 self._debug_suggestion(
                     result,
@@ -633,9 +637,33 @@ class CategorySuggestionService:
     def _evidence_signature(self, photos: Iterable) -> str:
         parts = []
         for p in photos:
+            metadata = dict(getattr(p, "metadata", {}) or {})
             category_id, trust = self._trusted_category(p)
             parts.append(
-                f"{self._photo_identity_key(p)}|{category_id}|{trust}"
+                "|".join(
+                    (
+                        self._photo_identity_key(p),
+                        category_id,
+                        trust,
+                        self._normalize_category_id(
+                            metadata.get("user_corrected_media_category", "")
+                            or getattr(p, "user_corrected_media_category", "")
+                        ),
+                        self._normalize_category_id(
+                            metadata.get("effective_media_category", "")
+                            or getattr(p, "effective_media_category", "")
+                        ),
+                        str(metadata.get("category_confirmation_state", "")).lower(),
+                        (
+                            "accepted"
+                            if str(
+                                metadata.get("category_suggestion_state", "")
+                            ).lower()
+                            == "accepted"
+                            else ""
+                        ),
+                    )
+                )
             )
         payload = "\n".join(sorted(parts))
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
