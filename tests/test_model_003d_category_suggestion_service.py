@@ -151,6 +151,37 @@ def test_only_untrusted_labels_and_non_content_categories_excluded(tmp_path):
     assert result.status == "insufficient_evidence"
 
 
+def test_unrelated_manual_confirmation_outside_semantic_matches_is_not_evidence(
+    tmp_path,
+):
+    store = EmbeddingStore(tmp_path / "e.sqlite3")
+    src = photo(tmp_path / "source.jpg")
+    unknown_match = photo(tmp_path / "nearest_unknown.jpg")
+    unrelated = photo(tmp_path / "unrelated.jpg", "family_photo", user=True)
+    put(store, src, [1, 0, 0])
+
+    class UnknownOnlySimilarity:
+        def most_similar(self, *_args, **_kwargs):
+            return [
+                SemanticSimilarityResult(
+                    canonical_photo_key(unknown_match), 0.99, META.model_key
+                )
+            ]
+
+    svc = CategorySuggestionService(
+        embedding_store=store,
+        similarity_service=UnknownOnlySimilarity(),
+        category_registry=CategoryRegistry(storage_root=tmp_path / "cats"),
+        media_classifier=FakeClassifier(),
+    )
+
+    result = svc.suggest(src, [src, unknown_match, unrelated], META)
+
+    assert result.status == "insufficient_evidence"
+    assert result.evidence_counts == {}
+    assert result.supporting_photos == []
+
+
 def test_conflicting_category_evidence_and_tie(tmp_path):
     store = EmbeddingStore(tmp_path / "e.sqlite3")
     src = photo(tmp_path / "src.jpg")
@@ -638,67 +669,6 @@ def test_windows_path_case_and_separator_differences_resolve_trusted_match(tmp_p
     assert canonical_photo_key(r"C:\PHOTOS\CONFIRMED.JPG") == canonical_photo_key(
         "c:/photos/confirmed.jpg"
     )
-
-
-def test_unambiguous_filename_fallback_resolves_exact_in_memory_photo(tmp_path):
-    store = EmbeddingStore(tmp_path / "e.sqlite3")
-    src = photo(tmp_path / "source.jpg")
-    put(store, src, [1, 0, 0])
-    confirmed = photo(tmp_path / "confirmed.jpg", "family_photo", user=True)
-
-    class RelocatedSimilarity:
-        def most_similar(self, *_args, **_kwargs):
-            return [
-                SemanticSimilarityResult(
-                    "/different/import/root/confirmed.jpg", 0.98, META.model_key
-                )
-            ]
-
-    svc = CategorySuggestionService(
-        embedding_store=store,
-        similarity_service=RelocatedSimilarity(),
-        category_registry=CategoryRegistry(storage_root=tmp_path / "cats"),
-        media_classifier=FakeClassifier(),
-        config=CategorySuggestionConfig(minimum_support_count=1),
-    )
-
-    result = svc.suggest(src, [src, confirmed], META)
-
-    assert result.status == "suggested"
-    assert result.supporting_photos[0].category_id == "family_photo"
-
-
-def test_ambiguous_filename_fallback_is_rejected(tmp_path):
-    store = EmbeddingStore(tmp_path / "e.sqlite3")
-    src = photo(tmp_path / "source.jpg")
-    put(store, src, [1, 0, 0])
-    first_dir = tmp_path / "first"
-    second_dir = tmp_path / "second"
-    first_dir.mkdir()
-    second_dir.mkdir()
-    first = photo(first_dir / "duplicate.jpg", "family_photo", user=True)
-    second = photo(second_dir / "duplicate.jpg", "personal_photo", user=True)
-
-    class AmbiguousSimilarity:
-        def most_similar(self, *_args, **_kwargs):
-            return [
-                SemanticSimilarityResult(
-                    "/different/root/duplicate.jpg", 0.98, META.model_key
-                )
-            ]
-
-    svc = CategorySuggestionService(
-        embedding_store=store,
-        similarity_service=AmbiguousSimilarity(),
-        category_registry=CategoryRegistry(storage_root=tmp_path / "cats"),
-        media_classifier=FakeClassifier(),
-        config=CategorySuggestionConfig(minimum_support_count=1),
-    )
-
-    result = svc.suggest(src, [src, first, second], META)
-
-    assert result.status == "insufficient_evidence"
-    assert result.evidence_counts == {}
 
 
 def test_debug_diagnostics_report_match_resolution_and_trust(tmp_path, monkeypatch, capsys):

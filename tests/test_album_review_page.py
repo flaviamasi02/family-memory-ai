@@ -25,6 +25,7 @@ from vision.embedding_provider import (
     now_iso,
     source_identity,
 )
+from vision.semantic_similarity_service import canonical_photo_key
 
 
 class AlbumReviewPageTests(unittest.TestCase):
@@ -379,6 +380,57 @@ class AlbumReviewPageTests(unittest.TestCase):
                 )
             )
             self.assertGreaterEqual(len(semantic_matches), 3)
+            confirmed_photos = [
+                row.breakdown.photo for row in page._all_rows[:3]
+            ]
+            confirmed_keys = {
+                canonical_photo_key(photo) for photo in confirmed_photos
+            }
+            semantic_match_keys = {
+                canonical_photo_key(match.photo_key) for match in semantic_matches
+            }
+            self.assertTrue(
+                confirmed_keys.issubset(semantic_match_keys),
+                msg=(
+                    "manual_confirmed="
+                    f"{[photo.filename for photo in confirmed_photos]!r} "
+                    "semantic_matches="
+                    f"{[(Path(match.photo_key).name, match.similarity) for match in semantic_matches]!r}"
+                ),
+            )
+            self.assertNotIn(canonical_photo_key(target), semantic_match_keys)
+            photos_by_key = {
+                canonical_photo_key(row.breakdown.photo): row.breakdown.photo
+                for row in page._all_rows
+            }
+            for match in semantic_matches:
+                match_key = canonical_photo_key(match.photo_key)
+                matched_photo = photos_by_key.get(match_key)
+                self.assertIsNotNone(
+                    matched_photo,
+                    msg=(
+                        f"raw_match={match.photo_key!r} canonical_match={match_key!r} "
+                        f"available_keys={sorted(photos_by_key)!r}"
+                    ),
+                )
+                if match_key in confirmed_keys:
+                    self.assertGreaterEqual(
+                        match.similarity,
+                        page._category_suggestion_service.config.minimum_similarity,
+                    )
+                    self.assertIn(
+                        page._category_suggestion_service._trusted_category(
+                            matched_photo
+                        ),
+                        {
+                            ("family_photo", "manual_confirmed"),
+                            ("family_photo", "user_correction"),
+                        },
+                        msg=(
+                            f"filename={matched_photo.filename!r} "
+                            f"metadata={matched_photo.metadata!r}"
+                        ),
+                    )
             self.assertFalse(
                 page._category_suggestion_service._has_persisted_rejection(
                     target,

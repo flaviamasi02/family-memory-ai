@@ -158,7 +158,7 @@ class CategorySuggestionService:
             counts: dict[str, int] = {}
             for sim in sims:
                 match_key = self._photo_identity_key(sim.photo_key)
-                photo = self._resolve_similar_photo(match_key, by_key)
+                photo = by_key.get(match_key)
                 if photo is None:
                     self._debug_match(
                         sim.photo_key,
@@ -170,7 +170,7 @@ class CategorySuggestionService:
                         trust="unresolved",
                         accepted=False,
                         reason=(
-                            f"no unambiguous all_photos object for normalized key "
+                            f"no all_photos object for normalized key "
                             f"{match_key}; available_keys={sorted(by_key)}"
                         ),
                     )
@@ -559,25 +559,6 @@ class CategorySuggestionService:
 
     def _photo_identity_key(self, photo_or_path) -> str:
         return canonical_photo_key(photo_or_path)
-
-    def _resolve_similar_photo(self, match_key: str, by_key: dict[str, object]):
-        direct = by_key.get(match_key)
-        if direct is not None:
-            return direct
-        filename = self._canonical_filename(match_key)
-        if not filename:
-            return None
-        matches = [
-            photo
-            for key, photo in by_key.items()
-            if self._canonical_filename(key) == filename
-        ]
-        return matches[0] if len(matches) == 1 else None
-
-    @staticmethod
-    def _canonical_filename(photo_key: str) -> str:
-        normalized = str(photo_key or "").replace("\\", "/").rstrip("/")
-        return normalized.rsplit("/", 1)[-1].casefold()
 
     def _raw_category_value(self, photo) -> str:
         metadata = dict(getattr(photo, "metadata", {}) or {})
