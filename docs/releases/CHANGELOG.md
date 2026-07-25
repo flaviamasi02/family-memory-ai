@@ -627,3 +627,5 @@
 - Fixed MODEL-003D manual evidence capture so Apply Category to Selected records confirmed category evidence, updates pending rows to Keep, persists confirmation metadata, and allows highly similar photos to use that trusted manual evidence for suggestions.
 
 - Improved MODEL-003D trusted evidence consumption by normalizing category labels/IDs before matching eligible categories and adding opt-in `FAMILY_MEMORY_DEBUG_SUGGESTIONS=1` diagnostics for semantic matches, trusted evidence, category IDs, evidence counts, and final status reason.
+
+- Added a lightweight embedding-completion notification in the existing status area: success, warning, cancellation, and failure summaries remain visible for seven seconds, then clear without modal dialogs or overwriting newer scan/progress status.

@@ -312,7 +312,7 @@ def test_embedding_completion_refresh_contract_is_wired_to_memory_review():
         main.index("def _on_embedding_complete") : main.index("def _on_embedding_error")
     ]
     assert "self.status_label.setText" in complete_block
-    assert "Semantic embeddings indexed" in complete_block
+    assert "Semantic embedding indexing completed" in complete_block
     assert "Indexing semantic embeddings" not in complete_block
     assert "self._on_embedding_index_updated(result)" in complete_block
     assert "def _on_embedding_index_updated" in main

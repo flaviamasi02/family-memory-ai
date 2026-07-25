@@ -320,6 +320,143 @@ def test_embedding_completion_success_does_not_print_failure_diagnostics(capsys)
     assert "failure 1/" not in err
 
 
+def test_embedding_success_notification_is_transient(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    window._active_embedding_run_id = 1
+    timers = []
+    monkeypatch.setattr(
+        "ui.main_window.QTimer.singleShot",
+        lambda delay, callback: timers.append((delay, callback)),
+    )
+    result = type(
+        "Result",
+        (),
+        {
+            "total_images_received": 12,
+            "processed_successfully": 12,
+            "skipped_cached": 0,
+            "failed": 0,
+            "cancelled": 0,
+            "elapsed_seconds": 0.1,
+            "outcomes": [],
+        },
+    )()
+
+    window._on_embedding_complete(1, result)
+
+    assert window.status_label.text == (
+        "✓ Semantic embedding indexing completed.\n"
+        "12 photos processed · 0 skipped · 0 failed"
+    )
+    assert timers[0][0] == 7000
+    timers[0][1]()
+    assert window.status_label.text == ""
+
+
+def test_embedding_completion_with_warnings_is_transient(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    window._active_embedding_run_id = 1
+    timers = []
+    monkeypatch.setattr(
+        "ui.main_window.QTimer.singleShot",
+        lambda delay, callback: timers.append((delay, callback)),
+    )
+    result = type(
+        "Result",
+        (),
+        {
+            "total_images_received": 15,
+            "processed_successfully": 12,
+            "skipped_cached": 2,
+            "failed": 1,
+            "cancelled": 0,
+            "elapsed_seconds": 0.1,
+            "outcomes": [],
+        },
+    )()
+
+    window._on_embedding_complete(1, result)
+
+    assert window.status_label.text == (
+        "⚠ Semantic embedding indexing completed with warnings.\n"
+        "12 processed · 2 skipped · 1 failed"
+    )
+    timers[0][1]()
+    assert window.status_label.text == ""
+
+
+def test_complete_embedding_failure_shows_error_notification(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    window._active_embedding_run_id = 1
+    timers = []
+    monkeypatch.setattr(
+        "ui.main_window.QTimer.singleShot",
+        lambda delay, callback: timers.append((delay, callback)),
+    )
+    result = type(
+        "Result",
+        (),
+        {
+            "total_images_received": 3,
+            "processed_successfully": 0,
+            "skipped_cached": 0,
+            "failed": 3,
+            "cancelled": 0,
+            "elapsed_seconds": 0.1,
+            "outcomes": [],
+        },
+    )()
+
+    window._on_embedding_complete(1, result)
+
+    assert window.status_label.text == (
+        "✕ Semantic embedding indexing failed.\n"
+        "0 processed · 0 skipped · 3 failed"
+    )
+    assert timers[0][0] == 7000
+
+
+def test_embedding_progress_does_not_schedule_completion_notification(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    window._active_embedding_run_id = 1
+    timers = []
+    monkeypatch.setattr(
+        "ui.main_window.QTimer.singleShot",
+        lambda delay, callback: timers.append((delay, callback)),
+    )
+    progress = type(
+        "Progress",
+        (),
+        {
+            "current_index": 3,
+            "total_count": 12,
+            "processed_count": 3,
+            "cached_count": 0,
+            "failed_count": 0,
+        },
+    )()
+
+    window._on_embedding_progress(1, progress)
+
+    assert window.status_label.text.startswith("Indexing semantic embeddings 3/12")
+    assert timers == []
+
+
+def test_old_completion_timer_does_not_clear_newer_status(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    timers = []
+    monkeypatch.setattr(
+        "ui.main_window.QTimer.singleShot",
+        lambda delay, callback: timers.append((delay, callback)),
+    )
+
+    window._show_embedding_completion_notification("completion")
+    window.status_label.setText("Scanning folder…")
+    timers[0][1]()
+
+    assert window.status_label.text == "Scanning folder…"
+
+
 def test_close_event_waits_for_running_embedding_thread_before_destroying(monkeypatch):
     window = _embedding_window_for_lifecycle_tests()
     waited = []

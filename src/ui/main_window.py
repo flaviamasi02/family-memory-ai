@@ -473,18 +473,41 @@ class MainWindow(QMainWindow):
         failed = int(getattr(result, "failed", 0) or 0)
         cancelled = int(getattr(result, "cancelled", 0) or 0)
         if cancelled:
-            self.status_label.setText(
-                f"Semantic embedding indexing cancelled (processed={processed}, cached={cached}, failed={failed})."
+            self._show_embedding_completion_notification(
+                "⚠ Semantic embedding indexing cancelled.\n"
+                f"{processed} processed · {cached} skipped · {failed} failed"
             )
-        elif failed:
-            self.status_label.setText(
-                f"Semantic embedding indexing finished with {failed} failures (processed={processed}, cached={cached})."
+        elif failed and not processed and not cached:
+            self._show_embedding_completion_notification(
+                "✕ Semantic embedding indexing failed.\n"
+                f"{processed} processed · {cached} skipped · {failed} failed"
+            )
+        elif failed or cached:
+            self._show_embedding_completion_notification(
+                "⚠ Semantic embedding indexing completed with warnings.\n"
+                f"{processed} processed · {cached} skipped · {failed} failed"
             )
         else:
-            self.status_label.setText(
-                f"Semantic embeddings indexed — processed={processed}, cached={cached}, failed=0."
+            self._show_embedding_completion_notification(
+                "✓ Semantic embedding indexing completed.\n"
+                f"{processed} photos processed · {cached} skipped · {failed} failed"
             )
         self._on_embedding_index_updated(result)
+
+    def _show_embedding_completion_notification(self, message: str) -> None:
+        """Show a transient completion message without clearing newer status text."""
+        self.status_label.setText(message)
+        QTimer.singleShot(
+            7000,
+            lambda expected=message: self._clear_embedding_notification(expected),
+        )
+
+    def _clear_embedding_notification(self, expected: str) -> None:
+        # A new scan/progress update owns the shared status area once its text changes.
+        text_value = self.status_label.text
+        current_text = text_value() if callable(text_value) else text_value
+        if current_text == expected:
+            self.status_label.setText("")
 
     def _on_embedding_index_updated(self, result) -> None:
         _ = result
@@ -498,6 +521,9 @@ class MainWindow(QMainWindow):
         if run_id != self._active_embedding_run_id:
             return
         print(f"[EmbeddingIndex] error: {error_message}", file=sys.stderr, flush=True)
+        self._show_embedding_completion_notification(
+            f"✕ Semantic embedding indexing failed.\n{error_message}"
+        )
 
     def _deferred_setup_cleanup_review(self) -> None:
         """Populate Cleanup Review — deferred from _on_scan_complete."""
