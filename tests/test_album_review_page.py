@@ -1,9 +1,11 @@
+import json
 import tempfile
 import unittest
 import os
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from PySide6.QtTest import QTest
 from PySide6.QtCore import Qt
@@ -12,10 +14,22 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 
 from album.album_scoring_engine import AlbumScoreBreakdown
 from core.category_registry import get_category_registry, reset_category_registry
+from core.category_suggestion_service import (
+    CategorySuggestionResult,
+    CategorySuggestionService,
+)
 from core.media_classifier import MediaCategory
 from models.photo import Photo
 from models.photo_intelligence import PhotoIntelligence
 from ui.album_review_page import AlbumReviewPage
+from vision.embedding_provider import (
+    EmbeddingRecord,
+    EmbeddingStore,
+    FakeEmbeddingProvider,
+    now_iso,
+    source_identity,
+)
+from vision.semantic_similarity_service import canonical_photo_key
 
 
 class AlbumReviewPageTests(unittest.TestCase):
@@ -178,6 +192,318 @@ class AlbumReviewPageTests(unittest.TestCase):
 
             page.reset_selected()
             self.assertEqual(page.review_state_for_filename("a.jpg"), "pending")
+
+    def test_apply_suggestion_uses_category_correction_and_persists_sidecar(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            breakdown = self._make_breakdown(
+                root,
+                "suggested.jpg",
+                80,
+                80,
+                80,
+                80,
+                "2024:01:01 00:00:00",
+                metadata={
+                    "automatic_media_category": MediaCategory.Unknown.value,
+                    "effective_media_category": MediaCategory.Unknown.value,
+                    "media_category": MediaCategory.Unknown.value,
+                    "user_decision": "pending",
+                },
+            )
+            page = AlbumReviewPage()
+            page._decision_history = Mock()
+            page._category_learning_engine = Mock()
+            page._preference_learning_engine = Mock()
+            page.set_scored_photos([breakdown])
+            self._flush_ui()
+            self.assertTrue(page.select_photo_by_filename("suggested.jpg"))
+            page._current_suggestion = SimpleNamespace(
+                status="suggested",
+                suggested_category_id=MediaCategory.FamilyPhoto.value,
+                model_key="mobileclip:test",
+            )
+
+            page._apply_current_suggestion()
+
+            row = page._selected_row()
+            photo = breakdown.photo
+            self.assertEqual(photo.user_corrected_media_category, "family_photo")
+            self.assertEqual(photo.effective_media_category, "family_photo")
+            self.assertEqual(photo.media_category, "family_photo")
+            self.assertEqual(photo.user_decision, "keep")
+            self.assertEqual(row.user_decision, "keep")
+            self.assertEqual(photo.metadata["category_confirmation_state"], "manual_confirmed")
+            self.assertEqual(photo.metadata["category_confirmation_source"], "ai_suggestion_accepted")
+            self.assertTrue(photo.metadata["category_confirmation_at"])
+            self.assertEqual(photo.metadata["category_suggestion_state"], "accepted")
+            self.assertIsNone(page._current_suggestion)
+
+            sidecar = page._user_metadata_service.sidecar_path_for(photo.path)
+            self.assertTrue(sidecar.exists())
+            payload = json.loads(sidecar.read_text(encoding="utf-8"))
+            self.assertEqual(payload["user_corrected_media_category"], "family_photo")
+            self.assertEqual(payload["effective_media_category"], "family_photo")
+            self.assertEqual(payload["user_decision"], "keep")
+            self.assertEqual(payload["category_suggestion_state"], "accepted")
+            self.assertEqual(
+                payload["category_suggestion_applied_category"], "family_photo"
+            )
+            self.assertTrue(payload["category_suggestion_applied_at"])
+
+            reloaded = Photo.from_path(photo.path)
+            load_result = page._user_metadata_service.apply_for_photo(reloaded)
+            self.assertEqual(load_result.sidecar_path, sidecar)
+            self.assertEqual(reloaded.user_corrected_media_category, "family_photo")
+            self.assertEqual(reloaded.effective_media_category, "family_photo")
+            self.assertEqual(reloaded.media_category, "family_photo")
+            self.assertEqual(reloaded.user_decision, "keep")
+            self.assertEqual(reloaded.metadata["category_suggestion_state"], "accepted")
+            reloaded_breakdown = AlbumScoreBreakdown(
+                photo=reloaded,
+                total_score=breakdown.total_score,
+                technical_score=breakdown.technical_score,
+                memory_score=breakdown.memory_score,
+                date_score=breakdown.date_score,
+                explanation=list(breakdown.explanation),
+            )
+            reloaded_page = AlbumReviewPage()
+            reloaded_page.set_scored_photos([reloaded_breakdown])
+            self._flush_ui()
+            self.assertTrue(reloaded_page.select_photo_by_filename("suggested.jpg"))
+            self.assertEqual(reloaded_page.media_category_value.text(), "Family Photo")
+            self.assertEqual(
+                reloaded_page.category_source_value.text(), "Accepted AI suggestion"
+            )
+            self.assertEqual(reloaded_page.user_decision_value.text(), "Keep")
+            page._decision_history.record_category_correction.assert_called_once()
+            page._category_learning_engine.record_category_correction.assert_called_once()
+
+    def test_apply_suggestion_save_failure_rolls_back_without_acceptance(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            breakdown = self._make_breakdown(
+                root,
+                "unsaved.jpg",
+                80,
+                80,
+                80,
+                80,
+                "2024:01:01 00:00:00",
+                metadata={
+                    "automatic_media_category": MediaCategory.Unknown.value,
+                    "effective_media_category": MediaCategory.Unknown.value,
+                    "media_category": MediaCategory.Unknown.value,
+                    "user_decision": "pending",
+                },
+            )
+            page = AlbumReviewPage()
+            page.set_scored_photos([breakdown])
+            self._flush_ui()
+            self.assertTrue(page.select_photo_by_filename("unsaved.jpg"))
+            suggestion = SimpleNamespace(
+                status="suggested",
+                suggested_category_id=MediaCategory.FamilyPhoto.value,
+                model_key="mobileclip:test",
+            )
+            page._current_suggestion = suggestion
+            page._user_metadata_service.save_photo_metadata = Mock(
+                side_effect=OSError("read-only sidecar")
+            )
+
+            page._apply_current_suggestion()
+
+            photo = breakdown.photo
+            self.assertEqual(photo.user_corrected_media_category, "")
+            self.assertEqual(photo.effective_media_category, "unknown")
+            self.assertEqual(photo.media_category, "unknown")
+            self.assertEqual(photo.user_decision, "pending")
+            self.assertEqual(page._selected_row().user_decision, "pending")
+            self.assertNotIn("category_suggestion_state", photo.metadata)
+            self.assertIs(page._current_suggestion, suggestion)
+            self.assertIn("No acceptance was recorded", page.ai_suggestion_value.text())
+
+    def test_already_accepted_suggestion_renders_completed_informational_state(self):
+        page = AlbumReviewPage()
+        result = CategorySuggestionResult(
+            source_photo_key="accepted.jpg",
+            status="already_accepted",
+            suggested_category_id="family_photo",
+            suggested_category_name="Family Photo",
+            evidence_counts={"family_photo": 3},
+            reasons=["This suggestion has already been applied."],
+        )
+
+        page._render_category_suggestion(result)
+
+        text = page.ai_suggestion_value.text()
+        self.assertIn("Suggestion already accepted", text)
+        self.assertIn("Category: Family Photo", text)
+        self.assertIn("3 confirmed similar photos", text)
+        self.assertNotIn("Insufficient Evidence", text)
+        self.assertNotIn("No suggestion", text)
+        self.assertFalse(page.apply_suggestion_button.isEnabled())
+        self.assertFalse(page.reject_suggestion_button.isEnabled())
+        self.assertIsNone(page._current_suggestion)
+
+    def test_manual_category_workflow_immediately_feeds_semantic_suggestion(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            breakdowns = [
+                self._make_breakdown(
+                    root,
+                    f"20210117_15535{index}.jpg",
+                    80 - index,
+                    80,
+                    80,
+                    80,
+                    "2021:01:17 15:53:50",
+                    metadata={
+                        "automatic_media_category": MediaCategory.Unknown.value,
+                        "effective_media_category": MediaCategory.Unknown.value,
+                        "media_category": MediaCategory.Unknown.value,
+                    },
+                )
+                for index in range(4)
+            ]
+            provider = FakeEmbeddingProvider()
+            store = EmbeddingStore(root / "embeddings.sqlite3")
+            for index, item in enumerate(breakdowns):
+                key, modified, size, fingerprint = source_identity(item.photo.path)
+                vector = [1.0, 0.01 * index] + [0.0] * 510
+                store.put(
+                    EmbeddingRecord(
+                        key,
+                        fingerprint,
+                        modified,
+                        size,
+                        provider.metadata.provider_id,
+                        provider.metadata.checkpoint_id,
+                        provider.metadata.revision,
+                        512,
+                        vector,
+                        now_iso(),
+                    )
+                )
+
+            page = AlbumReviewPage()
+            page._decision_history = Mock()
+            page._category_learning_engine = Mock()
+            page._preference_learning_engine = Mock()
+            page._category_suggestion_service = CategorySuggestionService(
+                embedding_store=store,
+                category_registry=page._category_registry,
+            )
+            page._suggestion_metadata = provider.metadata
+            page.set_scored_photos(breakdowns)
+            self._flush_ui()
+            self.assertEqual(page.category_selector_values().count("family_photo"), 1)
+            self.assertNotIn(
+                "family_photo_candidate", page.category_selector_values()
+            )
+            target = page._all_rows[3].breakdown.photo
+            before = page._category_suggestion_service.suggest(
+                target,
+                [row.breakdown.photo for row in page._all_rows],
+                provider.metadata,
+            )
+            self.assertEqual(before.status, "insufficient_evidence")
+            signature_before = page._category_suggestion_service._evidence_signature(
+                row.breakdown.photo for row in page._all_rows
+            )
+
+            applied = page._apply_category_to_rows(
+                page._all_rows[:3], "Family Photo", source="user_bulk"
+            )
+            self.assertTrue(applied)
+            self.assertFalse(page._category_suggestion_service._cache)
+
+            signature_after = page._category_suggestion_service._evidence_signature(
+                row.breakdown.photo for row in page._all_rows
+            )
+            self.assertNotEqual(signature_before, signature_after)
+            for row in page._all_rows[:3]:
+                self.assertIn(
+                    page._category_suggestion_service._trusted_category(
+                        row.breakdown.photo
+                    ),
+                    {
+                        ("family_photo", "user_correction"),
+                        ("family_photo", "manual_confirmed"),
+                    },
+                )
+            semantic_matches = (
+                page._category_suggestion_service.similarity_service.most_similar(
+                    target,
+                    provider.metadata,
+                    candidates=[row.breakdown.photo for row in page._all_rows],
+                    minimum_similarity=page._category_suggestion_service.config.minimum_similarity,
+                )
+            )
+            confirmed_photos = [row.breakdown.photo for row in page._all_rows[:3]]
+            confirmed_keys = {
+                canonical_photo_key(photo) for photo in confirmed_photos
+            }
+            semantic_match_keys = {
+                canonical_photo_key(match.photo_key) for match in semantic_matches
+            }
+            photos_by_key = {
+                canonical_photo_key(row.breakdown.photo): row.breakdown.photo
+                for row in page._all_rows
+            }
+            self.assertGreaterEqual(len(semantic_matches), 3)
+            self.assertTrue(confirmed_keys.issubset(semantic_match_keys))
+            self.assertNotIn(canonical_photo_key(target), semantic_match_keys)
+            self.assertIn(
+                "family_photo",
+                page._category_suggestion_service._eligible_category_ids(),
+            )
+            for match in semantic_matches:
+                match_key = canonical_photo_key(match.photo_key)
+                matched_photo = photos_by_key.get(match_key)
+                self.assertIsNotNone(matched_photo)
+                if match_key in confirmed_keys:
+                    self.assertGreaterEqual(
+                        match.similarity,
+                        page._category_suggestion_service.config.minimum_similarity,
+                    )
+                    self.assertIn(
+                        page._category_suggestion_service._trusted_category(
+                            matched_photo
+                        ),
+                        {
+                            ("family_photo", "manual_confirmed"),
+                            ("family_photo", "user_correction"),
+                        },
+                    )
+            self.assertFalse(
+                page._category_suggestion_service._has_persisted_rejection(
+                    target, "family_photo", provider.metadata.model_key, signature_after
+                )
+            )
+
+            after = page._category_suggestion_service.suggest(
+                target,
+                [row.breakdown.photo for row in page._all_rows],
+                provider.metadata,
+            )
+            supporting_keys = {
+                canonical_photo_key(item.photo_key) for item in after.supporting_photos
+            }
+            self.assertEqual(after.status, "suggested")
+            self.assertEqual(after.suggested_category_id, "family_photo")
+            self.assertGreaterEqual(after.evidence_counts.get("family_photo", 0), 3)
+            self.assertGreaterEqual(len(after.supporting_photos), 3)
+            self.assertTrue(confirmed_keys.issubset(supporting_keys))
+            self.assertEqual(target.effective_media_category, "unknown")
+            for row in page._all_rows[:3]:
+                photo = row.breakdown.photo
+                self.assertEqual(photo.user_corrected_media_category, "family_photo")
+                self.assertEqual(photo.effective_media_category, "family_photo")
+                self.assertEqual(
+                    photo.metadata["category_confirmation_state"], "manual_confirmed"
+                )
+                self.assertEqual(row.user_decision, "keep")
 
     def test_detail_panel_and_explanations_visible(self):
         with tempfile.TemporaryDirectory() as tmpdir:

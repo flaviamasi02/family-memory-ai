@@ -7,7 +7,10 @@ from pathlib import Path
 import pytest
 
 from vision.embedding_provider import EmbeddingRecord, EmbeddingStore, FakeEmbeddingProvider, ModelMetadata, now_iso, source_identity
-from vision.semantic_similarity_service import SemanticSimilarityService
+from vision.semantic_similarity_service import (
+    SemanticSimilarityService,
+    canonical_photo_key,
+)
 
 JPEG_BYTES = bytes.fromhex("ffd8ffe000104a46494600010101006000600000ffdb0043000302020302020303030304030304050805050404050a070706080c0a0c0c0b0a0b0b0d0e12100d0e110e0b0b1016101113141515150c0f171816141812141514ffdb00430103040405040509050509140d0b0d141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414ffc00011080001000103012200021101031101ffc4001400010000000000000000000000000000000000000008ffc40014100100000000000000000000000000000000000000ffda000c03010002110311003f00b2c001ffd9")
 
@@ -195,3 +198,32 @@ def test_unchanged_current_files_remain_included_after_freshness_check(tmp_path)
     results = SemanticSimilarityService(store).most_similar(source, meta)
 
     assert [Path(r.photo_key).name for r in results] == ["candidate.jpg"]
+
+
+def test_canonical_photo_key_unifies_relative_absolute_and_slash_forms(
+    tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "nested").mkdir()
+    path = image(tmp_path / "nested" / "candidate.jpg", b"c")
+
+    assert canonical_photo_key(Path("nested/candidate.jpg")) == canonical_photo_key(
+        path
+    )
+    assert canonical_photo_key(r"nested\candidate.jpg") == canonical_photo_key(path)
+    assert canonical_photo_key(r"C:\Photos\IMAGE.JPG") == canonical_photo_key(
+        "c:/photos/image.jpg"
+    )
+
+
+def test_similarity_results_use_the_shared_canonical_photo_key(tmp_path):
+    store = EmbeddingStore(tmp_path / "e.sqlite3")
+    meta = FakeEmbeddingProvider(dimension=2).metadata
+    source = image(tmp_path / "source.jpg", b"s")
+    candidate = image(tmp_path / "candidate.jpg", b"c")
+    put(store, source, meta, [1, 0])
+    put(store, candidate, meta, [1, 0])
+
+    result = SemanticSimilarityService(store).most_similar(source, meta)[0]
+
+    assert result.photo_key == canonical_photo_key(candidate)

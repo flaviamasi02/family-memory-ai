@@ -98,6 +98,9 @@ class MainWindow(QMainWindow):
         self.status_label = QLabel("Choose a folder to import photos.")
         self.status_label.setStyleSheet("font-size: 15px;")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.ai_status_label = QLabel("AI embeddings: not indexed yet")
+        self.ai_status_label.setStyleSheet("font-size: 13px; color: #5f6368;")
+        self.ai_status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.photo_model = PhotoModel()
         self.photo_view = PhotoGridWidget()
@@ -184,6 +187,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(title)
         layout.addWidget(import_button)
         layout.addWidget(self.status_label)
+        layout.addWidget(self.ai_status_label)
         layout.addWidget(self.tabs, 1)
 
         container = QWidget()
@@ -299,7 +303,8 @@ class MainWindow(QMainWindow):
 
     def _queue_or_start_scan(self, folder_path: str) -> None:
         """Start scanning now unless an embedding run must finish cancellation first."""
-        if self.embedding_thread is not None and self.embedding_thread.isRunning():
+        self._set_embedding_status("Indexing semantic embeddings: preparing new import…")
+        if self._embedding_thread_is_running():
             self._pending_import_folder_path = folder_path
             self._pending_embedding_photos = None
             self._request_embedding_worker_cancel()
@@ -387,12 +392,25 @@ class MainWindow(QMainWindow):
     def _start_embedding_indexing(self, photos: list) -> None:
         """Launch import/index embedding generation without blocking the UI."""
         requested_photos = list(photos or [])
-        if self.embedding_thread is not None and self.embedding_thread.isRunning():
+        if self._embedding_thread_is_running():
             self._pending_embedding_photos = requested_photos
             self._request_embedding_worker_cancel()
             return
 
         self._launch_embedding_worker(requested_photos)
+
+    def _embedding_thread_is_running(self) -> bool:
+        """Return thread state while discarding a deleted Qt wrapper safely."""
+        thread = self.embedding_thread
+        if thread is None:
+            return False
+        try:
+            return bool(thread.isRunning())
+        except RuntimeError:
+            self.embedding_thread = None
+            self.embedding_worker = None
+            self._active_embedding_run_id = 0
+            return False
 
     def _launch_embedding_worker(self, photos: list) -> None:
         self._embedding_run_id += 1
@@ -445,15 +463,13 @@ class MainWindow(QMainWindow):
     def _on_embedding_progress(self, run_id: int, progress) -> None:
         if run_id != self._active_embedding_run_id:
             return
-        self.status_label.setText(
+        self._set_embedding_status(
             f"Indexing semantic embeddings {progress.current_index}/{progress.total_count} "
-            f"(new={progress.processed_count}, skipped={progress.cached_count}, failed={progress.failed_count})…"
+            f"(new={progress.processed_count}, reused={progress.cached_count}, failed={progress.failed_count})…"
         )
 
     def _on_embedding_complete(self, run_id: int, result) -> None:
         if run_id != self._active_embedding_run_id:
-            return
-        if getattr(result, "total_images_received", 0) <= 0:
             return
         print(
             "[EmbeddingIndex] "
@@ -468,10 +484,79 @@ class MainWindow(QMainWindow):
         for line in embedding_failure_diagnostic_lines(result, limit=3):
             print(line, file=sys.stderr, flush=True)
 
+        processed = int(getattr(result, "processed_successfully", 0) or 0)
+        cached = int(getattr(result, "skipped_cached", 0) or 0)
+        failed = int(getattr(result, "failed", 0) or 0)
+        cancelled = int(getattr(result, "cancelled", 0) or 0)
+        received = int(getattr(result, "total_images_received", 0) or 0)
+        ready = processed + cached
+        total = ready + failed + cancelled
+        if received <= 0:
+            self._set_embedding_status(
+                "AI embeddings: no eligible photos to index.",
+                severity="success",
+            )
+        elif cancelled:
+            self._set_embedding_status(
+                "⚠ Semantic embedding indexing cancelled. "
+                f"{processed} new · {cached} reused · {failed} failed",
+                severity="warning",
+            )
+        elif failed and not processed and not cached:
+            self._set_embedding_status(
+                "✕ Semantic embedding indexing failed. "
+                f"0 ready · {failed} failed",
+                severity="error",
+            )
+        elif failed:
+            self._set_embedding_status(
+                f"⚠ AI embeddings ready: {ready}/{total}. "
+                f"{processed} new · {cached} reused · {failed} failed",
+                severity="warning",
+            )
+        elif processed and not cached:
+            self._set_embedding_status(
+                f"✓ Semantic embedding indexing completed. {processed} new embeddings "
+                f"created · 0 reused · 0 failed",
+                severity="success",
+            )
+        else:
+            self._set_embedding_status(
+                f"✓ Semantic embeddings ready: {ready}/{total}. "
+                f"{processed} new · {cached} reused from cache · 0 failed",
+                severity="success",
+            )
+        self._on_embedding_index_updated(result)
+
+    def _set_embedding_status(self, message: str, severity: str = "progress") -> None:
+        """Update the dedicated persistent AI status (or test-compatible fallback)."""
+        label = getattr(self, "ai_status_label", self.status_label)
+        label.setText(message)
+        colors = {
+            "success": "#137333",
+            "warning": "#b06000",
+            "error": "#b3261e",
+            "progress": "#5f6368",
+        }
+        if hasattr(label, "setStyleSheet"):
+            label.setStyleSheet(f"font-size: 13px; color: {colors[severity]};")
+
+    def _on_embedding_index_updated(self, result) -> None:
+        _ = result
+        review_page = getattr(self, "review_page", None)
+        if review_page is not None and hasattr(
+            review_page, "on_embedding_index_updated"
+        ):
+            review_page.on_embedding_index_updated()
+
     def _on_embedding_error(self, run_id: int, error_message: str) -> None:
         if run_id != self._active_embedding_run_id:
             return
         print(f"[EmbeddingIndex] error: {error_message}", file=sys.stderr, flush=True)
+        self._set_embedding_status(
+            f"✕ Semantic embedding indexing failed. {error_message}",
+            severity="error",
+        )
 
     def _deferred_setup_cleanup_review(self) -> None:
         """Populate Cleanup Review — deferred from _on_scan_complete."""

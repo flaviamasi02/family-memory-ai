@@ -47,7 +47,7 @@ class FaceDetectionServiceTests(unittest.TestCase):
             self.assertEqual(result.detector, "unavailable")
             self.assertEqual(result.explanation, ["Face detection unavailable"])
 
-    def test_classifier_uses_face_metadata_as_family_photo_evidence(self):
+    def test_face_metadata_does_not_assign_family_photo_automatically(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             photo = self._make_photo(
                 Path(tmpdir),
@@ -65,9 +65,9 @@ class FaceDetectionServiceTests(unittest.TestCase):
             classifier = MediaClassifier()
             result = classifier.classify_photo(photo)
 
-            self.assertEqual(result.media_category, MediaCategory.FamilyPhoto)
-            self.assertEqual(photo.media_category, MediaCategory.FamilyPhoto.value)
-            self.assertIn("face detected", result.classification_reason.lower())
+            self.assertEqual(result.media_category, MediaCategory.Unknown)
+            self.assertEqual(photo.media_category, MediaCategory.Unknown.value)
+            self.assertIn("semantic similarity", result.classification_reason.lower())
 
     def test_user_corrected_category_is_not_overridden(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -95,7 +95,7 @@ class FaceDetectionServiceTests(unittest.TestCase):
             self.assertEqual(photo.effective_media_category, MediaCategory.Advertisement.value)
             self.assertEqual(photo.media_category, MediaCategory.Advertisement.value)
 
-    def test_unknown_photo_with_face_metadata_becomes_family_photo(self):
+    def test_unknown_photo_with_face_metadata_remains_unknown(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             photo = self._make_photo(
                 Path(tmpdir),
@@ -113,9 +113,9 @@ class FaceDetectionServiceTests(unittest.TestCase):
             classifier = MediaClassifier()
             result = classifier.classify_photo(photo)
 
-            self.assertEqual(result.media_category, MediaCategory.FamilyPhoto)
-            self.assertEqual(photo.media_category, MediaCategory.FamilyPhoto.value)
-            self.assertIn("face detected", result.classification_reason.lower())
+            self.assertEqual(result.media_category, MediaCategory.Unknown)
+            self.assertEqual(photo.media_category, MediaCategory.Unknown.value)
+            self.assertIn("semantic similarity", result.classification_reason.lower())
 
     def test_no_face_metadata_does_not_force_family_photo(self):
         with tempfile.TemporaryDirectory() as tmpdir:

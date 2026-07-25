@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from core.application_data import get_app_data_service, atomic_write_json
-from core.category_registry import get_category_registry
+from core.category_registry import get_category_registry, normalize_category_id
 from core.user_metadata_service import UserMetadataService
 from models.visual_feature_profile import VisualFeatureProfile
 
@@ -21,7 +21,7 @@ MIN_SIGNAL_CONFIDENCE = 0.60
 MIN_RECOMMENDATION_CONFIDENCE = 0.62
 CONTENT_CATEGORY_IDS = {
     "family_photo", "personal_photo", "screenshot", "document", "receipt", "invoice",
-    "advertisement", "meme", "graphic", "family_photo_candidate", "document_or_scan", "meme_or_graphic",
+    "advertisement", "meme", "graphic", "document_or_scan", "meme_or_graphic",
 }
 WORKFLOW_CATEGORY_IDS = {"duplicate_candidate", "low_quality", "low_quality_photo", "unknown", "video"}
 
@@ -171,7 +171,11 @@ class CategoryLearningEngine:
             if profile.extraction_status == "extracted":
                 try:
                     from models.photo import Photo
-                    photo = Photo.from_path(Path(path)); service.apply_profile_to_photo(photo, profile); UserMetadataService().save_for_photo(photo)
+                    photo = Photo.from_path(Path(path))
+                    metadata_service = UserMetadataService()
+                    metadata_service.apply_for_photo(photo)
+                    service.apply_profile_to_photo(photo, profile)
+                    metadata_service.save_for_photo(photo)
                 except Exception: pass
             if self.record_completed_visual_analysis(event_id, profile): done += 1
         return done
@@ -329,7 +333,7 @@ def _event_id(path: str, previous: str, category: str, source: str) -> str:
 def _rule_id(target_category: str, conditions: dict[str, Any]) -> str:
     return "rule_" + hashlib.sha1((target_category + json.dumps(conditions, sort_keys=True)).encode()).hexdigest()[:16]
 
-def _normalize(v: Any) -> str: return str(v or "").strip().lower()
+def _normalize(v: Any) -> str: return normalize_category_id(v)
 def _now_iso() -> str: return datetime.now(timezone.utc).isoformat()
 def _to_int(v: Any) -> int | None:
     try: return int(v)

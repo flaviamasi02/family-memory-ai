@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### MODEL-003D canonical Family Photo category
+
+- Established `family_photo` as the single canonical, album-candidate ID for the user-facing Family Photo category.
+- Added central compatibility normalization for legacy `family_photo_candidate` and display-label variants across the registry, sidecars, learning metadata, Memory Review, and category suggestions without creating a duplicate category.
+- Legacy category configuration can no longer hide or disable the canonical Family Photo category; existing sidecars remain readable and are written back with the canonical ID.
+- Fixed the deferred category-learning visual analysis pass so it loads and merges an existing photo sidecar before adding visual features; manual categories, accepted suggestions, and Keep decisions are no longer overwritten by a freshly reconstructed Photo.
+- Memory Review now renders an accepted suggestion as a completed informational state with its category and saved supporting-evidence count, rather than labeling it as insufficient evidence; Apply and Reject remain disabled.
+
 
 ### DOCSYNC DEC-0049 platform strategy propagation
 
@@ -615,3 +623,35 @@
 - Fixed stale-source handling so similarity scans exclude deleted, modified, replaced, or otherwise non-current source files before returning matches.
 - Improved embedding failure diagnostics so import/index completion preserves the existing summary and prints a limited, grouped stderr sample with image path, exception type, and concise error message.
 - Changed automatic MODEL-003B embedding generation to use the AI Runtime Manager's configured dedicated MobileCLIP interpreter through a managed subprocess boundary, avoiding torch/mobileclip imports in the main application environment and reporting non-Ready runtime state as one grouped runtime-level failure.
+
+### MODEL-003D - Explainable Category Suggestions
+
+- Added an advisory category suggestion service over stored semantic embeddings, trusted labeled evidence, eligible existing content categories, and deterministic classification agreement.
+- Added a compact Memory Review AI Suggestion section with confidence, explanation, evidence count, explicit Apply suggestion, and Reject / Not useful actions, with rejection feedback persisted in existing photo sidecars.
+- Documented that confidence is a deterministic heuristic, manual categories remain authoritative, local stored vectors are used only, and automatic category replacement is not included.
+
+- Fixed MODEL-003D Memory Review refresh after embedding indexing completion: the status banner now leaves the indexing state, suggestion cache is invalidated, and the selected photo suggestion is recomputed without restarting the app.
+
+- Fixed MODEL-003D manual evidence capture so Apply Category to Selected records confirmed category evidence, updates pending rows to Keep, persists confirmation metadata, and allows highly similar photos to use that trusted manual evidence for suggestions.
+
+- Improved MODEL-003D trusted evidence consumption by normalizing category labels/IDs before matching eligible categories and adding opt-in `FAMILY_MEMORY_DEBUG_SUGGESTIONS=1` diagnostics for semantic matches, trusted evidence, category IDs, evidence counts, and final status reason.
+
+- Added a lightweight embedding-completion notification in the existing status area: success, warning, cancellation, and failure summaries remain visible for seven seconds, then clear without modal dialogs or overwriting newer scan/progress status.
+
+- Fixed Apply suggestion persistence by routing acceptance metadata through the same category-correction save, persisting category/Keep/confirmation fields atomically before learning signals, rolling back non-destructively on sidecar failure, and suppressing an accepted suggestion after sidecar reload.
+
+- Replaced the easy-to-miss transient embedding completion text with a compact dedicated AI status that remains visible until the next import, treats cached embeddings as successful reuse, distinguishes new/reused counts, and reserves warning/error styling for cancellation or failures.
+
+- Fixed embedding startup/result reporting so every imported photo reaches the batch service (including cache hits), empty runs replace the preparation state with an explicit reason and terminal summary, and stale deleted Qt thread wrappers cannot block subsequent imports.
+
+- Restored cache-first managed-runtime initialization: valid stored embeddings are now counted and reused before MobileCLIP readiness validation, while uncached photos still require the fully validated managed runtime and retain grouped readiness failures when it is genuinely unavailable.
+
+- Removed the weak automatic Family Photo fallback: ordinary JPEG/photo files now begin as Unknown when evidence is limited to format, EXIF/camera/GPS metadata, camera-style filenames, or photo-like structure. Explanations state that family content is unconfirmed, while strong face evidence and authoritative manual/accepted/learned categories remain supported.
+
+- Tightened visual Document classification so rectangular/page-like geometry, edge density, and generic contrast cannot classify an ordinary photograph as Document without explicit document filename evidence or strongly text-dominant document evidence.
+
+- Rebalanced Document-versus-Graphic ordering so a portrait page with combined text likelihood, document likelihood, and a document-over-photo margin remains Document even when flat regions also raise the generic Graphic score.
+
+- Removed the remaining automatic Family Photo paths, including strong-face overrides and legacy learned Family Photo outputs. New photographs remain Unknown with a semantic-evidence waiting reason; only MODEL-003D may suggest Family Photo, and assignment still requires explicit user acceptance or manual correction.
+
+- Fixed immediate manual-evidence suggestions by canonicalizing photo identities consistently across the UI collection, semantic result paths, evidence signatures, and cache keys (including Windows case/separator differences). Opt-in suggestion diagnostics now report every semantic match, resolution result, similarity, raw/normalized category, confirmation state, trust decision, and acceptance/rejection reason.

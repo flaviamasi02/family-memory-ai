@@ -2,6 +2,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from PySide6.QtGui import QColor, QImage, QPainter
 
@@ -99,7 +100,7 @@ class MediaClassifierTests(unittest.TestCase):
 
         self.assertIn(result.media_category, {MediaCategory.Graphic, MediaCategory.Unknown})
 
-    def test_normal_img_camera_photo_is_family_photo(self):
+    def test_normal_img_camera_photo_is_unknown_without_family_evidence(self):
         result = self.classifier.classify(
             "IMG_20260705_153011.jpg",
             {
@@ -111,9 +112,12 @@ class MediaClassifierTests(unittest.TestCase):
             },
         )
 
-        self.assertEqual(result.media_category, MediaCategory.FamilyPhoto)
+        self.assertEqual(result.media_category, MediaCategory.Unknown)
+        self.assertIn("Category not yet confirmed", result.classification_reason)
+        self.assertIn("semantic similarity evidence", result.classification_reason)
+        self.assertNotIn("Classified as family photo", result.classification_reason)
 
-    def test_pxl_phone_photo_is_family_photo(self):
+    def test_pxl_phone_photo_is_unknown_without_family_evidence(self):
         result = self.classifier.classify(
             "PXL_20260705_101010.jpg",
             {
@@ -125,9 +129,9 @@ class MediaClassifierTests(unittest.TestCase):
             },
         )
 
-        self.assertEqual(result.media_category, MediaCategory.FamilyPhoto)
+        self.assertEqual(result.media_category, MediaCategory.Unknown)
 
-    def test_normal_camera_photo_remains_family_photo(self):
+    def test_camera_metadata_and_gps_do_not_imply_family_content(self):
         result = self.classifier.classify(
             "family_trip.jpg",
             {
@@ -140,8 +144,58 @@ class MediaClassifierTests(unittest.TestCase):
             },
         )
 
-        self.assertEqual(result.media_category, MediaCategory.FamilyPhoto)
-        self.assertGreaterEqual(result.classification_confidence, 0.8)
+        self.assertEqual(result.media_category, MediaCategory.Unknown)
+        self.assertIn("Category not yet confirmed", result.classification_reason)
+
+    def test_manual_family_photo_remains_authoritative_on_reclassification(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            photo = self._make_photo(
+                Path(tmpdir),
+                "IMG_20260705_153011.jpg",
+                {
+                    "width": 4032,
+                    "height": 3024,
+                    "camera_make": "Canon",
+                    "camera_model": "EOS",
+                    "date_taken": "2026:07:05 15:30:11",
+                    "user_corrected_media_category": MediaCategory.FamilyPhoto.value,
+                    "effective_media_category": MediaCategory.FamilyPhoto.value,
+                    "media_category": MediaCategory.FamilyPhoto.value,
+                    "category_confirmation_state": "manual_confirmed",
+                },
+            )
+
+            self.classifier.classify_photo(photo)
+
+            self.assertEqual(photo.automatic_media_category, MediaCategory.Unknown.value)
+            self.assertEqual(photo.user_corrected_media_category, MediaCategory.FamilyPhoto.value)
+            self.assertEqual(photo.effective_media_category, MediaCategory.FamilyPhoto.value)
+            self.assertEqual(photo.media_category, MediaCategory.FamilyPhoto.value)
+
+    def test_accepted_family_suggestion_remains_authoritative_on_reclassification(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            photo = self._make_photo(
+                Path(tmpdir),
+                "PXL_20260705_101010.jpg",
+                {
+                    "width": 4032,
+                    "height": 3024,
+                    "camera_make": "Google",
+                    "camera_model": "Pixel",
+                    "date_taken": "2026:07:05 10:10:10",
+                    "user_corrected_media_category": MediaCategory.FamilyPhoto.value,
+                    "effective_media_category": MediaCategory.FamilyPhoto.value,
+                    "media_category": MediaCategory.FamilyPhoto.value,
+                    "category_suggestion_state": "accepted",
+                    "category_suggestion_applied_category": MediaCategory.FamilyPhoto.value,
+                },
+            )
+
+            self.classifier.classify_photo(photo)
+
+            self.assertEqual(photo.user_corrected_media_category, MediaCategory.FamilyPhoto.value)
+            self.assertEqual(photo.effective_media_category, MediaCategory.FamilyPhoto.value)
+            self.assertEqual(photo.media_category, MediaCategory.FamilyPhoto.value)
 
     def test_screenshot_remains_screenshot(self):
         result = self.classifier.classify(
@@ -202,8 +256,34 @@ class MediaClassifierTests(unittest.TestCase):
                 "date_taken": "2026:07:05 10:11:12",
             },
         )
-        if stronger_result.media_category == MediaCategory.FamilyPhoto:
-            self.assertLessEqual(stronger_result.classification_confidence, 0.85)
+        self.assertNotEqual(stronger_result.media_category, MediaCategory.FamilyPhoto)
+
+    def test_legacy_learned_family_rule_cannot_assign_family_photo(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            photo = self._make_photo(
+                Path(tmpdir),
+                "IMG_20260705_153011.jpg",
+                {"width": 4032, "height": 3024, "date_taken": "2026:07:05"},
+            )
+
+            class LegacyLearningEngine:
+                def apply_learning(self, **_kwargs):
+                    return (
+                        MediaCategory.FamilyPhoto.value,
+                        0.91,
+                        "Legacy learned family rule.",
+                        object(),
+                    )
+
+            with patch(
+                "core.media_classifier.get_category_learning_engine",
+                return_value=LegacyLearningEngine(),
+            ):
+                result = self.classifier.classify_photo(photo)
+
+            self.assertEqual(result.media_category, MediaCategory.Unknown)
+            self.assertEqual(photo.automatic_media_category, MediaCategory.Unknown.value)
+            self.assertIn("semantic similarity evidence", photo.classification_reason)
 
     def test_supported_image_without_strong_signals_is_unknown(self):
         result = self.classifier.classify(
@@ -259,7 +339,7 @@ class MediaClassifierTests(unittest.TestCase):
         painter.end()
         self.assertTrue(image.save(str(path), "PNG"))
 
-    def test_no_metadata_photo_like_image_is_not_automatically_unknown(self):
+    def test_photo_like_visual_structure_does_not_imply_family_content(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "old_family_scan.png"
             self._save_photo_like(path)
@@ -271,7 +351,67 @@ class MediaClassifierTests(unittest.TestCase):
                 {"camera_make": "", "camera_model": "", "date_taken": ""},
                 allow_visual_analysis=True,
             )
-            self.assertNotEqual(result.media_category, MediaCategory.Unknown)
+            self.assertEqual(result.media_category, MediaCategory.Unknown)
+            self.assertIn("category not yet confirmed", result.classification_reason.lower())
+            self.assertIn("semantic similarity evidence", result.classification_reason.lower())
+
+    def test_page_geometry_and_edges_without_document_evidence_remain_unknown(self):
+        from core.visual_content_analyzer import VisualContentSignals
+
+        signals = VisualContentSignals(
+            file_path="ordinary.jpg",
+            width=1200,
+            height=800,
+            aspect_ratio=1.5,
+            dominant_layout="landscape",
+            has_faces=None,
+            face_count=0,
+            text_likelihood=0.68,
+            graphic_likelihood=0.20,
+            photo_likelihood=0.70,
+            screenshot_likelihood=0.15,
+            document_likelihood=0.74,
+            advertisement_likelihood=0.10,
+            explanation=["Rectangular layout with many edges."],
+        )
+
+        result = self.classifier.classify(
+            "ordinary.jpg",
+            {"width": 1200, "height": 800},
+            allow_visual_analysis=True,
+            precomputed_visual_signals=signals,
+        )
+
+        self.assertEqual(result.media_category, MediaCategory.Unknown)
+
+    def test_strong_text_dominant_document_visual_evidence_remains_document(self):
+        from core.visual_content_analyzer import VisualContentSignals
+
+        signals = VisualContentSignals(
+            file_path="page.jpg",
+            width=1700,
+            height=2400,
+            aspect_ratio=0.71,
+            dominant_layout="portrait",
+            has_faces=None,
+            face_count=0,
+            text_likelihood=0.86,
+            graphic_likelihood=0.22,
+            photo_likelihood=0.40,
+            screenshot_likelihood=0.18,
+            document_likelihood=0.88,
+            advertisement_likelihood=0.12,
+            explanation=["Text-like regions dominate a page-like image."],
+        )
+
+        result = self.classifier.classify(
+            "page.jpg",
+            {"width": 1700, "height": 2400},
+            allow_visual_analysis=True,
+            precomputed_visual_signals=signals,
+        )
+
+        self.assertEqual(result.media_category, MediaCategory.Document)
 
     def test_no_metadata_document_like_image_becomes_document(self):
         with tempfile.TemporaryDirectory() as tmpdir:

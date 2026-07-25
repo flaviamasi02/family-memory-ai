@@ -78,3 +78,11 @@ Consequences:
 - Inspect Qt widget hierarchy, grid rows, visibility, geometry, size hints, and layout ordering when metadata appears blank.
 - Preserve explicit row sizing/geometry refresh behavior in the AI Models card.
 - Preserve the completed MODEL-002F validation record, keep runtime diagnostics separate from classification behavior, and require explicit Product Owner approval before any production classification integration.
+
+## MODEL-003D — Advisory explainable category suggestions
+
+Decision: category suggestions may use stored MobileCLIP embeddings only as advisory evidence in Memory Review. The service must use current valid embeddings, existing content categories, trusted category corrections/confirmations, and deterministic classifier agreement/disagreement to produce a bounded heuristic confidence. It must not overwrite manual categories or perform automatic replacement during import, indexing, embedding generation, or suggestion calculation.
+
+## MODEL-003D follow-up — Weak photograph signals do not imply Family Photo
+
+Decision: supported image format, EXIF/camera metadata, camera-style filenames, GPS, faces, and ordinary photo-like structure must not automatically assign Family Photo. New photographs start as Unknown, and only MODEL-003D stored-vector semantic similarity may propose Family Photo. Applying that proposal remains an explicit user action. Reliable screenshot, document, meme/graphic, advertisement, corrupt/unsupported, and workflow rules remain in force. Existing manual categories and accepted suggestions remain authoritative and are never reset; legacy deterministic or learned Family Photo outputs are ignored.

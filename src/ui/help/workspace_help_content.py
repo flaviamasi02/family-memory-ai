@@ -85,7 +85,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                 _purpose_section(
                     why_this_workspace_exists="Photo Browser gives you the fastest way to inspect everything that was imported before deeper review work begins.",
                     problem_it_solves="Large folders are difficult to assess quickly without visual browsing, relevance filters, and metadata context.",
-                    ai_automation="The AI-assisted classification engine tags each file with relevance categories and confidence signals during import.",
+                    ai_automation="Import applies reliable technical rules for screenshots, documents, graphics, and workflow states. Ordinary photographs remain Unknown until family content is confirmed manually or through an accepted AI Suggestion.",
                     user_interaction="Use relevance filters and open photo details to validate what the system detected before moving into Memory Review or Cleanup Review.",
                     expected_outcome="You get a clear understanding of library quality, relevance distribution, and where to focus manual review effort.",
                 ),
@@ -135,7 +135,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                     why_this_workspace_exists="Memory Review is the core workspace for teaching which moments should contribute to family memories and future album quality.",
                     problem_it_solves="Raw imported photos contain noise, ambiguity, and mixed quality that must be resolved through guided category correction.",
                     ai_automation="The system pre-scores candidates, predicts categories, keeps explainable reasoning visible, and can use locally stored visual/content signals when those profiles are available.",
-                    user_interaction="Correct Media Category values in small batches; every correction is captured immediately and teaches from local visual content when evidence is available; missing visual analysis may finish in the background.",
+                    user_interaction="Correct Media Category values in small batches; review advisory AI suggestions when stored-vector evidence is available; every accepted correction is captured immediately and teaches from local visual content when evidence is available; missing visual analysis may finish in the background.",
                     expected_outcome="A cleaner, higher-confidence reviewed set that teaches future classification and recommendation behavior without mixing in album-decision editing.",
                 ),
                 _workflow_section(

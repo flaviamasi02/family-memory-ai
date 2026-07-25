@@ -36,18 +36,23 @@ class EmbeddingWorker(QObject):
     def run(self) -> None:
         try:
             service = self._service_factory()
-            required = [photo for photo in self._photos if service.needs_embedding(photo)]
             if self._cancel_event.is_set():
-                result = BatchEmbeddingResult(total_images_received=len(required), cancelled=len(required))
+                result = BatchEmbeddingResult(
+                    total_images_received=len(self._photos),
+                    cancelled=len(self._photos),
+                )
                 self.complete.emit(result)
                 return
-            if not required:
+            if not self._photos:
                 result = BatchEmbeddingResult(total_images_received=0)
                 self.complete.emit(result)
                 return
 
+            # Pass the complete import set through the batch service.  The service
+            # owns cache validation and reports cached files as successful reuse;
+            # pre-filtering here loses that result and leaves the UI in "preparing".
             result = service.embed_images(
-                required,
+                self._photos,
                 progress_callback=self._emit_progress,
                 cancellation_token=self._cancel_event,
             )

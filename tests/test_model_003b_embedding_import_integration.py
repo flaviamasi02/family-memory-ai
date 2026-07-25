@@ -47,7 +47,8 @@ def test_import_worker_generates_embeddings_skips_unchanged_and_reuses_cache(tmp
     second.complete.connect(second_results.append)
     second.run()
 
-    assert second_results[-1].total_images_received == 0
+    assert second_results[-1].total_images_received == 2
+    assert second_results[-1].skipped_cached == 2
     assert second_provider.embed_call_count == 0
 
 
@@ -67,8 +68,12 @@ def test_changed_image_is_regenerated_but_unchanged_image_is_skipped(tmp_path):
     worker.complete.connect(results.append)
     worker.run()
 
-    assert results[-1].total_images_received == 1
-    assert results[-1].processed_successfully == 1
+    result = results[-1]
+    assert result.total_images_received == 2
+    assert result.processed_successfully == 1
+    assert result.skipped_cached == 1
+    assert result.failed == 0
+    assert result.cancelled == 0
     assert provider.embed_call_count == calls + 1
 
 
@@ -320,6 +325,145 @@ def test_embedding_completion_success_does_not_print_failure_diagnostics(capsys)
     assert "failure 1/" not in err
 
 
+def _embedding_result(processed, cached, failed):
+    return type(
+        "Result",
+        (),
+        {
+            "total_images_received": processed + cached + failed,
+            "processed_successfully": processed,
+            "skipped_cached": cached,
+            "failed": failed,
+            "cancelled": 0,
+            "elapsed_seconds": 0.1,
+            "outcomes": [],
+        },
+    )()
+
+
+def test_new_embedding_completion_is_persistent_success():
+    window = _embedding_window_for_lifecycle_tests()
+    window._active_embedding_run_id = 1
+
+    window._on_embedding_complete(1, _embedding_result(12, 0, 0))
+
+    assert window.ai_status_label.text.startswith(
+        "✓ Semantic embedding indexing completed."
+    )
+    assert "12 new embeddings created · 0 reused · 0 failed" in window.ai_status_label.text
+
+
+def test_cached_embedding_completion_is_success_not_warning():
+    window = _embedding_window_for_lifecycle_tests()
+    window._active_embedding_run_id = 1
+
+    window._on_embedding_complete(1, _embedding_result(0, 12, 0))
+
+    assert window.ai_status_label.text.startswith("✓ Semantic embeddings ready: 12/12")
+    assert "0 new · 12 reused from cache · 0 failed" in window.ai_status_label.text
+    assert "⚠" not in window.ai_status_label.text
+
+
+def test_mixed_new_and_cached_embedding_completion_is_success():
+    window = _embedding_window_for_lifecycle_tests()
+    window._active_embedding_run_id = 1
+
+    window._on_embedding_complete(1, _embedding_result(5, 7, 0))
+
+    assert window.ai_status_label.text.startswith("✓ Semantic embeddings ready: 12/12")
+    assert "5 new · 7 reused from cache · 0 failed" in window.ai_status_label.text
+
+
+def test_embedding_failures_use_warning_or_error_status():
+    partial = _embedding_window_for_lifecycle_tests()
+    partial._active_embedding_run_id = 1
+    partial._on_embedding_complete(1, _embedding_result(5, 6, 1))
+    assert partial.ai_status_label.text.startswith("⚠ AI embeddings ready: 11/12")
+
+    complete = _embedding_window_for_lifecycle_tests()
+    complete._active_embedding_run_id = 1
+    complete._on_embedding_complete(1, _embedding_result(0, 0, 3))
+    assert complete.ai_status_label.text.startswith(
+        "✕ Semantic embedding indexing failed."
+    )
+
+
+def test_embedding_progress_replaces_previous_ready_state():
+    window = _embedding_window_for_lifecycle_tests()
+    window._active_embedding_run_id = 1
+    window.ai_status_label.setText("✓ Semantic embeddings ready: 12/12")
+    progress = type(
+        "Progress",
+        (),
+        {
+            "current_index": 3,
+            "total_count": 12,
+            "processed_count": 3,
+            "cached_count": 0,
+            "failed_count": 0,
+        },
+    )()
+
+    window._on_embedding_progress(1, progress)
+
+    assert window.ai_status_label.text.startswith("Indexing semantic embeddings 3/12")
+
+
+def test_generic_scan_status_does_not_overwrite_embedding_ready_status(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    window._active_embedding_run_id = 1
+    window._on_embedding_complete(1, _embedding_result(0, 12, 0))
+
+    window.status_label.setText("Found 12 review photos. Loading thumbnails…")
+
+    assert window.ai_status_label.text.startswith("✓ Semantic embeddings ready: 12/12")
+
+
+def test_starting_new_import_replaces_ready_status(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    window.ai_status_label.setText("✓ Semantic embeddings ready: 12/12")
+    monkeypatch.setattr(window, "_start_scan", lambda _folder: None)
+
+    window._queue_or_start_scan("/new-import")
+
+    assert window.ai_status_label.text == (
+        "Indexing semantic embeddings: preparing new import…"
+    )
+
+
+def test_empty_embedding_run_emits_summary_and_clears_preparing_state(capsys):
+    window = _embedding_window_for_lifecycle_tests()
+    window._active_embedding_run_id = 1
+
+    window._on_embedding_complete(1, _embedding_result(0, 0, 0))
+
+    assert window.ai_status_label.text == "AI embeddings: no eligible photos to index."
+    assert "[EmbeddingIndex] processed=0 cached=0 failed=0 cancelled=0" in (
+        capsys.readouterr().err
+    )
+
+
+def test_deleted_embedding_thread_wrapper_does_not_block_worker_launch(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    launched = []
+
+    class DeletedThread:
+        def isRunning(self):
+            raise RuntimeError("Internal C++ object already deleted")
+
+    window.embedding_thread = DeletedThread()
+    window.embedding_worker = object()
+    window._active_embedding_run_id = 4
+    monkeypatch.setattr(window, "_launch_embedding_worker", launched.append)
+
+    window._start_embedding_indexing(["photo"])
+
+    assert launched == [["photo"]]
+    assert window.embedding_thread is None
+    assert window.embedding_worker is None
+    assert window._active_embedding_run_id == 0
+
+
 def test_close_event_waits_for_running_embedding_thread_before_destroying(monkeypatch):
     window = _embedding_window_for_lifecycle_tests()
     waited = []
@@ -443,6 +587,7 @@ def _embedding_window_for_lifecycle_tests():
     window._pending_import_folder_path = None
     window._embedding_close_requested = False
     window.status_label = _StatusLabel()
+    window.ai_status_label = _StatusLabel()
     return window
 
 

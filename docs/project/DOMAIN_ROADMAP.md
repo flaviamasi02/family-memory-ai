@@ -387,3 +387,9 @@ Current MODEL-003 milestones:
 - [x] MODEL-003C — Reusable semantic image similarity service over stored embeddings.
 
 MODEL-003C keeps the production classifier unchanged and adds a reusable non-UI service for future category suggestions, near-duplicate detection, semantic search, clustering, and learning from corrections. Automatic classification remains deferred until explicitly approved.
+
+### MODEL-003D — Explainable Category Suggestions
+
+- [x] MODEL-003D — Advisory category suggestions in Memory Review using stored semantic vectors and trusted existing labels.
+
+MODEL-003D is intentionally advisory: it can propose at most one existing content category with heuristic confidence and evidence-based reasons, but no category changes occur without an explicit user click through the existing correction workflow. Manual categories remain authoritative, unreviewed machine labels are not trusted as strong evidence, and production automatic category replacement remains deferred.

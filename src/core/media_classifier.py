@@ -12,6 +12,10 @@ from core.feature_flags import ENABLE_VISUAL_CONTENT_ANALYSIS
 from core.visual_content_analyzer import VisualContentAnalyzer
 from learning.category_learning_engine import get_category_learning_engine
 
+UNCONFIRMED_PHOTO_REASON = (
+    "Category not yet confirmed. Waiting for semantic similarity evidence."
+)
+
 
 class MediaCategory(str, Enum):
     FamilyPhoto = "family_photo"
@@ -284,10 +288,6 @@ class MediaClassifier:
         has_camera_metadata = self._has_camera_metadata(metadata_dict)
         has_exif_date = self._has_exif_date(metadata_dict)
         has_gps = bool(metadata_dict.get("has_gps", False))
-        face_context = self._face_detection_context(metadata_dict)
-        has_user_correction = bool(str(metadata_dict.get("user_corrected_media_category", "") or "").strip())
-        face_evidence_is_strong = bool(face_context["has_faces"] and face_context["confidence"] >= 0.55)
-
         looks_downloaded = self._looks_downloaded_or_shared(filename_lower)
         meme_indicators = self._matched_meme_indicators(filename_lower)
         strong_meme_hit = any(indicator in STRONG_MEME_INDICATORS for indicator in meme_indicators)
@@ -366,24 +366,13 @@ class MediaClassifier:
         if self._is_meme(filename_lower):
             detail = ", ".join(meme_indicators[:3]) if meme_indicators else "meme indicators"
 
-            if face_evidence_is_strong and not has_user_correction:
-                face_reason = self._face_detection_reason(face_context)
-                return MediaClassification(
-                    MediaCategory.FamilyPhoto,
-                    self._append_visual_note(
-                        f"Classified as family photo because {face_reason}.",
-                        visual_note,
-                    ),
-                    max(0.68, min(0.92, 0.64 + face_context["confidence"] * 0.18)),
-                )
-
             # WhatsApp filenames are ambiguous. A normal WhatsApp photo should not
             # automatically become Meme just because it contains WA/WhatsApp.
             if whatsapp_like and not strong_meme_hit and photo_like_geometry and not weak_metadata_profile:
                 return MediaClassification(
-                    MediaCategory.FamilyPhoto,
-                    f"Classified as family photo with conservative confidence because WhatsApp filename is ambiguous but geometry and photo evidence are present ({width}x{height}).",
-                    0.64,
+                    MediaCategory.Unknown,
+                    UNCONFIRMED_PHOTO_REASON,
+                    0.55,
                 )
 
             if area is not None and area <= 600 * 600:
@@ -441,82 +430,15 @@ class MediaClassifier:
             if visual_decision is not None:
                 return visual_decision
 
-        # 9. family photo
+        # 9. standard photograph (semantic content not yet confirmed)
         if extension in IMAGE_EXTENSIONS:
-            confidence = 0.30
-            reason_notes = ["supported image extension"]
-            strong_positive_signals = 0
-
-            if face_evidence_is_strong:
-                face_count = max(1, int(face_context["face_count"]))
-                confidence += min(0.34, 0.22 + (face_context["confidence"] * 0.20))
-                reason_notes.append(self._face_detection_reason(face_context))
-                strong_positive_signals += 1
-
-            if has_camera_metadata:
-                confidence += 0.24
-                reason_notes.append("camera metadata present")
-                strong_positive_signals += 1
-
-            if has_exif_date:
-                confidence += 0.20
-                reason_notes.append("EXIF date present")
-                strong_positive_signals += 1
-
-            if has_gps:
-                confidence += 0.04
-                reason_notes.append("GPS metadata present")
-
-            if camera_pattern:
-                confidence += 0.16
-                reason_notes.append("filename matches camera/photo pattern")
-                strong_positive_signals += 1
-
-            if photo_like_geometry:
-                confidence += 0.10
-                reason_notes.append("photo-like resolution/aspect ratio")
-
-            if whatsapp_like:
-                confidence -= 0.08
-                reason_notes.append("WhatsApp filename requires conservative confidence")
-
-            if looks_downloaded and weak_metadata_profile:
-                confidence -= 0.32
-                reason_notes.append("filename looks downloaded/shared/WhatsApp with no camera metadata")
-
-            if area is not None and area < 800 * 800:
-                confidence -= 0.08
-                reason_notes.append("limited resolution")
-
-            confidence = max(0.20, min(0.96, confidence))
-
-            if strong_positive_signals == 0:
-                return MediaClassification(
-                    MediaCategory.Unknown,
-                    self._append_visual_note(
-                        f"Classified as unknown because no strong photo signal is present ({'; '.join(reason_notes)}).",
-                        visual_note,
-                    ),
-                    max(0.35, min(confidence, 0.62)),
-                )
-
-            if confidence < 0.62:
-                return MediaClassification(
-                    MediaCategory.Unknown,
-                    self._append_visual_note(
-                        f"Classified as unknown because family-photo evidence is weak ({'; '.join(reason_notes)}).",
-                        visual_note,
-                    ),
-                    confidence,
-                )
-
             return MediaClassification(
-                MediaCategory.FamilyPhoto,
+                MediaCategory.Unknown,
                 self._append_visual_note(
-                    f"Classified as family photo because {'; '.join(reason_notes)}.",
+                    UNCONFIRMED_PHOTO_REASON,
                     visual_note,
                 ),
-                confidence,
+                0.55 if (has_camera_metadata or has_exif_date or camera_pattern) else 0.45,
             )
 
         # 10. unknown
@@ -560,22 +482,14 @@ class MediaClassifier:
             visual_profile=metadata.get("visual_feature_profile"),
         )
 
-        face_context = self._face_detection_context(metadata)
-        has_user_correction = bool(str(metadata.get("user_corrected_media_category", "") or "").strip())
-        keep_face_family_photo = (
-            classification.media_category == MediaCategory.FamilyPhoto
-            and face_context["has_faces"]
-            and face_context["confidence"] >= 0.55
-            and str(learned_category or "").strip().lower() != MediaCategory.FamilyPhoto.value
-            and not has_user_correction
-        )
-
-        if keep_face_family_photo:
-            learned_category = classification.media_category.value
-            learned_confidence = max(learned_confidence, classification.classification_confidence)
-            learned_reason = (
-                f"{classification.classification_reason} "
-                "Strong face evidence retained family photo classification."
+        if str(learned_category or "").strip().lower() == MediaCategory.FamilyPhoto.value:
+            # Learned rules may support advisory evidence, but Family Photo is now
+            # proposed only by MODEL-003D semantic similarity and applied explicitly.
+            learned_category = MediaCategory.Unknown.value
+            learned_confidence = classification.classification_confidence
+            learned_reason = self._append_visual_note(
+                UNCONFIRMED_PHOTO_REASON,
+                visual_note,
             )
 
         learned_enum = self._media_category_from_value(learned_category)
@@ -690,12 +604,41 @@ class MediaClassifier:
 
         if any(ind in filename_lower for ind in MEME_FILENAME_INDICATORS):
             scores["graphic"] += 0.08
-        if any(ind in filename_lower for ind in DOCUMENT_FILENAME_INDICATORS):
+        document_filename_evidence = self._has_document_filename_evidence(
+            filename_lower
+        )
+        if document_filename_evidence:
             scores["document"] += 0.08
         if any(ind in filename_lower for ind in SCREENSHOT_FILENAME_INDICATORS):
             scores["screenshot"] += 0.08
         if any(ind in filename_lower for ind in ADVERTISEMENT_FILENAME_INDICATORS):
             scores["advertisement"] += 0.10
+
+        aspect_ratio = getattr(visual_signals, "aspect_ratio", None)
+        portrait_page_structure = bool(
+            isinstance(aspect_ratio, (int, float))
+            and 0.65 <= float(aspect_ratio) <= 0.85
+        )
+        strong_document_visual_evidence = bool(
+            portrait_page_structure
+            and float(visual_signals.text_likelihood) >= 0.50
+            and float(visual_signals.document_likelihood) >= 0.62
+            and float(visual_signals.document_likelihood)
+            >= float(visual_signals.photo_likelihood) + 0.10
+        )
+        if strong_document_visual_evidence:
+            # A portrait page plus text-dominant evidence is stronger than the
+            # flat-region signal that can otherwise make a scanned page look Graphic.
+            scores["document"] = max(
+                scores["document"],
+                min(0.95, float(visual_signals.document_likelihood) + 0.10),
+                min(0.95, scores["graphic"] + 0.12),
+            )
+        elif not document_filename_evidence:
+            # Geometry, edge density, and generic high-contrast structure can all
+            # occur in ordinary photographs.  They are not document evidence by
+            # themselves, so keep the document score below the decision threshold.
+            scores["document"] = min(scores["document"], 0.60)
 
         if str(getattr(visual_signals, "dominant_layout", "") or "") == "tall_mobile":
             scores["screenshot"] += 0.18
@@ -719,7 +662,7 @@ class MediaClassifier:
             return MediaClassification(MediaCategory.Unknown, reason, 0.52)
 
         category_map = {
-            "photo": MediaCategory.FamilyPhoto,
+            "photo": MediaCategory.Unknown,
             "document": MediaCategory.Document,
             "graphic": MediaCategory.Meme if any(ind in filename_lower for ind in MEME_FILENAME_INDICATORS) else MediaCategory.Graphic,
             "screenshot": MediaCategory.Screenshot,
@@ -731,9 +674,13 @@ class MediaClassifier:
         evidence = list(visual_signals.explanation[:3])
         evidence_text = "; ".join(evidence) if evidence else self._visual_summary_text(visual_signals)
 
-        reason = (
-            f"Classified as {chosen.value.replace('_', ' ')} because visual evidence is strong: {evidence_text}."
-        )
+        if top_label == "photo":
+            reason = UNCONFIRMED_PHOTO_REASON
+        else:
+            reason = (
+                f"Classified as {chosen.value.replace('_', ' ')} because visual "
+                f"evidence is strong: {evidence_text}."
+            )
         return MediaClassification(chosen, reason, confidence)
 
     def _resolve_visual_signals(
@@ -814,9 +761,22 @@ class MediaClassifier:
         return "screenshot" in software or "screenrec" in software
 
     def _is_document(self, filename_lower: str) -> bool:
-        if any(keyword in filename_lower for keyword in DOCUMENT_FILENAME_INDICATORS):
+        return self._has_document_filename_evidence(filename_lower)
+
+    def _has_document_filename_evidence(self, filename_lower: str) -> bool:
+        strong_indicators = DOCUMENT_FILENAME_INDICATORS - {"scan", "scanned", "doc"}
+        if any(keyword in filename_lower for keyword in strong_indicators):
             return True
-        return any(keyword in filename_lower for keyword in ("doc_", "receipt", "invoice"))
+        normalized = filename_lower.replace("-", "_").replace(".", "_")
+        tokens = {token for token in normalized.split("_") if token}
+        if "doc" in tokens:
+            return True
+        # “scan” alone is also common for digitized ordinary photographs. Require
+        # a second page/document term before treating it as semantic evidence.
+        return bool(
+            tokens.intersection({"scan", "scanned"})
+            and tokens.intersection({"page", "paper", "form", "letter", "record"})
+        )
 
     def _is_advertisement(self, filename_lower: str) -> bool:
         if any(keyword in filename_lower for keyword in ADVERTISEMENT_FILENAME_INDICATORS):
@@ -900,41 +860,6 @@ class MediaClassifier:
         make = str(metadata.get("camera_make", "") or "").strip()
         model = str(metadata.get("camera_model", "") or "").strip()
         return bool(make or model)
-
-    def _face_detection_context(self, metadata: Mapping[str, Any]) -> dict[str, Any]:
-        face_count_value = metadata.get("face_count", metadata.get("faces_count", 0))
-        has_faces_value = metadata.get("has_faces", None)
-        confidence_value = metadata.get("face_detection_confidence", 0.0)
-        detector_value = str(metadata.get("face_detection_detector", "") or "").strip() or "unknown"
-
-        try:
-            face_count = int(face_count_value or 0)
-        except Exception:
-            face_count = 0
-
-        if isinstance(has_faces_value, bool):
-            has_faces = has_faces_value
-        else:
-            has_faces = face_count > 0
-
-        try:
-            confidence = float(confidence_value or 0.0)
-        except Exception:
-            confidence = 0.0
-
-        return {
-            "face_count": face_count,
-            "has_faces": has_faces,
-            "confidence": confidence,
-            "detector": detector_value,
-        }
-
-    def _face_detection_reason(self, face_context: Mapping[str, Any]) -> str:
-        face_count = int(face_context.get("face_count", 0) or 0)
-        detector = str(face_context.get("detector", "unknown") or "unknown")
-        confidence = float(face_context.get("confidence", 0.0) or 0.0)
-        face_word = "face" if face_count == 1 else "faces"
-        return f"face detected ({face_count} {face_word} via {detector}, confidence {int(round(confidence * 100))}%)"
 
     def _has_exif_date(self, metadata: Mapping[str, Any]) -> bool:
         date_value = metadata.get("date_taken")

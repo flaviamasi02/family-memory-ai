@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import math
+import ntpath
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -64,12 +66,18 @@ class SemanticSimilarityService:
         results: list[SemanticSimilarityResult] = []
         for candidate in candidate_records:
             self._validate_record(candidate, metadata)
-            if exclude_source and candidate.photo_key == source.photo_key:
+            if exclude_source and canonical_photo_key(candidate.photo_key) == canonical_photo_key(
+                source.photo_key
+            ):
                 continue
             score = _cosine_similarity(source.embedding, candidate.embedding)
             if minimum_similarity is not None and score < minimum_similarity:
                 continue
-            results.append(SemanticSimilarityResult(candidate.photo_key, score, candidate.model_key))
+            results.append(
+                SemanticSimilarityResult(
+                    canonical_photo_key(candidate.photo_key), score, candidate.model_key
+                )
+            )
 
         results.sort(key=lambda r: (-r.similarity, r.photo_key))
         return results[:limit]
@@ -88,6 +96,18 @@ class SemanticSimilarityService:
 
 def _path_for(image) -> Path:
     return Path(getattr(image, "path", image))
+
+
+def canonical_photo_key(photo_or_path) -> str:
+    """Return one cross-platform identity key for photo paths and stored keys."""
+    raw = str(getattr(photo_or_path, "path", photo_or_path) or "").strip()
+    if not raw:
+        return ""
+    drive, _tail = ntpath.splitdrive(raw)
+    if drive or raw.startswith(("\\\\", "//")):
+        return ntpath.normcase(ntpath.normpath(raw.replace("/", "\\")))
+    native = raw.replace("\\", os.sep)
+    return os.path.normcase(os.path.normpath(os.path.abspath(native)))
 
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
