@@ -68,8 +68,12 @@ def test_changed_image_is_regenerated_but_unchanged_image_is_skipped(tmp_path):
     worker.complete.connect(results.append)
     worker.run()
 
-    assert results[-1].total_images_received == 1
-    assert results[-1].processed_successfully == 1
+    result = results[-1]
+    assert result.total_images_received == 2
+    assert result.processed_successfully == 1
+    assert result.skipped_cached == 1
+    assert result.failed == 0
+    assert result.cancelled == 0
     assert provider.embed_call_count == calls + 1
 
 
