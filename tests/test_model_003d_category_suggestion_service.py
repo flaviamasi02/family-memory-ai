@@ -351,6 +351,8 @@ def test_acceptance_metadata_round_trips_and_suppresses_the_applied_suggestion(
             "category_suggestion_model_key": META.model_key,
             "category_suggestion_applied_category": "family_photo",
             "category_suggestion_accepted_at": "2026-07-25T12:00:00+00:00",
+            "category_suggestion_support_count": 2,
+            "category_suggestion_confidence": 0.85,
         }
     )
     a = photo(tmp_path / "a.jpg", "family_photo", user=True)
@@ -369,9 +371,13 @@ def test_acceptance_metadata_round_trips_and_suppresses_the_applied_suggestion(
     assert reloaded.metadata["category_confirmation_at"]
     assert reloaded.metadata["category_suggestion_state"] == "accepted"
     assert reloaded.metadata["category_suggestion_applied_category"] == "family_photo"
+    assert reloaded.metadata["category_suggestion_support_count"] == 2
     result = service(tmp_path, store).suggest(reloaded, [reloaded, a, b], META)
-    assert result.status == "insufficient_evidence"
-    assert "already applied" in result.reasons[0]
+    assert result.status == "already_accepted"
+    assert result.suggested_category_id == "family_photo"
+    assert result.suggested_category_name == "Family Photo"
+    assert result.evidence_counts["family_photo"] == 2
+    assert "already been applied" in result.reasons[0]
 
 
 def test_category_apply_persists_once_before_learning_and_returns_success():

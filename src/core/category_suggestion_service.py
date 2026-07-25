@@ -123,12 +123,19 @@ class CategorySuggestionService:
                     or getattr(source_photo, "user_corrected_media_category", "")
                 )
                 if applied and applied == current:
+                    support_count = int(
+                        source_metadata.get("category_suggestion_support_count", 0)
+                        or 0
+                    )
                     return self._result(
                         source_key,
-                        "insufficient_evidence",
+                        "already_accepted",
+                        suggested_category_id=applied,
+                        suggested_category_name=self.category_registry.label_for(applied),
                         model_key=metadata.model_key,
+                        evidence_counts={applied: support_count},
                         reasons=[
-                            "The accepted suggestion is already applied to this photo."
+                            "This suggestion has already been applied."
                         ],
                     )
             eligible = self._eligible_category_ids()

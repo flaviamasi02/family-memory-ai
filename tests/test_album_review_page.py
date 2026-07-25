@@ -14,7 +14,10 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 
 from album.album_scoring_engine import AlbumScoreBreakdown
 from core.category_registry import get_category_registry, reset_category_registry
-from core.category_suggestion_service import CategorySuggestionService
+from core.category_suggestion_service import (
+    CategorySuggestionResult,
+    CategorySuggestionService,
+)
 from core.media_classifier import MediaCategory
 from models.photo import Photo
 from models.photo_intelligence import PhotoIntelligence
@@ -319,6 +322,29 @@ class AlbumReviewPageTests(unittest.TestCase):
             self.assertNotIn("category_suggestion_state", photo.metadata)
             self.assertIs(page._current_suggestion, suggestion)
             self.assertIn("No acceptance was recorded", page.ai_suggestion_value.text())
+
+    def test_already_accepted_suggestion_renders_completed_informational_state(self):
+        page = AlbumReviewPage()
+        result = CategorySuggestionResult(
+            source_photo_key="accepted.jpg",
+            status="already_accepted",
+            suggested_category_id="family_photo",
+            suggested_category_name="Family Photo",
+            evidence_counts={"family_photo": 3},
+            reasons=["This suggestion has already been applied."],
+        )
+
+        page._render_category_suggestion(result)
+
+        text = page.ai_suggestion_value.text()
+        self.assertIn("Suggestion already accepted", text)
+        self.assertIn("Category: Family Photo", text)
+        self.assertIn("3 confirmed similar photos", text)
+        self.assertNotIn("Insufficient Evidence", text)
+        self.assertNotIn("No suggestion", text)
+        self.assertFalse(page.apply_suggestion_button.isEnabled())
+        self.assertFalse(page.reject_suggestion_button.isEnabled())
+        self.assertIsNone(page._current_suggestion)
 
     def test_manual_category_workflow_immediately_feeds_semantic_suggestion(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -1270,6 +1270,22 @@ class AlbumReviewPage(QWidget):
                 self.ai_suggestion_reasons.addItem(reason)
             self.apply_suggestion_button.setEnabled(True)
             self.reject_suggestion_button.setEnabled(True)
+        elif result.status == "already_accepted":
+            support_count = result.evidence_counts.get(
+                result.suggested_category_id, 0
+            )
+            support_text = (
+                f"\nSupporting evidence: {support_count} confirmed similar photos"
+                if support_count
+                else ""
+            )
+            self.ai_suggestion_value.setText(
+                "✓ Suggestion already accepted\n"
+                f"Category: {result.suggested_category_name}\n"
+                f"This suggestion has already been applied.{support_text}"
+            )
+            self.apply_suggestion_button.setEnabled(False)
+            self.reject_suggestion_button.setEnabled(False)
         else:
             label = result.status.replace("_", " ").title()
             detail = (
@@ -1290,6 +1306,7 @@ class AlbumReviewPage(QWidget):
             return
         self._suggestion_request_id += 1
         applied_at = datetime.now(timezone.utc).isoformat()
+        evidence_counts = getattr(result, "evidence_counts", {}) or {}
         applied = self._apply_category_to_rows(
             [row],
             result.suggested_category_id,
@@ -1298,6 +1315,12 @@ class AlbumReviewPage(QWidget):
                 "category_suggestion_state": "accepted",
                 "category_suggestion_model_key": result.model_key,
                 "category_suggestion_applied_category": result.suggested_category_id,
+                "category_suggestion_support_count": evidence_counts.get(
+                    result.suggested_category_id, 0
+                ),
+                "category_suggestion_confidence": float(
+                    getattr(result, "confidence", 0.0) or 0.0
+                ),
                 "category_suggestion_accepted_at": applied_at,
                 "category_suggestion_applied_at": applied_at,
             },

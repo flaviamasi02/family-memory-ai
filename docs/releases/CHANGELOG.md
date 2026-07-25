@@ -8,6 +8,7 @@
 - Added central compatibility normalization for legacy `family_photo_candidate` and display-label variants across the registry, sidecars, learning metadata, Memory Review, and category suggestions without creating a duplicate category.
 - Legacy category configuration can no longer hide or disable the canonical Family Photo category; existing sidecars remain readable and are written back with the canonical ID.
 - Fixed the deferred category-learning visual analysis pass so it loads and merges an existing photo sidecar before adding visual features; manual categories, accepted suggestions, and Keep decisions are no longer overwritten by a freshly reconstructed Photo.
+- Memory Review now renders an accepted suggestion as a completed informational state with its category and saved supporting-evidence count, rather than labeling it as insufficient evidence; Apply and Reject remain disabled.
 
 
 ### DOCSYNC DEC-0049 platform strategy propagation
