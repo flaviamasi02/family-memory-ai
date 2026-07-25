@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -1269,15 +1269,27 @@ class AlbumReviewPage(QWidget):
         if result is None or row is None or result.status != "suggested":
             return
         self._suggestion_request_id += 1
-        self._apply_category_to_rows(
-            [row], result.suggested_category_id, source="ai_suggestion_accepted"
+        applied = self._apply_category_to_rows(
+            [row],
+            result.suggested_category_id,
+            source="ai_suggestion_accepted",
+            acceptance_metadata={
+                "category_suggestion_state": "accepted",
+                "category_suggestion_model_key": result.model_key,
+                "category_suggestion_applied_category": result.suggested_category_id,
+                "category_suggestion_accepted_at": datetime.now(
+                    timezone.utc
+                ).isoformat(),
+            },
         )
-        metadata = dict(getattr(row.breakdown.photo, "metadata", {}) or {})
-        metadata["category_suggestion_state"] = "accepted"
-        metadata["category_suggestion_model_key"] = result.model_key
-        metadata["category_suggestion_applied_category"] = result.suggested_category_id
-        row.breakdown.photo.metadata = metadata
-        self._save_photo_user_metadata(row.breakdown.photo)
+        if not applied:
+            self.ai_suggestion_value.setText(
+                "Could not save the suggested category. No acceptance was recorded; "
+                "the suggestion is still available."
+            )
+            self.apply_suggestion_button.setEnabled(True)
+            self.reject_suggestion_button.setEnabled(True)
+            return
         self._current_suggestion = None
         self.apply_suggestion_button.setEnabled(False)
         self.reject_suggestion_button.setEnabled(False)
@@ -1428,11 +1440,15 @@ class AlbumReviewPage(QWidget):
         self._trigger_refresh(force=True)
 
     def _apply_category_to_rows(
-        self, rows: List[AlbumReviewRow], category: str, source: str
-    ) -> None:
+        self,
+        rows: List[AlbumReviewRow],
+        category: str,
+        source: str,
+        acceptance_metadata: Optional[dict] = None,
+    ) -> bool:
         category = self._normalize_category_id(category)
         if not category:
-            return
+            return False
 
         affected_keys = [self._row_key(row) for row in rows]
         preferred_key = self._selected_key or (
@@ -1449,7 +1465,20 @@ class AlbumReviewPage(QWidget):
             previous = self._effective_category_for_photo(photo)
 
             metadata = dict(getattr(photo, "metadata", {}) or {})
+            previous_metadata = dict(metadata)
             previous_decision = row.user_decision
+            previous_review_state = row.review_state
+            previous_photo_decision = getattr(photo, "user_decision", "")
+            previous_category_fields = {
+                name: getattr(photo, name, "")
+                for name in (
+                    "automatic_media_category",
+                    "user_corrected_media_category",
+                    "effective_media_category",
+                    "media_category",
+                    "classification_reason",
+                )
+            }
             decision_changed = False
             automatic = (
                 str(
@@ -1468,6 +1497,11 @@ class AlbumReviewPage(QWidget):
             metadata["category_confirmation_state"] = "manual_confirmed"
             metadata["category_confirmation_source"] = source
             metadata["category_confirmation_category"] = category
+            metadata["category_confirmation_at"] = datetime.now(
+                timezone.utc
+            ).isoformat()
+            if acceptance_metadata:
+                metadata.update(acceptance_metadata)
             if row.user_decision == UserDecision.Pending.value:
                 row.user_decision = UserDecision.Keep.value
                 row.review_state = self._review_state_from_decision(row.user_decision)
@@ -1487,6 +1521,17 @@ class AlbumReviewPage(QWidget):
                 metadata.get("classification_reason", "") or ""
             )
             photo.sync_intelligence_from_metadata()
+
+            if not self._save_photo_user_metadata(photo):
+                photo.metadata = previous_metadata
+                row.user_decision = previous_decision
+                row.review_state = previous_review_state
+                photo.user_decision = previous_photo_decision
+                for name, value in previous_category_fields.items():
+                    setattr(photo, name, value)
+                photo.sync_intelligence_from_metadata()
+                self._show_user_saved_indicator("Category save failed — no change applied")
+                return False
 
             if decision_changed:
                 self._decision_history.record_decision_change(
@@ -1523,8 +1568,6 @@ class AlbumReviewPage(QWidget):
                 corrected_category=category,
                 source=source,
             )
-            self._save_photo_user_metadata(photo)
-
             card = self._cards_by_key.get(self._row_key(row))
             if card is not None:
                 card.refresh_from_row(thumbnail=self._get_cached_card_thumbnail(row))
@@ -1540,6 +1583,7 @@ class AlbumReviewPage(QWidget):
             previous_scroll=previous_scroll,
             previous_render_count=previous_render_count,
         )
+        return True
 
     def _refresh_after_category_change(
         self,
@@ -1651,12 +1695,12 @@ class AlbumReviewPage(QWidget):
         self.user_saved_label.setVisible(True)
         QTimer.singleShot(2500, lambda: self.user_saved_label.setVisible(False))
 
-    def _save_photo_user_metadata(self, photo) -> None:
+    def _save_photo_user_metadata(self, photo) -> bool:
         try:
-            self._user_metadata_service.save_photo_metadata(photo)
-        except Exception:
-            # Metadata persistence must not break review flow.
-            pass
+            saved_path = self._user_metadata_service.save_photo_metadata(photo)
+        except (OSError, ValueError, TypeError):
+            return False
+        return saved_path is not None
 
     def _ensure_category_fields(self, photo) -> None:
         metadata = dict(getattr(photo, "metadata", {}) or {})

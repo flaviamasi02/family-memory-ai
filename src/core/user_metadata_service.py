@@ -109,6 +109,18 @@ class UserMetadataService:
         category_confirmation_category = str(
             data.get("category_confirmation_category", "") or ""
         ).strip()
+        category_confirmation_at = str(
+            data.get("category_confirmation_at", "") or ""
+        ).strip()
+        suggestion_model_key = str(
+            data.get("category_suggestion_model_key", "") or ""
+        ).strip()
+        suggestion_applied_category = str(
+            data.get("category_suggestion_applied_category", "") or ""
+        ).strip()
+        suggestion_accepted_at = str(
+            data.get("category_suggestion_accepted_at", "") or ""
+        ).strip()
 
         if automatic:
             metadata["automatic_media_category"] = automatic
@@ -169,6 +181,16 @@ class UserMetadataService:
             metadata["category_confirmation_source"] = category_confirmation_source
         if category_confirmation_category:
             metadata["category_confirmation_category"] = category_confirmation_category
+        if category_confirmation_at:
+            metadata["category_confirmation_at"] = category_confirmation_at
+        if suggestion_model_key:
+            metadata["category_suggestion_model_key"] = suggestion_model_key
+        if suggestion_applied_category:
+            metadata["category_suggestion_applied_category"] = (
+                suggestion_applied_category
+            )
+        if suggestion_accepted_at:
+            metadata["category_suggestion_accepted_at"] = suggestion_accepted_at
 
         if not identity_match:
             metadata["user_metadata_warning"] = "identity_mismatch"
@@ -291,6 +313,18 @@ class UserMetadataService:
             ).strip(),
             "category_confirmation_category": str(
                 metadata.get("category_confirmation_category", "") or ""
+            ).strip(),
+            "category_confirmation_at": str(
+                metadata.get("category_confirmation_at", "") or ""
+            ).strip(),
+            "category_suggestion_model_key": str(
+                metadata.get("category_suggestion_model_key", "") or ""
+            ).strip(),
+            "category_suggestion_applied_category": str(
+                metadata.get("category_suggestion_applied_category", "") or ""
+            ).strip(),
+            "category_suggestion_accepted_at": str(
+                metadata.get("category_suggestion_accepted_at", "") or ""
             ).strip(),
             "updated_at": datetime.now(timezone.utc).isoformat(),
             "app_version": app_version or self._app_version,

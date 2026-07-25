@@ -108,6 +108,26 @@ class CategorySuggestionService:
                         "No current stored embedding is available for this photo."
                     ],
                 )
+            source_metadata = dict(getattr(source_photo, "metadata", {}) or {})
+            if str(source_metadata.get("category_suggestion_state", "")).lower() == (
+                "accepted"
+            ):
+                applied = self._normalize_category_id(
+                    source_metadata.get("category_suggestion_applied_category", "")
+                )
+                current = self._normalize_category_id(
+                    source_metadata.get("user_corrected_media_category", "")
+                    or getattr(source_photo, "user_corrected_media_category", "")
+                )
+                if applied and applied == current:
+                    return self._result(
+                        source_key,
+                        "insufficient_evidence",
+                        model_key=metadata.model_key,
+                        reasons=[
+                            "The accepted suggestion is already applied to this photo."
+                        ],
+                    )
             eligible = self._eligible_category_ids()
             if not eligible:
                 return self._result(

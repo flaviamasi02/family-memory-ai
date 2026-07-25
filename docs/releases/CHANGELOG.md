@@ -629,3 +629,5 @@
 - Improved MODEL-003D trusted evidence consumption by normalizing category labels/IDs before matching eligible categories and adding opt-in `FAMILY_MEMORY_DEBUG_SUGGESTIONS=1` diagnostics for semantic matches, trusted evidence, category IDs, evidence counts, and final status reason.
 
 - Added a lightweight embedding-completion notification in the existing status area: success, warning, cancellation, and failure summaries remain visible for seven seconds, then clear without modal dialogs or overwriting newer scan/progress status.
+
+- Fixed Apply suggestion persistence by routing acceptance metadata through the same category-correction save, persisting category/Keep/confirmation fields atomically before learning signals, rolling back non-destructively on sidecar failure, and suppressing an accepted suggestion after sidecar reload.

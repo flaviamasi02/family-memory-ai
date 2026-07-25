@@ -3,7 +3,8 @@ import unittest
 import os
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from PySide6.QtTest import QTest
 from PySide6.QtCore import Qt
@@ -178,6 +179,106 @@ class AlbumReviewPageTests(unittest.TestCase):
 
             page.reset_selected()
             self.assertEqual(page.review_state_for_filename("a.jpg"), "pending")
+
+    def test_apply_suggestion_uses_category_correction_and_persists_sidecar(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            breakdown = self._make_breakdown(
+                root,
+                "suggested.jpg",
+                80,
+                80,
+                80,
+                80,
+                "2024:01:01 00:00:00",
+                metadata={
+                    "automatic_media_category": MediaCategory.Unknown.value,
+                    "effective_media_category": MediaCategory.Unknown.value,
+                    "media_category": MediaCategory.Unknown.value,
+                    "user_decision": "pending",
+                },
+            )
+            page = AlbumReviewPage()
+            page._decision_history = Mock()
+            page._category_learning_engine = Mock()
+            page._preference_learning_engine = Mock()
+            page.set_scored_photos([breakdown])
+            self._flush_ui()
+            self.assertTrue(page.select_photo_by_filename("suggested.jpg"))
+            page._current_suggestion = SimpleNamespace(
+                status="suggested",
+                suggested_category_id=MediaCategory.FamilyPhoto.value,
+                model_key="mobileclip:test",
+            )
+
+            page._apply_current_suggestion()
+
+            row = page._selected_row()
+            photo = breakdown.photo
+            self.assertEqual(photo.user_corrected_media_category, "family_photo")
+            self.assertEqual(photo.effective_media_category, "family_photo")
+            self.assertEqual(photo.media_category, "family_photo")
+            self.assertEqual(photo.user_decision, "keep")
+            self.assertEqual(row.user_decision, "keep")
+            self.assertEqual(photo.metadata["category_confirmation_state"], "manual_confirmed")
+            self.assertEqual(photo.metadata["category_confirmation_source"], "ai_suggestion_accepted")
+            self.assertTrue(photo.metadata["category_confirmation_at"])
+            self.assertEqual(photo.metadata["category_suggestion_state"], "accepted")
+            self.assertIsNone(page._current_suggestion)
+
+            reloaded = Photo.from_path(photo.path)
+            page._user_metadata_service.apply_for_photo(reloaded)
+            self.assertEqual(reloaded.user_corrected_media_category, "family_photo")
+            self.assertEqual(reloaded.effective_media_category, "family_photo")
+            self.assertEqual(reloaded.media_category, "family_photo")
+            self.assertEqual(reloaded.user_decision, "keep")
+            self.assertEqual(reloaded.metadata["category_suggestion_state"], "accepted")
+            page._decision_history.record_category_correction.assert_called_once()
+            page._category_learning_engine.record_category_correction.assert_called_once()
+
+    def test_apply_suggestion_save_failure_rolls_back_without_acceptance(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            breakdown = self._make_breakdown(
+                root,
+                "unsaved.jpg",
+                80,
+                80,
+                80,
+                80,
+                "2024:01:01 00:00:00",
+                metadata={
+                    "automatic_media_category": MediaCategory.Unknown.value,
+                    "effective_media_category": MediaCategory.Unknown.value,
+                    "media_category": MediaCategory.Unknown.value,
+                    "user_decision": "pending",
+                },
+            )
+            page = AlbumReviewPage()
+            page.set_scored_photos([breakdown])
+            self._flush_ui()
+            self.assertTrue(page.select_photo_by_filename("unsaved.jpg"))
+            suggestion = SimpleNamespace(
+                status="suggested",
+                suggested_category_id=MediaCategory.FamilyPhoto.value,
+                model_key="mobileclip:test",
+            )
+            page._current_suggestion = suggestion
+            page._user_metadata_service.save_photo_metadata = Mock(
+                side_effect=OSError("read-only sidecar")
+            )
+
+            page._apply_current_suggestion()
+
+            photo = breakdown.photo
+            self.assertEqual(photo.user_corrected_media_category, "")
+            self.assertEqual(photo.effective_media_category, "unknown")
+            self.assertEqual(photo.media_category, "unknown")
+            self.assertEqual(photo.user_decision, "pending")
+            self.assertEqual(page._selected_row().user_decision, "pending")
+            self.assertNotIn("category_suggestion_state", photo.metadata)
+            self.assertIs(page._current_suggestion, suggestion)
+            self.assertIn("No acceptance was recorded", page.ai_suggestion_value.text())
 
     def test_detail_panel_and_explanations_visible(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -289,6 +289,64 @@ def test_apply_suggestion_source_uses_existing_category_workflow_and_clears_pane
     assert "record_category_correction" not in apply_block
     assert "Suggestion applied through the category correction workflow." in apply_block
     assert "self._suggestion_request_id += 1" in apply_block
+    assert "if not applied:" in apply_block
+    assert "No acceptance was recorded" in apply_block
+
+
+def test_acceptance_metadata_round_trips_and_suppresses_the_applied_suggestion(
+    tmp_path,
+):
+    store = EmbeddingStore(tmp_path / "e.sqlite3")
+    src = photo(tmp_path / "src.jpg", "family_photo", user=True)
+    src.user_decision = "keep"
+    src.metadata.update(
+        {
+            "user_decision": "keep",
+            "category_confirmation_state": "manual_confirmed",
+            "category_confirmation_source": "ai_suggestion_accepted",
+            "category_confirmation_category": "family_photo",
+            "category_confirmation_at": "2026-07-25T12:00:00+00:00",
+            "category_suggestion_state": "accepted",
+            "category_suggestion_model_key": META.model_key,
+            "category_suggestion_applied_category": "family_photo",
+            "category_suggestion_accepted_at": "2026-07-25T12:00:00+00:00",
+        }
+    )
+    a = photo(tmp_path / "a.jpg", "family_photo", user=True)
+    b = photo(tmp_path / "b.jpg", "family_photo", user=True)
+    for item, vector in ((src, [1, 0, 0]), (a, [0.99, 0, 0]), (b, [0.98, 0, 0])):
+        put(store, item, vector)
+
+    UserMetadataService().save_photo_metadata(src)
+    reloaded = photo(tmp_path / "src.jpg")
+    UserMetadataService().apply_for_photo(reloaded)
+
+    assert reloaded.user_corrected_media_category == "family_photo"
+    assert reloaded.effective_media_category == "family_photo"
+    assert reloaded.media_category == "family_photo"
+    assert reloaded.user_decision == "keep"
+    assert reloaded.metadata["category_confirmation_at"]
+    assert reloaded.metadata["category_suggestion_state"] == "accepted"
+    assert reloaded.metadata["category_suggestion_applied_category"] == "family_photo"
+    result = service(tmp_path, store).suggest(reloaded, [reloaded, a, b], META)
+    assert result.status == "insufficient_evidence"
+    assert "already applied" in result.reasons[0]
+
+
+def test_category_apply_persists_once_before_learning_and_returns_success():
+    ui = Path("src/ui/album_review_page.py").read_text()
+    apply_block = ui[
+        ui.index("def _apply_category_to_rows") : ui.index(
+            "def _refresh_after_category_change"
+        )
+    ]
+    assert "acceptance_metadata: Optional[dict] = None" in apply_block
+    assert "if not self._save_photo_user_metadata(photo):" in apply_block
+    assert apply_block.index("if not self._save_photo_user_metadata(photo):") < apply_block.index(
+        "record_category_correction"
+    )
+    assert "return False" in apply_block
+    assert "return True" in apply_block
 
 
 def test_reject_path_persists_feedback_and_blocks_stale_result_restore():
