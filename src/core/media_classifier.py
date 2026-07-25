@@ -635,12 +635,27 @@ class MediaClassifier:
 
         if any(ind in filename_lower for ind in MEME_FILENAME_INDICATORS):
             scores["graphic"] += 0.08
-        if any(ind in filename_lower for ind in DOCUMENT_FILENAME_INDICATORS):
+        document_filename_evidence = self._has_document_filename_evidence(
+            filename_lower
+        )
+        if document_filename_evidence:
             scores["document"] += 0.08
         if any(ind in filename_lower for ind in SCREENSHOT_FILENAME_INDICATORS):
             scores["screenshot"] += 0.08
         if any(ind in filename_lower for ind in ADVERTISEMENT_FILENAME_INDICATORS):
             scores["advertisement"] += 0.10
+
+        strong_document_visual_evidence = bool(
+            float(visual_signals.text_likelihood) >= 0.72
+            and float(visual_signals.document_likelihood) >= 0.78
+            and float(visual_signals.document_likelihood)
+            >= float(visual_signals.photo_likelihood) + 0.15
+        )
+        if not document_filename_evidence and not strong_document_visual_evidence:
+            # Geometry, edge density, and generic high-contrast structure can all
+            # occur in ordinary photographs.  They are not document evidence by
+            # themselves, so keep the document score below the decision threshold.
+            scores["document"] = min(scores["document"], 0.60)
 
         if str(getattr(visual_signals, "dominant_layout", "") or "") == "tall_mobile":
             scores["screenshot"] += 0.18
@@ -766,9 +781,22 @@ class MediaClassifier:
         return "screenshot" in software or "screenrec" in software
 
     def _is_document(self, filename_lower: str) -> bool:
-        if any(keyword in filename_lower for keyword in DOCUMENT_FILENAME_INDICATORS):
+        return self._has_document_filename_evidence(filename_lower)
+
+    def _has_document_filename_evidence(self, filename_lower: str) -> bool:
+        strong_indicators = DOCUMENT_FILENAME_INDICATORS - {"scan", "scanned", "doc"}
+        if any(keyword in filename_lower for keyword in strong_indicators):
             return True
-        return any(keyword in filename_lower for keyword in ("doc_", "receipt", "invoice"))
+        normalized = filename_lower.replace("-", "_").replace(".", "_")
+        tokens = {token for token in normalized.split("_") if token}
+        if "doc" in tokens:
+            return True
+        # “scan” alone is also common for digitized ordinary photographs. Require
+        # a second page/document term before treating it as semantic evidence.
+        return bool(
+            tokens.intersection({"scan", "scanned"})
+            and tokens.intersection({"page", "paper", "form", "letter", "record"})
+        )
 
     def _is_advertisement(self, filename_lower: str) -> bool:
         if any(keyword in filename_lower for keyword in ADVERTISEMENT_FILENAME_INDICATORS):

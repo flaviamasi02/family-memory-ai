@@ -639,3 +639,5 @@
 - Restored cache-first managed-runtime initialization: valid stored embeddings are now counted and reused before MobileCLIP readiness validation, while uncached photos still require the fully validated managed runtime and retain grouped readiness failures when it is genuinely unavailable.
 
 - Removed the weak automatic Family Photo fallback: ordinary JPEG/photo files now begin as Unknown when evidence is limited to format, EXIF/camera/GPS metadata, camera-style filenames, or photo-like structure. Explanations state that family content is unconfirmed, while strong face evidence and authoritative manual/accepted/learned categories remain supported.
+
+- Tightened visual Document classification so rectangular/page-like geometry, edge density, and generic contrast cannot classify an ordinary photograph as Document without explicit document filename evidence or strongly text-dominant document evidence.

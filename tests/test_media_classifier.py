@@ -328,6 +328,64 @@ class MediaClassifierTests(unittest.TestCase):
             self.assertIn("family content", result.classification_reason.lower())
             self.assertIn("not been confirmed", result.classification_reason.lower())
 
+    def test_page_geometry_and_edges_without_document_evidence_remain_unknown(self):
+        from core.visual_content_analyzer import VisualContentSignals
+
+        signals = VisualContentSignals(
+            file_path="ordinary.jpg",
+            width=1200,
+            height=800,
+            aspect_ratio=1.5,
+            dominant_layout="landscape",
+            has_faces=None,
+            face_count=0,
+            text_likelihood=0.68,
+            graphic_likelihood=0.20,
+            photo_likelihood=0.70,
+            screenshot_likelihood=0.15,
+            document_likelihood=0.74,
+            advertisement_likelihood=0.10,
+            explanation=["Rectangular layout with many edges."],
+        )
+
+        result = self.classifier.classify(
+            "ordinary.jpg",
+            {"width": 1200, "height": 800},
+            allow_visual_analysis=True,
+            precomputed_visual_signals=signals,
+        )
+
+        self.assertEqual(result.media_category, MediaCategory.Unknown)
+
+    def test_strong_text_dominant_document_visual_evidence_remains_document(self):
+        from core.visual_content_analyzer import VisualContentSignals
+
+        signals = VisualContentSignals(
+            file_path="page.jpg",
+            width=1700,
+            height=2400,
+            aspect_ratio=0.71,
+            dominant_layout="portrait",
+            has_faces=None,
+            face_count=0,
+            text_likelihood=0.86,
+            graphic_likelihood=0.22,
+            photo_likelihood=0.40,
+            screenshot_likelihood=0.18,
+            document_likelihood=0.88,
+            advertisement_likelihood=0.12,
+            explanation=["Text-like regions dominate a page-like image."],
+        )
+
+        result = self.classifier.classify(
+            "page.jpg",
+            {"width": 1700, "height": 2400},
+            allow_visual_analysis=True,
+            precomputed_visual_signals=signals,
+        )
+
+        self.assertEqual(result.media_category, MediaCategory.Document)
+
     def test_no_metadata_document_like_image_becomes_document(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "scan_without_exif.png"
