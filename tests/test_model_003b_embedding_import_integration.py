@@ -47,7 +47,8 @@ def test_import_worker_generates_embeddings_skips_unchanged_and_reuses_cache(tmp
     second.complete.connect(second_results.append)
     second.run()
 
-    assert second_results[-1].total_images_received == 0
+    assert second_results[-1].total_images_received == 2
+    assert second_results[-1].skipped_cached == 2
     assert second_provider.embed_call_count == 0
 
 
@@ -424,6 +425,39 @@ def test_starting_new_import_replaces_ready_status(monkeypatch):
     assert window.ai_status_label.text == (
         "Indexing semantic embeddings: preparing new import…"
     )
+
+
+def test_empty_embedding_run_emits_summary_and_clears_preparing_state(capsys):
+    window = _embedding_window_for_lifecycle_tests()
+    window._active_embedding_run_id = 1
+
+    window._on_embedding_complete(1, _embedding_result(0, 0, 0))
+
+    assert window.ai_status_label.text == "AI embeddings: no eligible photos to index."
+    assert "[EmbeddingIndex] processed=0 cached=0 failed=0 cancelled=0" in (
+        capsys.readouterr().err
+    )
+
+
+def test_deleted_embedding_thread_wrapper_does_not_block_worker_launch(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    launched = []
+
+    class DeletedThread:
+        def isRunning(self):
+            raise RuntimeError("Internal C++ object already deleted")
+
+    window.embedding_thread = DeletedThread()
+    window.embedding_worker = object()
+    window._active_embedding_run_id = 4
+    monkeypatch.setattr(window, "_launch_embedding_worker", launched.append)
+
+    window._start_embedding_indexing(["photo"])
+
+    assert launched == [["photo"]]
+    assert window.embedding_thread is None
+    assert window.embedding_worker is None
+    assert window._active_embedding_run_id == 0
 
 
 def test_close_event_waits_for_running_embedding_thread_before_destroying(monkeypatch):

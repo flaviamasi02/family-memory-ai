@@ -304,7 +304,7 @@ class MainWindow(QMainWindow):
     def _queue_or_start_scan(self, folder_path: str) -> None:
         """Start scanning now unless an embedding run must finish cancellation first."""
         self._set_embedding_status("Indexing semantic embeddings: preparing new import…")
-        if self.embedding_thread is not None and self.embedding_thread.isRunning():
+        if self._embedding_thread_is_running():
             self._pending_import_folder_path = folder_path
             self._pending_embedding_photos = None
             self._request_embedding_worker_cancel()
@@ -392,12 +392,25 @@ class MainWindow(QMainWindow):
     def _start_embedding_indexing(self, photos: list) -> None:
         """Launch import/index embedding generation without blocking the UI."""
         requested_photos = list(photos or [])
-        if self.embedding_thread is not None and self.embedding_thread.isRunning():
+        if self._embedding_thread_is_running():
             self._pending_embedding_photos = requested_photos
             self._request_embedding_worker_cancel()
             return
 
         self._launch_embedding_worker(requested_photos)
+
+    def _embedding_thread_is_running(self) -> bool:
+        """Return thread state while discarding a deleted Qt wrapper safely."""
+        thread = self.embedding_thread
+        if thread is None:
+            return False
+        try:
+            return bool(thread.isRunning())
+        except RuntimeError:
+            self.embedding_thread = None
+            self.embedding_worker = None
+            self._active_embedding_run_id = 0
+            return False
 
     def _launch_embedding_worker(self, photos: list) -> None:
         self._embedding_run_id += 1
@@ -458,8 +471,6 @@ class MainWindow(QMainWindow):
     def _on_embedding_complete(self, run_id: int, result) -> None:
         if run_id != self._active_embedding_run_id:
             return
-        if getattr(result, "total_images_received", 0) <= 0:
-            return
         print(
             "[EmbeddingIndex] "
             f"processed={getattr(result, 'processed_successfully', 0)} "
@@ -477,9 +488,15 @@ class MainWindow(QMainWindow):
         cached = int(getattr(result, "skipped_cached", 0) or 0)
         failed = int(getattr(result, "failed", 0) or 0)
         cancelled = int(getattr(result, "cancelled", 0) or 0)
+        received = int(getattr(result, "total_images_received", 0) or 0)
         ready = processed + cached
         total = ready + failed + cancelled
-        if cancelled:
+        if received <= 0:
+            self._set_embedding_status(
+                "AI embeddings: no eligible photos to index.",
+                severity="success",
+            )
+        elif cancelled:
             self._set_embedding_status(
                 "⚠ Semantic embedding indexing cancelled. "
                 f"{processed} new · {cached} reused · {failed} failed",

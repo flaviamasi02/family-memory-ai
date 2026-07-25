@@ -633,3 +633,5 @@
 - Fixed Apply suggestion persistence by routing acceptance metadata through the same category-correction save, persisting category/Keep/confirmation fields atomically before learning signals, rolling back non-destructively on sidecar failure, and suppressing an accepted suggestion after sidecar reload.
 
 - Replaced the easy-to-miss transient embedding completion text with a compact dedicated AI status that remains visible until the next import, treats cached embeddings as successful reuse, distinguishes new/reused counts, and reserves warning/error styling for cancellation or failures.
+
+- Fixed embedding startup/result reporting so every imported photo reaches the batch service (including cache hits), empty runs replace the preparation state with an explicit reason and terminal summary, and stale deleted Qt thread wrappers cannot block subsequent imports.
