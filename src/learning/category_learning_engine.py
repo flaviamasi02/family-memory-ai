@@ -171,7 +171,11 @@ class CategoryLearningEngine:
             if profile.extraction_status == "extracted":
                 try:
                     from models.photo import Photo
-                    photo = Photo.from_path(Path(path)); service.apply_profile_to_photo(photo, profile); UserMetadataService().save_for_photo(photo)
+                    photo = Photo.from_path(Path(path))
+                    metadata_service = UserMetadataService()
+                    metadata_service.apply_for_photo(photo)
+                    service.apply_profile_to_photo(photo, profile)
+                    metadata_service.save_for_photo(photo)
                 except Exception: pass
             if self.record_completed_visual_analysis(event_id, profile): done += 1
         return done

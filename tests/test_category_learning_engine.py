@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QApplication
 
 from core.category_registry import get_category_registry, reset_category_registry
 from core.media_classifier import MediaClassifier
+from core.user_metadata_service import UserMetadataService
 from learning.category_learning_engine import (
     get_category_learning_engine,
     reset_category_learning_engine,
@@ -284,6 +285,71 @@ class CategoryLearningEngineTests(unittest.TestCase):
 
             self.assertEqual(engine.profile.total_events, 3)
             self.assertEqual(engine.profile.category_event_counts.get("meme"), 3)
+
+    def test_background_visual_analysis_preserves_accepted_suggestion_sidecar(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            self._configure_env(root)
+            engine = get_category_learning_engine(force_reload=True)
+            photo = self._make_photo(root, "accepted.jpg")
+            photo.user_corrected_media_category = "family_photo"
+            photo.effective_media_category = "family_photo"
+            photo.media_category = "family_photo"
+            photo.user_decision = "keep"
+            photo.metadata.update(
+                {
+                    "automatic_media_category": "unknown",
+                    "user_corrected_media_category": "family_photo",
+                    "effective_media_category": "family_photo",
+                    "media_category": "family_photo",
+                    "user_decision": "keep",
+                    "category_confirmation_state": "manual_confirmed",
+                    "category_confirmation_source": "ai_suggestion_accepted",
+                    "category_confirmation_category": "family_photo",
+                    "category_suggestion_state": "accepted",
+                    "category_suggestion_applied_category": "family_photo",
+                    "category_suggestion_accepted_at": "2026-07-25T12:00:00+00:00",
+                }
+            )
+            metadata_service = UserMetadataService()
+            sidecar = metadata_service.save_for_photo(photo)
+            engine.record_category_correction(
+                photo, "unknown", "family_photo", "ai_suggestion_accepted"
+            )
+
+            class Extractor:
+                def extract(self, _path):
+                    return VisualFeatureProfile(
+                        visual_tags=["photo-like"], extraction_status="extracted"
+                    )
+
+                def apply_profile_to_photo(self, target, profile):
+                    target.metadata["visual_feature_profile"] = profile.to_dict()
+                    target.sync_visual_features_from_metadata()
+
+            self.assertEqual(
+                engine.process_pending_visual_analyses(limit=1, extractor=Extractor()),
+                1,
+            )
+            self.assertEqual(
+                sidecar, metadata_service.sidecar_path_for(photo.path)
+            )
+
+            reloaded = Photo.from_path(photo.path)
+            load_result = metadata_service.apply_for_photo(reloaded)
+
+            self.assertTrue(load_result.loaded)
+            self.assertEqual(load_result.sidecar_path, sidecar)
+            self.assertEqual(reloaded.user_corrected_media_category, "family_photo")
+            self.assertEqual(reloaded.effective_media_category, "family_photo")
+            self.assertEqual(reloaded.user_decision, "keep")
+            self.assertEqual(
+                reloaded.metadata["category_suggestion_state"], "accepted"
+            )
+            self.assertEqual(
+                reloaded.metadata["category_confirmation_source"],
+                "ai_suggestion_accepted",
+            )
 
     def test_custom_category_minimum_support_is_three(self):
         with tempfile.TemporaryDirectory() as tmpdir:

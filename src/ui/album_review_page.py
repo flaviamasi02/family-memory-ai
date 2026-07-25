@@ -1289,6 +1289,7 @@ class AlbumReviewPage(QWidget):
         if result is None or row is None or result.status != "suggested":
             return
         self._suggestion_request_id += 1
+        applied_at = datetime.now(timezone.utc).isoformat()
         applied = self._apply_category_to_rows(
             [row],
             result.suggested_category_id,
@@ -1297,9 +1298,8 @@ class AlbumReviewPage(QWidget):
                 "category_suggestion_state": "accepted",
                 "category_suggestion_model_key": result.model_key,
                 "category_suggestion_applied_category": result.suggested_category_id,
-                "category_suggestion_accepted_at": datetime.now(
-                    timezone.utc
-                ).isoformat(),
+                "category_suggestion_accepted_at": applied_at,
+                "category_suggestion_applied_at": applied_at,
             },
         )
         if not applied:

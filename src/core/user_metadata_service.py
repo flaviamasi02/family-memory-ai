@@ -130,6 +130,9 @@ class UserMetadataService:
         suggestion_accepted_at = str(
             data.get("category_suggestion_accepted_at", "") or ""
         ).strip()
+        suggestion_applied_at = str(
+            data.get("category_suggestion_applied_at", "") or ""
+        ).strip()
 
         if automatic:
             metadata["automatic_media_category"] = automatic
@@ -204,6 +207,8 @@ class UserMetadataService:
             )
         if suggestion_accepted_at:
             metadata["category_suggestion_accepted_at"] = suggestion_accepted_at
+        if suggestion_applied_at:
+            metadata["category_suggestion_applied_at"] = suggestion_applied_at
 
         if not identity_match:
             metadata["user_metadata_warning"] = "identity_mismatch"
@@ -338,6 +343,9 @@ class UserMetadataService:
             ),
             "category_suggestion_accepted_at": str(
                 metadata.get("category_suggestion_accepted_at", "") or ""
+            ).strip(),
+            "category_suggestion_applied_at": str(
+                metadata.get("category_suggestion_applied_at", "") or ""
             ).strip(),
             "updated_at": datetime.now(timezone.utc).isoformat(),
             "app_version": app_version or self._app_version,

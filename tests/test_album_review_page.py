@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 import os
@@ -235,13 +236,43 @@ class AlbumReviewPageTests(unittest.TestCase):
             self.assertEqual(photo.metadata["category_suggestion_state"], "accepted")
             self.assertIsNone(page._current_suggestion)
 
+            sidecar = page._user_metadata_service.sidecar_path_for(photo.path)
+            self.assertTrue(sidecar.exists())
+            payload = json.loads(sidecar.read_text(encoding="utf-8"))
+            self.assertEqual(payload["user_corrected_media_category"], "family_photo")
+            self.assertEqual(payload["effective_media_category"], "family_photo")
+            self.assertEqual(payload["user_decision"], "keep")
+            self.assertEqual(payload["category_suggestion_state"], "accepted")
+            self.assertEqual(
+                payload["category_suggestion_applied_category"], "family_photo"
+            )
+            self.assertTrue(payload["category_suggestion_applied_at"])
+
             reloaded = Photo.from_path(photo.path)
-            page._user_metadata_service.apply_for_photo(reloaded)
+            load_result = page._user_metadata_service.apply_for_photo(reloaded)
+            self.assertEqual(load_result.sidecar_path, sidecar)
             self.assertEqual(reloaded.user_corrected_media_category, "family_photo")
             self.assertEqual(reloaded.effective_media_category, "family_photo")
             self.assertEqual(reloaded.media_category, "family_photo")
             self.assertEqual(reloaded.user_decision, "keep")
             self.assertEqual(reloaded.metadata["category_suggestion_state"], "accepted")
+            reloaded_breakdown = AlbumScoreBreakdown(
+                photo=reloaded,
+                total_score=breakdown.total_score,
+                technical_score=breakdown.technical_score,
+                memory_score=breakdown.memory_score,
+                date_score=breakdown.date_score,
+                explanation=list(breakdown.explanation),
+            )
+            reloaded_page = AlbumReviewPage()
+            reloaded_page.set_scored_photos([reloaded_breakdown])
+            self._flush_ui()
+            self.assertTrue(reloaded_page.select_photo_by_filename("suggested.jpg"))
+            self.assertEqual(reloaded_page.media_category_value.text(), "Family Photo")
+            self.assertEqual(
+                reloaded_page.category_source_value.text(), "Accepted AI suggestion"
+            )
+            self.assertEqual(reloaded_page.user_decision_value.text(), "Keep")
             page._decision_history.record_category_correction.assert_called_once()
             page._category_learning_engine.record_category_correction.assert_called_once()
 
