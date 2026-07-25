@@ -645,3 +645,5 @@
 - Rebalanced Document-versus-Graphic ordering so a portrait page with combined text likelihood, document likelihood, and a document-over-photo margin remains Document even when flat regions also raise the generic Graphic score.
 
 - Removed the remaining automatic Family Photo paths, including strong-face overrides and legacy learned Family Photo outputs. New photographs remain Unknown with a semantic-evidence waiting reason; only MODEL-003D may suggest Family Photo, and assignment still requires explicit user acceptance or manual correction.
+
+- Fixed immediate manual-evidence suggestions by canonicalizing photo identities consistently across the UI collection, semantic result paths, evidence signatures, and cache keys (including Windows case/separator differences). Opt-in suggestion diagnostics now report every semantic match, resolution result, similarity, raw/normalized category, confirmation state, trust decision, and acceptance/rejection reason.

@@ -13,10 +13,18 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 
 from album.album_scoring_engine import AlbumScoreBreakdown
 from core.category_registry import get_category_registry, reset_category_registry
+from core.category_suggestion_service import CategorySuggestionService
 from core.media_classifier import MediaCategory
 from models.photo import Photo
 from models.photo_intelligence import PhotoIntelligence
 from ui.album_review_page import AlbumReviewPage
+from vision.embedding_provider import (
+    EmbeddingRecord,
+    EmbeddingStore,
+    FakeEmbeddingProvider,
+    now_iso,
+    source_identity,
+)
 
 
 class AlbumReviewPageTests(unittest.TestCase):
@@ -279,6 +287,88 @@ class AlbumReviewPageTests(unittest.TestCase):
             self.assertNotIn("category_suggestion_state", photo.metadata)
             self.assertIs(page._current_suggestion, suggestion)
             self.assertIn("No acceptance was recorded", page.ai_suggestion_value.text())
+
+    def test_manual_category_workflow_immediately_feeds_semantic_suggestion(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            breakdowns = [
+                self._make_breakdown(
+                    root,
+                    f"20210117_15535{index}.jpg",
+                    80 - index,
+                    80,
+                    80,
+                    80,
+                    "2021:01:17 15:53:50",
+                    metadata={
+                        "automatic_media_category": MediaCategory.Unknown.value,
+                        "effective_media_category": MediaCategory.Unknown.value,
+                        "media_category": MediaCategory.Unknown.value,
+                    },
+                )
+                for index in range(4)
+            ]
+            provider = FakeEmbeddingProvider()
+            store = EmbeddingStore(root / "embeddings.sqlite3")
+            for index, item in enumerate(breakdowns):
+                key, modified, size, fingerprint = source_identity(item.photo.path)
+                vector = [1.0, 0.01 * index] + [0.0] * 510
+                store.put(
+                    EmbeddingRecord(
+                        key,
+                        fingerprint,
+                        modified,
+                        size,
+                        provider.metadata.provider_id,
+                        provider.metadata.checkpoint_id,
+                        provider.metadata.revision,
+                        512,
+                        vector,
+                        now_iso(),
+                    )
+                )
+
+            page = AlbumReviewPage()
+            page._decision_history = Mock()
+            page._category_learning_engine = Mock()
+            page._preference_learning_engine = Mock()
+            page._category_suggestion_service = CategorySuggestionService(
+                embedding_store=store,
+                category_registry=page._category_registry,
+            )
+            page._suggestion_metadata = provider.metadata
+            page.set_scored_photos(breakdowns)
+            self._flush_ui()
+            target = page._all_rows[3].breakdown.photo
+            before = page._category_suggestion_service.suggest(
+                target,
+                [row.breakdown.photo for row in page._all_rows],
+                provider.metadata,
+            )
+            self.assertEqual(before.status, "insufficient_evidence")
+
+            applied = page._apply_category_to_rows(
+                page._all_rows[:3], "Family Photo", source="user_bulk"
+            )
+            self.assertTrue(applied)
+
+            after = page._category_suggestion_service.suggest(
+                target,
+                [row.breakdown.photo for row in page._all_rows],
+                provider.metadata,
+            )
+            self.assertEqual(after.status, "suggested")
+            self.assertEqual(after.suggested_category_id, "family_photo")
+            self.assertEqual(after.evidence_counts["family_photo"], 3)
+            self.assertEqual(target.effective_media_category, "unknown")
+            for row in page._all_rows[:3]:
+                photo = row.breakdown.photo
+                self.assertEqual(photo.user_corrected_media_category, "family_photo")
+                self.assertEqual(photo.effective_media_category, "family_photo")
+                self.assertEqual(
+                    photo.metadata["category_confirmation_state"], "manual_confirmed"
+                )
+                self.assertEqual(row.user_decision, "keep")
 
     def test_detail_panel_and_explanations_visible(self):
         with tempfile.TemporaryDirectory() as tmpdir:

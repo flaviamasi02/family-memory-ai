@@ -7,6 +7,7 @@ from core.category_suggestion_service import (
 from core.category_registry import CategoryRegistry
 from core.user_metadata_service import UserMetadataService
 from types import SimpleNamespace
+from vision.semantic_similarity_service import SemanticSimilarityResult
 
 
 class FakeClassifier:
@@ -482,6 +483,108 @@ def test_three_manual_family_photo_labels_with_display_names_feed_suggestion(tmp
     assert any(
         "previously confirmed as Family Photo" in reason for reason in result.reasons
     )
+
+
+def test_cached_insufficient_result_is_replaced_after_immediate_manual_updates(tmp_path):
+    store = EmbeddingStore(tmp_path / "e.sqlite3")
+    src = photo(tmp_path / "20210117_155357.jpg")
+    evidence = [
+        photo(tmp_path / name)
+        for name in (
+            "20210117_155350.jpg",
+            "20210117_155352.jpg",
+            "20210117_155354.jpg",
+        )
+    ]
+    put(store, src, [1, 0, 0])
+    for index, item in enumerate(evidence):
+        put(store, item, [0.995 - index * 0.005, 0.01, 0])
+    svc = service(tmp_path, store)
+
+    before = svc.suggest(src, [src, *evidence], META)
+    assert before.status == "insufficient_evidence"
+
+    for index, item in enumerate(evidence):
+        category = "Family Photo" if index == 0 else "family_photo"
+        item.user_corrected_media_category = category
+        item.effective_media_category = category
+        item.media_category = category
+        item.user_decision = "keep"
+        item.metadata.update(
+            {
+                "user_corrected_media_category": category,
+                "effective_media_category": category,
+                "media_category": category,
+                "category_confirmation_state": "manual_confirmed",
+                "category_confirmation_source": "user",
+                "category_confirmation_category": "family_photo",
+                "user_decision": "keep",
+            }
+        )
+    svc.invalidate_cache()
+
+    after = svc.suggest(src, [src, *evidence], META)
+
+    assert after.status == "suggested"
+    assert after.suggested_category_id == "family_photo"
+    assert after.evidence_counts["family_photo"] == 3
+    assert {item.photo_key for item in after.supporting_photos} == {
+        str(item.path.resolve()) for item in evidence
+    }
+    assert all(
+        item.trust_level in {"manual_confirmed", "user_correction"}
+        for item in after.supporting_photos
+    )
+
+
+def test_windows_path_case_and_separator_differences_resolve_trusted_match(tmp_path):
+    store = EmbeddingStore(tmp_path / "e.sqlite3")
+    src = photo(tmp_path / "source.jpg")
+    put(store, src, [1, 0, 0])
+    candidate = photo(tmp_path / "placeholder.jpg", "family_photo", user=True)
+    candidate.path = Path("c:/photos/confirmed.jpg")
+
+    class WindowsSimilarity:
+        def most_similar(self, *_args, **_kwargs):
+            return [
+                SemanticSimilarityResult(
+                    r"C:\PHOTOS\CONFIRMED.JPG", 0.98, META.model_key
+                )
+            ]
+
+    svc = CategorySuggestionService(
+        embedding_store=store,
+        similarity_service=WindowsSimilarity(),
+        category_registry=CategoryRegistry(storage_root=tmp_path / "cats"),
+        media_classifier=FakeClassifier(),
+        config=CategorySuggestionConfig(minimum_support_count=1),
+    )
+
+    result = svc.suggest(src, [src, candidate], META)
+
+    assert result.status == "suggested"
+    assert result.suggested_category_id == "family_photo"
+
+
+def test_debug_diagnostics_report_match_resolution_and_trust(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("FAMILY_MEMORY_DEBUG_SUGGESTIONS", "1")
+    store = EmbeddingStore(tmp_path / "e.sqlite3")
+    src = photo(tmp_path / "src.jpg")
+    confirmed = photo(tmp_path / "confirmed.jpg", "family_photo", user=True)
+    put(store, src, [1, 0, 0])
+    put(store, confirmed, [0.99, 0, 0])
+
+    service(tmp_path, store).suggest(src, [src, confirmed], META)
+
+    diagnostic = capsys.readouterr().err
+    assert "[CategorySuggestionMatch]" in diagnostic
+    assert "filename=confirmed.jpg" in diagnostic
+    assert "similarity=" in diagnostic
+    assert "resolved=True" in diagnostic
+    assert "raw_category='family_photo'" in diagnostic
+    assert "normalized_category='family_photo'" in diagnostic
+    assert "trust=user_correction" in diagnostic
+    assert "accepted=True" in diagnostic
 
 
 def test_album_review_category_apply_normalizes_display_label_before_persisting():

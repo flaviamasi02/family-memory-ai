@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import hashlib
+import ntpath
 import os
 import sys
 from datetime import datetime, timezone
@@ -92,7 +93,7 @@ class CategorySuggestionService:
     def suggest(
         self, source_photo, all_photos: Iterable, metadata: ModelMetadata
     ) -> CategorySuggestionResult:
-        source_key = str(Path(getattr(source_photo, "path", source_photo)).resolve())
+        source_key = self._photo_identity_key(source_photo)
         try:
             if (
                 self.embedding_store.get_valid(
@@ -136,7 +137,7 @@ class CategorySuggestionService:
                     model_key=metadata.model_key,
                     reasons=["No content categories are eligible for AI suggestions."],
                 )
-            by_key = {str(Path(getattr(p, "path", p)).resolve()): p for p in all_photos}
+            by_key = {self._photo_identity_key(p): p for p in all_photos}
             signature_key = self._evidence_signature(by_key.values())
             cache_key = (source_key, metadata.model_key, signature_key)
             if cache_key in self._cache:
@@ -153,16 +154,62 @@ class CategorySuggestionService:
             scores: dict[str, float] = {}
             counts: dict[str, int] = {}
             for sim in sims:
-                photo = by_key.get(str(Path(sim.photo_key).resolve()))
+                match_key = self._photo_identity_key(sim.photo_key)
+                photo = by_key.get(match_key)
                 if photo is None:
+                    self._debug_match(
+                        sim.photo_key,
+                        sim.similarity,
+                        resolved=False,
+                        photo=None,
+                        raw_category="",
+                        normalized_category="",
+                        trust="unresolved",
+                        accepted=False,
+                        reason=f"no all_photos object for normalized key {match_key}",
+                    )
                     continue
                 cat, trust = self._trusted_category(photo)
+                raw_category = self._raw_category_value(photo)
                 cat = self._normalize_category_id(cat)
                 if not cat or cat not in eligible:
+                    self._debug_match(
+                        sim.photo_key,
+                        sim.similarity,
+                        resolved=True,
+                        photo=photo,
+                        raw_category=raw_category,
+                        normalized_category=cat,
+                        trust=trust,
+                        accepted=False,
+                        reason="category is untrusted, empty, or ineligible",
+                    )
                     continue
                 weight = self.TRUST_WEIGHTS[trust]
                 if weight <= 0:
+                    self._debug_match(
+                        sim.photo_key,
+                        sim.similarity,
+                        resolved=True,
+                        photo=photo,
+                        raw_category=raw_category,
+                        normalized_category=cat,
+                        trust=trust,
+                        accepted=False,
+                        reason="trust weight is zero",
+                    )
                     continue
+                self._debug_match(
+                    sim.photo_key,
+                    sim.similarity,
+                    resolved=True,
+                    photo=photo,
+                    raw_category=raw_category,
+                    normalized_category=cat,
+                    trust=trust,
+                    accepted=True,
+                    reason="trusted category evidence accepted",
+                )
                 ev = CategorySuggestionEvidence(
                     sim.photo_key,
                     cat,
@@ -434,6 +481,24 @@ class CategorySuggestionService:
                 return category.id
         return compact
 
+    def _photo_identity_key(self, photo_or_path) -> str:
+        raw = str(getattr(photo_or_path, "path", photo_or_path) or "").strip()
+        if not raw:
+            return ""
+        if (len(raw) >= 2 and raw[1] == ":") or "\\" in raw:
+            return ntpath.normcase(ntpath.normpath(raw))
+        return os.path.normcase(os.path.realpath(os.path.abspath(raw)))
+
+    def _raw_category_value(self, photo) -> str:
+        metadata = dict(getattr(photo, "metadata", {}) or {})
+        return str(
+            metadata.get("user_corrected_media_category")
+            or getattr(photo, "user_corrected_media_category", "")
+            or metadata.get("effective_media_category")
+            or getattr(photo, "effective_media_category", "")
+            or ""
+        )
+
     def _trusted_category(self, photo) -> tuple[str, str]:
         md = dict(getattr(photo, "metadata", {}) or {})
         user = (
@@ -506,10 +571,41 @@ class CategorySuggestionService:
         for p in photos:
             category_id, trust = self._trusted_category(p)
             parts.append(
-                f"{Path(getattr(p, 'path', p)).resolve()}|{category_id}|{trust}"
+                f"{self._photo_identity_key(p)}|{category_id}|{trust}"
             )
         payload = "\n".join(sorted(parts))
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def _debug_match(
+        self,
+        photo_key: str,
+        similarity: float,
+        *,
+        resolved: bool,
+        photo,
+        raw_category: str,
+        normalized_category: str,
+        trust: str,
+        accepted: bool,
+        reason: str,
+    ) -> None:
+        if os.environ.get("FAMILY_MEMORY_DEBUG_SUGGESTIONS", "").lower() not in {
+            "1",
+            "true",
+            "yes",
+        }:
+            return
+        metadata = dict(getattr(photo, "metadata", {}) or {}) if photo else {}
+        print(
+            "[CategorySuggestionMatch] "
+            f"filename={ntpath.basename(str(photo_key))} similarity={similarity:.4f} "
+            f"resolved={resolved} raw_category={raw_category!r} "
+            f"normalized_category={normalized_category!r} "
+            f"confirmation_state={metadata.get('category_confirmation_state', '')!r} "
+            f"trust={trust} accepted={accepted} reason={reason}",
+            file=sys.stderr,
+            flush=True,
+        )
 
     def _debug_suggestion(
         self,
