@@ -320,110 +320,73 @@ def test_embedding_completion_success_does_not_print_failure_diagnostics(capsys)
     assert "failure 1/" not in err
 
 
-def test_embedding_success_notification_is_transient(monkeypatch):
-    window = _embedding_window_for_lifecycle_tests()
-    window._active_embedding_run_id = 1
-    timers = []
-    monkeypatch.setattr(
-        "ui.main_window.QTimer.singleShot",
-        lambda delay, callback: timers.append((delay, callback)),
-    )
-    result = type(
+def _embedding_result(processed, cached, failed):
+    return type(
         "Result",
         (),
         {
-            "total_images_received": 12,
-            "processed_successfully": 12,
-            "skipped_cached": 0,
-            "failed": 0,
+            "total_images_received": processed + cached + failed,
+            "processed_successfully": processed,
+            "skipped_cached": cached,
+            "failed": failed,
             "cancelled": 0,
             "elapsed_seconds": 0.1,
             "outcomes": [],
         },
     )()
 
-    window._on_embedding_complete(1, result)
 
-    assert window.status_label.text == (
-        "✓ Semantic embedding indexing completed.\n"
-        "12 photos processed · 0 skipped · 0 failed"
-    )
-    assert timers[0][0] == 7000
-    timers[0][1]()
-    assert window.status_label.text == ""
-
-
-def test_embedding_completion_with_warnings_is_transient(monkeypatch):
+def test_new_embedding_completion_is_persistent_success():
     window = _embedding_window_for_lifecycle_tests()
     window._active_embedding_run_id = 1
-    timers = []
-    monkeypatch.setattr(
-        "ui.main_window.QTimer.singleShot",
-        lambda delay, callback: timers.append((delay, callback)),
+
+    window._on_embedding_complete(1, _embedding_result(12, 0, 0))
+
+    assert window.ai_status_label.text.startswith(
+        "✓ Semantic embedding indexing completed."
     )
-    result = type(
-        "Result",
-        (),
-        {
-            "total_images_received": 15,
-            "processed_successfully": 12,
-            "skipped_cached": 2,
-            "failed": 1,
-            "cancelled": 0,
-            "elapsed_seconds": 0.1,
-            "outcomes": [],
-        },
-    )()
-
-    window._on_embedding_complete(1, result)
-
-    assert window.status_label.text == (
-        "⚠ Semantic embedding indexing completed with warnings.\n"
-        "12 processed · 2 skipped · 1 failed"
-    )
-    timers[0][1]()
-    assert window.status_label.text == ""
+    assert "12 new embeddings created · 0 reused · 0 failed" in window.ai_status_label.text
 
 
-def test_complete_embedding_failure_shows_error_notification(monkeypatch):
+def test_cached_embedding_completion_is_success_not_warning():
     window = _embedding_window_for_lifecycle_tests()
     window._active_embedding_run_id = 1
-    timers = []
-    monkeypatch.setattr(
-        "ui.main_window.QTimer.singleShot",
-        lambda delay, callback: timers.append((delay, callback)),
-    )
-    result = type(
-        "Result",
-        (),
-        {
-            "total_images_received": 3,
-            "processed_successfully": 0,
-            "skipped_cached": 0,
-            "failed": 3,
-            "cancelled": 0,
-            "elapsed_seconds": 0.1,
-            "outcomes": [],
-        },
-    )()
 
-    window._on_embedding_complete(1, result)
+    window._on_embedding_complete(1, _embedding_result(0, 12, 0))
 
-    assert window.status_label.text == (
-        "✕ Semantic embedding indexing failed.\n"
-        "0 processed · 0 skipped · 3 failed"
-    )
-    assert timers[0][0] == 7000
+    assert window.ai_status_label.text.startswith("✓ Semantic embeddings ready: 12/12")
+    assert "0 new · 12 reused from cache · 0 failed" in window.ai_status_label.text
+    assert "⚠" not in window.ai_status_label.text
 
 
-def test_embedding_progress_does_not_schedule_completion_notification(monkeypatch):
+def test_mixed_new_and_cached_embedding_completion_is_success():
     window = _embedding_window_for_lifecycle_tests()
     window._active_embedding_run_id = 1
-    timers = []
-    monkeypatch.setattr(
-        "ui.main_window.QTimer.singleShot",
-        lambda delay, callback: timers.append((delay, callback)),
+
+    window._on_embedding_complete(1, _embedding_result(5, 7, 0))
+
+    assert window.ai_status_label.text.startswith("✓ Semantic embeddings ready: 12/12")
+    assert "5 new · 7 reused from cache · 0 failed" in window.ai_status_label.text
+
+
+def test_embedding_failures_use_warning_or_error_status():
+    partial = _embedding_window_for_lifecycle_tests()
+    partial._active_embedding_run_id = 1
+    partial._on_embedding_complete(1, _embedding_result(5, 6, 1))
+    assert partial.ai_status_label.text.startswith("⚠ AI embeddings ready: 11/12")
+
+    complete = _embedding_window_for_lifecycle_tests()
+    complete._active_embedding_run_id = 1
+    complete._on_embedding_complete(1, _embedding_result(0, 0, 3))
+    assert complete.ai_status_label.text.startswith(
+        "✕ Semantic embedding indexing failed."
     )
+
+
+def test_embedding_progress_replaces_previous_ready_state():
+    window = _embedding_window_for_lifecycle_tests()
+    window._active_embedding_run_id = 1
+    window.ai_status_label.setText("✓ Semantic embeddings ready: 12/12")
     progress = type(
         "Progress",
         (),
@@ -438,23 +401,29 @@ def test_embedding_progress_does_not_schedule_completion_notification(monkeypatc
 
     window._on_embedding_progress(1, progress)
 
-    assert window.status_label.text.startswith("Indexing semantic embeddings 3/12")
-    assert timers == []
+    assert window.ai_status_label.text.startswith("Indexing semantic embeddings 3/12")
 
 
-def test_old_completion_timer_does_not_clear_newer_status(monkeypatch):
+def test_generic_scan_status_does_not_overwrite_embedding_ready_status(monkeypatch):
     window = _embedding_window_for_lifecycle_tests()
-    timers = []
-    monkeypatch.setattr(
-        "ui.main_window.QTimer.singleShot",
-        lambda delay, callback: timers.append((delay, callback)),
+    window._active_embedding_run_id = 1
+    window._on_embedding_complete(1, _embedding_result(0, 12, 0))
+
+    window.status_label.setText("Found 12 review photos. Loading thumbnails…")
+
+    assert window.ai_status_label.text.startswith("✓ Semantic embeddings ready: 12/12")
+
+
+def test_starting_new_import_replaces_ready_status(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    window.ai_status_label.setText("✓ Semantic embeddings ready: 12/12")
+    monkeypatch.setattr(window, "_start_scan", lambda _folder: None)
+
+    window._queue_or_start_scan("/new-import")
+
+    assert window.ai_status_label.text == (
+        "Indexing semantic embeddings: preparing new import…"
     )
-
-    window._show_embedding_completion_notification("completion")
-    window.status_label.setText("Scanning folder…")
-    timers[0][1]()
-
-    assert window.status_label.text == "Scanning folder…"
 
 
 def test_close_event_waits_for_running_embedding_thread_before_destroying(monkeypatch):
@@ -580,6 +549,7 @@ def _embedding_window_for_lifecycle_tests():
     window._pending_import_folder_path = None
     window._embedding_close_requested = False
     window.status_label = _StatusLabel()
+    window.ai_status_label = _StatusLabel()
     return window
 
 

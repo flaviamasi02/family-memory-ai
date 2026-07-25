@@ -369,12 +369,13 @@ def test_embedding_completion_refresh_contract_is_wired_to_memory_review():
     complete_block = main[
         main.index("def _on_embedding_complete") : main.index("def _on_embedding_error")
     ]
-    assert "self.status_label.setText" in complete_block
+    assert "self._set_embedding_status" in complete_block
     assert "Semantic embedding indexing completed" in complete_block
     assert "Indexing semantic embeddings" not in complete_block
     assert "self._on_embedding_index_updated(result)" in complete_block
     assert "def _on_embedding_index_updated" in main
     assert "review_page.on_embedding_index_updated()" in main
+    assert "self.ai_status_label" in main
     assert "def on_embedding_index_updated" in ui
     assert "self._category_suggestion_service.invalidate_cache()" in ui
     assert "self._request_category_suggestion(row)" in ui

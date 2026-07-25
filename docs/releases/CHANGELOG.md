@@ -631,3 +631,5 @@
 - Added a lightweight embedding-completion notification in the existing status area: success, warning, cancellation, and failure summaries remain visible for seven seconds, then clear without modal dialogs or overwriting newer scan/progress status.
 
 - Fixed Apply suggestion persistence by routing acceptance metadata through the same category-correction save, persisting category/Keep/confirmation fields atomically before learning signals, rolling back non-destructively on sidecar failure, and suppressing an accepted suggestion after sidecar reload.
+
+- Replaced the easy-to-miss transient embedding completion text with a compact dedicated AI status that remains visible until the next import, treats cached embeddings as successful reuse, distinguishes new/reused counts, and reserves warning/error styling for cancellation or failures.
