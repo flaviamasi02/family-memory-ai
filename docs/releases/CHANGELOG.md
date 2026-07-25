@@ -637,3 +637,5 @@
 - Fixed embedding startup/result reporting so every imported photo reaches the batch service (including cache hits), empty runs replace the preparation state with an explicit reason and terminal summary, and stale deleted Qt thread wrappers cannot block subsequent imports.
 
 - Restored cache-first managed-runtime initialization: valid stored embeddings are now counted and reused before MobileCLIP readiness validation, while uncached photos still require the fully validated managed runtime and retain grouped readiness failures when it is genuinely unavailable.
+
+- Removed the weak automatic Family Photo fallback: ordinary JPEG/photo files now begin as Unknown when evidence is limited to format, EXIF/camera/GPS metadata, camera-style filenames, or photo-like structure. Explanations state that family content is unconfirmed, while strong face evidence and authoritative manual/accepted/learned categories remain supported.

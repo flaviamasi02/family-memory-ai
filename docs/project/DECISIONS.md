@@ -82,3 +82,7 @@ Consequences:
 ## MODEL-003D — Advisory explainable category suggestions
 
 Decision: category suggestions may use stored MobileCLIP embeddings only as advisory evidence in Memory Review. The service must use current valid embeddings, existing content categories, trusted category corrections/confirmations, and deterministic classifier agreement/disagreement to produce a bounded heuristic confidence. It must not overwrite manual categories or perform automatic replacement during import, indexing, embedding generation, or suggestion calculation.
+
+## MODEL-003D follow-up — Weak photograph signals do not imply Family Photo
+
+Decision: supported image format, EXIF/camera metadata, camera-style filenames, GPS, and ordinary photo-like structure establish only that a file is probably a photograph. They must not automatically assign Family Photo. Such files start as Unknown unless stronger family evidence exists. Reliable screenshot, document, meme/graphic, advertisement, corrupt/unsupported, and workflow rules remain in force. Manual categories, accepted suggestions, and trusted learned evidence remain authoritative and are never reset by this technical default.

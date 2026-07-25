@@ -381,9 +381,10 @@ class MediaClassifier:
             # automatically become Meme just because it contains WA/WhatsApp.
             if whatsapp_like and not strong_meme_hit and photo_like_geometry and not weak_metadata_profile:
                 return MediaClassification(
-                    MediaCategory.FamilyPhoto,
-                    f"Classified as family photo with conservative confidence because WhatsApp filename is ambiguous but geometry and photo evidence are present ({width}x{height}).",
-                    0.64,
+                    MediaCategory.Unknown,
+                    "Recognized as a standard photograph from file and metadata "
+                    "signals. Family content has not been confirmed.",
+                    0.55,
                 )
 
             if area is not None and area <= 600 * 600:
@@ -441,82 +442,26 @@ class MediaClassifier:
             if visual_decision is not None:
                 return visual_decision
 
-        # 9. family photo
+        # 9. standard photograph (semantic content not yet confirmed)
         if extension in IMAGE_EXTENSIONS:
-            confidence = 0.30
-            reason_notes = ["supported image extension"]
-            strong_positive_signals = 0
-
             if face_evidence_is_strong:
-                face_count = max(1, int(face_context["face_count"]))
-                confidence += min(0.34, 0.22 + (face_context["confidence"] * 0.20))
-                reason_notes.append(self._face_detection_reason(face_context))
-                strong_positive_signals += 1
-
-            if has_camera_metadata:
-                confidence += 0.24
-                reason_notes.append("camera metadata present")
-                strong_positive_signals += 1
-
-            if has_exif_date:
-                confidence += 0.20
-                reason_notes.append("EXIF date present")
-                strong_positive_signals += 1
-
-            if has_gps:
-                confidence += 0.04
-                reason_notes.append("GPS metadata present")
-
-            if camera_pattern:
-                confidence += 0.16
-                reason_notes.append("filename matches camera/photo pattern")
-                strong_positive_signals += 1
-
-            if photo_like_geometry:
-                confidence += 0.10
-                reason_notes.append("photo-like resolution/aspect ratio")
-
-            if whatsapp_like:
-                confidence -= 0.08
-                reason_notes.append("WhatsApp filename requires conservative confidence")
-
-            if looks_downloaded and weak_metadata_profile:
-                confidence -= 0.32
-                reason_notes.append("filename looks downloaded/shared/WhatsApp with no camera metadata")
-
-            if area is not None and area < 800 * 800:
-                confidence -= 0.08
-                reason_notes.append("limited resolution")
-
-            confidence = max(0.20, min(0.96, confidence))
-
-            if strong_positive_signals == 0:
                 return MediaClassification(
-                    MediaCategory.Unknown,
+                    MediaCategory.FamilyPhoto,
                     self._append_visual_note(
-                        f"Classified as unknown because no strong photo signal is present ({'; '.join(reason_notes)}).",
+                        f"Classified as family photo because {self._face_detection_reason(face_context)}.",
                         visual_note,
                     ),
-                    max(0.35, min(confidence, 0.62)),
-                )
-
-            if confidence < 0.62:
-                return MediaClassification(
-                    MediaCategory.Unknown,
-                    self._append_visual_note(
-                        f"Classified as unknown because family-photo evidence is weak ({'; '.join(reason_notes)}).",
-                        visual_note,
-                    ),
-                    confidence,
+                    max(0.68, min(0.92, 0.64 + face_context["confidence"] * 0.18)),
                 )
 
             return MediaClassification(
-                MediaCategory.FamilyPhoto,
+                MediaCategory.Unknown,
                 self._append_visual_note(
-                    f"Classified as family photo because {'; '.join(reason_notes)}.",
+                    "Recognized as a standard photograph from file and metadata "
+                    "signals. Family content has not been confirmed.",
                     visual_note,
                 ),
-                confidence,
+                0.55 if (has_camera_metadata or has_exif_date or camera_pattern) else 0.45,
             )
 
         # 10. unknown
@@ -719,7 +664,7 @@ class MediaClassifier:
             return MediaClassification(MediaCategory.Unknown, reason, 0.52)
 
         category_map = {
-            "photo": MediaCategory.FamilyPhoto,
+            "photo": MediaCategory.Unknown,
             "document": MediaCategory.Document,
             "graphic": MediaCategory.Meme if any(ind in filename_lower for ind in MEME_FILENAME_INDICATORS) else MediaCategory.Graphic,
             "screenshot": MediaCategory.Screenshot,
@@ -731,9 +676,16 @@ class MediaClassifier:
         evidence = list(visual_signals.explanation[:3])
         evidence_text = "; ".join(evidence) if evidence else self._visual_summary_text(visual_signals)
 
-        reason = (
-            f"Classified as {chosen.value.replace('_', ' ')} because visual evidence is strong: {evidence_text}."
-        )
+        if top_label == "photo":
+            reason = (
+                "Visual evidence indicates a standard photograph, but family content "
+                "has not been confirmed."
+            )
+        else:
+            reason = (
+                f"Classified as {chosen.value.replace('_', ' ')} because visual "
+                f"evidence is strong: {evidence_text}."
+            )
         return MediaClassification(chosen, reason, confidence)
 
     def _resolve_visual_signals(
