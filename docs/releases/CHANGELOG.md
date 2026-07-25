@@ -641,3 +641,5 @@
 - Removed the weak automatic Family Photo fallback: ordinary JPEG/photo files now begin as Unknown when evidence is limited to format, EXIF/camera/GPS metadata, camera-style filenames, or photo-like structure. Explanations state that family content is unconfirmed, while strong face evidence and authoritative manual/accepted/learned categories remain supported.
 
 - Tightened visual Document classification so rectangular/page-like geometry, edge density, and generic contrast cannot classify an ordinary photograph as Document without explicit document filename evidence or strongly text-dominant document evidence.
+
+- Rebalanced Document-versus-Graphic ordering so a portrait page with combined text likelihood, document likelihood, and a document-over-photo margin remains Document even when flat regions also raise the generic Graphic score.

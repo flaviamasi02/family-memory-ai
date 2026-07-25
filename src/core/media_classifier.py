@@ -645,13 +645,27 @@ class MediaClassifier:
         if any(ind in filename_lower for ind in ADVERTISEMENT_FILENAME_INDICATORS):
             scores["advertisement"] += 0.10
 
-        strong_document_visual_evidence = bool(
-            float(visual_signals.text_likelihood) >= 0.72
-            and float(visual_signals.document_likelihood) >= 0.78
-            and float(visual_signals.document_likelihood)
-            >= float(visual_signals.photo_likelihood) + 0.15
+        aspect_ratio = getattr(visual_signals, "aspect_ratio", None)
+        portrait_page_structure = bool(
+            isinstance(aspect_ratio, (int, float))
+            and 0.65 <= float(aspect_ratio) <= 0.85
         )
-        if not document_filename_evidence and not strong_document_visual_evidence:
+        strong_document_visual_evidence = bool(
+            portrait_page_structure
+            and float(visual_signals.text_likelihood) >= 0.50
+            and float(visual_signals.document_likelihood) >= 0.62
+            and float(visual_signals.document_likelihood)
+            >= float(visual_signals.photo_likelihood) + 0.10
+        )
+        if strong_document_visual_evidence:
+            # A portrait page plus text-dominant evidence is stronger than the
+            # flat-region signal that can otherwise make a scanned page look Graphic.
+            scores["document"] = max(
+                scores["document"],
+                min(0.95, float(visual_signals.document_likelihood) + 0.10),
+                min(0.95, scores["graphic"] + 0.12),
+            )
+        elif not document_filename_evidence:
             # Geometry, edge density, and generic high-contrast structure can all
             # occur in ordinary photographs.  They are not document evidence by
             # themselves, so keep the document score below the decision threshold.
