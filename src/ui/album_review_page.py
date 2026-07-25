@@ -369,6 +369,7 @@ class AlbumReviewPage(QWidget):
         self.pipeline_value = QLabel("-")
         self.rejection_reason_value = QLabel("-")
         self.media_category_value = QLabel("-")
+        self.category_source_value = QLabel("-")
         self.classification_reason_value = QLabel("-")
         self.classification_reason_value.setWordWrap(True)
         self.visual_summary_value = QLabel("-")
@@ -395,8 +396,9 @@ class AlbumReviewPage(QWidget):
         details_form = QFormLayout()
         details_form.addRow("Filename:", self.filename_value)
         details_form.addRow("Score:", self.score_value)
-        details_form.addRow("Media category:", self.media_category_value)
-        details_form.addRow("Classification reason:", self.classification_reason_value)
+        details_form.addRow("Current category:", self.media_category_value)
+        details_form.addRow("Category source:", self.category_source_value)
+        details_form.addRow("Initial technical reason:", self.classification_reason_value)
         details_form.addRow("Visual signals:", self.visual_summary_value)
         details_form.addRow("Confidence:", self.confidence_value)
         details_form.addRow("User decision:", self.user_decision_value)
@@ -1122,6 +1124,23 @@ class AlbumReviewPage(QWidget):
 
         category_value = self._effective_category_for_photo(photo)
         self.media_category_value.setText(media_category_label(category_value))
+        metadata = dict(getattr(photo, "metadata", {}) or {})
+        user_category = str(
+            metadata.get("user_corrected_media_category", "") or ""
+        ).strip()
+        if user_category:
+            source = str(metadata.get("category_confirmation_source", "") or "")
+            if (
+                metadata.get("category_suggestion_state") == "accepted"
+                or source == "ai_suggestion_accepted"
+            ):
+                self.category_source_value.setText("Accepted AI suggestion")
+            else:
+                self.category_source_value.setText("Manual correction")
+        elif category_value == MediaCategory.Unknown.value:
+            self.category_source_value.setText("Unconfirmed")
+        else:
+            self.category_source_value.setText("Deterministic classification")
         self.classification_reason_value.setText(
             str(getattr(photo, "classification_reason", "") or "-")
         )
@@ -1188,6 +1207,7 @@ class AlbumReviewPage(QWidget):
         self.filename_value.setText("-")
         self.score_value.setText("-")
         self.media_category_value.setText("-")
+        self.category_source_value.setText("-")
         self.classification_reason_value.setText("-")
         self.visual_summary_value.setText("-")
         self.confidence_value.setText("-")

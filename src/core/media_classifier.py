@@ -12,6 +12,10 @@ from core.feature_flags import ENABLE_VISUAL_CONTENT_ANALYSIS
 from core.visual_content_analyzer import VisualContentAnalyzer
 from learning.category_learning_engine import get_category_learning_engine
 
+UNCONFIRMED_PHOTO_REASON = (
+    "Category not yet confirmed. Waiting for semantic similarity evidence."
+)
+
 
 class MediaCategory(str, Enum):
     FamilyPhoto = "family_photo"
@@ -284,10 +288,6 @@ class MediaClassifier:
         has_camera_metadata = self._has_camera_metadata(metadata_dict)
         has_exif_date = self._has_exif_date(metadata_dict)
         has_gps = bool(metadata_dict.get("has_gps", False))
-        face_context = self._face_detection_context(metadata_dict)
-        has_user_correction = bool(str(metadata_dict.get("user_corrected_media_category", "") or "").strip())
-        face_evidence_is_strong = bool(face_context["has_faces"] and face_context["confidence"] >= 0.55)
-
         looks_downloaded = self._looks_downloaded_or_shared(filename_lower)
         meme_indicators = self._matched_meme_indicators(filename_lower)
         strong_meme_hit = any(indicator in STRONG_MEME_INDICATORS for indicator in meme_indicators)
@@ -366,24 +366,12 @@ class MediaClassifier:
         if self._is_meme(filename_lower):
             detail = ", ".join(meme_indicators[:3]) if meme_indicators else "meme indicators"
 
-            if face_evidence_is_strong and not has_user_correction:
-                face_reason = self._face_detection_reason(face_context)
-                return MediaClassification(
-                    MediaCategory.FamilyPhoto,
-                    self._append_visual_note(
-                        f"Classified as family photo because {face_reason}.",
-                        visual_note,
-                    ),
-                    max(0.68, min(0.92, 0.64 + face_context["confidence"] * 0.18)),
-                )
-
             # WhatsApp filenames are ambiguous. A normal WhatsApp photo should not
             # automatically become Meme just because it contains WA/WhatsApp.
             if whatsapp_like and not strong_meme_hit and photo_like_geometry and not weak_metadata_profile:
                 return MediaClassification(
                     MediaCategory.Unknown,
-                    "Recognized as a standard photograph from file and metadata "
-                    "signals. Family content has not been confirmed.",
+                    UNCONFIRMED_PHOTO_REASON,
                     0.55,
                 )
 
@@ -444,21 +432,10 @@ class MediaClassifier:
 
         # 9. standard photograph (semantic content not yet confirmed)
         if extension in IMAGE_EXTENSIONS:
-            if face_evidence_is_strong:
-                return MediaClassification(
-                    MediaCategory.FamilyPhoto,
-                    self._append_visual_note(
-                        f"Classified as family photo because {self._face_detection_reason(face_context)}.",
-                        visual_note,
-                    ),
-                    max(0.68, min(0.92, 0.64 + face_context["confidence"] * 0.18)),
-                )
-
             return MediaClassification(
                 MediaCategory.Unknown,
                 self._append_visual_note(
-                    "Recognized as a standard photograph from file and metadata "
-                    "signals. Family content has not been confirmed.",
+                    UNCONFIRMED_PHOTO_REASON,
                     visual_note,
                 ),
                 0.55 if (has_camera_metadata or has_exif_date or camera_pattern) else 0.45,
@@ -505,22 +482,14 @@ class MediaClassifier:
             visual_profile=metadata.get("visual_feature_profile"),
         )
 
-        face_context = self._face_detection_context(metadata)
-        has_user_correction = bool(str(metadata.get("user_corrected_media_category", "") or "").strip())
-        keep_face_family_photo = (
-            classification.media_category == MediaCategory.FamilyPhoto
-            and face_context["has_faces"]
-            and face_context["confidence"] >= 0.55
-            and str(learned_category or "").strip().lower() != MediaCategory.FamilyPhoto.value
-            and not has_user_correction
-        )
-
-        if keep_face_family_photo:
-            learned_category = classification.media_category.value
-            learned_confidence = max(learned_confidence, classification.classification_confidence)
-            learned_reason = (
-                f"{classification.classification_reason} "
-                "Strong face evidence retained family photo classification."
+        if str(learned_category or "").strip().lower() == MediaCategory.FamilyPhoto.value:
+            # Learned rules may support advisory evidence, but Family Photo is now
+            # proposed only by MODEL-003D semantic similarity and applied explicitly.
+            learned_category = MediaCategory.Unknown.value
+            learned_confidence = classification.classification_confidence
+            learned_reason = self._append_visual_note(
+                UNCONFIRMED_PHOTO_REASON,
+                visual_note,
             )
 
         learned_enum = self._media_category_from_value(learned_category)
@@ -706,10 +675,7 @@ class MediaClassifier:
         evidence_text = "; ".join(evidence) if evidence else self._visual_summary_text(visual_signals)
 
         if top_label == "photo":
-            reason = (
-                "Visual evidence indicates a standard photograph, but family content "
-                "has not been confirmed."
-            )
+            reason = UNCONFIRMED_PHOTO_REASON
         else:
             reason = (
                 f"Classified as {chosen.value.replace('_', ' ')} because visual "
@@ -894,41 +860,6 @@ class MediaClassifier:
         make = str(metadata.get("camera_make", "") or "").strip()
         model = str(metadata.get("camera_model", "") or "").strip()
         return bool(make or model)
-
-    def _face_detection_context(self, metadata: Mapping[str, Any]) -> dict[str, Any]:
-        face_count_value = metadata.get("face_count", metadata.get("faces_count", 0))
-        has_faces_value = metadata.get("has_faces", None)
-        confidence_value = metadata.get("face_detection_confidence", 0.0)
-        detector_value = str(metadata.get("face_detection_detector", "") or "").strip() or "unknown"
-
-        try:
-            face_count = int(face_count_value or 0)
-        except Exception:
-            face_count = 0
-
-        if isinstance(has_faces_value, bool):
-            has_faces = has_faces_value
-        else:
-            has_faces = face_count > 0
-
-        try:
-            confidence = float(confidence_value or 0.0)
-        except Exception:
-            confidence = 0.0
-
-        return {
-            "face_count": face_count,
-            "has_faces": has_faces,
-            "confidence": confidence,
-            "detector": detector_value,
-        }
-
-    def _face_detection_reason(self, face_context: Mapping[str, Any]) -> str:
-        face_count = int(face_context.get("face_count", 0) or 0)
-        detector = str(face_context.get("detector", "unknown") or "unknown")
-        confidence = float(face_context.get("confidence", 0.0) or 0.0)
-        face_word = "face" if face_count == 1 else "faces"
-        return f"face detected ({face_count} {face_word} via {detector}, confidence {int(round(confidence * 100))}%)"
 
     def _has_exif_date(self, metadata: Mapping[str, Any]) -> bool:
         date_value = metadata.get("date_taken")

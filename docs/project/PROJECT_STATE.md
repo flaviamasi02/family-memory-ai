@@ -534,7 +534,7 @@ PEOPLE-001 implementation summary:
 - Added explicit background worker flow (`FaceDetectionWorker`) for user-triggered face analysis.
 - Added `Analyze Faces for Visible` action in Cleanup Review with non-blocking progress and result summary.
 - Face metadata is persisted per photo (`face_count`, `has_faces`, `face_detection_confidence`, `face_detection_detector`).
-- Media classification now treats strong face evidence as Family Photo evidence and includes `face detected` in reasoning.
+- Historical face-assisted classification was introduced here, but MODEL-003D now supersedes it: face evidence no longer assigns Family Photo automatically, and semantic similarity is the only Family Photo suggestion source.
 - User-corrected categories remain authoritative and are never auto-overridden by face detection.
 - No cloud AI; no identity recognition; no person-name matching in this milestone.
 
@@ -1144,4 +1144,4 @@ Status: implemented in PR branch; awaiting Product Owner manual validation befor
 - MODEL-003D follow-up: manual category application in Memory Review now records category confirmation metadata and moves pending rows to a non-pending Keep decision so user-applied categories are available as trusted evidence for later suggestions.
 
 - MODEL-003D follow-up: suggestion evidence now normalizes category IDs/display labels such as `Family Photo`, `family photo`, and `family_photo` before eligibility checks, and opt-in developer diagnostics can explain evidence counts when suggestions are unavailable.
-- MODEL-003D follow-up: weak technical photograph signals no longer assign Family Photo. Ordinary supported images with camera/EXIF/GPS/filename/geometry evidence begin as Unknown with a truthful “family content not confirmed” explanation, while manual categories, accepted suggestions, trusted learning, strong face evidence, and reliable non-photo rules remain authoritative.
+- MODEL-003D follow-up: deterministic and legacy learned rules no longer assign Family Photo. Ordinary supported images remain Unknown even with camera/EXIF/GPS/filename/geometry or face evidence, with a truthful semantic-evidence waiting explanation. Only MODEL-003D may propose Family Photo; explicit manual categories and accepted suggestions remain authoritative, and reliable non-family rules are unchanged.

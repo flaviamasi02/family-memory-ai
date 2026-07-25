@@ -2,6 +2,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from PySide6.QtGui import QColor, QImage, QPainter
 
@@ -112,8 +113,8 @@ class MediaClassifierTests(unittest.TestCase):
         )
 
         self.assertEqual(result.media_category, MediaCategory.Unknown)
-        self.assertIn("standard photograph", result.classification_reason)
-        self.assertIn("not been confirmed", result.classification_reason)
+        self.assertIn("Category not yet confirmed", result.classification_reason)
+        self.assertIn("semantic similarity evidence", result.classification_reason)
         self.assertNotIn("Classified as family photo", result.classification_reason)
 
     def test_pxl_phone_photo_is_unknown_without_family_evidence(self):
@@ -144,7 +145,7 @@ class MediaClassifierTests(unittest.TestCase):
         )
 
         self.assertEqual(result.media_category, MediaCategory.Unknown)
-        self.assertIn("Family content has not been confirmed", result.classification_reason)
+        self.assertIn("Category not yet confirmed", result.classification_reason)
 
     def test_manual_family_photo_remains_authoritative_on_reclassification(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -255,8 +256,34 @@ class MediaClassifierTests(unittest.TestCase):
                 "date_taken": "2026:07:05 10:11:12",
             },
         )
-        if stronger_result.media_category == MediaCategory.FamilyPhoto:
-            self.assertLessEqual(stronger_result.classification_confidence, 0.85)
+        self.assertNotEqual(stronger_result.media_category, MediaCategory.FamilyPhoto)
+
+    def test_legacy_learned_family_rule_cannot_assign_family_photo(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            photo = self._make_photo(
+                Path(tmpdir),
+                "IMG_20260705_153011.jpg",
+                {"width": 4032, "height": 3024, "date_taken": "2026:07:05"},
+            )
+
+            class LegacyLearningEngine:
+                def apply_learning(self, **_kwargs):
+                    return (
+                        MediaCategory.FamilyPhoto.value,
+                        0.91,
+                        "Legacy learned family rule.",
+                        object(),
+                    )
+
+            with patch(
+                "core.media_classifier.get_category_learning_engine",
+                return_value=LegacyLearningEngine(),
+            ):
+                result = self.classifier.classify_photo(photo)
+
+            self.assertEqual(result.media_category, MediaCategory.Unknown)
+            self.assertEqual(photo.automatic_media_category, MediaCategory.Unknown.value)
+            self.assertIn("semantic similarity evidence", photo.classification_reason)
 
     def test_supported_image_without_strong_signals_is_unknown(self):
         result = self.classifier.classify(
@@ -325,8 +352,8 @@ class MediaClassifierTests(unittest.TestCase):
                 allow_visual_analysis=True,
             )
             self.assertEqual(result.media_category, MediaCategory.Unknown)
-            self.assertIn("family content", result.classification_reason.lower())
-            self.assertIn("not been confirmed", result.classification_reason.lower())
+            self.assertIn("category not yet confirmed", result.classification_reason.lower())
+            self.assertIn("semantic similarity evidence", result.classification_reason.lower())
 
     def test_page_geometry_and_edges_without_document_evidence_remain_unknown(self):
         from core.visual_content_analyzer import VisualContentSignals
