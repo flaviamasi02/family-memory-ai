@@ -544,18 +544,7 @@ class CategorySuggestionService:
         }
 
     def _normalize_category_id(self, value: str) -> str:
-        raw = str(getattr(value, "value", value) or "").strip().lower()
-        if not raw:
-            return ""
-        compact = raw.replace("-", "_").replace(" ", "_")
-        if self.category_registry.has_category(compact):
-            return compact
-        for category in self.category_registry.all_categories():
-            if raw == category.display_name.strip().lower():
-                return category.id
-            if compact == category.display_name.strip().lower().replace(" ", "_"):
-                return category.id
-        return compact
+        return self.category_registry.normalize_category_id(value)
 
     def _photo_identity_key(self, photo_or_path) -> str:
         return canonical_photo_key(photo_or_path)

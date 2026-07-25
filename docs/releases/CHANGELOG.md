@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### MODEL-003D canonical Family Photo category
+
+- Established `family_photo` as the single canonical, album-candidate ID for the user-facing Family Photo category.
+- Added central compatibility normalization for legacy `family_photo_candidate` and display-label variants across the registry, sidecars, learning metadata, Memory Review, and category suggestions without creating a duplicate category.
+- Legacy category configuration can no longer hide or disable the canonical Family Photo category; existing sidecars remain readable and are written back with the canonical ID.
+
 
 ### DOCSYNC DEC-0049 platform strategy propagation
 

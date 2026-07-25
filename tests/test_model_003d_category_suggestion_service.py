@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from core.category_suggestion_service import (
@@ -496,6 +497,41 @@ def test_category_confirmation_fields_persist_in_sidecar(tmp_path):
     assert reloaded.metadata["category_confirmation_source"] == "user"
     assert reloaded.metadata["category_confirmation_category"] == "family_photo"
     assert reloaded.user_corrected_media_category == "family_photo"
+
+
+def test_legacy_family_photo_candidate_sidecar_loads_as_canonical_family_photo(
+    tmp_path,
+):
+    original = photo(tmp_path / "legacy.jpg", "family_photo_candidate", user=True)
+    original.user_decision = "keep"
+    original.metadata.update(
+        {
+            "category_confirmation_state": "manual_confirmed",
+            "category_confirmation_category": "family_photo_candidate",
+            "category_suggestion_state": "accepted",
+            "category_suggestion_applied_category": "family_photo_candidate",
+        }
+    )
+    metadata_service = UserMetadataService()
+    sidecar = metadata_service.save_photo_metadata(original)
+    payload = json.loads(sidecar.read_text(encoding="utf-8"))
+    for key in (
+        "user_corrected_media_category",
+        "effective_media_category",
+        "category_confirmation_category",
+        "category_suggestion_applied_category",
+    ):
+        payload[key] = "family_photo_candidate"
+    sidecar.write_text(json.dumps(payload), encoding="utf-8")
+
+    reloaded = photo(tmp_path / "legacy.jpg")
+    metadata_service.apply_for_photo(reloaded)
+
+    assert reloaded.user_corrected_media_category == "family_photo"
+    assert reloaded.effective_media_category == "family_photo"
+    assert reloaded.media_category == "family_photo"
+    assert reloaded.metadata["category_confirmation_category"] == "family_photo"
+    assert reloaded.metadata["category_suggestion_applied_category"] == "family_photo"
 
 
 def test_three_manual_family_photo_labels_with_display_names_feed_suggestion(tmp_path):

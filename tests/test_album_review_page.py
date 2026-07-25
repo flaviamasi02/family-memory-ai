@@ -340,6 +340,10 @@ class AlbumReviewPageTests(unittest.TestCase):
             page._suggestion_metadata = provider.metadata
             page.set_scored_photos(breakdowns)
             self._flush_ui()
+            self.assertEqual(page.category_selector_values().count("family_photo"), 1)
+            self.assertNotIn(
+                "family_photo_candidate", page.category_selector_values()
+            )
             target = page._all_rows[3].breakdown.photo
             before = page._category_suggestion_service.suggest(
                 target,
@@ -390,60 +394,32 @@ class AlbumReviewPageTests(unittest.TestCase):
                 canonical_photo_key(row.breakdown.photo): row.breakdown.photo
                 for row in page._all_rows
             }
-            manual_details = []
-            for photo in confirmed_photos:
-                metadata = photo.metadata
-                manual_details.append(
-                    {
-                        "filename": photo.filename,
-                        "canonical_key": canonical_photo_key(photo),
-                        "effective_media_category": photo.effective_media_category,
-                        "user_corrected_media_category": (
-                            photo.user_corrected_media_category
-                        ),
-                        "category_confirmation_state": metadata.get(
-                            "category_confirmation_state", ""
-                        ),
-                        "trusted_category": (
-                            page._category_suggestion_service._trusted_category(photo)
-                        ),
-                        "object_id": id(photo),
-                    }
-                )
-            match_details = []
+            self.assertGreaterEqual(len(semantic_matches), 3)
+            self.assertTrue(confirmed_keys.issubset(semantic_match_keys))
+            self.assertNotIn(canonical_photo_key(target), semantic_match_keys)
+            self.assertIn(
+                "family_photo",
+                page._category_suggestion_service._eligible_category_ids(),
+            )
             for match in semantic_matches:
                 match_key = canonical_photo_key(match.photo_key)
                 matched_photo = photos_by_key.get(match_key)
-                metadata = matched_photo.metadata if matched_photo is not None else {}
-                match_details.append(
-                    {
-                        "raw_photo_key": match.photo_key,
-                        "canonical_key": match_key,
-                        "similarity": match.similarity,
-                        "resolved": matched_photo is not None,
-                        "resolved_filename": getattr(matched_photo, "filename", ""),
-                        "resolved_object_id": (
-                            id(matched_photo) if matched_photo is not None else None
+                self.assertIsNotNone(matched_photo)
+                if match_key in confirmed_keys:
+                    self.assertGreaterEqual(
+                        match.similarity,
+                        page._category_suggestion_service.config.minimum_similarity,
+                    )
+                    self.assertIn(
+                        page._category_suggestion_service._trusted_category(
+                            matched_photo
                         ),
-                        "effective_media_category": getattr(
-                            matched_photo, "effective_media_category", ""
-                        ),
-                        "user_corrected_media_category": getattr(
-                            matched_photo, "user_corrected_media_category", ""
-                        ),
-                        "category_confirmation_state": metadata.get(
-                            "category_confirmation_state", ""
-                        ),
-                        "trusted_category": (
-                            page._category_suggestion_service._trusted_category(
-                                matched_photo
-                            )
-                            if matched_photo is not None
-                            else None
-                        ),
-                    }
-                )
-            persisted_rejection = (
+                        {
+                            ("family_photo", "manual_confirmed"),
+                            ("family_photo", "user_correction"),
+                        },
+                    )
+            self.assertFalse(
                 page._category_suggestion_service._has_persisted_rejection(
                     target, "family_photo", provider.metadata.model_key, signature_after
                 )
@@ -457,50 +433,11 @@ class AlbumReviewPageTests(unittest.TestCase):
             supporting_keys = {
                 canonical_photo_key(item.photo_key) for item in after.supporting_photos
             }
-            diagnostic = (
-                f"manual_details={manual_details!r}\n"
-                f"match_details={match_details!r}\n"
-                f"manual_confirmed_photo_keys={sorted(confirmed_keys)!r}\n"
-                f"semantic_match_photo_keys={sorted(semantic_match_keys)!r}\n"
-                f"intersection={sorted(confirmed_keys & semantic_match_keys)!r}\n"
-                f"by_key_keys={sorted(photos_by_key)!r}\n"
-                f"persisted_rejection={persisted_rejection!r}\n"
-                f"eligible_categories={sorted(page._category_suggestion_service._eligible_category_ids())!r}\n"
-                f"result_status={after.status!r}\n"
-                f"result_reasons={after.reasons!r}\n"
-                f"result_evidence_counts={after.evidence_counts!r}\n"
-                f"result_supporting_photos={after.supporting_photos!r}\n"
-                f"result_confidence={after.confidence!r}\n"
-                f"cache_keys={list(page._category_suggestion_service._cache)!r}\n"
-                f"evidence_signature={after.evidence_signature!r}"
-            )
-            self.assertGreaterEqual(len(semantic_matches), 3, diagnostic)
-            self.assertTrue(confirmed_keys.issubset(semantic_match_keys), diagnostic)
-            self.assertNotIn(canonical_photo_key(target), semantic_match_keys, diagnostic)
-            self.assertTrue(all(item["resolved"] for item in match_details), diagnostic)
-            for item in match_details:
-                if item["canonical_key"] in confirmed_keys:
-                    self.assertGreaterEqual(
-                        item["similarity"],
-                        page._category_suggestion_service.config.minimum_similarity,
-                        diagnostic,
-                    )
-                    self.assertIn(
-                        item["trusted_category"],
-                        {
-                            ("family_photo", "manual_confirmed"),
-                            ("family_photo", "user_correction"),
-                        },
-                        diagnostic,
-                    )
-            self.assertFalse(persisted_rejection, diagnostic)
-            self.assertEqual(after.status, "suggested", diagnostic)
-            self.assertEqual(after.suggested_category_id, "family_photo", diagnostic)
-            self.assertGreaterEqual(
-                after.evidence_counts.get("family_photo", 0), 3, diagnostic
-            )
-            self.assertGreaterEqual(len(after.supporting_photos), 3, diagnostic)
-            self.assertTrue(confirmed_keys.issubset(supporting_keys), diagnostic)
+            self.assertEqual(after.status, "suggested")
+            self.assertEqual(after.suggested_category_id, "family_photo")
+            self.assertGreaterEqual(after.evidence_counts.get("family_photo", 0), 3)
+            self.assertGreaterEqual(len(after.supporting_photos), 3)
+            self.assertTrue(confirmed_keys.issubset(supporting_keys))
             self.assertEqual(target.effective_media_category, "unknown")
             for row in page._all_rows[:3]:
                 photo = row.breakdown.photo

@@ -12,6 +12,24 @@ from typing import Optional
 from core.application_data import get_app_data_service, atomic_write_json
 
 
+_CATEGORY_ID_ALIASES = {
+    "family_photo_candidate": "family_photo",
+    "family-photo": "family_photo",
+    "family photo": "family_photo",
+}
+
+
+def normalize_category_id(value) -> str:
+    """Return the canonical persisted ID for a category value or legacy alias."""
+    raw = str(getattr(value, "value", value) or "").strip().lower()
+    if not raw:
+        return ""
+    if raw in _CATEGORY_ID_ALIASES:
+        return _CATEGORY_ID_ALIASES[raw]
+    compact = raw.replace("-", "_").replace(" ", "_")
+    return _CATEGORY_ID_ALIASES.get(compact, compact)
+
+
 @dataclass
 class CategoryDefinition:
     id: str
@@ -50,7 +68,6 @@ _SYSTEM_CATEGORIES: list[tuple[str, str, str, bool, bool]] = [
     ("low_quality", "Low Quality", "Low-quality image candidate.", True, False),
     ("unknown", "Unknown", "Unclassified media.", True, False),
     # Compatibility IDs currently produced/used in cleanup flows.
-    ("family_photo_candidate", "Family photos", "Cleanup family-photo candidate.", True, True),
     ("document_or_scan", "Documents", "Cleanup document/scan category.", True, False),
     ("meme_or_graphic", "Memes", "Cleanup meme/graphic category.", True, False),
     ("low_quality_photo", "Low quality", "Cleanup low-quality category.", True, False),
@@ -76,6 +93,7 @@ class CategoryRegistry:
         self._system_defaults: dict[str, CategoryDefinition] = {}
         self._bootstrap_system_categories()
         self._load_persisted_categories()
+        self._enforce_canonical_categories()
 
     @property
     def storage_path(self) -> Path:
@@ -107,10 +125,20 @@ class CategoryRegistry:
         return bool(item.is_album_candidate) if item is not None else False
 
     def has_category(self, category_id: str) -> bool:
-        return str(category_id or "").strip().lower() in self._categories
+        return normalize_category_id(category_id) in self._categories
 
     def get(self, category_id: str) -> Optional[CategoryDefinition]:
-        return self._categories.get(str(category_id or "").strip().lower())
+        return self._categories.get(normalize_category_id(category_id))
+
+    def normalize_category_id(self, value) -> str:
+        category_id = normalize_category_id(value)
+        if category_id in self._categories:
+            return category_id
+        raw = str(getattr(value, "value", value) or "").strip().lower()
+        for category in self.all_categories():
+            if raw == category.display_name.strip().lower():
+                return category.id
+        return category_id
 
     def label_for(self, category_id: str) -> str:
         item = self.get(category_id)
@@ -197,6 +225,11 @@ class CategoryRegistry:
             item.is_cleanup_category = bool(is_cleanup_category)
         if is_album_candidate is not None:
             item.is_album_candidate = bool(is_album_candidate)
+
+        if item.id == "family_photo":
+            item.display_name = "Family Photo"
+            item.is_cleanup_category = False
+            item.is_album_candidate = True
 
         item.updated_at = _now_iso()
         self._categories[item.id] = item
@@ -317,8 +350,12 @@ class CategoryRegistry:
         for raw in items:
             if not isinstance(raw, dict):
                 continue
-            category_id = str(raw.get("id", "")).strip().lower()
+            raw_category_id = str(raw.get("id", "")).strip().lower()
+            category_id = normalize_category_id(raw_category_id)
             if not category_id:
+                continue
+
+            if raw_category_id == "family_photo_candidate":
                 continue
 
             if category_id in self._system_defaults:
@@ -349,7 +386,10 @@ class CategoryRegistry:
     def _apply_system_override(self, raw: dict) -> None:
         if not isinstance(raw, dict):
             return
-        category_id = str(raw.get("id", "")).strip().lower()
+        raw_category_id = str(raw.get("id", "")).strip().lower()
+        if raw_category_id == "family_photo_candidate":
+            return
+        category_id = normalize_category_id(raw_category_id)
         if not category_id:
             return
         default_item = self._system_defaults.get(category_id)
@@ -373,6 +413,14 @@ class CategoryRegistry:
         )
         current.updated_at = str(raw.get("updated_at", current.updated_at) or current.updated_at)
         self._categories[current.id] = current
+
+    def _enforce_canonical_categories(self) -> None:
+        self._categories.pop("family_photo_candidate", None)
+        family = self._categories.get("family_photo")
+        if family is not None:
+            family.display_name = "Family Photo"
+            family.is_cleanup_category = False
+            family.is_album_candidate = True
 
     def _save_categories(self) -> None:
         self._storage_path.parent.mkdir(parents=True, exist_ok=True)

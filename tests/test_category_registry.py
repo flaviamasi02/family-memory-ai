@@ -2,8 +2,13 @@ import json
 import os
 import tempfile
 import unittest
+from pathlib import Path
 
-from core.category_registry import get_category_registry, reset_category_registry
+from core.category_registry import (
+    get_category_registry,
+    normalize_category_id,
+    reset_category_registry,
+)
 
 
 class CategoryRegistryTests(unittest.TestCase):
@@ -38,6 +43,72 @@ class CategoryRegistryTests(unittest.TestCase):
             self.assertTrue(created.is_album_candidate)
             self.assertFalse(created.is_cleanup_category)
             self.assertTrue(registry.has_category("travel"))
+
+    def test_family_photo_has_one_canonical_album_candidate_definition(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            registry = self._new_registry(tmpdir)
+
+            family_entries = [
+                item
+                for item in registry.all_categories()
+                if normalize_category_id(item.id) == "family_photo"
+            ]
+
+            self.assertEqual(len(family_entries), 1)
+            self.assertEqual(family_entries[0].id, "family_photo")
+            self.assertEqual(family_entries[0].display_name, "Family Photo")
+            self.assertTrue(family_entries[0].is_album_candidate)
+            self.assertNotIn(
+                "family_photo_candidate", [item.id for item in registry.all_categories()]
+            )
+
+    def test_family_photo_aliases_normalize_to_canonical_id(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            registry = self._new_registry(tmpdir)
+
+            for value in (
+                "family_photo_candidate",
+                "Family Photo",
+                "family photo",
+                "family-photo",
+                "family_photo",
+            ):
+                self.assertEqual(registry.normalize_category_id(value), "family_photo")
+                self.assertEqual(registry.get(value).id, "family_photo")
+
+    def test_legacy_overrides_cannot_disable_canonical_family_photo(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            config = root / "categories.json"
+            config.write_text(
+                json.dumps(
+                    {
+                        "system_overrides": [
+                            {
+                                "id": "family_photo",
+                                "display_name": "Old family category",
+                                "is_album_candidate": False,
+                            },
+                            {
+                                "id": "family_photo_candidate",
+                                "display_name": "Family photos",
+                                "is_album_candidate": True,
+                            },
+                        ],
+                        "categories": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            registry = self._new_registry(tmpdir)
+
+            family = registry.get("family_photo")
+            self.assertEqual(family.display_name, "Family Photo")
+            self.assertTrue(family.is_album_candidate)
+            self.assertEqual(
+                [item.id for item in registry.all_categories()].count("family_photo"), 1
+            )
 
     def test_rename_custom_category(self):
         with tempfile.TemporaryDirectory() as tmpdir:

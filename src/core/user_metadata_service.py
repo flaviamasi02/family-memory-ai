@@ -7,7 +7,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+from core.category_registry import normalize_category_id
 from models.visual_feature_profile import VisualFeatureProfile
+
+
+def _normalize_suggestion_feedback_item(item: dict) -> dict:
+    normalized = dict(item)
+    for key in ("suggested_category_id", "category_id"):
+        if normalized.get(key):
+            normalized[key] = normalize_category_id(normalized[key])
+    return normalized
 
 
 @dataclass
@@ -73,13 +82,13 @@ class UserMetadataService:
             return UserMetadataLoadResult(True, False, True, sidecar_path)
 
         metadata = dict(getattr(photo, "metadata", {}) or {})
-        automatic = str(data.get("automatic_media_category", "") or "").strip()
-        user_corrected = str(
-            data.get("user_corrected_media_category", "") or ""
-        ).strip()
-        effective_from_sidecar = str(
-            data.get("effective_media_category", "") or ""
-        ).strip()
+        automatic = normalize_category_id(data.get("automatic_media_category", ""))
+        user_corrected = normalize_category_id(
+            data.get("user_corrected_media_category", "")
+        )
+        effective_from_sidecar = normalize_category_id(
+            data.get("effective_media_category", "")
+        )
         user_decision = str(data.get("user_decision", "") or "").strip()
         classification_reason = str(data.get("classification_reason", "") or "").strip()
         face_count = data.get("face_count", data.get("faces_count", 0))
@@ -94,9 +103,9 @@ class UserMetadataService:
         )
         suggestion_feedback = data.get("category_suggestion_feedback", [])
         suggestion_state = str(data.get("category_suggestion_state", "") or "").strip()
-        suggestion_last_rejected = str(
-            data.get("category_suggestion_last_rejected_category", "") or ""
-        ).strip()
+        suggestion_last_rejected = normalize_category_id(
+            data.get("category_suggestion_last_rejected_category", "")
+        )
         suggestion_last_feedback_at = str(
             data.get("category_suggestion_last_feedback_at", "") or ""
         ).strip()
@@ -106,18 +115,18 @@ class UserMetadataService:
         category_confirmation_source = str(
             data.get("category_confirmation_source", "") or ""
         ).strip()
-        category_confirmation_category = str(
-            data.get("category_confirmation_category", "") or ""
-        ).strip()
+        category_confirmation_category = normalize_category_id(
+            data.get("category_confirmation_category", "")
+        )
         category_confirmation_at = str(
             data.get("category_confirmation_at", "") or ""
         ).strip()
         suggestion_model_key = str(
             data.get("category_suggestion_model_key", "") or ""
         ).strip()
-        suggestion_applied_category = str(
-            data.get("category_suggestion_applied_category", "") or ""
-        ).strip()
+        suggestion_applied_category = normalize_category_id(
+            data.get("category_suggestion_applied_category", "")
+        )
         suggestion_accepted_at = str(
             data.get("category_suggestion_accepted_at", "") or ""
         ).strip()
@@ -162,9 +171,13 @@ class UserMetadataService:
         ):
             metadata["visual_feature_profile"] = visual_profile.to_dict()
         if isinstance(suggestion_feedback, list):
-            metadata["category_suggestion_feedback"] = [
-                item for item in suggestion_feedback if isinstance(item, dict)
-            ]
+            metadata["category_suggestion_feedback"] = []
+            for item in suggestion_feedback:
+                if not isinstance(item, dict):
+                    continue
+                metadata["category_suggestion_feedback"].append(
+                    _normalize_suggestion_feedback_item(item)
+                )
         if suggestion_state:
             metadata["category_suggestion_state"] = suggestion_state
         if suggestion_last_rejected:
@@ -228,26 +241,26 @@ class UserMetadataService:
         stat = path.stat() if path.exists() else None
         metadata = dict(getattr(photo, "metadata", {}) or {})
 
-        automatic = str(
+        automatic = normalize_category_id(
             getattr(photo, "automatic_media_category", "")
             or metadata.get("automatic_media_category", "")
             or getattr(photo, "media_category", "")
             or "unknown"
-        ).strip()
-        user_corrected = str(
+        )
+        user_corrected = normalize_category_id(
             getattr(photo, "user_corrected_media_category", "")
             or metadata.get("user_corrected_media_category", "")
             or metadata.get("cleanup_user_corrected_category", "")
             or ""
-        ).strip()
-        effective = str(
+        )
+        effective = normalize_category_id(
             getattr(photo, "effective_media_category", "")
             or metadata.get("effective_media_category", "")
             or metadata.get("cleanup_effective_category", "")
             or user_corrected
             or automatic
             or "unknown"
-        ).strip()
+        )
         user_decision = str(
             getattr(photo, "user_decision", "")
             or metadata.get("user_decision", "")
@@ -292,16 +305,16 @@ class UserMetadataService:
                 metadata.get("visual_feature_profile")
             ).to_dict(),
             "category_suggestion_feedback": [
-                item
+                _normalize_suggestion_feedback_item(item)
                 for item in metadata.get("category_suggestion_feedback", [])
                 if isinstance(item, dict)
             ],
             "category_suggestion_state": str(
                 metadata.get("category_suggestion_state", "") or ""
             ).strip(),
-            "category_suggestion_last_rejected_category": str(
-                metadata.get("category_suggestion_last_rejected_category", "") or ""
-            ).strip(),
+            "category_suggestion_last_rejected_category": normalize_category_id(
+                metadata.get("category_suggestion_last_rejected_category", "")
+            ),
             "category_suggestion_last_feedback_at": str(
                 metadata.get("category_suggestion_last_feedback_at", "") or ""
             ).strip(),
@@ -311,18 +324,18 @@ class UserMetadataService:
             "category_confirmation_source": str(
                 metadata.get("category_confirmation_source", "") or ""
             ).strip(),
-            "category_confirmation_category": str(
-                metadata.get("category_confirmation_category", "") or ""
-            ).strip(),
+            "category_confirmation_category": normalize_category_id(
+                metadata.get("category_confirmation_category", "")
+            ),
             "category_confirmation_at": str(
                 metadata.get("category_confirmation_at", "") or ""
             ).strip(),
             "category_suggestion_model_key": str(
                 metadata.get("category_suggestion_model_key", "") or ""
             ).strip(),
-            "category_suggestion_applied_category": str(
-                metadata.get("category_suggestion_applied_category", "") or ""
-            ).strip(),
+            "category_suggestion_applied_category": normalize_category_id(
+                metadata.get("category_suggestion_applied_category", "")
+            ),
             "category_suggestion_accepted_at": str(
                 metadata.get("category_suggestion_accepted_at", "") or ""
             ).strip(),
