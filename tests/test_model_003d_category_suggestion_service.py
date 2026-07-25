@@ -7,7 +7,10 @@ from core.category_suggestion_service import (
 from core.category_registry import CategoryRegistry
 from core.user_metadata_service import UserMetadataService
 from types import SimpleNamespace
-from vision.semantic_similarity_service import SemanticSimilarityResult
+from vision.semantic_similarity_service import (
+    SemanticSimilarityResult,
+    canonical_photo_key,
+)
 
 
 class FakeClassifier:
@@ -564,6 +567,9 @@ def test_windows_path_case_and_separator_differences_resolve_trusted_match(tmp_p
 
     assert result.status == "suggested"
     assert result.suggested_category_id == "family_photo"
+    assert canonical_photo_key(r"C:\PHOTOS\CONFIRMED.JPG") == canonical_photo_key(
+        "c:/photos/confirmed.jpg"
+    )
 
 
 def test_debug_diagnostics_report_match_resolution_and_trust(tmp_path, monkeypatch, capsys):

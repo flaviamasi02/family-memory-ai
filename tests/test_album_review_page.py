@@ -346,11 +346,38 @@ class AlbumReviewPageTests(unittest.TestCase):
                 provider.metadata,
             )
             self.assertEqual(before.status, "insufficient_evidence")
+            signature_before = page._category_suggestion_service._evidence_signature(
+                row.breakdown.photo for row in page._all_rows
+            )
 
             applied = page._apply_category_to_rows(
                 page._all_rows[:3], "Family Photo", source="user_bulk"
             )
             self.assertTrue(applied)
+
+            signature_after = page._category_suggestion_service._evidence_signature(
+                row.breakdown.photo for row in page._all_rows
+            )
+            self.assertNotEqual(signature_before, signature_after)
+            for row in page._all_rows[:3]:
+                self.assertIn(
+                    page._category_suggestion_service._trusted_category(
+                        row.breakdown.photo
+                    ),
+                    {
+                        ("family_photo", "user_correction"),
+                        ("family_photo", "manual_confirmed"),
+                    },
+                )
+            semantic_matches = (
+                page._category_suggestion_service.similarity_service.most_similar(
+                    target,
+                    provider.metadata,
+                    candidates=[row.breakdown.photo for row in page._all_rows],
+                    minimum_similarity=page._category_suggestion_service.config.minimum_similarity,
+                )
+            )
+            self.assertGreaterEqual(len(semantic_matches), 3)
 
             after = page._category_suggestion_service.suggest(
                 target,

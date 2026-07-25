@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import hashlib
-import ntpath
 import os
 import sys
 from datetime import datetime, timezone
@@ -12,7 +11,10 @@ from typing import Iterable, Optional
 from core.category_registry import CategoryRegistry, get_category_registry
 from core.user_metadata_service import UserMetadataService
 from vision.embedding_provider import EmbeddingStore, ModelMetadata
-from vision.semantic_similarity_service import SemanticSimilarityService
+from vision.semantic_similarity_service import (
+    SemanticSimilarityService,
+    canonical_photo_key,
+)
 
 
 @dataclass(frozen=True)
@@ -482,12 +484,7 @@ class CategorySuggestionService:
         return compact
 
     def _photo_identity_key(self, photo_or_path) -> str:
-        raw = str(getattr(photo_or_path, "path", photo_or_path) or "").strip()
-        if not raw:
-            return ""
-        if (len(raw) >= 2 and raw[1] == ":") or "\\" in raw:
-            return ntpath.normcase(ntpath.normpath(raw))
-        return os.path.normcase(os.path.realpath(os.path.abspath(raw)))
+        return canonical_photo_key(photo_or_path)
 
     def _raw_category_value(self, photo) -> str:
         metadata = dict(getattr(photo, "metadata", {}) or {})
@@ -596,9 +593,10 @@ class CategorySuggestionService:
         }:
             return
         metadata = dict(getattr(photo, "metadata", {}) or {}) if photo else {}
+        filename = Path(str(photo_key).replace("\\", "/")).name
         print(
             "[CategorySuggestionMatch] "
-            f"filename={ntpath.basename(str(photo_key))} similarity={similarity:.4f} "
+            f"filename={filename} similarity={similarity:.4f} "
             f"resolved={resolved} raw_category={raw_category!r} "
             f"normalized_category={normalized_category!r} "
             f"confirmation_state={metadata.get('category_confirmation_state', '')!r} "
