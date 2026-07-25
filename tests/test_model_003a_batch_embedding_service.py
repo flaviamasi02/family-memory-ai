@@ -33,6 +33,16 @@ class BadProvider(FakeEmbeddingProvider):
         return [EmbeddingRecord(key, fp, mt, sz, self.metadata.provider_id, self.metadata.checkpoint_id, self.metadata.revision, len(self.values), list(self.values), now_iso())]
 
 
+class UnavailableRuntimeProvider(FakeEmbeddingProvider):
+    def __init__(self):
+        super().__init__()
+        self.prepare_calls = 0
+
+    def prepare_batch(self, paths, cancel_event=None):
+        self.prepare_calls += 1
+        raise RuntimeError("Managed MobileCLIP runtime is not Ready: Dependencies missing")
+
+
 def test_new_image_gets_valid_persistent_512_embedding_and_reload_lookup(tmp_path):
     p = image(tmp_path / "a.jpg")
     db = tmp_path / "emb.sqlite3"
@@ -56,6 +66,43 @@ def test_unchanged_cached_image_is_skipped_and_provider_not_recalled(tmp_path):
     result = service.embed_images([p])
     assert result.skipped_cached == 1
     assert provider.embed_call_count == calls
+
+
+def test_cached_embeddings_do_not_require_runtime_initialization(tmp_path):
+    p = image(tmp_path / "cached.jpg")
+    store = EmbeddingStore(tmp_path / "emb.sqlite3")
+    priming_provider = FakeEmbeddingProvider()
+    assert BatchEmbeddingService(priming_provider, store).embed_images([p]).processed_successfully == 1
+    unavailable = UnavailableRuntimeProvider()
+
+    result = BatchEmbeddingService(unavailable, store).embed_images([p])
+
+    assert result.total_images_received == 1
+    assert result.processed_successfully == 0
+    assert result.skipped_cached == 1
+    assert result.failed == 0
+    assert unavailable.prepare_calls == 0
+    assert unavailable.load_count == 0
+    assert unavailable.embed_call_count == 0
+
+
+def test_runtime_validation_failure_preserves_compatible_cached_embeddings(tmp_path):
+    cached = image(tmp_path / "cached.jpg")
+    missing = image(tmp_path / "missing.jpg")
+    store = EmbeddingStore(tmp_path / "emb.sqlite3")
+    assert BatchEmbeddingService(FakeEmbeddingProvider(), store).embed_images(
+        [cached]
+    ).processed_successfully == 1
+    unavailable = UnavailableRuntimeProvider()
+
+    result = BatchEmbeddingService(unavailable, store).embed_images([cached, missing])
+
+    assert result.total_images_received == 2
+    assert result.processed_successfully == 0
+    assert result.skipped_cached == 1
+    assert result.failed == 1
+    assert unavailable.prepare_calls == 1
+    assert "not Ready" in result.outcomes[0].error
 
 
 def test_changed_source_file_and_changed_model_key_regenerate(tmp_path):

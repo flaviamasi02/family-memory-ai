@@ -635,3 +635,5 @@
 - Replaced the easy-to-miss transient embedding completion text with a compact dedicated AI status that remains visible until the next import, treats cached embeddings as successful reuse, distinguishes new/reused counts, and reserves warning/error styling for cancellation or failures.
 
 - Fixed embedding startup/result reporting so every imported photo reaches the batch service (including cache hits), empty runs replace the preparation state with an explicit reason and terminal summary, and stale deleted Qt thread wrappers cannot block subsequent imports.
+
+- Restored cache-first managed-runtime initialization: valid stored embeddings are now counted and reused before MobileCLIP readiness validation, while uncached photos still require the fully validated managed runtime and retain grouped readiness failures when it is genuinely unavailable.

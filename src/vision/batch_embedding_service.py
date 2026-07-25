@@ -82,12 +82,32 @@ class BatchEmbeddingService:
         result = BatchEmbeddingResult(total_images_received=len(paths))
         start = time.perf_counter()
         loaded = False
+        cached_by_path = {
+            path: self.store.get_valid(path, self.provider.metadata)
+            for path in paths
+            if path.suffix.lower() in IMAGE_EXTENSIONS
+        }
+        runtime_paths = [
+            path
+            for path in paths
+            if path.suffix.lower() in IMAGE_EXTENSIONS
+            and cached_by_path.get(path) is None
+        ]
+        unsupported_paths = [
+            path for path in paths if path.suffix.lower() not in IMAGE_EXTENSIONS
+        ]
         try:
             prepare_batch = getattr(self.provider, "prepare_batch", None)
-            if paths and callable(prepare_batch):
-                prepare_batch(paths, cancellation_token)
+            # A valid stored vector needs no provider runtime.  Read cache state
+            # before readiness validation so a temporarily unavailable managed
+            # runtime cannot invalidate otherwise usable embeddings.
+            if runtime_paths and callable(prepare_batch):
+                prepare_batch(runtime_paths, cancellation_token)
         except Exception as exc:
-            result.failed = len(paths)
+            result.skipped_cached = sum(
+                1 for record in cached_by_path.values() if record is not None
+            )
+            result.failed = len(runtime_paths) + len(unsupported_paths)
             result.elapsed_seconds = time.perf_counter() - start
             result.outcomes.append(
                 BatchImageEmbeddingOutcome(
@@ -96,9 +116,28 @@ class BatchEmbeddingService:
                     str(exc),
                     type(exc).__name__,
                     self.provider.metadata.embedding_dimension,
-                    repeat_count=len(paths),
+                    repeat_count=len(runtime_paths),
                 )
             )
+            for path, record in cached_by_path.items():
+                if record is not None:
+                    result.outcomes.append(
+                        BatchImageEmbeddingOutcome(
+                            str(path),
+                            EMBEDDING_STATUS_CACHED,
+                            embedding_dimension=record.embedding_dimension,
+                        )
+                    )
+            for path in unsupported_paths:
+                result.outcomes.append(
+                    BatchImageEmbeddingOutcome(
+                        str(path),
+                        EMBEDDING_STATUS_FAILED,
+                        error=f"Unsupported image extension: {path.suffix.lower()}",
+                        error_type="ValueError",
+                        embedding_dimension=self.provider.metadata.embedding_dimension,
+                    )
+                )
             return result
         for idx, path in enumerate(paths, start=1):
             if cancellation_token and cancellation_token.is_set():
@@ -108,7 +147,7 @@ class BatchEmbeddingService:
             try:
                 if path.suffix.lower() not in IMAGE_EXTENSIONS:
                     raise ValueError(f"Unsupported image extension: {path.suffix.lower()}")
-                cached = self.store.get_valid(path, self.provider.metadata)
+                cached = cached_by_path.get(path)
                 if cached is not None:
                     result.skipped_cached += 1
                     result.outcomes.append(BatchImageEmbeddingOutcome(str(path), EMBEDDING_STATUS_CACHED, embedding_dimension=cached.embedding_dimension))
