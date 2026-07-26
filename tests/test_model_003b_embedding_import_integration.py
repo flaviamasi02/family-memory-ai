@@ -458,9 +458,10 @@ def test_starting_new_import_replaces_ready_status(monkeypatch):
 
     window._queue_or_start_scan("/new-import")
 
-    assert window.ai_status_label.text == (
-        "Indexing semantic embeddings: preparing new import…"
-    )
+    assert window._import_phase == "Preparing"
+    assert window.ai_status_label.text.startswith("Preparing import:")
+    assert "scanning" in window.ai_status_label.text.lower()
+    assert not window.ai_status_label.text.startswith("✓ Semantic embeddings ready:")
 
 
 def test_empty_embedding_run_emits_summary_and_clears_preparing_state(capsys):
@@ -966,6 +967,29 @@ def test_deleted_scan_thread_wrapper_is_not_reused_for_second_scan(monkeypatch):
     assert deleted_thread.quit_called is False
     assert deleted_thread.wait_called is False
 
+    second_thread = window.scan_thread
+    second_thread.finished.emit()
+    assert window.scan_thread is None
+    assert window.scan_worker is None
+
+    window._start_scan("/third")
+    third_thread = window.scan_thread
+    third_worker = window.scan_worker
+    assert third_thread is not second_thread
+    assert len(workers) == 2
+    assert workers[1].folder_path == "/third"
+
+    # A stale/duplicate completion from the second run cannot clear the third.
+    window._on_scan_thread_finished(1, second_thread)
+    assert window.scan_thread is third_thread
+    assert window.scan_worker is third_worker
+
+    third_thread.finished.emit()
+    assert window.scan_thread is None
+    assert window.scan_worker is None
+    assert window._pending_import_folder_path is None
+    assert window._import_phase != "Preparing"
+
 
 def _scan_lifecycle_harness():
     class Harness:
@@ -976,8 +1000,12 @@ def _scan_lifecycle_harness():
     window.scan_worker = None
     window._scan_run_id = 0
     window._active_scan_run_id = 0
+    window._pending_import_folder_path = None
+    window._import_phase = "Idle"
+    window.sender = lambda: None
     window._start_scan = MainWindow._start_scan.__get__(window, Harness)
     window._scan_thread_is_running = MainWindow._scan_thread_is_running.__get__(window, Harness)
+    window._on_active_scan_thread_finished = MainWindow._on_active_scan_thread_finished.__get__(window, Harness)
     window._on_scan_thread_finished = MainWindow._on_scan_thread_finished.__get__(window, Harness)
     window._on_scan_complete = lambda photos: None
     window._on_scan_error = lambda error: None
