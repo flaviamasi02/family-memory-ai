@@ -33,10 +33,11 @@ def test_import_worker_generates_embeddings_skips_unchanged_and_reuses_cache(tmp
 
     worker = EmbeddingWorker([photo(p1), photo(p2)], service_factory=lambda: service)
     completed = []
-    worker.complete.connect(completed.append)
+    worker.complete.connect(lambda _run_id, result: completed.append(result))
     worker.run()
 
     assert completed[-1].processed_successfully == 2
+    assert len(completed) == 1
     assert provider.load_count == 1
     assert provider.embed_call_count == 2
     assert EmbeddingStore(db).get_valid(p1, provider.metadata) is not None
@@ -45,10 +46,11 @@ def test_import_worker_generates_embeddings_skips_unchanged_and_reuses_cache(tmp
     second_service = BatchEmbeddingService(second_provider, EmbeddingStore(db))
     second = EmbeddingWorker([photo(p1), photo(p2)], service_factory=lambda: second_service)
     second_results = []
-    second.complete.connect(second_results.append)
+    second.complete.connect(lambda _run_id, result: second_results.append(result))
     second.run()
 
     assert second_results[-1].total_images_received == 2
+    assert len(second_results) == 1
     assert second_results[-1].skipped_cached == 2
     assert second_provider.embed_call_count == 0
 
@@ -124,7 +126,7 @@ def test_changed_image_is_regenerated_but_unchanged_image_is_skipped(tmp_path):
     image(p1, b"new")
     worker = EmbeddingWorker([photo(p1), photo(p2)], service_factory=lambda: service)
     results = []
-    worker.complete.connect(results.append)
+    worker.complete.connect(lambda _run_id, result: results.append(result))
     worker.run()
 
     result = results[-1]
@@ -144,17 +146,18 @@ def test_embedding_worker_supports_cancellation_and_progress(tmp_path):
     progress = []
     results = []
 
-    def on_progress(item):
+    def on_progress(_run_id, item):
         progress.append(item)
         worker.cancel()
 
     worker.progress.connect(on_progress)
-    worker.complete.connect(results.append)
+    worker.complete.connect(lambda _run_id, result: results.append(result))
     worker.run()
 
     assert len(progress) == 1
     assert progress[0].current_index == 1
     assert results[-1].processed_successfully == 1
+    assert len(results) == 1
     assert results[-1].cancelled == 2
 
 
@@ -189,9 +192,6 @@ def test_main_window_startup_succeeds_and_scan_complete_starts_embedding_indexin
             self.progress = _Signal()
             self.complete = _Signal()
             self.error = _Signal()
-            self.progress_for_run = _Signal()
-            self.complete_for_run = _Signal()
-            self.error_for_run = _Signal()
             self.finished = _Signal()
 
         def moveToThread(self, _thread):
@@ -266,9 +266,6 @@ def test_slow_worker_is_not_abandoned_and_second_import_waits_for_finish(monkeyp
             self.progress = _Signal()
             self.complete = _Signal()
             self.error = _Signal()
-            self.progress_for_run = _Signal()
-            self.complete_for_run = _Signal()
-            self.error_for_run = _Signal()
             self.finished = _Signal()
             self.cancelled = False
             workers.append(self)
@@ -301,6 +298,9 @@ def test_slow_worker_is_not_abandoned_and_second_import_waits_for_finish(monkeyp
     assert first_worker.service_factory is not None
     assert first_worker.service_factory().provider.runtime_manager is window.ai_runtime_manager
 
+    # A real worker emits one terminal result before finished.  This lifecycle
+    # test supplies the same contract without running the service.
+    window._embedding_run_lifecycle[1]["terminal"] = True
     first_worker.finished.emit()
 
     assert len(workers) == 2
@@ -528,6 +528,7 @@ def test_deleted_embedding_thread_wrapper_does_not_block_worker_launch(monkeypat
     window.embedding_thread = DeletedThread()
     window.embedding_worker = object()
     window._active_embedding_run_id = 4
+    window._embedding_run_lifecycle[4] = {"thread_finished": False, "terminal": False}
     monkeypatch.setattr(window, "_launch_embedding_worker", launched.append)
 
     window._start_embedding_indexing(["photo"])
@@ -536,6 +537,7 @@ def test_deleted_embedding_thread_wrapper_does_not_block_worker_launch(monkeypat
     assert window.embedding_thread is None
     assert window.embedding_worker is None
     assert window._active_embedding_run_id == 0
+    assert window._embedding_run_lifecycle == {}
 
 
 def test_close_event_waits_for_running_embedding_thread_before_destroying(monkeypatch):

@@ -481,6 +481,7 @@ class MainWindow(QMainWindow):
         try:
             return bool(thread.isRunning())
         except RuntimeError:
+            self._embedding_run_lifecycle.pop(self._active_embedding_run_id, None)
             self.embedding_thread = None
             self.embedding_worker = None
             self._active_embedding_run_id = 0
@@ -511,9 +512,9 @@ class MainWindow(QMainWindow):
         # latter may execute Python UI work on the worker thread on some PySide6
         # builds, which made a cache-fast second import especially crash-prone.
         self._embedding_run_lifecycle[run_id] = {"thread_finished": False, "terminal": False}
-        worker.progress_for_run.connect(self._on_embedding_progress_for_run, Qt.ConnectionType.QueuedConnection)
-        worker.complete_for_run.connect(self._on_embedding_complete_for_run, Qt.ConnectionType.QueuedConnection)
-        worker.error_for_run.connect(self._on_embedding_error_for_run, Qt.ConnectionType.QueuedConnection)
+        worker.progress.connect(self._on_embedding_progress_for_run, Qt.ConnectionType.QueuedConnection)
+        worker.complete.connect(self._on_embedding_complete_for_run, Qt.ConnectionType.QueuedConnection)
+        worker.error.connect(self._on_embedding_error_for_run, Qt.ConnectionType.QueuedConnection)
         worker.finished.connect(worker.deleteLater)
         worker.finished.connect(thread.quit, Qt.ConnectionType.DirectConnection)
         thread.finished.connect(self._on_active_embedding_thread_finished, Qt.ConnectionType.QueuedConnection)
