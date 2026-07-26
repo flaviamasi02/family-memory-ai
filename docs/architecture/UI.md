@@ -228,7 +228,14 @@ MODEL-002E fixed a layout sizing issue where metadata labels contained text but 
 
 Memory Review includes a compact “AI Suggestion” section in the existing right-side details panel. Suggestions load lazily after selection so the grid selection path remains responsive. The section displays either a safe no-suggestion status or one advisory category suggestion with confidence, explanation, and supporting evidence count. “Apply suggestion” is an explicit user action that routes through the existing category-correction workflow; “Reject / Not useful” records persistent sidecar rejection feedback and leaves the category unchanged. No new top-level tab or normal-use modal is introduced.
 
-The details panel labels the effective value as Current category and separately identifies its source as Unconfirmed, Deterministic classification, Manual correction, or Accepted AI suggestion. The deterministic explanation is labeled Initial technical reason, while semantic confidence and supporting evidence remain confined to the AI Suggestion section.
+The selected-photo workspace labels the effective value as Current category and separately identifies its source as Unconfirmed, Deterministic classification, Manual correction, or Accepted AI suggestion. A user-oriented Classification Summary explains the current state; import-time reasoning remains secondary in collapsed Technical details, while semantic confidence and supporting evidence remain confined to the AI Suggestion section.
 
 
 Memory Review listens for background embedding-index completion through MainWindow. On completion, the indexing banner is replaced with a completed/failed/cancelled status and the selected photo suggestion is invalidated/recomputed so stored embeddings become visible immediately.
+
+
+## Memory Review workspace (UX-001)
+
+Memory Review uses a compact two-row toolbar followed by a non-collapsible horizontal `QSplitter`. The initial grid and selected-photo workspace share the available width approximately equally and retain independent vertical scrolling. Minimum panel widths protect common desktop layouts while stretch factors support Full HD and larger windows.
+
+The selected-photo workspace presents Preview, Current Status, AI Suggestion, Classification Summary, Photo Information, and Actions in that order. Import diagnostics and score explanations remain available under collapsed Technical details. The UI structure does not modify category classification, semantic suggestion, confidence, persistence, sidecar, review-decision, or embedding-cache behavior.

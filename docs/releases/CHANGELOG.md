@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### UX-001 — Memory Review UI redesign
+
+- Redesigned Memory Review around a compact grouped toolbar and an approximately balanced, resizable grid/workspace split.
+- Replaced the dense sidebar with Preview, Current Status, AI Suggestion, Classification Summary, Photo Information, Actions, and collapsed Technical details sections.
+- Improved palette-aware card selection and badge styling, clarified bulk-action scope, and updated contextual help.
+- Preserved MODEL-003D suggestion states, persistence, semantic evidence, classification outcomes, thumbnail virtualization, filters, and all existing review actions; this is a UI-only restructuring and still requires Product Owner manual approval before merge.
+
 ### MODEL-003D canonical Family Photo category
 
 - Established `family_photo` as the single canonical, album-candidate ID for the user-facing Family Photo category.

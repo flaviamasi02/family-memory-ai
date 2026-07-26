@@ -251,10 +251,12 @@ def test_memory_review_ui_entry_point_is_existing_panel_not_new_tab():
     assert "AI Suggestion" in ui
     assert "Apply suggestion" in ui
     assert "Reject / Not useful" in ui
-    assert 'details_form.addRow("Current category:"' in ui
-    assert 'details_form.addRow("Category source:"' in ui
+    assert 'status_form.addRow("Current category:"' in ui
+    assert 'status_form.addRow("Source:"' in ui
     assert "Accepted AI suggestion" in ui
-    assert "Initial technical reason:" in ui
+    assert 'QGroupBox("Classification Summary")' in ui
+    assert 'QGroupBox("Technical details")' in ui
+    assert "Initial technical reason:" not in ui
     assert "_apply_category_to_rows" in ui and "result.suggested_category_id" in ui
     assert ui.count("addTab") == 0
     assert main.count("Memory Review") >= 1

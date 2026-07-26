@@ -133,6 +133,60 @@ class AlbumReviewPageTests(unittest.TestCase):
         saved = pixmap.save(str(path), "JPG")
         self.assertTrue(saved)
 
+    def test_redesigned_split_workspace_is_responsive_and_keeps_core_actions(self):
+        page = AlbumReviewPage()
+        self.assertFalse(page.main_splitter.childrenCollapsible())
+        self.assertEqual(page.main_splitter.count(), 2)
+        self.assertGreaterEqual(page.main_splitter.widget(0).minimumWidth(), 400)
+        self.assertGreaterEqual(page.main_splitter.widget(1).minimumWidth(), 400)
+        self.assertEqual(page.current_status_section.title(), "Current Status")
+        self.assertEqual(page.ai_suggestion_section.title(), "AI Suggestion")
+        self.assertEqual(page.classification_summary_section.title(), "Classification Summary")
+        self.assertEqual(page.photo_information_section.title(), "Photo Information")
+        self.assertEqual(page.actions_section.title(), "Actions")
+        self.assertEqual(page.apply_category_button.text(), "Apply Category to Selected")
+        self.assertGreaterEqual(page.classification_summary_value.minimumHeight(), 30)
+        self.assertGreaterEqual(page.ai_suggestion_value.minimumHeight(), 30)
+
+        for width, height in ((1366, 768), (1920, 1080), (2560, 1440)):
+            page.resize(width, height)
+            page.show()
+            self._flush_ui()
+            sizes = page.main_splitter.sizes()
+            self.assertEqual(len(sizes), 2)
+            self.assertTrue(all(size >= 400 for size in sizes))
+            self.assertGreater(page.media_category_value.height(), 0)
+            self.assertGreater(page.user_decision_value.height(), 0)
+            self.assertGreater(page.apply_category_button.height(), 0)
+
+    def test_classification_summary_describes_current_manual_and_unknown_states(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            manual = self._make_breakdown(
+                root, "manual.jpg", 80, 70, 60, 50, "2024:01:01 00:00:00",
+                metadata={
+                    "user_corrected_media_category": "document",
+                    "effective_media_category": "document",
+                    "media_category": "document",
+                },
+            )
+            unknown = self._make_breakdown(
+                root, "unknown.jpg", 70, 60, 50, 40, "2024:01:02 00:00:00",
+                metadata={
+                    "automatic_media_category": "unknown",
+                    "effective_media_category": "unknown",
+                    "media_category": "unknown",
+                },
+            )
+            page = AlbumReviewPage()
+            page.set_scored_photos([manual, unknown])
+            self._flush_ui()
+            self.assertTrue(page.select_photo_by_filename("manual.jpg"))
+            self.assertEqual(page.classification_summary_value.text(), "This category was selected manually.")
+            self.assertTrue(page.select_photo_by_filename("unknown.jpg"))
+            self.assertIn("No category has been confirmed yet", page.classification_summary_value.text())
+            self.assertEqual(page.category_source_value.text(), "Unconfirmed")
+
     def test_sorting_modes(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

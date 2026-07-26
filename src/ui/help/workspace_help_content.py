@@ -135,15 +135,15 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                     why_this_workspace_exists="Memory Review is the core workspace for teaching which moments should contribute to family memories and future album quality.",
                     problem_it_solves="Raw imported photos contain noise, ambiguity, and mixed quality that must be resolved through guided category correction.",
                     ai_automation="The system pre-scores candidates, predicts categories, keeps explainable reasoning visible, and can use locally stored visual/content signals when those profiles are available.",
-                    user_interaction="Correct Media Category values in small batches; review advisory AI suggestions when stored-vector evidence is available; every accepted correction is captured immediately and teaches from local visual content when evidence is available; missing visual analysis may finish in the background.",
+                    user_interaction="Select one or more photos in the grid. Use Current Status for the confirmed category, source, and decision; AI Suggestion for advisory evidence; Classification Summary for a plain-language explanation; Photo Information for secondary metadata; and Actions to apply a category to the stated selection count.",
                     expected_outcome="A cleaner, higher-confidence reviewed set that teaches future classification and recommendation behavior without mixing in album-decision editing.",
                 ),
                 _workflow_section(
                     [
-                        "Review AI Suggested Priority",
-                        "Confirm or Correct Category",
-                        "Validate Explanations and Confidence",
-                        "Feed Learning Signals from Corrections",
+                        "Filter and Select Photos in the Grid",
+                        "Read Current Status and Classification Summary",
+                        "Apply or Reject an AI Suggestion",
+                        "Confirm or Correct Category for the Current Selection",
                         "Open Learning Summary to Review Timestamped Learning History",
                         "Improve Future Ranking Quality",
                     ]
@@ -151,7 +151,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                 _best_practices_section(
                     [
                         "Review visually similar photos together to keep decisions consistent.",
-                        "Use multi-selection for repeated patterns instead of editing one by one.",
+                        "Use Ctrl/Shift selection or Select all visible for repeated patterns, then verify the selection count in Actions before applying a category.",
                         "Correct category mistakes immediately when confidence is low.",
                         "Use Learning Summary to distinguish activity counts, visual category learning, and preference signals; filenames and metadata are only secondary evidence.",
                         "Do focused sessions of 15 to 30 minutes to reduce fatigue.",
@@ -162,11 +162,11 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                     [
                         WorkspaceHelpTip(
                             title="Tip of the Day",
-                            body="Reviewing only 20 photos with corrections can materially improve future AI categorization.",
+                            body="Current Status shows what is active now. AI Suggestion is advisory; Classification Summary explains the current category, while Photo Information keeps scores and dates secondary.",
                         ),
                         WorkspaceHelpTip(
                             title="Learning Tip",
-                            body="Learning Summary shows stored event dates, visual characteristics learned from corrected images, pending background analyses, and conservative Unknown behavior when evidence is insufficient. The compact workspace introduction panel at the top can be collapsed after orientation.",
+                            body="For bulk work, select photos in the grid and check the exact count beside the category action. Apply Category to Selected uses the same persisted learning workflow for one photo or many. Technical import details remain available in the collapsed Technical details section.",
                         ),
                     ]
                 ),
