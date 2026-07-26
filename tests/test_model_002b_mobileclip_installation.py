@@ -127,7 +127,29 @@ def test_settings_completion_refreshes_shared_ready_state(tmp_path):
     page.deleteLater()
 
 
-def test_settings_completion_displays_verification_failure(tmp_path):
+def test_settings_completion_displays_checkpoint_missing(tmp_path):
+    try:
+        from PySide6.QtWidgets import QApplication
+    except ImportError as exc:
+        pytest.skip(f'PySide6 unavailable in this environment: {exc}')
+    from ui.settings_page import SettingsPage
+
+    app=QApplication.instance() or QApplication([])
+    manager=create_default_runtime_manager(ApplicationDataPathService(tmp_path,tmp_path))
+    record=manager.installation_record('mobileclip'); record.interpreter_path=sys.executable
+    record.installation_state=AIRuntimeState.CHECKPOINT_MISSING.value; record.last_validation_result='Checkpoint Missing - missing model files: mobileclip_s0.pt'; record.last_error=record.last_validation_result
+    manager.storage.save_installation(record)
+    page=SettingsPage(runtime_manager=manager)
+
+    page._on_ai_runtime_completed('verify', CommandResult('verify_provider',1,'','Checkpoint Missing - missing model files: mobileclip_s0.pt',0.1))
+
+    assert page.ai_detail_labels['Status'].text() == AIRuntimeState.CHECKPOINT_MISSING.value
+    assert page.runtime_step_label.text() == 'Current step: verification failed'
+    assert 'Checkpoint Missing' in page.ai_plan_box.toPlainText()
+    page.deleteLater()
+
+
+def test_settings_completion_displays_generic_verification_failure(tmp_path):
     try:
         from PySide6.QtWidgets import QApplication
     except ImportError as exc:
@@ -139,6 +161,7 @@ def test_settings_completion_displays_verification_failure(tmp_path):
     record=manager.installation_record('mobileclip'); record.interpreter_path=sys.executable
     record.installation_state=AIRuntimeState.FAILED.value; record.last_validation_result='provider verification failed'; record.last_error='model load failed'
     manager.storage.save_installation(record)
+    (Path(record.local_model_cache_path)/'mobileclip_s0.pt').write_bytes(b'checkpoint')
     page=SettingsPage(runtime_manager=manager)
 
     page._on_ai_runtime_completed('verify', CommandResult('verify_provider',1,'','model load failed',0.1))
