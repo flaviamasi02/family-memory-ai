@@ -117,3 +117,12 @@ The service returns a typed result with source identity, status, suggested categ
 Current performance is an exact stored-vector scan through the semantic similarity service: O(n*d) for n current valid embeddings and d embedding dimensions. Results are cached by source/model/evidence signature and invalidated after category changes or feedback. Rejected suggestions are persisted through the existing photo sidecar metadata so the same category is not immediately resurfaced for unchanged evidence; future ANN indexing can be added behind the similarity service boundary.
 
 The deterministic media classifier distinguishes technical file recognition from semantic family classification. Supported image format, EXIF/camera metadata, camera-style filenames, GPS, faces, and photo-like geometry leave the content category as Unknown. Only MODEL-003D semantic similarity may propose Family Photo; assignment still requires an explicit user Apply action. Existing manual/accepted sidecar categories remain authoritative during reclassification, and legacy deterministic or learned Family Photo rules are ignored.
+
+## Face recognition foundation (MODEL-004A)
+
+- `faces.models`: UI- and AI-library-independent Face, Person, FaceCluster, geometry, landmark, and versioned embedding records.
+- `faces.repositories`: portable loading, saving, update, query, deletion, and cache-invalidation protocols.
+- `faces.persistence.SQLiteFaceRepository`: application-data SQLite implementation with stable IDs, foreign keys, source validity, model-keyed embedding cache, and incremental upserts.
+- `faces.services`: detection, embedding, clustering, and person-management contracts; inert placeholders; and repository-backed manual identity assignment.
+
+No MODEL-004A component is wired into PySide6 or an import pipeline, so application behavior and user experience remain unchanged. See `docs/architecture/FACE_RECOGNITION.md`.

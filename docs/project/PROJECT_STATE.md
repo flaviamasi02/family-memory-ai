@@ -1,5 +1,11 @@
 # Family Memory AI - Project State
 
+## MODEL-004A — Face Recognition Foundation
+
+MODEL-004A is implemented and awaiting Product Owner manual validation. The project now has platform-neutral Face, Person, FaceCluster, and versioned FaceEmbedding domain records; detection, embedding, clustering, and person-management contracts; inert no-AI placeholders; repository-backed manual identity operations; and portable SQLite persistence with stable IDs, source-fingerprint validity, incremental updates, and embedding invalidation.
+
+This milestone is architecture only. It is not connected to import, workers, classification, Memory Review, or PySide6; it performs no new face detection or recognition and makes no visible UX change. InsightFace, DeepFace, and face-recognition libraries were not introduced. Next face milestones remain MODEL-004B through MODEL-004F after validation.
+
 ## Current Application State — after UX-001 Memory Review redesign
 
 UX-001 is complete and merged in PR #37. Memory Review now uses a compact grouped toolbar and a balanced, resizable split between the responsive thumbnail grid and the selected-photo workspace. Preview and Current Status share a horizontal first row, followed by AI Suggestion, Classification Summary, and selection-aware Actions. Photo Information and Technical Details are collapsed secondary sections, so the primary workflow requires no vertical scrolling during normal maximized desktop use.
@@ -18,7 +24,7 @@ The redesign changed presentation only. MODEL-003D remains advisory and explaina
 - The current Windows desktop application includes the redesigned Memory Review workspace, staged/asynchronous import preparation, persistent embeddings, advisory category suggestions, category correction and learning signals, Cleanup Review, Album Draft, and the existing local-first workflows.
 - Production automatic category replacement remains intentionally unimplemented; semantic suggestions require explicit user action.
 - DEC-0049 remains active: Windows desktop is the current implementation target and reusable domain logic stays mobile-ready.
-- Next recommended milestone: **UX-002 — Visual Language & Badges**, followed by **UX-003 — Memory Review Workspace Polish**.
+- Next recommended UI milestone remains **UX-002 — Visual Language & Badges**, followed by **UX-003 — Memory Review Workspace Polish**. The face-recognition sequence can continue with **MODEL-004B — Face Detection** after MODEL-004A validation.
 
 ## Last Updated
 

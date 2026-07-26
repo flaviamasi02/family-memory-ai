@@ -736,3 +736,15 @@ Approved through the completed and merged UX-001 Memory Review Redesign:
 
 **Impacted milestones:**
 UX-001 Memory Review Redesign, UX-002, and UX-003.
+
+### DEC-0051
+MODEL-004 Face Recognition Uses Stable Domain Identity and Versioned Evidence
+
+**Value:** Both
+**Impact:** High
+
+Approved by the MODEL-004A architecture specification. Face, Person, and FaceCluster are stable, platform-neutral domain identities. Bounding boxes, landmarks, confidence, quality, and provider provenance use portable values rather than AI-library objects. Face embeddings are versioned cache evidence separate from Face identity, permitting re-embedding, retraining, clustering changes, and profile learning without replacing manual names or assignments. Persistence lives in application data behind repository contracts and supports incremental upserts and explicit schema migration. PySide6, model installation, AI providers, and Memory Review presentation remain outside the domain and persistence layers.
+
+MODEL-004A supplies contracts and inert placeholders only. It must not be described as face detection or recognition, and introduces no InsightFace, DeepFace, or face-recognition dependency.
+
+Canonical detail: `docs/architecture/FACE_RECOGNITION.md`.

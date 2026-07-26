@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### MODEL-004A — Face Recognition Foundation
+
+- Established stable, platform-neutral Face, Person, FaceCluster, bounding-box, landmark, quality, and versioned FaceEmbedding records.
+- Added detection, embedding, clustering, person-management, and repository contracts with intentionally inert AI placeholders.
+- Added portable application-data SQLite storage for multiple faces per image, incremental upserts, manual assignments, cluster membership, source-valid embedding cache, invalidation, and relationship cleanup.
+- Added MODEL-004A unit tests and architecture/decision documentation. No detection algorithm, optional face library, import integration, Memory Review integration, PySide6 dependency, or visible behavior was added.
+
 ### UX-001 — Memory Review UI redesign
 
 - Redesigned Memory Review around a compact grouped toolbar and an approximately balanced, resizable grid/workspace split.

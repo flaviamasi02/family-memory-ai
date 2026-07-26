@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### MODEL-004A — Face Recognition Foundation
+
+- Added platform-neutral Face, Person, FaceCluster, geometry, landmark, quality, and versioned FaceEmbedding domain records with stable IDs and JSON-safe serialization.
+- Added service and repository contracts for future detection, embeddings, clustering, person management, querying, incremental updates, and cache invalidation.
+- Added application-data SQLite persistence supporting multiple faces per image, relationship cleanup, source-fingerprint validity, and multiple model versions.
+- Added inert placeholders only: no new face detection, recognition, AI dependency, UI integration, or user-experience change.
+- Added unit coverage and documented DEC-0051 plus the MODEL-004A architecture and future milestone boundaries.
+
 ### UX-001 — Memory Review UI redesign
 
 - Redesigned Memory Review around a compact grouped toolbar and an approximately balanced, resizable grid/workspace split.
