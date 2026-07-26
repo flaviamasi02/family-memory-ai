@@ -46,4 +46,4 @@ python scripts/embed_folder.py <folder> --limit 20
 python scripts/similar_images.py <source-image> <folder> --limit 10
 ```
 
-Current limits: production automatic category classification is not implemented, semantic similarity is not exposed in the production UI, and similar-photo UI, near-duplicate assistance, clustering, automatic category suggestions, and learning from corrections remain future Product Owner-prioritized work.
+Current limits: production automatic category replacement is not implemented. MODEL-003D exposes advisory semantic category suggestions in Memory Review, while similar-photo UI, near-duplicate assistance, clustering, and semantic search remain future Product Owner-prioritized work. UX-002 Visual Language & Badges is the next recommended milestone.

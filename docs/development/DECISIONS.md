@@ -710,3 +710,29 @@ Canonical detailed strategy: `docs/architecture/PLATFORM_STRATEGY.md`.
 
 **Impacted Sprints:**
 All future implementation, architecture, planning, and documentation cycles.
+
+### DEC-0050
+Memory Review Workspace Presentation
+
+**Value:** Product
+**Impact:** Medium
+
+Approved through the completed and merged UX-001 Memory Review Redesign:
+
+- Memory Review uses a compact grouped toolbar above a balanced, resizable grid/workspace split.
+- Preview and Current Status form one horizontal row; the preview receives the larger share while preserving image aspect ratio and orientation without cropping.
+- The primary workspace hierarchy is Preview + Current Status, AI Suggestion, Classification Summary, and Actions.
+- Photo Information and Technical Details are secondary, collapsed-by-default sections.
+- The primary workflow must fit without vertical scrolling during normal maximized desktop use; detailed information remains available on demand.
+- AI Suggestion explanations use adaptive word wrapping rather than nested scrolling.
+- Styling uses the application palette and clear hierarchy. A richer project-wide colour/icon badge language is deliberately deferred to UX-002.
+- The redesign must preserve MODEL-003D semantics and all existing classification, suggestion, persistence, sidecar, embedding, selection, filter, thumbnail, and action behavior.
+
+**Impacted documents:**
+- docs/architecture/UI.md
+- docs/project/PROJECT_STATE.md
+- docs/project/DOMAIN_ROADMAP.md
+- docs/releases/CHANGELOG.md
+
+**Impacted milestones:**
+UX-001 Memory Review Redesign, UX-002, and UX-003.

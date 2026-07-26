@@ -210,4 +210,12 @@ Runtime boundary: start the main PySide6 application from the normal project `.v
 
 Validation handover: verify MobileCLIP through Settings -> AI Models, import an image folder, wait for the `[EmbeddingIndex]` summary, then run `python scripts\similar_images.py <source-image> <folder> --limit 10` against a source image that has already been embedded. Detailed observed evidence is kept in `docs/project/PROJECT_STATE.md` so this handover remains concise.
 
-Current limits: production automatic category classification is not implemented; semantic similarity is available only through the developer diagnostic script, not the production UI; near-duplicate workflow, clustering, similar-photo UI, automatic category suggestions, semantic search UI, and learning from corrections remain future work. The next product milestone requires Product Owner selection among these possible consumers of semantic embeddings.
+Historical MODEL-003C limit at that handover: production automatic category replacement was not implemented and semantic similarity had only a developer diagnostic. MODEL-003D subsequently added advisory semantic category suggestions to Memory Review; near-duplicate workflow, clustering, similar-photo UI, and semantic search UI remain future work.
+
+## Current handover update — after UX-001 Memory Review Redesign
+
+As of 2026-07-26, UX-001 is complete and merged in PR #37. Memory Review's current baseline is the compact grouped toolbar, balanced resizable grid/workspace split, horizontal Preview + Current Status row, AI Suggestion, Classification Summary, Actions, and collapsed Photo Information and Technical Details. Normal maximized desktop use keeps the primary flow visible without vertical scrolling.
+
+MODEL-003D is now available in Memory Review as an advisory category-suggestion workflow. Applying a suggestion remains explicit, rejection does not change the category, and manual categories remain authoritative. Production automatic category replacement remains out of scope.
+
+Next recommended milestone: UX-002 Visual Language & Badges. UX-003 Memory Review Workspace Polish follows it in the official domain roadmap.

@@ -72,8 +72,11 @@ Recently completed domain milestones relevant to Learning readiness:
 - CLEAN-002 Improved deterministic initial media classification
 - CLEAN-003 Cleanup Review UX & Explainability
 - PERF-004 Staged loading and responsive import with deferred secondary workspaces
-- UX-001 Reusable WorkspaceInfoPanel with collapsible per-workspace persistence
+- UX-001 Reusable WorkspaceInfoPanel with collapsible per-workspace persistence (historical milestone; completed)
 - MEM-REVIEW-FIX Asynchronous Memory Review synchronization and root-cause-first loading fix
+- UX-001 Memory Review Redesign (completed and merged; identifier reused in the later redesign specification)
+
+Current UX backlog is maintained in `docs/project/DOMAIN_ROADMAP.md`: UX-002 Visual Language & Badges is the next recommended milestone, followed by UX-003 Memory Review Workspace Polish.
 
 ### Phase 3 - Memory Intelligence
 

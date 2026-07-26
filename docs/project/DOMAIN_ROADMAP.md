@@ -93,6 +93,17 @@ Example milestones:
 - MEM-004 Compact Memory Review thumbnail grid (completed)
 - MEM-005 True multi-column Memory Review grid (completed)
 - MEM-006 Memory Review UX polishing and keyboard workflow improvements
+- UX-001 Memory Review Redesign (completed and merged)
+- UX-002 Visual Language & Badges (backlog; next recommended milestone)
+  - colour-coded, user-friendly score badge replacing the compact “S 68” label
+  - category colours and decision colours
+  - icons for category and decision badges
+  - consistent badge sizing and a project-wide visual language
+- UX-003 Memory Review Workspace Polish (backlog)
+  - slightly larger preview
+  - approximately 75/25 Preview-to-Current-Status ratio
+  - additional spacing refinements
+  - AI Suggestion micro-layout improvements
 - MEM-010 Learning Transparency and Learning Inspector
 
 MEM-010 direction:
