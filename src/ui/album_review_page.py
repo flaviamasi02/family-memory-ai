@@ -454,6 +454,7 @@ class AlbumReviewPage(QWidget):
         self.apply_decision_button = QPushButton("Apply Decision to Selected")
         self.apply_decision_button.clicked.connect(self._apply_selector_decision)
         self.apply_category_button = QPushButton("Apply Category to Selected")
+        self.apply_category_button.setDefault(True)
         self.apply_category_button.clicked.connect(self._apply_selector_category)
         self.action_scope_label = QLabel(
             "Select one or more photos to apply a category."
@@ -473,9 +474,21 @@ class AlbumReviewPage(QWidget):
         status_form = QFormLayout(self.current_status_section)
         status_form.setContentsMargins(5, 3, 5, 4)
         status_form.setVerticalSpacing(1)
-        status_form.addRow("Current category:", self.media_category_value)
-        status_form.addRow("Source:", self.category_source_value)
-        status_form.addRow("Decision:", self.user_decision_value)
+        self.current_category_label = QLabel("Current category")
+        self.category_source_label = QLabel("Source")
+        self.user_decision_label = QLabel("Decision")
+        for label in (
+            self.current_category_label,
+            self.category_source_label,
+            self.user_decision_label,
+        ):
+            label.setStyleSheet("font-size: 11px;")
+        self.media_category_value.setStyleSheet("font-size: 16px; font-weight: 700;")
+        self.category_source_value.setStyleSheet("font-weight: 600;")
+        self.user_decision_value.setStyleSheet("font-weight: 600;")
+        status_form.addRow(self.current_category_label, self.media_category_value)
+        status_form.addRow(self.category_source_label, self.category_source_value)
+        status_form.addRow(self.user_decision_label, self.user_decision_value)
 
         self.ai_suggestion_section = QGroupBox("AI Suggestion")
         suggestion_layout = QVBoxLayout(self.ai_suggestion_section)
@@ -535,7 +548,11 @@ class AlbumReviewPage(QWidget):
         actions_layout.setSpacing(2)
         actions_layout.addWidget(self.action_scope_label)
         category_actions = QHBoxLayout()
-        category_actions.addWidget(QLabel("Category:"))
+        category_actions.setSpacing(4)
+        category_action_label = QLabel("Category")
+        category_action_label.setStyleSheet("font-size: 11px;")
+        category_actions.addWidget(category_action_label)
+        self.category_selector.setMinimumWidth(180)
         category_actions.addWidget(self.category_selector, 1)
         category_actions.addWidget(self.apply_category_button)
         actions_layout.addLayout(category_actions)
@@ -570,6 +587,7 @@ class AlbumReviewPage(QWidget):
         )
         self.details_scroll.setWidget(details_content)
         self.details_scroll.setMinimumWidth(430)
+        self.details_scroll.viewport().installEventFilter(self)
 
         grid_panel = QWidget()
         grid_panel.setMinimumWidth(430)
@@ -1082,6 +1100,14 @@ class AlbumReviewPage(QWidget):
             new_columns = self._calculate_columns()
             if new_columns != self._grid_columns:
                 self._relayout_existing_cards(new_columns)
+
+        details_scroll = getattr(self, "details_scroll", None)
+        if (
+            details_scroll is not None
+            and watched is details_scroll.viewport()
+            and event.type() == QEvent.Type.Resize
+        ):
+            self._refresh_selected_preview()
         return super().eventFilter(watched, event)
 
     def _relayout_existing_cards(self, new_columns: int) -> None:
@@ -1424,14 +1450,21 @@ class AlbumReviewPage(QWidget):
         if result.status == "suggested":
             support_count = result.evidence_counts.get(result.suggested_category_id, 0)
             self.ai_suggestion_value.setText(
-                f"<b>Suggested category:</b> {escape(result.suggested_category_name)}<br>"
-                f"<b>Confidence:</b> {int(round(result.confidence * 100))}%<br>"
-                f"<b>Supporting evidence:</b> {support_count} confirmed similar photos"
+                "<span style='font-size: 11px'>Suggested category</span><br>"
+                f"<span style='font-size: 16px; font-weight: 700'>{escape(result.suggested_category_name)}</span><br>"
+                "<span style='font-size: 11px'>Confidence</span> "
+                f"<b>{int(round(result.confidence * 100))}%</b>&nbsp;&nbsp;"
+                "<span style='font-size: 11px'>Supporting evidence</span> "
+                f"<b>{support_count} confirmed similar photos</b>"
             )
-            explanation = "\n".join(
-                str(reason).strip() for reason in result.reasons if str(reason).strip()
+            explanation = "<br>".join(
+                escape(str(reason).strip())
+                for reason in result.reasons
+                if str(reason).strip()
             )
-            self.ai_suggestion_reasons.setText(f"Explanation:\n{explanation}")
+            self.ai_suggestion_reasons.setText(
+                "<span style='font-size: 11px'>Explanation</span><br>" + explanation
+            )
             self.apply_suggestion_button.setEnabled(True)
             self.reject_suggestion_button.setEnabled(True)
         elif result.status == "already_accepted":
@@ -2064,8 +2097,11 @@ class AlbumReviewPage(QWidget):
             if not cache_key.startswith(f"{key}|")
         }
 
-        preview_cache_key = self._thumbnail_cache_key(key, QSize(280, 160))
-        self._preview_cache.pop(preview_cache_key, None)
+        self._preview_cache = {
+            cache_key: value
+            for cache_key, value in self._preview_cache.items()
+            if not cache_key.startswith(f"{key}|")
+        }
 
         for row in self._all_rows:
             if self._row_key(row) != key:
@@ -2078,12 +2114,29 @@ class AlbumReviewPage(QWidget):
                 self._show_details(row, force=True)
             break
 
+    def _refresh_selected_preview(self) -> None:
+        row = self._selected_row()
+        if row is None:
+            return
+        preview = self._get_cached_preview(row.breakdown.photo)
+        if isinstance(preview, QPixmap) and not preview.isNull():
+            self.preview_label.setPixmap(preview)
+            self.preview_label.setText("")
+
+    def _preview_target_size(self) -> QSize:
+        available_width = max(300, self.preview_label.width() - 10)
+        # Quantizing avoids filling the cache with a new pixmap for every resize pixel.
+        target_width = max(300, (available_width // 40) * 40)
+        target_height = max(110, self.preview_label.height() - 8)
+        return QSize(target_width, target_height)
+
     def _get_cached_preview(self, photo) -> Optional[QPixmap]:
         photo_key = self._photo_key(photo)
         if not photo_key:
             return None
 
-        cache_key = self._thumbnail_cache_key(photo_key, QSize(280, 160))
+        target_size = self._preview_target_size()
+        cache_key = self._thumbnail_cache_key(photo_key, target_size)
         cached = self._preview_cache.get(cache_key)
         if cached is not None:
             return cached[1]
@@ -2091,7 +2144,7 @@ class AlbumReviewPage(QWidget):
         retained = self._retained_thumbnail_by_key.get(photo_key)
         if isinstance(retained, QPixmap) and not retained.isNull():
             scaled = retained.scaled(
-                QSize(280, 160),
+                target_size,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
@@ -2101,7 +2154,7 @@ class AlbumReviewPage(QWidget):
         photo_thumbnail = getattr(photo, "thumbnail", None)
         if isinstance(photo_thumbnail, QPixmap) and not photo_thumbnail.isNull():
             scaled = photo_thumbnail.scaled(
-                QSize(280, 160),
+                target_size,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
@@ -2111,7 +2164,7 @@ class AlbumReviewPage(QWidget):
         thumbnail_path = str(getattr(photo, "thumbnail_path", "") or "")
         pixmap = None
         if thumbnail_path and Path(thumbnail_path).exists():
-            pixmap = load_display_thumbnail(thumbnail_path, QSize(280, 160))
+            pixmap = load_display_thumbnail(thumbnail_path, target_size)
         if pixmap is not None and not pixmap.isNull():
             self._preview_cache[cache_key] = (0, pixmap)
             return pixmap

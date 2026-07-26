@@ -200,6 +200,21 @@ class AlbumReviewPageTests(unittest.TestCase):
         self.assertIn("semantic evidence", page.ai_suggestion_reasons.text())
         self.assertTrue(page.apply_suggestion_button.isEnabled())
         self.assertTrue(page.reject_suggestion_button.isEnabled())
+        self.assertIn("Suggested category", page.ai_suggestion_value.text())
+        self.assertIn("Confidence", page.ai_suggestion_value.text())
+        self.assertIn("Supporting evidence", page.ai_suggestion_value.text())
+
+    def test_preview_and_primary_values_use_available_space(self):
+        page = AlbumReviewPage()
+        page.preview_label.resize(700, 140)
+        target_size = page._preview_target_size()
+
+        self.assertGreater(target_size.width(), 500)
+        self.assertLessEqual(target_size.height(), 150)
+        self.assertIn("font-size: 16px", page.media_category_value.styleSheet())
+        self.assertIn("font-weight: 700", page.media_category_value.styleSheet())
+        self.assertTrue(page.apply_category_button.isDefault())
+        self.assertGreaterEqual(page.category_selector.minimumWidth(), 180)
 
     def test_classification_summary_describes_current_manual_and_unknown_states(self):
         with tempfile.TemporaryDirectory() as tmpdir:
