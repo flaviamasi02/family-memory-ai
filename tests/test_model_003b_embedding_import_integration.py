@@ -626,6 +626,9 @@ def _embedding_window_for_lifecycle_tests():
     window._thumbnail_run_id = 0
     window._active_thumbnail_run_id = 0
     window._pending_thumbnail_photos = None
+    window._thumbnail_import_started_at = {}
+    window._import_wall_t0 = 0.0
+    window._first_thumbnail_logged = False
     window.status_label = _StatusLabel()
     window.ai_status_label = _StatusLabel()
     return window
@@ -693,6 +696,30 @@ def test_repeated_thumbnail_import_waits_for_prior_worker_shutdown(monkeypatch):
     assert len(workers) == 2
     assert workers[1].photos == ["second"]
     assert window.thumbnail_thread is threads[1]
+    assert window._import_wall_t0 == 0.0
+    assert window._embedding_close_requested is False
+
+
+def test_superseded_thumbnail_completion_does_not_consume_new_import_timer(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    recorded = []
+    monkeypatch.setattr("ui.main_window.get_session_stats", lambda: type(
+        "Stats", (), {"record": lambda self, name, value: recorded.append((name, value)), "print_summary": lambda self: None}
+    )())
+    window._thumbnail_import_started_at = {1: 10.0, 2: 20.0}
+    window._import_wall_t0 = 20.0
+
+    window._on_thumbnail_worker_finished(1)
+
+    assert window._import_wall_t0 == 20.0
+    assert recorded == []
+    assert 1 not in window._thumbnail_import_started_at
+
+    monkeypatch.setattr("ui.main_window.time.perf_counter", lambda: 20.5)
+    window._on_thumbnail_worker_finished(2)
+
+    assert window._import_wall_t0 == 0.0
+    assert recorded == [("total_import_wall_clock [UI]", 500.0)]
 
 
 class _StatusLabel:

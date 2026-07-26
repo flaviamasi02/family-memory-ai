@@ -72,6 +72,7 @@ class MainWindow(QMainWindow):
         self._thumbnail_run_id = 0
         self._active_thumbnail_run_id = 0
         self._pending_thumbnail_photos = None
+        self._thumbnail_import_started_at: dict[int, float] = {}
         self.scan_thread = None
         self.scan_worker = None
         self._scan_run_id = 0
@@ -977,6 +978,10 @@ class MainWindow(QMainWindow):
         self._thumbnail_run_id += 1
         run_id = self._thumbnail_run_id
         self._active_thumbnail_run_id = run_id
+        # Capture the import timer owned by this run.  A superseded thumbnail
+        # worker may finish after the user has started another import; it must
+        # not consume or reset the newer import's wall-clock measurement.
+        self._thumbnail_import_started_at[run_id] = self._import_wall_t0
         thread = QThread()
         thread._family_memory_run_id = run_id
         worker = ThumbnailWorker(photos, batch_size=20, delay_ms=0)
@@ -987,7 +992,6 @@ class MainWindow(QMainWindow):
 
         thread.started.connect(worker.run)
         worker.thumbnail_ready.connect(self.update_thumbnail)
-        worker.finished.connect(self._on_thumbnail_worker_finished)
         worker.finished.connect(thread.quit)
         worker.finished.connect(worker.deleteLater)
         thread.finished.connect(self._on_active_thumbnail_thread_finished, Qt.ConnectionType.QueuedConnection)
@@ -1008,7 +1012,9 @@ class MainWindow(QMainWindow):
 
     def _on_thumbnail_thread_finished(self, run_id: int, finished_thread) -> None:
         if run_id != self._active_thumbnail_run_id or self.thumbnail_thread is not finished_thread:
+            self._thumbnail_import_started_at.pop(run_id, None)
             return
+        self._on_thumbnail_worker_finished(run_id)
         self.thumbnail_thread = None
         self.thumbnail_worker = None
         self._active_thumbnail_run_id = 0
@@ -1020,10 +1026,11 @@ class MainWindow(QMainWindow):
         if pending is not None:
             self._launch_thumbnail_worker(pending)
 
-    def _on_thumbnail_worker_finished(self) -> None:
-        """Called on the UI thread when the thumbnail worker has processed all photos."""
-        if self._import_wall_t0 > 0:
-            elapsed_ms = (time.perf_counter() - self._import_wall_t0) * 1000
+    def _on_thumbnail_worker_finished(self, run_id: int) -> None:
+        """Record timing only for the import that owns this finished run."""
+        started_at = self._thumbnail_import_started_at.pop(run_id, 0.0)
+        if started_at > 0 and started_at == self._import_wall_t0:
+            elapsed_ms = (time.perf_counter() - started_at) * 1000
             get_session_stats().record("total_import_wall_clock [UI]", elapsed_ms)
             self._import_wall_t0 = 0.0
             get_session_stats().print_summary()
