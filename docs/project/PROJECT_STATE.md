@@ -1,39 +1,28 @@
 # Family Memory AI - Project State
 
-## UX-001 Memory Review redesign (awaiting Product Owner validation)
+## Current Application State — after UX-001 Memory Review redesign
 
-Memory Review now uses a compact grouped toolbar and a balanced resizable split between its responsive thumbnail grid and a structured selected-photo workspace. Current Status, advisory AI Suggestion, current-state Classification Summary, Photo Information, and selection-aware category Actions replace the former dense primary metadata list; diagnostics remain available as secondary details. Classification and MODEL-003D behavior are unchanged. Automated validation is recorded with the implementation, but manual Product Owner approval remains required before merge.
+UX-001 is complete and merged in PR #37. Memory Review now uses a compact grouped toolbar and a balanced, resizable split between the responsive thumbnail grid and the selected-photo workspace. Preview and Current Status share a horizontal first row, followed by AI Suggestion, Classification Summary, and selection-aware Actions. Photo Information and Technical Details are collapsed secondary sections, so the primary workflow requires no vertical scrolling during normal maximized desktop use.
+
+The redesign changed presentation only. MODEL-003D remains advisory and explainable: suggestions use stored semantic evidence, Apply remains explicit, Reject leaves the category unchanged, manual categories remain authoritative, and existing suggestion state, persistence, sidecar, classification, embedding-cache, filters, thumbnail virtualization, and review-action behavior is preserved.
 
 ## Current Version
 
 - Version: v0.1.0
 
-## Current Sprint
-
-- PERF-004 (Staged load: Photo Browser first, secondary views deferred) - Completed
-- UX-001 (Collapsible Workspace Information Panels) - Completed
-- MEM-REVIEW-FIX (Asynchronous Memory Review loading and thumbnail synchronization) - Completed and manually validated
-
-## Project Status
+## Current Sprint and Status
 
 - Status: In Development
-- Repository state: PR #9 is completed and merged.
-- Performance state: asynchronous thumbnail loading, responsive import, deferred secondary workspace setup, and JPEG warning suppression are now part of the current baseline.
-- UX state: reusable `WorkspaceInfoPanel` is integrated in all main workspaces with collapsible per-workspace persisted state (default expanded).
-- Memory Review state: asynchronous loading diagnosis and root-cause fix are complete; manual Product Owner validation confirmed expected behavior.
-- Current focus: MODEL-001 through MODEL-003C are complete through stored-vector semantic similarity; the next product milestone is not committed and requires Product Owner prioritization among possible semantic-embedding consumers.
-- PR #28 is merged: MODEL-003B automatic background embedding generation during import/index is complete and manually validated.
-- PR #29 is merged: MODEL-003C semantic image similarity over stored embeddings is complete and manually validated.
-- MobileCLIP managed runtime is operational on the Product Owner Windows CPU machine through Settings -> AI Models.
-- Persistent embeddings, automatic background embedding generation, and developer semantic similarity diagnostics are operational.
-- Production automatic category classification is still not implemented. Semantic similarity is currently available through `scripts/similar_images.py`, not through the production UI.
-- Near-duplicate workflow, clustering, similar-photo UI, automatic category suggestions, semantic search UI, and learning from corrections remain future work.
-
-- DEC-0049 is approved and active: the project is desktop-first and mobile-ready. The Windows desktop app remains the only active implementation target until the representative desktop workflow is validated, while new reusable business/domain logic should stay independent from PySide6 wherever practical for a later focused Android companion.
+- UX-001 — Memory Review Redesign: **Completed and merged** (PR #37).
+- MODEL-003D — Explainable Category Suggestions: **Completed and present in Memory Review**.
+- The current Windows desktop application includes the redesigned Memory Review workspace, staged/asynchronous import preparation, persistent embeddings, advisory category suggestions, category correction and learning signals, Cleanup Review, Album Draft, and the existing local-first workflows.
+- Production automatic category replacement remains intentionally unimplemented; semantic suggestions require explicit user action.
+- DEC-0049 remains active: Windows desktop is the current implementation target and reusable domain logic stays mobile-ready.
+- Next recommended milestone: **UX-002 — Visual Language & Badges**, followed by **UX-003 — Memory Review Workspace Polish**.
 
 ## Last Updated
 
-- 2026-07-24
+- 2026-07-26
 
 
 ## MODEL chain current validation update

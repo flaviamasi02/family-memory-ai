@@ -86,3 +86,14 @@ Decision: category suggestions may use stored MobileCLIP embeddings only as advi
 ## MODEL-003D follow-up — Weak photograph signals do not imply Family Photo
 
 Decision: supported image format, EXIF/camera metadata, camera-style filenames, GPS, faces, and ordinary photo-like structure must not automatically assign Family Photo. New photographs start as Unknown, and only MODEL-003D stored-vector semantic similarity may propose Family Photo. Applying that proposal remains an explicit user action. Reliable screenshot, document, meme/graphic, advertisement, corrupt/unsupported, and workflow rules remain in force. Existing manual categories and accepted suggestions remain authoritative and are never reset; legacy deterministic or learned Family Photo outputs are ignored.
+
+## UX-001 — Memory Review workspace presentation
+
+Decision: the merged Memory Review desktop baseline uses a compact grouped toolbar, balanced resizable grid/workspace split, horizontal Preview + Current Status row, followed by AI Suggestion, Classification Summary, and Actions. Photo Information and Technical Details are collapsed by default so normal maximized desktop use does not require vertical scrolling for the primary workflow.
+
+Consequences:
+- MODEL-003D remains advisory and explicit-apply; the redesign does not change classification, suggestion, persistence, sidecar, embedding, or review-action behavior.
+- Adaptive wrapped explanations are preferred to nested scrolling in AI Suggestion.
+- UX-002 owns the future project-wide colour/icon badge language; UX-003 owns preview ratio, spacing, and AI Suggestion micro-layout polish.
+
+Canonical record: DEC-0050 in `docs/development/DECISIONS.md`.

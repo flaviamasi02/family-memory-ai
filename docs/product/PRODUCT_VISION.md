@@ -119,6 +119,8 @@ Memory Review and Cleanup Review are two distinct workspaces with different resp
 
 ## Memory Review
 
+Current workspace baseline after UX-001: a grouped toolbar and balanced grid/workspace split place Preview beside Current Status, followed by AI Suggestion, Classification Summary, and Actions. Photo Information and Technical Details are collapsed secondary sections, allowing the primary desktop workflow to fit without normal-use vertical scrolling. This layout preserves the advisory MODEL-003D interaction model.
+
 **Purpose: Teach the AI.**
 
 Memory Review is the workspace where the user reviews memories, corrects AI decisions, confirms important photos, assigns categories, improves people recognition, validates events, and increases the AI knowledge base.

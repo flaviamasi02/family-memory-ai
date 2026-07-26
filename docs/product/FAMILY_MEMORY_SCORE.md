@@ -295,6 +295,8 @@ MASTER_DEVELOPMENT_PLAN.md defines the high-level product-planning rule set that
 
 # Memory Review
 
+The current UX-001 workspace uses a compact grouped toolbar and balanced grid/workspace split. Preview and Current Status share the first row; AI Suggestion, Classification Summary, and Actions remain visible in the primary flow, while Photo Information and Technical Details are collapsed on demand. Normal maximized desktop use does not require vertical scrolling for the primary review workflow, and MODEL-003D behavior is unchanged.
+
 Memory Review is the main interaction point between the user and the application.
 
 It is where users teach the application what matters through category correction, AI teaching, preference learning, and classification validation.
