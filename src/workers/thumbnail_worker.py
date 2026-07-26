@@ -1,5 +1,6 @@
 import time
 from pathlib import Path
+from threading import Event
 
 from PySide6.QtCore import QObject, QThread, QSize, Signal
 from PySide6.QtGui import QImage
@@ -24,6 +25,11 @@ class ThumbnailWorker(QObject):
         self.thumbnail_size = thumbnail_size
         self.batch_size = batch_size
         self.delay_ms = delay_ms
+        self._cancel_event = Event()
+
+    def cancel(self) -> None:
+        """Cooperatively stop before decoding the next thumbnail."""
+        self._cancel_event.set()
 
     def run(self):
         stats = get_session_stats()
@@ -35,9 +41,13 @@ class ThumbnailWorker(QObject):
 
         try:
             for start in range(0, len(self.photos), self.batch_size):
+                if self._cancel_event.is_set():
+                    break
                 batch = self.photos[start : start + self.batch_size]
 
                 for photo in batch:
+                    if self._cancel_event.is_set():
+                        break
                     try:
                         path = Path(photo.path)
                         if path.suffix.lower() not in THUMBNAIL_IMAGE_EXTENSIONS:

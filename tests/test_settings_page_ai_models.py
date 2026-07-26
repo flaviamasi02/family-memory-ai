@@ -265,7 +265,7 @@ def test_settings_refreshes_authoritative_state_after_verification_completion(mo
     page.deleteLater()
 
 
-def test_settings_restarts_orphaned_verification_instead_of_showing_cancelled(monkeypatch, tmp_path):
+def test_settings_displays_composition_authorized_startup_recovery(monkeypatch, tmp_path):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     widgets = pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
     from ai_runtime.manager import create_default_runtime_manager
@@ -281,11 +281,11 @@ def test_settings_restarts_orphaned_verification_instead_of_showing_cancelled(mo
     record.last_validation_result = 'provider verification in progress'
     manager.storage.save_installation(record)
     (Path(record.local_model_cache_path) / 'mobileclip_s0.pt').write_bytes(b'checkpoint')
+    assert manager.prepare_verification_recovery('mobileclip') is True
     page = SettingsPage(runtime_manager=manager)
     started = []
     monkeypatch.setattr(page, '_start_ai_runtime_operation', lambda operation, **kwargs: started.append(operation))
-
-    app.processEvents()
+    page.start_mobileclip_verification_recovery()
 
     assert page.ai_detail_labels['Status'].text() == AIRuntimeState.VERIFYING.value
     assert started == ['verify']
@@ -293,7 +293,7 @@ def test_settings_restarts_orphaned_verification_instead_of_showing_cancelled(mo
     page.deleteLater()
 
 
-def test_settings_recovers_legacy_inferred_cancelled_state(monkeypatch, tmp_path):
+def test_settings_refreshes_when_cancelled_startup_recovery_begins(monkeypatch, tmp_path):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     widgets = pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
     from ai_runtime.manager import create_default_runtime_manager
@@ -306,20 +306,21 @@ def test_settings_recovers_legacy_inferred_cancelled_state(monkeypatch, tmp_path
     record = manager.installation_record('mobileclip')
     record.interpreter_path = __import__('sys').executable
     record.installation_state = AIRuntimeState.CANCELLED.value
-    record.last_validation_result = 'provider verification interrupted'
-    record.last_error = 'Previous provider verification was interrupted before completion; run Verify again.'
+    record.last_validation_result = 'provider verification cancelled'
+    record.last_error = 'Provider verification cancelled by user.'
     manager.storage.save_installation(record)
     (Path(record.local_model_cache_path) / 'mobileclip_s0.pt').write_bytes(b'checkpoint')
+    assert manager.prepare_verification_recovery('mobileclip') is True
     page = SettingsPage(runtime_manager=manager)
     started = []
     monkeypatch.setattr(page, '_start_ai_runtime_operation', lambda operation, **kwargs: started.append(operation))
-
-    app.processEvents()
+    page.start_mobileclip_verification_recovery()
 
     assert started == ['verify']
     recovered = manager.installation_record('mobileclip')
     assert recovered.installation_state == AIRuntimeState.VERIFYING.value
     assert recovered.last_validation_result == 'provider verification recovery pending'
+    assert page.ai_detail_labels['Status'].text() == AIRuntimeState.VERIFYING.value
     page.deleteLater()
 
 
@@ -328,6 +329,36 @@ def test_main_window_composes_one_runtime_manager_for_settings_and_indexing():
     assert source.count('self.ai_runtime_manager = create_default_runtime_manager()') == 1
     assert 'SettingsPage(runtime_manager=self.ai_runtime_manager)' in source
     assert 'runtime_manager=self.ai_runtime_manager' in source[source.index('def _launch_embedding_worker'):]
+    assert 'QTimer.singleShot(0, self._recover_mobileclip_runtime_on_startup)' in source
+    assert 'self.settings_page.start_mobileclip_verification_recovery()' in source
+
+
+def test_application_startup_recovery_is_idempotent():
+    from types import SimpleNamespace
+    from ui.main_window import MainWindow
+
+    calls = []
+    manager = SimpleNamespace(
+        needs_verification_recovery=lambda provider_id: calls.append(('needs', provider_id)) or True,
+        prepare_verification_recovery=lambda provider_id: calls.append(('prepare', provider_id)) or True,
+    )
+    settings = SimpleNamespace(
+        start_mobileclip_verification_recovery=lambda: calls.append(('start', 'mobileclip'))
+    )
+    composition = SimpleNamespace(
+        ai_runtime_manager=manager,
+        settings_page=settings,
+        _mobileclip_startup_recovery_scheduled=False,
+    )
+
+    MainWindow._recover_mobileclip_runtime_on_startup(composition)
+    MainWindow._recover_mobileclip_runtime_on_startup(composition)
+
+    assert calls == [
+        ('needs', 'mobileclip'),
+        ('prepare', 'mobileclip'),
+        ('start', 'mobileclip'),
+    ]
 
 
 def test_ai_runtime_worker_signals_are_queued_to_prevent_windows_qtextdocument_thread_error():

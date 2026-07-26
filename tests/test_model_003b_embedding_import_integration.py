@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from threading import Thread
 from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
@@ -32,10 +33,11 @@ def test_import_worker_generates_embeddings_skips_unchanged_and_reuses_cache(tmp
 
     worker = EmbeddingWorker([photo(p1), photo(p2)], service_factory=lambda: service)
     completed = []
-    worker.complete.connect(completed.append)
+    worker.complete.connect(lambda _run_id, result: completed.append(result))
     worker.run()
 
     assert completed[-1].processed_successfully == 2
+    assert len(completed) == 1
     assert provider.load_count == 1
     assert provider.embed_call_count == 2
     assert EmbeddingStore(db).get_valid(p1, provider.metadata) is not None
@@ -44,12 +46,71 @@ def test_import_worker_generates_embeddings_skips_unchanged_and_reuses_cache(tmp
     second_service = BatchEmbeddingService(second_provider, EmbeddingStore(db))
     second = EmbeddingWorker([photo(p1), photo(p2)], service_factory=lambda: second_service)
     second_results = []
-    second.complete.connect(second_results.append)
+    second.complete.connect(lambda _run_id, result: second_results.append(result))
     second.run()
 
     assert second_results[-1].total_images_received == 2
+    assert len(second_results) == 1
     assert second_results[-1].skipped_cached == 2
     assert second_provider.embed_call_count == 0
+
+
+def test_repeated_imports_reopen_store_and_remain_cache_only(tmp_path):
+    paths = [image(tmp_path / f"repeat-{index}.jpg", str(index).encode()) for index in range(4)]
+    db = tmp_path / "embeddings.sqlite3"
+    first_provider = FakeEmbeddingProvider()
+    first = BatchEmbeddingService(first_provider, EmbeddingStore(db)).embed_images(paths)
+
+    assert first.processed_successfully == 4
+    assert first.skipped_cached == 0
+    assert first.failed == 0
+
+    for _ in range(3):
+        provider = FakeEmbeddingProvider()
+        # Production creates a service and reopens the persistent store for
+        # every worker run; repeat that lifecycle rather than reusing objects.
+        result = BatchEmbeddingService(provider, EmbeddingStore(db)).embed_images(paths)
+        assert result.total_images_received == 4
+        assert result.processed_successfully == 0
+        assert result.skipped_cached == 4
+        assert result.failed == 0
+        assert result.cancelled == 0
+        assert provider.load_count == 0
+        assert provider.embed_call_count == 0
+
+
+def test_422_cached_inputs_reach_one_terminal_result_with_timeout(tmp_path):
+    paths = [image(tmp_path / f"cached-{index}.jpg", str(index).encode()) for index in range(422)]
+    db = tmp_path / "embeddings.sqlite3"
+    seeded = BatchEmbeddingService(FakeEmbeddingProvider(), EmbeddingStore(db)).embed_images(paths)
+    assert seeded.processed_successfully == 422
+
+    results = []
+    provider = FakeEmbeddingProvider()
+    thread = Thread(
+        target=lambda: results.append(BatchEmbeddingService(provider, EmbeddingStore(db)).embed_images(paths)),
+        daemon=True,
+    )
+    thread.start()
+    thread.join(10)
+
+    assert not thread.is_alive(), "cached indexing stalled before its terminal result"
+    assert len(results) == 1
+    result = results[0]
+    assert (result.processed_successfully, result.skipped_cached, result.failed, result.cancelled) == (0, 422, 0, 0)
+    assert provider.load_count == provider.embed_call_count == 0
+
+
+def test_cached_final_partial_batch_and_missing_path_are_accounted(tmp_path):
+    paths = [image(tmp_path / f"odd-{index}.jpg", str(index).encode()) for index in range(17)]
+    missing = tmp_path / "missing.jpg"
+    db = tmp_path / "embeddings.sqlite3"
+    assert BatchEmbeddingService(FakeEmbeddingProvider(), EmbeddingStore(db)).embed_images(paths).processed_successfully == 17
+
+    result = BatchEmbeddingService(FakeEmbeddingProvider(), EmbeddingStore(db)).embed_images([*paths, missing])
+
+    assert result.total_images_received == 18
+    assert (result.processed_successfully, result.skipped_cached, result.failed, result.cancelled) == (0, 17, 1, 0)
 
 
 def test_changed_image_is_regenerated_but_unchanged_image_is_skipped(tmp_path):
@@ -65,7 +126,7 @@ def test_changed_image_is_regenerated_but_unchanged_image_is_skipped(tmp_path):
     image(p1, b"new")
     worker = EmbeddingWorker([photo(p1), photo(p2)], service_factory=lambda: service)
     results = []
-    worker.complete.connect(results.append)
+    worker.complete.connect(lambda _run_id, result: results.append(result))
     worker.run()
 
     result = results[-1]
@@ -85,17 +146,18 @@ def test_embedding_worker_supports_cancellation_and_progress(tmp_path):
     progress = []
     results = []
 
-    def on_progress(item):
+    def on_progress(_run_id, item):
         progress.append(item)
         worker.cancel()
 
     worker.progress.connect(on_progress)
-    worker.complete.connect(results.append)
+    worker.complete.connect(lambda _run_id, result: results.append(result))
     worker.run()
 
     assert len(progress) == 1
     assert progress[0].current_index == 1
     assert results[-1].processed_successfully == 1
+    assert len(results) == 1
     assert results[-1].cancelled == 2
 
 
@@ -124,7 +186,7 @@ def test_main_window_startup_succeeds_and_scan_complete_starts_embedding_indexin
             pass
 
     class FakeWorker:
-        def __init__(self, photos, service_factory=None):
+        def __init__(self, photos, service_factory=None, run_id=0):
             self.photos = photos
             self.service_factory = service_factory
             self.progress = _Signal()
@@ -146,7 +208,7 @@ def test_main_window_startup_succeeds_and_scan_complete_starts_embedding_indexin
 
     monkeypatch.setattr("ui.main_window.QThread", FakeThread)
     monkeypatch.setattr("ui.main_window.EmbeddingWorker", FakeWorker)
-    monkeypatch.setattr(MainWindow, "start_thumbnail_loading", lambda self, photos: None)
+    monkeypatch.setattr(MainWindow, "start_thumbnail_loading", lambda self, photos: self._start_embedding_indexing(photos))
     monkeypatch.setattr(MainWindow, "_deferred_setup_cleanup_review", lambda self: None)
     window = MainWindow()
     window._on_scan_complete([])
@@ -160,7 +222,7 @@ class _Signal:
     def __init__(self):
         self._callbacks = []
 
-    def connect(self, callback):
+    def connect(self, callback, *_args):
         self._callbacks.append(callback)
 
     def emit(self, *args):
@@ -198,7 +260,7 @@ def test_slow_worker_is_not_abandoned_and_second_import_waits_for_finish(monkeyp
             self.deleted = True
 
     class FakeWorker:
-        def __init__(self, photos, service_factory=None):
+        def __init__(self, photos, service_factory=None, run_id=0):
             self.photos = list(photos)
             self.service_factory = service_factory
             self.progress = _Signal()
@@ -236,6 +298,9 @@ def test_slow_worker_is_not_abandoned_and_second_import_waits_for_finish(monkeyp
     assert first_worker.service_factory is not None
     assert first_worker.service_factory().provider.runtime_manager is window.ai_runtime_manager
 
+    # A real worker emits one terminal result before finished.  This lifecycle
+    # test supplies the same contract without running the service.
+    window._embedding_run_lifecycle[1]["terminal_state"] = "Cancelled"
     first_worker.finished.emit()
 
     assert len(workers) == 2
@@ -434,9 +499,10 @@ def test_starting_new_import_replaces_ready_status(monkeypatch):
 
     window._queue_or_start_scan("/new-import")
 
-    assert window.ai_status_label.text == (
-        "Indexing semantic embeddings: preparing new import…"
-    )
+    assert window._import_phase == "Preparing"
+    assert window.ai_status_label.text.startswith("Preparing import:")
+    assert "scanning" in window.ai_status_label.text.lower()
+    assert not window.ai_status_label.text.startswith("✓ Semantic embeddings ready:")
 
 
 def test_empty_embedding_run_emits_summary_and_clears_preparing_state(capsys):
@@ -462,6 +528,7 @@ def test_deleted_embedding_thread_wrapper_does_not_block_worker_launch(monkeypat
     window.embedding_thread = DeletedThread()
     window.embedding_worker = object()
     window._active_embedding_run_id = 4
+    window._embedding_run_lifecycle[4] = {"thread_finished": False, "terminal_state": None}
     monkeypatch.setattr(window, "_launch_embedding_worker", launched.append)
 
     window._start_embedding_indexing(["photo"])
@@ -470,6 +537,7 @@ def test_deleted_embedding_thread_wrapper_does_not_block_worker_launch(monkeypat
     assert window.embedding_thread is None
     assert window.embedding_worker is None
     assert window._active_embedding_run_id == 0
+    assert window._embedding_run_lifecycle == {}
 
 
 def test_close_event_waits_for_running_embedding_thread_before_destroying(monkeypatch):
@@ -531,6 +599,7 @@ def test_thread_and_worker_references_clear_only_after_thread_completion():
     window.embedding_thread = thread
     window.embedding_worker = worker
     window._active_embedding_run_id = 3
+    window._embedding_run_lifecycle[3] = {"thread_finished": False, "terminal_state": "Completed"}
 
     window._request_embedding_worker_cancel()
     assert window.embedding_thread is thread
@@ -564,6 +633,7 @@ def test_second_import_during_embedding_waits_for_cancellation_before_scanning()
     window.embedding_thread = RunningThread()
     window.embedding_worker = worker
     window._active_embedding_run_id = 7
+    window._embedding_run_lifecycle[7] = {"thread_finished": False, "terminal_state": "Cancelled"}
     window._start_scan = scans_started.append
 
     window._queue_or_start_scan("/second-folder")
@@ -571,7 +641,7 @@ def test_second_import_during_embedding_waits_for_cancellation_before_scanning()
     assert worker.cancelled is True
     assert scans_started == []
     assert window._pending_import_folder_path == "/second-folder"
-    assert window.status_label.text == "Cancelling previous embedding job before scanning next folder…"
+    assert window.status_label.text == "Queued new import; finishing the current worker…"
 
     window._on_embedding_thread_finished(7)
 
@@ -579,6 +649,125 @@ def test_second_import_during_embedding_waits_for_cancellation_before_scanning()
     assert window.status_label.text == "Scanning folder…"
     assert window.embedding_thread is None
     assert window.embedding_worker is None
+
+
+def test_third_import_also_resumes_exactly_once_after_embedding_cleanup():
+    window = _embedding_window_for_lifecycle_tests()
+    scans_started = []
+
+    class RunningThread:
+        def isRunning(self):
+            return True
+
+    class RunningWorker:
+        def __init__(self):
+            self.cancelled = False
+
+        def cancel(self):
+            self.cancelled = True
+
+    window._start_scan = scans_started.append
+    expected_scans = []
+    for run_id, folder in ((1, "/second-folder"), (2, "/third-folder")):
+        worker = RunningWorker()
+        window.embedding_thread = RunningThread()
+        window.embedding_worker = worker
+        window._active_embedding_run_id = run_id
+        window._embedding_run_lifecycle[run_id] = {"thread_finished": False, "terminal_state": "Cancelled"}
+
+        window._queue_or_start_scan(folder)
+        assert worker.cancelled is True
+        assert window._pending_import_folder_path == folder
+        assert window.status_label.text == "Queued new import; finishing the current worker…"
+
+        window._on_embedding_thread_finished(run_id)
+        window._on_embedding_thread_finished(run_id)  # duplicate/stale delivery
+        expected_scans.append(folder)
+        assert scans_started == expected_scans
+        assert window._pending_import_folder_path is None
+        assert window.embedding_thread is None
+        assert window.embedding_worker is None
+        assert window.status_label.text == "Scanning folder…"
+        assert window._embedding_close_requested is False
+
+
+def test_worker_shutdown_does_not_depend_on_queued_gui_delivery():
+    source = Path("src/ui/main_window.py").read_text(encoding="utf-8")
+    assert source.count(
+        "worker.finished.connect(thread.quit, Qt.ConnectionType.DirectConnection)"
+    ) == 3
+
+
+def test_terminal_result_survives_thread_cleanup_overtaking_queued_progress(capsys):
+    window = _embedding_window_for_lifecycle_tests()
+    run_id = 9
+    window._active_embedding_run_id = run_id
+    window.embedding_thread = object()
+    window.embedding_worker = object()
+    window._embedding_run_lifecycle[run_id] = {"thread_finished": False, "terminal_state": None}
+
+    # Reproduce the Product Owner ordering: the worker thread exits while many
+    # cache-hit progress events and the terminal result are still queued.
+    window._on_embedding_thread_finished(run_id)
+    assert window.embedding_worker is not None
+    assert window.ai_status_label.text == "initial"
+
+    window._on_embedding_complete_for_run(run_id, _embedding_result(0, 422, 0))
+
+    assert window.embedding_thread is None
+    assert window.embedding_worker is None
+    assert window._active_embedding_run_id == 0
+    assert run_id not in window._embedding_run_lifecycle
+    assert window.ai_status_label.text.startswith("✓ Semantic embeddings ready: 422/422")
+    assert "processed=0 cached=422 failed=0 cancelled=0" in capsys.readouterr().err
+
+
+def test_terminal_callback_exception_becomes_explicit_failure(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    run_id = 10
+    window._active_embedding_run_id = run_id
+    window.embedding_thread = object()
+    window.embedding_worker = object()
+    window._embedding_run_lifecycle[run_id] = {"thread_finished": True, "terminal_state": None}
+    monkeypatch.setattr(window, "_on_embedding_complete", lambda *_args: (_ for _ in ()).throw(RuntimeError("callback broke")))
+
+    window._on_embedding_complete_for_run(run_id, _embedding_result(0, 1, 0))
+
+    assert window._import_phase == "Failed"
+    assert "completion failed" in window.ai_status_label.text.lower()
+    assert window.embedding_thread is None
+    assert window.embedding_worker is None
+
+
+def test_import_state_machine_reaches_embedding_after_thumbnail_completion(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    displayed = []
+    thumbnail_inputs = []
+    embedding_inputs = []
+    window.photo_model = type("PhotoModel", (), {"set_photos": lambda self, photos: displayed.append(list(photos))})()
+    window._apply_browser_filter = lambda: None
+    window._deferred_setup_cleanup_review = lambda: None
+    window.start_thumbnail_loading = thumbnail_inputs.append
+    window._start_embedding_indexing = embedding_inputs.append
+    monkeypatch.setattr("ui.main_window.QTimer.singleShot", lambda _ms, callback: callback())
+
+    window._on_scan_complete(["photo"])
+
+    assert window._import_phase == "Thumbnail generation"
+    assert displayed == [["photo"]]
+    assert thumbnail_inputs == [["photo"]]
+    assert embedding_inputs == []
+
+    thread = object()
+    window.thumbnail_thread = thread
+    window.thumbnail_worker = object()
+    window._active_thumbnail_run_id = 1
+    window._thumbnail_import_started_at[1] = 0.0
+    window._on_thumbnail_thread_finished(1, thread)
+
+    assert window._import_phase == "Embedding indexing"
+    assert embedding_inputs == [["photo"]]
+    assert window.ai_status_label.text == "Indexing semantic embeddings: starting…"
 
 
 def _embedding_window_for_lifecycle_tests():
@@ -595,11 +784,111 @@ def _embedding_window_for_lifecycle_tests():
     window._embedding_run_id = 0
     window._active_embedding_run_id = 0
     window._pending_embedding_photos = None
+    window._embedding_run_lifecycle = {}
     window._pending_import_folder_path = None
     window._embedding_close_requested = False
+    window._import_phase = "Idle"
+    window._import_generation = 0
+    window._current_import_photos = []
+    window.thumbnail_thread = None
+    window.thumbnail_worker = None
+    window._thumbnail_run_id = 0
+    window._active_thumbnail_run_id = 0
+    window._pending_thumbnail_photos = None
+    window._thumbnail_import_started_at = {}
+    window._import_wall_t0 = 0.0
+    window._first_thumbnail_logged = False
     window.status_label = _StatusLabel()
     window.ai_status_label = _StatusLabel()
     return window
+
+
+def test_repeated_thumbnail_import_waits_for_prior_worker_shutdown(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    threads = []
+    workers = []
+
+    class FakeThread:
+        def __init__(self):
+            self.started = _Signal()
+            self.finished = _Signal()
+            self.running = False
+            threads.append(self)
+
+        def start(self):
+            self.running = True
+
+        def isRunning(self):
+            return self.running
+
+        def quit(self):
+            self.running = False
+            self.finished.emit()
+
+        def deleteLater(self):
+            pass
+
+    class FakeThumbnailWorker:
+        def __init__(self, photos, **_kwargs):
+            self.photos = list(photos)
+            self.thumbnail_ready = _Signal()
+            self.finished = _Signal()
+            self.cancelled = False
+            workers.append(self)
+
+        def moveToThread(self, _thread):
+            pass
+
+        def run(self):
+            pass
+
+        def cancel(self):
+            self.cancelled = True
+
+        def deleteLater(self):
+            pass
+
+    monkeypatch.setattr("ui.main_window.QThread", FakeThread)
+    monkeypatch.setattr("ui.main_window.ThumbnailWorker", FakeThumbnailWorker)
+
+    window.start_thumbnail_loading(["first"])
+    first_thread = threads[0]
+    window.start_thumbnail_loading(["second"])
+
+    assert len(workers) == 1
+    assert workers[0].cancelled is True
+    assert window.thumbnail_thread is first_thread
+    assert window._pending_thumbnail_photos == ["second"]
+
+    workers[0].finished.emit()
+
+    assert len(workers) == 2
+    assert workers[1].photos == ["second"]
+    assert window.thumbnail_thread is threads[1]
+    assert window._import_wall_t0 == 0.0
+    assert window._embedding_close_requested is False
+
+
+def test_superseded_thumbnail_completion_does_not_consume_new_import_timer(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    recorded = []
+    monkeypatch.setattr("ui.main_window.get_session_stats", lambda: type(
+        "Stats", (), {"record": lambda self, name, value: recorded.append((name, value)), "print_summary": lambda self: None}
+    )())
+    window._thumbnail_import_started_at = {1: 10.0, 2: 20.0}
+    window._import_wall_t0 = 20.0
+
+    window._on_thumbnail_worker_finished(1)
+
+    assert window._import_wall_t0 == 20.0
+    assert recorded == []
+    assert 1 not in window._thumbnail_import_started_at
+
+    monkeypatch.setattr("ui.main_window.time.perf_counter", lambda: 20.5)
+    window._on_thumbnail_worker_finished(2)
+
+    assert window._import_wall_t0 == 0.0
+    assert recorded == [("total_import_wall_clock [UI]", 500.0)]
 
 
 class _StatusLabel:
@@ -767,6 +1056,29 @@ def test_deleted_scan_thread_wrapper_is_not_reused_for_second_scan(monkeypatch):
     assert deleted_thread.quit_called is False
     assert deleted_thread.wait_called is False
 
+    second_thread = window.scan_thread
+    second_thread.finished.emit()
+    assert window.scan_thread is None
+    assert window.scan_worker is None
+
+    window._start_scan("/third")
+    third_thread = window.scan_thread
+    third_worker = window.scan_worker
+    assert third_thread is not second_thread
+    assert len(workers) == 2
+    assert workers[1].folder_path == "/third"
+
+    # A stale/duplicate completion from the second run cannot clear the third.
+    window._on_scan_thread_finished(1, second_thread)
+    assert window.scan_thread is third_thread
+    assert window.scan_worker is third_worker
+
+    third_thread.finished.emit()
+    assert window.scan_thread is None
+    assert window.scan_worker is None
+    assert window._pending_import_folder_path is None
+    assert window._import_phase != "Preparing"
+
 
 def _scan_lifecycle_harness():
     class Harness:
@@ -777,8 +1089,12 @@ def _scan_lifecycle_harness():
     window.scan_worker = None
     window._scan_run_id = 0
     window._active_scan_run_id = 0
+    window._pending_import_folder_path = None
+    window._import_phase = "Idle"
+    window.sender = lambda: None
     window._start_scan = MainWindow._start_scan.__get__(window, Harness)
     window._scan_thread_is_running = MainWindow._scan_thread_is_running.__get__(window, Harness)
+    window._on_active_scan_thread_finished = MainWindow._on_active_scan_thread_finished.__get__(window, Harness)
     window._on_scan_thread_finished = MainWindow._on_scan_thread_finished.__get__(window, Harness)
     window._on_scan_complete = lambda photos: None
     window._on_scan_error = lambda error: None

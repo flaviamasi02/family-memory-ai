@@ -4,6 +4,7 @@ import hashlib
 import math
 import sqlite3
 import struct
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -118,7 +119,7 @@ class EmbeddingStore:
         self._init()
 
     def _init(self) -> None:
-        with sqlite3.connect(self.db_path) as con:
+        with closing(sqlite3.connect(self.db_path)) as con, con:
             con.execute("PRAGMA journal_mode=WAL")
             con.execute(
                 """
@@ -166,7 +167,7 @@ class EmbeddingStore:
         return self.get_valid_by_identity(key, fp, mt, sz, metadata)
 
     def get_valid_by_identity(self, photo_key: str, source_fingerprint: str, source_mtime_ns: int, source_size: int, metadata: ModelMetadata) -> EmbeddingRecord | None:
-        with self._lock, sqlite3.connect(self.db_path) as con:
+        with self._lock, closing(sqlite3.connect(self.db_path)) as con, con:
             row = con.execute(
                 """
                 SELECT embedding_dimension, embedding_blob, embedding_json, generated_at, status, error
@@ -191,7 +192,7 @@ class EmbeddingStore:
         Persisted rows are returned only when the source file still exists and
         its current identity matches the stored size, mtime, and fingerprint.
         """
-        with self._lock, sqlite3.connect(self.db_path) as con:
+        with self._lock, closing(sqlite3.connect(self.db_path)) as con, con:
             rows = con.execute(
                 """
                 SELECT photo_key, source_fingerprint, source_mtime_ns, source_size, embedding_dimension,
@@ -233,7 +234,7 @@ class EmbeddingStore:
     def put(self, rec: EmbeddingRecord) -> None:
         updated_at = now_iso()
         blob = _embedding_to_blob(rec.embedding) if rec.embedding else None
-        with self._lock, sqlite3.connect(self.db_path) as con:
+        with self._lock, closing(sqlite3.connect(self.db_path)) as con, con:
             con.execute(
                 """
                 REPLACE INTO embeddings
@@ -256,7 +257,7 @@ class EmbeddingStore:
 
     def invalidate_embedding(self, path: Path, metadata: ModelMetadata | None = None) -> int:
         key = str(Path(path).resolve())
-        with self._lock, sqlite3.connect(self.db_path) as con:
+        with self._lock, closing(sqlite3.connect(self.db_path)) as con, con:
             if metadata is None:
                 cur = con.execute("UPDATE embeddings SET status='invalidated', updated_at=? WHERE photo_key=?", (now_iso(), key))
             else:
@@ -264,12 +265,12 @@ class EmbeddingStore:
             return int(cur.rowcount)
 
     def invalidate_model_embeddings(self, model_key: str) -> int:
-        with self._lock, sqlite3.connect(self.db_path) as con:
+        with self._lock, closing(sqlite3.connect(self.db_path)) as con, con:
             cur = con.execute("UPDATE embeddings SET status='invalidated', updated_at=? WHERE model_key=?", (now_iso(), model_key))
             return int(cur.rowcount)
 
     def count(self) -> int:
-        with sqlite3.connect(self.db_path) as con:
+        with closing(sqlite3.connect(self.db_path)) as con, con:
             return int(con.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0])
 
 

@@ -1,8 +1,9 @@
+import logging
 import sys
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QCoreApplication, Qt, QThread, QTimer
+from PySide6.QtCore import QCoreApplication, Qt, QThread, QTimer, Slot
 from PySide6.QtGui import QGuiApplication, QImage, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
@@ -45,6 +46,8 @@ from vision.managed_mobileclip_provider import ManagedMobileCLIPEmbeddingProvide
 from workers.scan_worker import ScanWorker
 from workers.thumbnail_worker import ThumbnailWorker
 
+logger = logging.getLogger(__name__)
+
 
 class MainWindow(QMainWindow):
     BROWSER_FILTER_ALL = "All"
@@ -69,6 +72,10 @@ class MainWindow(QMainWindow):
 
         self.thumbnail_thread = None
         self.thumbnail_worker = None
+        self._thumbnail_run_id = 0
+        self._active_thumbnail_run_id = 0
+        self._pending_thumbnail_photos = None
+        self._thumbnail_import_started_at: dict[int, float] = {}
         self.scan_thread = None
         self.scan_worker = None
         self._scan_run_id = 0
@@ -78,7 +85,11 @@ class MainWindow(QMainWindow):
         self._embedding_run_id = 0
         self._active_embedding_run_id = 0
         self._pending_embedding_photos = None
+        self._embedding_run_lifecycle: dict[int, dict[str, bool]] = {}
         self._pending_import_folder_path = None
+        self._import_phase = "Idle"
+        self._import_generation = 0
+        self._current_import_photos = []
         self._embedding_close_requested = False
         self.selected_photo = None
         self._review_cache_signature = None
@@ -203,13 +214,35 @@ class MainWindow(QMainWindow):
 
         self._build_workspace_help_dock()
         self._on_tab_changed(self.tabs.currentIndex())
+        self._mobileclip_startup_recovery_scheduled = False
+        # Application composition owns the one explicit startup decision; the
+        # shared manager remains authoritative for persisted transitions and
+        # Settings owns only the worker presentation.
+        QTimer.singleShot(0, self._recover_mobileclip_runtime_on_startup)
+
+    def _recover_mobileclip_runtime_on_startup(self) -> None:
+        """Schedule at most one verification for recoverable persisted state."""
+        if self._mobileclip_startup_recovery_scheduled:
+            return
+        if not self.ai_runtime_manager.needs_verification_recovery("mobileclip"):
+            return
+        if not self.ai_runtime_manager.prepare_verification_recovery("mobileclip"):
+            return
+        self._mobileclip_startup_recovery_scheduled = True
+        self.settings_page.start_mobileclip_verification_recovery()
 
     def closeEvent(self, event):
         self._embedding_close_requested = True
         self._request_embedding_worker_cancel()
+        if self.thumbnail_worker is not None:
+            self.thumbnail_worker.cancel()
         app = QCoreApplication.instance()
         while self.embedding_thread is not None and self.embedding_thread.isRunning():
             self.embedding_thread.wait(250)
+            if app is not None:
+                app.processEvents()
+        while self._thumbnail_thread_is_running():
+            self.thumbnail_thread.wait(250)
             if app is not None:
                 app.processEvents()
         if app is not None:
@@ -308,15 +341,29 @@ class MainWindow(QMainWindow):
         self._queue_or_start_scan(folder_path)
 
     def _queue_or_start_scan(self, folder_path: str) -> None:
-        """Start scanning now unless an embedding run must finish cancellation first."""
-        self._set_embedding_status("Indexing semantic embeddings: preparing new import…")
-        if self._embedding_thread_is_running():
+        """Enter the single import state machine or replace its queued request."""
+        active = (
+            (self.scan_thread is not None and self._scan_thread_is_running(self.scan_thread))
+            or self._thumbnail_thread_is_running()
+            or self._embedding_thread_is_running()
+        )
+        if active:
             self._pending_import_folder_path = folder_path
             self._pending_embedding_photos = None
             self._request_embedding_worker_cancel()
-            self.status_label.setText("Cancelling previous embedding job before scanning next folder…")
+            if self.thumbnail_worker is not None:
+                self.thumbnail_worker.cancel()
+            self._set_embedding_status("Waiting for the current import worker to finish before starting the queued import…")
+            self.status_label.setText("Queued new import; finishing the current worker…")
             return
+        self._begin_import_scan(folder_path)
 
+    def _begin_import_scan(self, folder_path: str) -> None:
+        self._pending_import_folder_path = None
+        self._import_generation += 1
+        self._import_phase = "Preparing"
+        logger.info("Import lifecycle generation=%s phase=Scanning", self._import_generation)
+        self._set_embedding_status("Preparing import: scanning folder…")
         self.status_label.setText("Scanning folder…")
         self._start_scan(folder_path)
 
@@ -332,6 +379,7 @@ class MainWindow(QMainWindow):
         self._active_scan_run_id = run_id
 
         thread = QThread()
+        thread._family_memory_run_id = run_id
         worker = ScanWorker(folder_path)
         self.scan_thread = thread
         self.scan_worker = worker
@@ -340,12 +388,23 @@ class MainWindow(QMainWindow):
         thread.started.connect(worker.run)
         worker.scan_complete.connect(self._on_scan_complete)
         worker.scan_error.connect(self._on_scan_error)
-        worker.finished.connect(thread.quit)
         worker.finished.connect(worker.deleteLater)
-        thread.finished.connect(lambda rid=run_id, finished_thread=thread: self._on_scan_thread_finished(rid, finished_thread))
+        worker.finished.connect(thread.quit, Qt.ConnectionType.DirectConnection)
+        thread.finished.connect(self._on_active_scan_thread_finished, Qt.ConnectionType.QueuedConnection)
         thread.finished.connect(thread.deleteLater)
 
         thread.start()
+
+    @Slot()
+    def _on_active_scan_thread_finished(self) -> None:
+        try:
+            thread = self.sender()
+        except RuntimeError:
+            thread = None
+        thread = thread or self.scan_thread
+        self._on_scan_thread_finished(
+            int(getattr(thread, "_family_memory_run_id", 0)), thread
+        )
 
     def _scan_thread_is_running(self, thread) -> bool:
         try:
@@ -363,8 +422,15 @@ class MainWindow(QMainWindow):
         self.scan_thread = None
         self.scan_worker = None
         self._active_scan_run_id = 0
+        if self._pending_import_folder_path is not None:
+            folder = self._pending_import_folder_path
+            self._begin_import_scan(folder)
 
     def _on_scan_complete(self, photos: list) -> None:
+        # A newer folder request owns the next transition.  Let this scan's
+        # thread-finished cleanup start it; do not create workers for stale data.
+        if self._pending_import_folder_path is not None:
+            return
         stats = get_session_stats()
         n = len(photos or [])
 
@@ -382,11 +448,13 @@ class MainWindow(QMainWindow):
             f"Scan complete — showing {n} photos. Loading thumbnails…"
         )
 
-        # Start background embedding generation for missing/outdated images.
-        self._start_embedding_indexing(photos)
-
-        # Start the thumbnail worker *immediately* so thumbnails begin arriving
-        # in the browser before Cleanup Review and Memory Review are prepared.
+        self._current_import_photos = list(photos or [])
+        self._import_phase = "Thumbnail generation"
+        logger.info(
+            "Import lifecycle generation=%s phase=ScanCompleted submitted=%s next=ThumbnailGeneration",
+            self._import_generation, len(self._current_import_photos),
+        )
+        self._set_embedding_status("Preparing import: generating thumbnails…")
         self.start_thumbnail_loading(photos)
 
         # ── Phase 2 & 3 (deferred) ────────────────────────────────────────────
@@ -413,6 +481,7 @@ class MainWindow(QMainWindow):
         try:
             return bool(thread.isRunning())
         except RuntimeError:
+            self._embedding_run_lifecycle.pop(self._active_embedding_run_id, None)
             self.embedding_thread = None
             self.embedding_worker = None
             self._active_embedding_run_id = 0
@@ -424,6 +493,7 @@ class MainWindow(QMainWindow):
         self._active_embedding_run_id = run_id
 
         thread = QThread()
+        thread._family_memory_run_id = run_id
         worker = EmbeddingWorker(
             photos,
             service_factory=lambda: BatchEmbeddingService(
@@ -431,21 +501,79 @@ class MainWindow(QMainWindow):
                     runtime_manager=self.ai_runtime_manager
                 )
             ),
+            run_id=run_id,
         )
         self.embedding_thread = thread
         self.embedding_worker = worker
         worker.moveToThread(thread)
 
         thread.started.connect(worker.run)
-        worker.progress.connect(lambda progress, rid=run_id: self._on_embedding_progress(rid, progress))
-        worker.complete.connect(lambda result, rid=run_id: self._on_embedding_complete(rid, result))
-        worker.error.connect(lambda message, rid=run_id: self._on_embedding_error(rid, message))
-        worker.finished.connect(thread.quit)
+        # Use QObject-bound queued slots rather than context-free lambdas.  The
+        # latter may execute Python UI work on the worker thread on some PySide6
+        # builds, which made a cache-fast second import especially crash-prone.
+        self._embedding_run_lifecycle[run_id] = {"thread_finished": False, "terminal_state": None}
+        worker.progress.connect(self._on_embedding_progress_for_run, Qt.ConnectionType.QueuedConnection)
+        worker.complete.connect(self._on_embedding_complete_for_run, Qt.ConnectionType.QueuedConnection)
+        worker.error.connect(self._on_embedding_error_for_run, Qt.ConnectionType.QueuedConnection)
         worker.finished.connect(worker.deleteLater)
-        thread.finished.connect(lambda rid=run_id: self._on_embedding_thread_finished(rid))
+        worker.finished.connect(thread.quit, Qt.ConnectionType.DirectConnection)
+        thread.finished.connect(self._on_active_embedding_thread_finished, Qt.ConnectionType.QueuedConnection)
         thread.finished.connect(thread.deleteLater)
 
         thread.start()
+
+    @Slot(int, object)
+    def _on_embedding_progress_for_run(self, run_id: int, progress) -> None:
+        if run_id in self._embedding_run_lifecycle:
+            self._on_embedding_progress(run_id, progress)
+
+    @Slot(int, object)
+    def _on_embedding_complete_for_run(self, run_id: int, result) -> None:
+        lifecycle = self._embedding_run_lifecycle.get(run_id)
+        if lifecycle is None or lifecycle["terminal_state"] is not None:
+            return
+        try:
+            self._on_embedding_complete(run_id, result)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Embedding terminal callback failed run_id=%s", run_id)
+            self._set_embedding_status(f"Embedding completion failed: {exc}", severity="error")
+            lifecycle["terminal_state"] = "Failed"
+        else:
+            processed = int(getattr(result, "processed_successfully", 0) or 0)
+            cached = int(getattr(result, "skipped_cached", 0) or 0)
+            failed = int(getattr(result, "failed", 0) or 0)
+            cancelled = int(getattr(result, "cancelled", 0) or 0)
+            lifecycle["terminal_state"] = (
+                "Cancelled" if cancelled
+                else "Failed" if failed and not (processed or cached)
+                else "Completed"
+            )
+        finally:
+            self._finalize_embedding_run(run_id)
+
+    @Slot(int, str)
+    def _on_embedding_error_for_run(self, run_id: int, message: str) -> None:
+        lifecycle = self._embedding_run_lifecycle.get(run_id)
+        if lifecycle is None or lifecycle["terminal_state"] is not None:
+            return
+        try:
+            self._on_embedding_error(run_id, message)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Embedding error callback failed run_id=%s", run_id)
+            self._set_embedding_status(f"Embedding failure reporting failed: {exc}", severity="error")
+            lifecycle["terminal_state"] = "Failed"
+        finally:
+            lifecycle["terminal_state"] = "Failed"
+            self._finalize_embedding_run(run_id)
+
+    @Slot()
+    def _on_active_embedding_thread_finished(self) -> None:
+        try:
+            thread = self.sender()
+        except RuntimeError:
+            thread = None
+        thread = thread or self.embedding_thread
+        self._on_embedding_thread_finished(int(getattr(thread, "_family_memory_run_id", 0)))
 
     def _request_embedding_worker_cancel(self) -> None:
         """Cooperatively request cancellation without destroying a running QThread."""
@@ -453,25 +581,40 @@ class MainWindow(QMainWindow):
             self.embedding_worker.cancel()
 
     def _on_embedding_thread_finished(self, run_id: int) -> None:
-        if run_id == self._active_embedding_run_id:
-            self.embedding_thread = None
-            self.embedding_worker = None
-            self._active_embedding_run_id = 0
+        lifecycle = self._embedding_run_lifecycle.get(run_id)
+        if lifecycle is None:
+            return
+        lifecycle["thread_finished"] = True
+        self._finalize_embedding_run(run_id)
+
+    def _finalize_embedding_run(self, run_id: int) -> None:
+        """Clean up only after both terminal result and thread exit arrived."""
+        lifecycle = self._embedding_run_lifecycle.get(run_id)
+        if lifecycle is None or not lifecycle["thread_finished"] or lifecycle["terminal_state"] is None:
+            return
+        self._embedding_run_lifecycle.pop(run_id, None)
+        if run_id != self._active_embedding_run_id:
+            return
+        self.embedding_thread = None
+        self.embedding_worker = None
+        self._active_embedding_run_id = 0
+        logger.info("Import lifecycle generation=%s embedding_run=%s cleanup=complete", self._import_generation, run_id)
 
         if self._embedding_close_requested:
             return
 
         pending_folder = self._pending_import_folder_path
-        self._pending_import_folder_path = None
         if pending_folder is not None:
-            self.status_label.setText("Scanning folder…")
-            self._start_scan(pending_folder)
+            self._begin_import_scan(pending_folder)
             return
 
         pending_photos = self._pending_embedding_photos
         self._pending_embedding_photos = None
         if pending_photos is not None:
             self._launch_embedding_worker(pending_photos)
+            return
+        self._import_phase = str(lifecycle["terminal_state"])
+        logger.info("Import lifecycle generation=%s phase=%s", self._import_generation, self._import_phase)
 
     def _on_embedding_progress(self, run_id: int, progress) -> None:
         if run_id != self._active_embedding_run_id:
@@ -504,6 +647,7 @@ class MainWindow(QMainWindow):
         received = int(getattr(result, "total_images_received", 0) or 0)
         ready = processed + cached
         total = ready + failed + cancelled
+        self._import_phase = "Cache reuse" if cached else "Embedding indexing"
         if received <= 0:
             self._set_embedding_status(
                 "AI embeddings: no eligible photos to index.",
@@ -539,7 +683,8 @@ class MainWindow(QMainWindow):
                 f"{processed} new · {cached} reused from cache · 0 failed",
                 severity="success",
             )
-        self._on_embedding_index_updated(result)
+        if ready and not cancelled:
+            self._on_embedding_index_updated(result)
 
     def _set_embedding_status(self, message: str, severity: str = "progress") -> None:
         """Update the dedicated persistent AI status (or test-compatible fallback)."""
@@ -601,7 +746,9 @@ class MainWindow(QMainWindow):
             )
 
     def _on_scan_error(self, error_message: str) -> None:
+        self._import_phase = "Completed"
         self.status_label.setText(f"Scan error: {error_message}")
+        self._set_embedding_status(f"Import scan failed: {error_message}", severity="error")
 
     def load_photos(self, photos):
         self._all_photos = list(photos or [])
@@ -899,24 +1046,98 @@ class MainWindow(QMainWindow):
         )
 
     def start_thumbnail_loading(self, photos):
-        self.thumbnail_thread = QThread()
-        self.thumbnail_worker = ThumbnailWorker(photos, batch_size=20, delay_ms=0)
+        """Serialize thumbnail jobs so a repeated import cannot orphan a QThread."""
+        requested_photos = list(photos or [])
+        if self._thumbnail_thread_is_running():
+            self._pending_thumbnail_photos = requested_photos
+            self.thumbnail_worker.cancel()
+            return
 
-        self.thumbnail_worker.moveToThread(self.thumbnail_thread)
+        self._launch_thumbnail_worker(requested_photos)
 
-        self.thumbnail_thread.started.connect(self.thumbnail_worker.run)
-        self.thumbnail_worker.thumbnail_ready.connect(self.update_thumbnail)
-        self.thumbnail_worker.finished.connect(self._on_thumbnail_worker_finished)
-        self.thumbnail_worker.finished.connect(self.thumbnail_thread.quit)
-        self.thumbnail_worker.finished.connect(self.thumbnail_worker.deleteLater)
-        self.thumbnail_thread.finished.connect(self.thumbnail_thread.deleteLater)
+    def _thumbnail_thread_is_running(self) -> bool:
+        thread = self.thumbnail_thread
+        if thread is None:
+            return False
+        try:
+            return bool(thread.isRunning())
+        except RuntimeError:
+            self.thumbnail_thread = None
+            self.thumbnail_worker = None
+            self._active_thumbnail_run_id = 0
+            return False
 
-        self.thumbnail_thread.start()
+    def _launch_thumbnail_worker(self, photos) -> None:
+        self._thumbnail_run_id += 1
+        run_id = self._thumbnail_run_id
+        self._active_thumbnail_run_id = run_id
+        # Capture the import timer owned by this run.  A superseded thumbnail
+        # worker may finish after the user has started another import; it must
+        # not consume or reset the newer import's wall-clock measurement.
+        self._thumbnail_import_started_at[run_id] = self._import_wall_t0
+        thread = QThread()
+        thread._family_memory_run_id = run_id
+        worker = ThumbnailWorker(photos, batch_size=20, delay_ms=0)
+        self.thumbnail_thread = thread
+        self.thumbnail_worker = worker
 
-    def _on_thumbnail_worker_finished(self) -> None:
-        """Called on the UI thread when the thumbnail worker has processed all photos."""
-        if self._import_wall_t0 > 0:
-            elapsed_ms = (time.perf_counter() - self._import_wall_t0) * 1000
+        worker.moveToThread(thread)
+
+        thread.started.connect(worker.run)
+        worker.thumbnail_ready.connect(self.update_thumbnail)
+        worker.finished.connect(worker.deleteLater)
+        worker.finished.connect(thread.quit, Qt.ConnectionType.DirectConnection)
+        thread.finished.connect(self._on_active_thumbnail_thread_finished, Qt.ConnectionType.QueuedConnection)
+        thread.finished.connect(thread.deleteLater)
+
+        thread.start()
+
+    @Slot()
+    def _on_active_thumbnail_thread_finished(self) -> None:
+        try:
+            thread = self.sender()
+        except RuntimeError:
+            thread = None
+        thread = thread or self.thumbnail_thread
+        self._on_thumbnail_thread_finished(
+            int(getattr(thread, "_family_memory_run_id", 0)), thread
+        )
+
+    def _on_thumbnail_thread_finished(self, run_id: int, finished_thread) -> None:
+        if run_id != self._active_thumbnail_run_id or self.thumbnail_thread is not finished_thread:
+            self._thumbnail_import_started_at.pop(run_id, None)
+            return
+        self._on_thumbnail_worker_finished(run_id)
+        self.thumbnail_thread = None
+        self.thumbnail_worker = None
+        self._active_thumbnail_run_id = 0
+        if self._embedding_close_requested:
+            self._pending_thumbnail_photos = None
+            return
+        if self._pending_import_folder_path is not None:
+            folder = self._pending_import_folder_path
+            self._pending_thumbnail_photos = None
+            self._begin_import_scan(folder)
+            return
+        pending = self._pending_thumbnail_photos
+        self._pending_thumbnail_photos = None
+        if pending is not None:
+            self._launch_thumbnail_worker(pending)
+            return
+        photos = self._current_import_photos
+        self._import_phase = "Embedding indexing"
+        logger.info(
+            "Import lifecycle generation=%s phase=Indexing submitted=%s",
+            self._import_generation, len(photos),
+        )
+        self._set_embedding_status("Indexing semantic embeddings: starting…")
+        self._start_embedding_indexing(photos)
+
+    def _on_thumbnail_worker_finished(self, run_id: int) -> None:
+        """Record timing only for the import that owns this finished run."""
+        started_at = self._thumbnail_import_started_at.pop(run_id, 0.0)
+        if started_at > 0 and started_at == self._import_wall_t0:
+            elapsed_ms = (time.perf_counter() - started_at) * 1000
             get_session_stats().record("total_import_wall_clock [UI]", elapsed_ms)
             self._import_wall_t0 = 0.0
             get_session_stats().print_summary()

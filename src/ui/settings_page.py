@@ -7,7 +7,7 @@ from pathlib import Path
 from threading import Event
 from typing import Callable
 
-from PySide6.QtCore import Qt, Signal, QThread, QTimer, Slot
+from PySide6.QtCore import Qt, Signal, QThread, Slot
 from PySide6.QtWidgets import (
     QFileDialog,
     QButtonGroup,
@@ -247,10 +247,6 @@ class SettingsPage(QWidget):
         self._restore_ai_environment_selection()
         self._refresh_mobileclip_status()
         self._refresh_source_summary()
-        # Resume a verification interrupted by a previous process only after
-        # widget construction is complete and the Qt event loop can own its
-        # worker lifecycle.  Do not misreport the interruption as cancellation.
-        QTimer.singleShot(0, self._recover_interrupted_mobileclip_verification)
         logger.info("SettingsPage construction %.1f ms", (time.perf_counter() - t0) * 1000)
         root.addStretch(1)
 
@@ -270,14 +266,14 @@ class SettingsPage(QWidget):
     def _show_ai_runtime_logs(self) -> None:
         self.ai_plan_box.setPlainText(self.ai_runtime_manager.storage.recent_log_text())
 
-    def _recover_interrupted_mobileclip_verification(self) -> None:
-        if not self.ai_runtime_manager.prepare_verification_recovery("mobileclip"):
-            return
+    def start_mobileclip_verification_recovery(self) -> None:
+        """Display and run recovery already authorized by app composition."""
         self.runtime_step_label.setText("Current step: starting verification recovery")
         self.ai_plan_box.append(
-            "The previous verification did not reach a terminal result. "
+            "The previous session did not leave a usable verified runtime. "
             "Verifying the configured runtime again."
         )
+        self._refresh_mobileclip_status()
         self._start_ai_runtime_operation("verify")
 
     def _refresh_mobileclip_status(self) -> None:

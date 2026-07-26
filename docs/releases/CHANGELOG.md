@@ -2,13 +2,18 @@
 
 ## Unreleased
 
-### BUG-001 — MobileCLIP verification lifecycle
+### BUG-001B — MobileCLIP cancelled-state startup recovery
 
-- Corrected the managed runtime lifecycle so only verification enters `Verifying`, successful execution persists `Ready`, prerequisite and execution failures remain truthful terminal states, cancellation persists `Cancelled`, and a transient state left by an interrupted process is automatically re-verified on restart instead of being mislabeled as cancelled.
-- Added a targeted migration for the earlier BUG-001 build that had already persisted interrupted verification as `Cancelled`: only records carrying the interruption marker are recovered automatically, while genuine user-cancelled records remain `Cancelled` and can be retried explicitly.
+- Completed the incomplete PR #41 lifecycle fix: its startup path recovered stale `Verifying` and only one specially marked legacy `Cancelled` record, so the Product Owner's persisted `provider verification cancelled` record remained permanently authoritative and Settings never started verification.
+- Moved the explicit, idempotent startup decision to application composition. On a new session, any persisted `Cancelled` or stale `Verifying` runtime is moved by `AIRuntimeManager` to recovery-pending `Verifying` and verified using the Settings worker; observed cancellation remains truthfully `Cancelled` for the rest of the session and the existing Verify action remains available.
+- Settings now refreshes visibly when recovery begins as well as when it completes. Verification still reports dependency, checkpoint, execution, and cancellation outcomes truthfully and never hard-codes `Ready`.
 - Made Test Image and import-time semantic indexing consult the same authoritative runtime state, and composed Settings and indexing with one application-owned runtime manager while retaining explicit dependency injection for tests.
 - Preserved cache-first embedding reuse, strict dependency/checkpoint checks, per-image corrupt-file isolation, local-only execution, and confirmation-gated installation/download behavior.
-- Product Owner validation with the 422-photo folder and restart remains mandatory before merge.
+- Product Owner validation from the existing persisted `Cancelled` metadata, including the 422-photo import, cache reuse, Test Image, and restart, remains mandatory before merge.
+- Follow-up validation reached `Ready`, produced a finite 512-dimensional Test Image embedding, and indexed all 422 photos, but exposed a repeated-import crash. Repeated imports now serialize thumbnail workers instead of replacing a live `QThread`, cooperatively cancel superseded thumbnail work, wait for thread shutdown during application close, and deliver embedding UI callbacks through explicitly queued QObject slots. Persistent embedding stores are reopened safely and unchanged images are reported as cache reuse without loading the model.
+- A subsequent repeated-import validation exposed a queued-shutdown stall at “preparing new import”. Worker terminal signals now invoke the thread-safe `QThread.quit()` directly; the queued UI cleanup remains the single place that clears references and consumes a pending folder exactly once, so a second or third import resumes automatically without concurrent workers or polling.
+- Import coordination is now one serialized state machine owned by `MainWindow`: `Idle -> Preparing/scan -> Thumbnail generation -> Embedding indexing -> Cache reuse -> Completed`. A new request during scan, thumbnail work, embedding work, or cleanup replaces the single pending folder; the active stage finishes or cancels cooperatively, its thread-finished owner clears references, and the pending scan starts exactly once. The UI reports the active/waiting stage rather than remaining at “preparing” with no worker.
+- Root-cause analysis of the repeatable `374/422` stall found leaked SQLite connections, not a model batch boundary: `sqlite3.Connection.__exit__` does not close the connection, so per-image cache reads/writes accumulated database and WAL descriptors across imports. `EmbeddingStore` now explicitly closes every connection, enforces terminal input accounting, and logs cache/terminal counts. A 422-item cached regression completes `0 new / 422 reused / 0 failed` with no descriptor growth.
 
 ### MODEL-004A — Face Recognition Foundation
 
