@@ -336,7 +336,7 @@ class AlbumReviewPage(QWidget):
 
         filters_group = QGroupBox("Filters")
         filters_layout = QHBoxLayout(filters_group)
-        filters_layout.setContentsMargins(8, 4, 8, 6)
+        filters_layout.setContentsMargins(6, 2, 6, 4)
         filters_layout.setSpacing(6)
         filters_layout.addWidget(QLabel("Decision:"))
         filters_layout.addWidget(self.filter_combo)
@@ -349,7 +349,7 @@ class AlbumReviewPage(QWidget):
 
         tools_group = QGroupBox("Selection and tools")
         tools_layout = QHBoxLayout(tools_group)
-        tools_layout.setContentsMargins(8, 4, 8, 6)
+        tools_layout.setContentsMargins(6, 2, 6, 4)
         tools_layout.setSpacing(6)
         tools_layout.addWidget(self.selection_count_label)
         tools_layout.addWidget(self.user_saved_label)
@@ -362,7 +362,7 @@ class AlbumReviewPage(QWidget):
 
         toolbar_layout = QVBoxLayout()
         toolbar_layout.setContentsMargins(0, 0, 0, 0)
-        toolbar_layout.setSpacing(4)
+        toolbar_layout.setSpacing(2)
         toolbar_layout.addWidget(filters_group)
         toolbar_layout.addWidget(tools_group)
 
@@ -389,8 +389,9 @@ class AlbumReviewPage(QWidget):
 
         self.preview_label = QLabel("No preview")
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview_label.setMinimumSize(300, 140)
-        self.preview_label.setMaximumHeight(190)
+        self.preview_label.setMinimumWidth(300)
+        self.preview_label.setMinimumHeight(120)
+        self.preview_label.setMaximumHeight(145)
         self.preview_label.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
@@ -418,15 +419,13 @@ class AlbumReviewPage(QWidget):
             "Select a photo to see why its current category is shown."
         )
         self.classification_summary_value.setWordWrap(True)
-        self.classification_summary_value.setMinimumHeight(32)
 
         self.ai_suggestion_value = QLabel(
             "Select one photo to check for an advisory suggestion."
         )
         self.ai_suggestion_value.setWordWrap(True)
-        self.ai_suggestion_value.setMinimumHeight(36)
         self.ai_suggestion_reasons = QListWidget()
-        self.ai_suggestion_reasons.setMaximumHeight(72)
+        self.ai_suggestion_reasons.setMaximumHeight(48)
         self.ai_suggestion_reasons.setVisible(False)
         self.apply_suggestion_button = QPushButton("Apply suggestion")
         self.apply_suggestion_button.clicked.connect(self._apply_current_suggestion)
@@ -458,22 +457,23 @@ class AlbumReviewPage(QWidget):
         self.decision_selector.setVisible(False)
         self.apply_decision_button.setVisible(False)
 
-        preview_section = QGroupBox("Preview")
-        preview_layout = QVBoxLayout(preview_section)
-        preview_layout.setContentsMargins(8, 6, 8, 8)
+        self.preview_section = QGroupBox("Preview")
+        preview_layout = QVBoxLayout(self.preview_section)
+        preview_layout.setContentsMargins(5, 3, 5, 4)
         preview_layout.addWidget(self.preview_label)
 
         self.current_status_section = QGroupBox("Current Status")
         status_form = QFormLayout(self.current_status_section)
-        status_form.setContentsMargins(8, 6, 8, 8)
+        status_form.setContentsMargins(5, 3, 5, 4)
+        status_form.setVerticalSpacing(1)
         status_form.addRow("Current category:", self.media_category_value)
         status_form.addRow("Source:", self.category_source_value)
         status_form.addRow("Decision:", self.user_decision_value)
 
         self.ai_suggestion_section = QGroupBox("AI Suggestion")
         suggestion_layout = QVBoxLayout(self.ai_suggestion_section)
-        suggestion_layout.setContentsMargins(8, 6, 8, 8)
-        suggestion_layout.setSpacing(4)
+        suggestion_layout.setContentsMargins(5, 3, 5, 4)
+        suggestion_layout.setSpacing(2)
         suggestion_layout.addWidget(self.ai_suggestion_value)
         suggestion_layout.addWidget(self.ai_suggestion_reasons)
         suggestion_actions = QHBoxLayout()
@@ -484,12 +484,12 @@ class AlbumReviewPage(QWidget):
 
         self.classification_summary_section = QGroupBox("Classification Summary")
         summary_layout = QVBoxLayout(self.classification_summary_section)
-        summary_layout.setContentsMargins(8, 6, 8, 8)
+        summary_layout.setContentsMargins(5, 3, 5, 4)
         summary_layout.addWidget(self.classification_summary_value)
 
         self.photo_information_section = QGroupBox("Photo Information")
         information_form = QFormLayout(self.photo_information_section)
-        information_form.setContentsMargins(8, 6, 8, 8)
+        information_form.setContentsMargins(5, 3, 5, 4)
         information_form.addRow("Filename:", self.filename_value)
         information_form.addRow("Date:", self.date_value)
         information_form.addRow("Date source:", self.date_source_value)
@@ -524,7 +524,8 @@ class AlbumReviewPage(QWidget):
 
         self.actions_section = QGroupBox("Actions")
         actions_layout = QVBoxLayout(self.actions_section)
-        actions_layout.setContentsMargins(8, 6, 8, 8)
+        actions_layout.setContentsMargins(5, 3, 5, 4)
+        actions_layout.setSpacing(2)
         actions_layout.addWidget(self.action_scope_label)
         category_actions = QHBoxLayout()
         category_actions.addWidget(QLabel("Category:"))
@@ -533,17 +534,27 @@ class AlbumReviewPage(QWidget):
         actions_layout.addLayout(category_actions)
 
         details_content = QWidget()
-        details_layout = QVBoxLayout(details_content)
-        details_layout.setContentsMargins(4, 4, 4, 4)
-        details_layout.setSpacing(6)
-        details_layout.addWidget(preview_section)
-        details_layout.addWidget(self.current_status_section)
-        details_layout.addWidget(self.ai_suggestion_section)
-        details_layout.addWidget(self.classification_summary_section)
-        details_layout.addWidget(self.photo_information_section)
-        details_layout.addWidget(self.actions_section)
-        details_layout.addWidget(self.diagnostics_section)
-        details_layout.addStretch(1)
+        self.details_layout = QVBoxLayout(details_content)
+        self.details_layout.setContentsMargins(2, 2, 2, 2)
+        self.details_layout.setSpacing(3)
+        self.details_layout.addWidget(self.preview_section)
+        self.details_layout.addWidget(self.current_status_section)
+        self.details_layout.addWidget(self.ai_suggestion_section)
+        self.details_layout.addWidget(self.classification_summary_section)
+        self.details_layout.addWidget(self.actions_section)
+        self.details_layout.addWidget(self.photo_information_section)
+        self.details_layout.addWidget(self.diagnostics_section)
+        self.details_layout.addStretch(1)
+
+        for section in (
+            self.current_status_section,
+            self.ai_suggestion_section,
+            self.classification_summary_section,
+            self.actions_section,
+        ):
+            section.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum
+            )
 
         self.details_scroll = QScrollArea()
         self.details_scroll.setWidgetResizable(True)
@@ -570,8 +581,8 @@ class AlbumReviewPage(QWidget):
         self.main_splitter.setSizes([700, 700])
 
         root_layout = QVBoxLayout(self)
-        root_layout.setContentsMargins(8, 6, 8, 8)
-        root_layout.setSpacing(4)
+        root_layout.setContentsMargins(6, 3, 6, 5)
+        root_layout.setSpacing(2)
         root_layout.addWidget(self.header)
         root_layout.addWidget(self.info_panel)
         root_layout.addLayout(toolbar_layout)

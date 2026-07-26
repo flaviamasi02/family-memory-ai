@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 from PySide6.QtTest import QTest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QMessageBox, QSizePolicy
 
 from album.album_scoring_engine import AlbumScoreBreakdown
 from core.category_registry import get_category_registry, reset_category_registry
@@ -145,8 +145,23 @@ class AlbumReviewPageTests(unittest.TestCase):
         self.assertEqual(page.photo_information_section.title(), "Photo Information")
         self.assertEqual(page.actions_section.title(), "Actions")
         self.assertEqual(page.apply_category_button.text(), "Apply Category to Selected")
-        self.assertGreaterEqual(page.classification_summary_value.minimumHeight(), 30)
-        self.assertGreaterEqual(page.ai_suggestion_value.minimumHeight(), 30)
+        self.assertLessEqual(page.preview_label.minimumHeight(), 150)
+        self.assertLessEqual(page.preview_label.maximumHeight(), 150)
+        for section in (
+            page.current_status_section,
+            page.ai_suggestion_section,
+            page.classification_summary_section,
+            page.actions_section,
+        ):
+            self.assertEqual(
+                section.sizePolicy().verticalPolicy(), QSizePolicy.Policy.Maximum
+            )
+        self.assertFalse(page.photo_information_section.isChecked())
+        self.assertFalse(page.diagnostics_section.isChecked())
+        self.assertLess(
+            page.details_layout.indexOf(page.actions_section),
+            page.details_layout.indexOf(page.photo_information_section),
+        )
 
         for width, height in ((1366, 768), (1920, 1080), (2560, 1440)):
             page.resize(width, height)
@@ -932,6 +947,9 @@ class AlbumReviewPageTests(unittest.TestCase):
         self.assertFalse(page.diagnostics_section.isChecked())
         self.assertLessEqual(page.diagnostics_section.maximumHeight(), 30)
         self.assertGreater(page.explanations_list.minimumHeight(), 0)
+        self.assertLess(page.explanations_list.minimumHeight(), 200)
+        self.assertFalse(page.photo_information_section.isChecked())
+        self.assertLessEqual(page.photo_information_section.maximumHeight(), 30)
 
         page.diagnostics_section.setChecked(True)
         self._flush_ui()

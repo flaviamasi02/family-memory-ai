@@ -8,6 +8,7 @@
 - Replaced the dense sidebar with Preview, Current Status, AI Suggestion, Classification Summary, Photo Information, Actions, and collapsed Technical details sections.
 - Improved palette-aware card selection and badge styling, clarified bulk-action scope, and updated contextual help.
 - Preserved MODEL-003D suggestion states, persistence, semantic evidence, classification outcomes, thumbnail virtualization, filters, and all existing review actions; this is a UI-only restructuring and still requires Product Owner manual approval before merge.
+- Compacted the initial vertical layout so Preview, Current Status, AI Suggestion, Classification Summary, and Actions fit together at normal maximized desktop sizes; Photo Information and Technical details remain collapsed fallbacks.
 
 ### MODEL-003D canonical Family Photo category
 
