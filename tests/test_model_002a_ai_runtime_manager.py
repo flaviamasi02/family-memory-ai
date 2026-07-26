@@ -136,6 +136,11 @@ def test_verification_failure_and_cancellation_are_terminal(tmp_path):
     cancelled = _verification_ready_manager(tmp_path / 'cancelled', CommandResult('verify_provider', -1, '', 'Cancelled', 0.1, cancelled=True))
     cancelled.verify_provider('fake')
     assert cancelled.status('fake', deep=False).state == 'Cancelled'
+    assert cancelled.needs_verification_recovery('fake') is False
+
+    cancelled.executor.run_action = lambda *args, **kwargs: CommandResult('verify_provider', 0, 'ok', '', 0.1)
+    assert cancelled.verify_provider('fake').returncode == 0
+    assert cancelled.status('fake', deep=False).state == 'Ready'
 
 
 def test_stale_verifying_state_is_marked_for_reverification_after_restart(tmp_path):
@@ -152,3 +157,36 @@ def test_stale_verifying_state_is_marked_for_reverification_after_restart(tmp_pa
     assert restarted.verify_provider('fake').returncode == 0
     assert restarted.status('fake', deep=False).state == 'Ready'
     assert restarted.needs_verification_recovery('fake') is False
+
+
+def test_legacy_interruption_cancelled_state_is_migrated_and_reverified(tmp_path):
+    m = _verification_ready_manager(tmp_path)
+    rec = m.installation_record('fake')
+    rec.installation_state = 'Cancelled'
+    rec.last_validation_result = 'provider verification interrupted'
+    rec.last_error = 'Previous provider verification was interrupted before completion; run Verify again.'
+    m.storage.save_installation(rec)
+
+    restarted = AIRuntimeManager(m.registry, ApplicationDataPathService(tmp_path, tmp_path), m.executor)
+    assert restarted.needs_verification_recovery('fake') is True
+    assert restarted.prepare_verification_recovery('fake') is True
+    pending = restarted.installation_record('fake')
+    assert pending.installation_state == 'Verifying'
+    assert pending.last_validation_result == 'provider verification recovery pending'
+    assert restarted.verify_provider('fake').returncode == 0
+    assert restarted.status('fake', deep=False).state == 'Ready'
+
+
+def test_shutdown_interruption_is_not_recorded_as_explicit_cancellation(tmp_path):
+    m = _verification_ready_manager(tmp_path)
+    rec = m.installation_record('fake')
+    rec.installation_state = 'Verifying'
+    rec.last_validation_result = 'provider verification in progress'
+    rec.last_error = ''
+    m.storage.save_installation(rec)
+
+    restarted = AIRuntimeManager(m.registry, ApplicationDataPathService(tmp_path, tmp_path), m.executor)
+    restored = restarted.installation_record('fake')
+    assert restored.installation_state == 'Verifying'
+    assert restored.last_validation_result != 'provider verification cancelled'
+    assert restarted.prepare_verification_recovery('fake') is True

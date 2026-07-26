@@ -271,7 +271,7 @@ class SettingsPage(QWidget):
         self.ai_plan_box.setPlainText(self.ai_runtime_manager.storage.recent_log_text())
 
     def _recover_interrupted_mobileclip_verification(self) -> None:
-        if not self.ai_runtime_manager.needs_verification_recovery("mobileclip"):
+        if not self.ai_runtime_manager.prepare_verification_recovery("mobileclip"):
             return
         self.runtime_step_label.setText("Current step: starting verification recovery")
         self.ai_plan_box.append(

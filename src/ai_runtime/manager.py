@@ -73,7 +73,37 @@ class AIRuntimeManager:
         """Return whether startup found an orphaned transient verification."""
         rec=self.installation_record(provider_id)
         with self._verification_lock:
-            return rec.installation_state == AIRuntimeState.VERIFYING.value and provider_id not in self._active_verifications
+            stale_verifying=rec.installation_state == AIRuntimeState.VERIFYING.value
+            legacy_interruption=(
+                rec.installation_state == AIRuntimeState.CANCELLED.value
+                and rec.last_validation_result == 'provider verification interrupted'
+            )
+            return (stale_verifying or legacy_interruption) and provider_id not in self._active_verifications
+    def prepare_verification_recovery(self, provider_id:str) -> bool:
+        """Restore an interrupted prior-session operation to a retryable transient state.
+
+        Older BUG-001 builds persisted an inferred interruption as Cancelled.
+        The validation marker distinguishes that legacy state from an explicit
+        cancellation, whose marker is ``provider verification cancelled``.
+        """
+        with self._verification_lock:
+            if provider_id in self._active_verifications:
+                return False
+            rec=self.installation_record(provider_id)
+            stale_verifying=rec.installation_state == AIRuntimeState.VERIFYING.value
+            legacy_interruption=(
+                rec.installation_state == AIRuntimeState.CANCELLED.value
+                and rec.last_validation_result == 'provider verification interrupted'
+            )
+            if not (stale_verifying or legacy_interruption):
+                return False
+            if legacy_interruption:
+                rec.installation_state=AIRuntimeState.VERIFYING.value
+                rec.last_validation_result='provider verification recovery pending'
+                rec.last_error=''
+                rec.last_status_check=now_iso()
+                self.storage.save_installation(rec)
+            return True
     def build_installation_plan(self, provider_id:str, interpreter:str|Path|None=None, device:str='CPU') -> AIRuntimeInstallationPlan:
         start=time.perf_counter(); rec=self.installation_record(provider_id); selected_interpreter=interpreter or rec.interpreter_path or sys.executable
         logger.info("AI runtime installation-plan build started provider=%s interpreter=%s", provider_id, selected_interpreter)
