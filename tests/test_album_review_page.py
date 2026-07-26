@@ -924,9 +924,19 @@ class AlbumReviewPageTests(unittest.TestCase):
             self.assertEqual(status_by_path[str(approved_breakdown.photo.path)], "approved")
             self.assertEqual(status_by_path[str(rejected_breakdown.photo.path)], "rejected")
 
-    def test_explanations_widget_has_large_minimum_height(self):
+    def test_technical_explanations_are_secondary_and_expand_on_demand(self):
         page = AlbumReviewPage()
-        self.assertGreaterEqual(page.explanations_list.minimumHeight(), 200)
+
+        # UX-001 intentionally keeps diagnostics compact so Preview, Current Status,
+        # AI Suggestion, and category Actions receive the primary vertical space.
+        self.assertFalse(page.diagnostics_section.isChecked())
+        self.assertLessEqual(page.diagnostics_section.maximumHeight(), 30)
+        self.assertGreater(page.explanations_list.minimumHeight(), 0)
+
+        page.diagnostics_section.setChecked(True)
+        self._flush_ui()
+        self.assertGreater(page.diagnostics_section.maximumHeight(), 200)
+        self.assertTrue(page.explanations_list.isEnabled())
 
     def test_setting_4000_scored_photos_uses_lazy_initial_render(self):
         breakdowns = [self._make_virtual_breakdown(index) for index in range(4000)]
