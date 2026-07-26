@@ -97,3 +97,9 @@ Consequences:
 - UX-002 owns the future project-wide colour/icon badge language; UX-003 owns preview ratio, spacing, and AI Suggestion micro-layout polish.
 
 Canonical record: DEC-0050 in `docs/development/DECISIONS.md`.
+
+## MODEL-004A — Stable face identity and versioned evidence
+
+Decision: future face intelligence uses stable, portable Face, Person, and FaceCluster identities behind platform-neutral service/repository contracts. Embeddings are versioned cache evidence rather than identity, enabling future reprocessing and profile learning without discarding manual decisions. MODEL-004A contains no detection or recognition algorithm and makes no UI change.
+
+Canonical record: DEC-0051 in `docs/development/DECISIONS.md`; architecture detail in `docs/architecture/FACE_RECOGNITION.md`.

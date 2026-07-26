@@ -37,3 +37,9 @@ python scripts/similar_images.py <source-image> <folder> --limit 10
 ```
 
 The command uses the existing supported metadata image extensions, reports individual corrupt images as failures, and leaves original photo files unchanged.
+
+## MODEL-004A Face intelligence records
+
+The platform-neutral `faces` domain adds stable `Face`, `Person`, and `FaceCluster` records plus a separately versioned `FaceEmbedding` cache record. Faces retain image identity, source fingerprint, bounding box, detector provenance/confidence, landmarks, quality metrics, optional Person/Cluster assignments, timestamps, and revision. Embeddings are keyed independently by provider/model/revision/dimension so future retraining does not replace Face or Person identity.
+
+The SQLite persistence design supports multiple Faces per image, incremental upserts, stale-source filtering, targeted embedding invalidation, and relationship cleanup. The canonical design and compatibility rules are documented in `docs/architecture/FACE_RECOGNITION.md`.
