@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -12,6 +13,8 @@ from vision.evaluation_sources import EVALUATION_IMAGE_EXTENSIONS as IMAGE_EXTEN
 from vision.embedding_provider import EmbeddingRecord, EmbeddingStore, VisionEmbeddingProvider, now_iso, source_identity
 from vision.managed_mobileclip_provider import ManagedMobileCLIPEmbeddingProvider
 from vision.mobileclip_provider import MobileCLIPEmbeddingProvider
+
+logger = logging.getLogger(__name__)
 
 EMBEDDING_STATUS_PROCESSED = "processed"
 EMBEDDING_STATUS_CACHED = "cached"
@@ -96,6 +99,11 @@ class BatchEmbeddingService:
         unsupported_paths = [
             path for path in paths if path.suffix.lower() not in IMAGE_EXTENSIONS
         ]
+        logger.info(
+            "Embedding batch prepared total=%s cache_hits=%s cache_misses=%s unsupported=%s",
+            len(paths), sum(record is not None for record in cached_by_path.values()),
+            len(runtime_paths), len(unsupported_paths),
+        )
         try:
             prepare_batch = getattr(self.provider, "prepare_batch", None)
             # A valid stored vector needs no provider runtime.  Read cache state
@@ -181,6 +189,16 @@ class BatchEmbeddingService:
                 if progress_callback:
                     progress_callback(BatchEmbeddingProgress(idx, len(paths), str(path), result.processed_successfully, result.skipped_cached, result.failed))
         result.elapsed_seconds = time.perf_counter() - start
+        accounted = result.processed_successfully + result.skipped_cached + result.failed + result.cancelled
+        if accounted != result.total_images_received:
+            raise RuntimeError(
+                f"Embedding result accounting mismatch: total={result.total_images_received} accounted={accounted}"
+            )
+        logger.info(
+            "Embedding batch terminal total=%s consumed=%s processed=%s cached=%s failed=%s cancelled=%s",
+            result.total_images_received, accounted, result.processed_successfully,
+            result.skipped_cached, result.failed, result.cancelled,
+        )
         return result
 
     def _validate_record(self, record: EmbeddingRecord) -> None:

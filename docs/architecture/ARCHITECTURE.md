@@ -819,6 +819,8 @@ Runtime lifecycle state is authoritative persisted metadata, not a value inferre
 
 Runtime metadata is stored through `ApplicationDataPathService` outside the repository under `ai-runtimes/`, `cache/models/<provider>/`, and `logs/ai-runtime/`. JSON writes are atomic, schema-versioned, and corruption-safe. Removal plans delete only manager-owned paths with ownership markers and never delete photos, thumbnails, categories, learning profiles, or semantic embeddings unless a future explicit embedding cleanup option is approved.
 
+Semantic embedding cache operations use short-lived SQLite connections with explicit close ownership; transaction context management alone is not treated as connection cleanup. Batch indexing logs total inputs, cache hits/misses, consumed and terminal outcome counts, and rejects a terminal result unless `processed + cached + failed + cancelled == total`. Import generations and embedding run IDs are logged without photo contents. A terminal embedding result and its thread-finished event may arrive in either GUI-queue order; run lifecycle cleanup waits for both and cannot discard an already-emitted terminal result.
+
 ## MODEL-002B Managed Runtime Installation Flow
 
 MobileCLIP installation now uses the same `AIRuntimeManager` architecture introduced in MODEL-002A. The manager validates the selected Python interpreter, builds a typed plan, executes only confirmed actions, downloads the checkpoint to a temporary partial file before atomic rename, and records history/status outside Git. Verification is performed in the selected interpreter and requires torch, torchvision, Pillow, mobileclip, checkpoint presence/load, model/transforms, tokenizer, and a finite synthetic image embedding before the runtime becomes Ready.
