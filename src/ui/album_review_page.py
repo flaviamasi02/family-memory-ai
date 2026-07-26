@@ -391,14 +391,12 @@ class AlbumReviewPage(QWidget):
         self.preview_label = QLabel("No preview")
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview_label.setMinimumWidth(300)
-        self.preview_label.setMinimumHeight(120)
-        self.preview_label.setMaximumHeight(145)
+        self.preview_label.setMinimumHeight(165)
+        self.preview_label.setMaximumHeight(190)
         self.preview_label.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-        self.preview_label.setStyleSheet(
-            "border: 1px solid palette(mid); background: palette(base);"
-        )
+        self.preview_label.setStyleSheet("background: palette(window);")
 
         self.filename_value = QLabel("-")
         self.score_value = QLabel("-")
@@ -467,14 +465,14 @@ class AlbumReviewPage(QWidget):
 
         self.preview_section = QGroupBox("Preview")
         preview_layout = QVBoxLayout(self.preview_section)
-        preview_layout.setContentsMargins(5, 3, 5, 4)
+        preview_layout.setContentsMargins(2, 2, 2, 2)
         preview_layout.addWidget(self.preview_label)
 
         self.current_status_section = QGroupBox("Current Status")
-        status_form = QFormLayout(self.current_status_section)
-        status_form.setContentsMargins(5, 3, 5, 4)
-        status_form.setVerticalSpacing(1)
-        self.current_category_label = QLabel("Current category")
+        status_layout = QVBoxLayout(self.current_status_section)
+        status_layout.setContentsMargins(6, 4, 6, 4)
+        status_layout.setSpacing(1)
+        self.current_category_label = QLabel("Category")
         self.category_source_label = QLabel("Source")
         self.user_decision_label = QLabel("Decision")
         for label in (
@@ -486,9 +484,24 @@ class AlbumReviewPage(QWidget):
         self.media_category_value.setStyleSheet("font-size: 16px; font-weight: 700;")
         self.category_source_value.setStyleSheet("font-weight: 600;")
         self.user_decision_value.setStyleSheet("font-weight: 600;")
-        status_form.addRow(self.current_category_label, self.media_category_value)
-        status_form.addRow(self.category_source_label, self.category_source_value)
-        status_form.addRow(self.user_decision_label, self.user_decision_value)
+        status_layout.addWidget(self.current_category_label)
+        status_layout.addWidget(self.media_category_value)
+        status_layout.addSpacing(3)
+        status_layout.addWidget(self.category_source_label)
+        status_layout.addWidget(self.category_source_value)
+        status_layout.addSpacing(3)
+        status_layout.addWidget(self.user_decision_label)
+        status_layout.addWidget(self.user_decision_value)
+        status_layout.addStretch(1)
+
+        self.preview_status_row = QWidget()
+        preview_status_layout = QHBoxLayout(self.preview_status_row)
+        preview_status_layout.setContentsMargins(0, 0, 0, 0)
+        preview_status_layout.setSpacing(4)
+        preview_status_layout.addWidget(self.preview_section, 3)
+        preview_status_layout.addWidget(
+            self.current_status_section, 2, Qt.AlignmentFlag.AlignTop
+        )
 
         self.ai_suggestion_section = QGroupBox("AI Suggestion")
         suggestion_layout = QVBoxLayout(self.ai_suggestion_section)
@@ -561,8 +574,7 @@ class AlbumReviewPage(QWidget):
         self.details_layout = QVBoxLayout(details_content)
         self.details_layout.setContentsMargins(2, 2, 2, 2)
         self.details_layout.setSpacing(3)
-        self.details_layout.addWidget(self.preview_section)
-        self.details_layout.addWidget(self.current_status_section)
+        self.details_layout.addWidget(self.preview_status_row)
         self.details_layout.addWidget(self.ai_suggestion_section)
         self.details_layout.addWidget(self.classification_summary_section)
         self.details_layout.addWidget(self.actions_section)

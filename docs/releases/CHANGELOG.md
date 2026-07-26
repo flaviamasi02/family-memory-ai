@@ -11,6 +11,7 @@
 - Compacted the initial vertical layout so Preview, Current Status, AI Suggestion, Classification Summary, and Actions fit together at normal maximized desktop sizes; Photo Information and Technical details remain collapsed fallbacks.
 - Replaced the AI Suggestion evidence list with an adaptive word-wrapped explanation label so the full explanation is readable without nested scrolling.
 - Polished the selected-photo presentation with width-aware preview scaling, stronger Current Status and AI Suggestion hierarchy, and a visually grouped primary category action without changing review logic.
+- Placed Preview and Current Status side by side, enlarging the uncropped aspect-ratio-preserving preview while freeing vertical space for the remaining review sections.
 
 ### MODEL-003D canonical Family Photo category
 

@@ -153,8 +153,10 @@ class AlbumReviewPageTests(unittest.TestCase):
         self.assertEqual(page.photo_information_section.title(), "Photo Information")
         self.assertEqual(page.actions_section.title(), "Actions")
         self.assertEqual(page.apply_category_button.text(), "Apply Category to Selected")
-        self.assertLessEqual(page.preview_label.minimumHeight(), 150)
-        self.assertLessEqual(page.preview_label.maximumHeight(), 150)
+        self.assertGreaterEqual(page.preview_label.minimumHeight(), 160)
+        self.assertLessEqual(page.preview_label.maximumHeight(), 200)
+        self.assertIs(page.preview_section.parentWidget(), page.preview_status_row)
+        self.assertIs(page.current_status_section.parentWidget(), page.preview_status_row)
         for section in (
             page.current_status_section,
             page.ai_suggestion_section,
@@ -224,7 +226,7 @@ class AlbumReviewPageTests(unittest.TestCase):
         target_size = page._preview_target_size()
 
         self.assertGreater(target_size.width(), 500)
-        self.assertLessEqual(target_size.height(), 150)
+        self.assertLessEqual(target_size.height(), 190)
         self.assertIn("font-size: 16px", page.media_category_value.styleSheet())
         self.assertIn("font-weight: 700", page.media_category_value.styleSheet())
         self.assertTrue(page.apply_category_button.isDefault())
