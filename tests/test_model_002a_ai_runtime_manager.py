@@ -138,7 +138,7 @@ def test_verification_failure_and_cancellation_are_terminal(tmp_path):
     assert cancelled.status('fake', deep=False).state == 'Cancelled'
 
 
-def test_stale_verifying_state_is_recovered_truthfully_after_restart(tmp_path):
+def test_stale_verifying_state_is_marked_for_reverification_after_restart(tmp_path):
     m = _verification_ready_manager(tmp_path)
     rec = m.installation_record('fake')
     rec.installation_state = 'Verifying'
@@ -147,5 +147,8 @@ def test_stale_verifying_state_is_recovered_truthfully_after_restart(tmp_path):
 
     restarted = AIRuntimeManager(m.registry, ApplicationDataPathService(tmp_path, tmp_path), m.executor)
     status = restarted.status('fake', deep=False)
-    assert status.state == 'Cancelled'
-    assert 'interrupted' in status.last_error
+    assert status.state == 'Verifying'
+    assert restarted.needs_verification_recovery('fake') is True
+    assert restarted.verify_provider('fake').returncode == 0
+    assert restarted.status('fake', deep=False).state == 'Ready'
+    assert restarted.needs_verification_recovery('fake') is False

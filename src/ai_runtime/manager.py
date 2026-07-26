@@ -52,10 +52,11 @@ class AIRuntimeManager:
         elif missing_deps: state=AIRuntimeState.DEPENDENCIES_MISSING.value
         elif missing_files: state=AIRuntimeState.CHECKPOINT_MISSING.value
         elif verified: state=AIRuntimeState.READY.value
-        elif state == AIRuntimeState.VERIFYING.value and provider_id not in self._active_verifications:
-            state=AIRuntimeState.CANCELLED.value
-            rec.last_error='Previous provider verification was interrupted before completion; run Verify again.'
-            rec.last_validation_result='provider verification interrupted'
+        elif state == AIRuntimeState.VERIFYING.value:
+            # A persisted transient state means verification must be resumed by
+            # the application startup coordinator.  It is not cancellation:
+            # CANCELLED is reserved for an observed cancellation result.
+            state=AIRuntimeState.VERIFYING.value
         elif state not in (AIRuntimeState.FAILED.value, AIRuntimeState.CANCELLED.value):
             state=AIRuntimeState.FAILED.value
             rec.last_error=rec.last_error or 'Provider has not completed verification; run Verify.'
@@ -68,6 +69,11 @@ class AIRuntimeManager:
         if original != (rec.installation_state, rec.last_validation_result, rec.last_error):
             self.storage.save_installation(rec)
         return AIRuntimeStatus(provider_id,state,state==AIRuntimeState.READY.value,not missing_deps,not missing_files,'Unknown',rec.last_error,rec.last_status_check,missing_deps,missing_files,env)
+    def needs_verification_recovery(self, provider_id:str) -> bool:
+        """Return whether startup found an orphaned transient verification."""
+        rec=self.installation_record(provider_id)
+        with self._verification_lock:
+            return rec.installation_state == AIRuntimeState.VERIFYING.value and provider_id not in self._active_verifications
     def build_installation_plan(self, provider_id:str, interpreter:str|Path|None=None, device:str='CPU') -> AIRuntimeInstallationPlan:
         start=time.perf_counter(); rec=self.installation_record(provider_id); selected_interpreter=interpreter or rec.interpreter_path or sys.executable
         logger.info("AI runtime installation-plan build started provider=%s interpreter=%s", provider_id, selected_interpreter)

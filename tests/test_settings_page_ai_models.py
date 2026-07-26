@@ -265,6 +265,34 @@ def test_settings_refreshes_authoritative_state_after_verification_completion(mo
     page.deleteLater()
 
 
+def test_settings_restarts_orphaned_verification_instead_of_showing_cancelled(monkeypatch, tmp_path):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    widgets = pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
+    from ai_runtime.manager import create_default_runtime_manager
+    from ai_runtime.models import AIRuntimeState
+    from core.application_data import ApplicationDataPathService
+    from ui.settings_page import SettingsPage
+
+    app = widgets.QApplication.instance() or widgets.QApplication([])
+    manager = create_default_runtime_manager(ApplicationDataPathService(tmp_path, tmp_path))
+    record = manager.installation_record('mobileclip')
+    record.interpreter_path = __import__('sys').executable
+    record.installation_state = AIRuntimeState.VERIFYING.value
+    record.last_validation_result = 'provider verification in progress'
+    manager.storage.save_installation(record)
+    (Path(record.local_model_cache_path) / 'mobileclip_s0.pt').write_bytes(b'checkpoint')
+    page = SettingsPage(runtime_manager=manager)
+    started = []
+    monkeypatch.setattr(page, '_start_ai_runtime_operation', lambda operation, **kwargs: started.append(operation))
+
+    app.processEvents()
+
+    assert page.ai_detail_labels['Status'].text() == AIRuntimeState.VERIFYING.value
+    assert started == ['verify']
+    assert manager.installation_record('mobileclip').installation_state != AIRuntimeState.CANCELLED.value
+    page.deleteLater()
+
+
 def test_main_window_composes_one_runtime_manager_for_settings_and_indexing():
     source = Path('src/ui/main_window.py').read_text(encoding='utf-8')
     assert source.count('self.ai_runtime_manager = create_default_runtime_manager()') == 1
