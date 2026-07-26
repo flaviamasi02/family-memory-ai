@@ -3,7 +3,7 @@ import sys, threading
 from pathlib import Path
 import pytest
 from core.application_data import ApplicationDataPathService
-from ai_runtime.executor import AIRuntimeCommandExecutor
+from ai_runtime.executor import AIRuntimeCommandExecutor, CommandResult
 from ai_runtime.manager import AIRuntimeManager, create_default_runtime_manager
 from ai_runtime.models import AIRuntimeActionType, AIRuntimeBenchmarkRecord, AIRuntimeCapability, AIRuntimeDescriptor, AIRuntimeInstallationPlan, AIRuntimePlanAction, RequiredModelFile, RuntimeDependency
 from ai_runtime.registry import AIRuntimeRegistry
@@ -36,6 +36,11 @@ def test_runtime_status_ready_requires_dependencies_files_and_verification(tmp_p
     st=m.status('fake')
     assert st.state in ('Model not downloaded', 'Checkpoint Missing')
     cache=Path(m.installation_record('fake').local_model_cache_path); (cache/'model.bin').write_text('x')
+    assert m.status('fake').state == 'Failed'
+    rec=m.installation_record('fake'); rec.interpreter_path=sys.executable; m.storage.save_installation(rec)
+    m.executor.imports_available=lambda interpreter, names: ()
+    m.executor.run_action=lambda *args, **kwargs: CommandResult('verify_provider',0,'ok','',0)
+    assert m.verify_provider('fake').returncode == 0
     assert m.status('fake').state == 'Ready'
 
 def test_installation_plan_confirmation_and_interpreter_selection(tmp_path):
@@ -101,3 +106,46 @@ def test_mobileclip_product_owner_state_generates_no_reinstall_actions(tmp_path)
     assert any('Already satisfied dependencies: mobileclip, torch, torchvision, PIL' in warning for warning in plan.warnings)
     assert any(action.action_type == AIRuntimeActionType.DOWNLOAD_MODEL_FILE and action.destination.endswith('mobileclip_s0.pt') for action in plan.actions)
     assert all(action.action_type != AIRuntimeActionType.INSTALL_PYTHON_PACKAGE for action in plan.actions)
+
+
+def _verification_ready_manager(tmp_path, result=None):
+    m = manager(tmp_path)
+    rec = m.installation_record('fake')
+    rec.interpreter_path = sys.executable
+    m.storage.save_installation(rec)
+    (Path(rec.local_model_cache_path) / 'model.bin').write_text('checkpoint')
+    m.executor.imports_available = lambda interpreter, names: ()
+    m.executor.run_action = lambda *args, **kwargs: result or CommandResult('verify_provider', 0, '{"embedding_dimension": 512}', '', 0.1)
+    return m
+
+
+def test_successful_verification_persists_ready_and_survives_restart(tmp_path):
+    m = _verification_ready_manager(tmp_path)
+    assert m.verify_provider('fake').returncode == 0
+    assert m.status('fake', deep=False).state == 'Ready'
+    restarted = AIRuntimeManager(m.registry, ApplicationDataPathService(tmp_path, tmp_path), m.executor)
+    assert restarted.status('fake', deep=False).state == 'Ready'
+
+
+def test_verification_failure_and_cancellation_are_terminal(tmp_path):
+    failed = _verification_ready_manager(tmp_path / 'failed', CommandResult('verify_provider', 1, '', 'model execution failed', 0.1))
+    failed.verify_provider('fake')
+    assert failed.status('fake', deep=False).state == 'Failed'
+    assert 'model execution failed' in failed.installation_record('fake').last_error
+
+    cancelled = _verification_ready_manager(tmp_path / 'cancelled', CommandResult('verify_provider', -1, '', 'Cancelled', 0.1, cancelled=True))
+    cancelled.verify_provider('fake')
+    assert cancelled.status('fake', deep=False).state == 'Cancelled'
+
+
+def test_stale_verifying_state_is_recovered_truthfully_after_restart(tmp_path):
+    m = _verification_ready_manager(tmp_path)
+    rec = m.installation_record('fake')
+    rec.installation_state = 'Verifying'
+    rec.last_validation_result = 'provider verification in progress'
+    m.storage.save_installation(rec)
+
+    restarted = AIRuntimeManager(m.registry, ApplicationDataPathService(tmp_path, tmp_path), m.executor)
+    status = restarted.status('fake', deep=False)
+    assert status.state == 'Cancelled'
+    assert 'interrupted' in status.last_error

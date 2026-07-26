@@ -30,6 +30,10 @@ The redesign changed presentation only. MODEL-003D remains advisory and explaina
 
 - 2026-07-26
 
+## BUG-001 MobileCLIP lifecycle correction
+
+Implementation corrects the persisted verification lifecycle that could leave MobileCLIP indefinitely `Verifying` and consequently reject every uncached import image. Verification now owns the transient state and persists every terminal outcome; startup recovers an interrupted transient record; Settings, Test Image, and import indexing share the application-owned runtime manager and observe the same state. Strict package/checkpoint/provider execution checks and persistent cache reuse remain unchanged. Automated coverage is included, but Product Owner validation with the specified 422-photo folder, repeat import, and restart is mandatory before merge.
+
 
 ## MODEL chain current validation update
 
