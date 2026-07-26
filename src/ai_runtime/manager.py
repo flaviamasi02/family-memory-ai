@@ -135,7 +135,7 @@ print(json.dumps({m: (md.version(m) if m in {d.metadata['Name'] for d in md.dist
         rec.last_status_check=now_iso()
         self.storage.save_installation(rec)
         if not rec.interpreter_path:
-            message='Dependencies Missing - no persisted interpreter is selected for this runtime.'
+            message='Dependencies Missing - No persisted interpreter is selected for this runtime.'
             rec.installation_state=AIRuntimeState.DEPENDENCIES_MISSING.value; rec.last_validation_result=message; rec.last_error=message
             self.storage.save_installation(rec)
             self._active_verifications.discard(provider_id)
