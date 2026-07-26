@@ -124,8 +124,9 @@ def test_main_window_startup_succeeds_and_scan_complete_starts_embedding_indexin
             pass
 
     class FakeWorker:
-        def __init__(self, photos):
+        def __init__(self, photos, service_factory=None):
             self.photos = photos
+            self.service_factory = service_factory
             self.progress = _Signal()
             self.complete = _Signal()
             self.error = _Signal()
@@ -150,6 +151,9 @@ def test_main_window_startup_succeeds_and_scan_complete_starts_embedding_indexin
     window = MainWindow()
     window._on_scan_complete([])
     assert started == ["started"]
+    assert window.embedding_worker.service_factory is not None
+    service = window.embedding_worker.service_factory()
+    assert service.provider.runtime_manager is window.ai_runtime_manager
 
 
 class _Signal:
@@ -194,8 +198,9 @@ def test_slow_worker_is_not_abandoned_and_second_import_waits_for_finish(monkeyp
             self.deleted = True
 
     class FakeWorker:
-        def __init__(self, photos):
+        def __init__(self, photos, service_factory=None):
             self.photos = list(photos)
+            self.service_factory = service_factory
             self.progress = _Signal()
             self.complete = _Signal()
             self.error = _Signal()
@@ -228,11 +233,14 @@ def test_slow_worker_is_not_abandoned_and_second_import_waits_for_finish(monkeyp
     assert window.embedding_thread is first_thread
     assert window.embedding_worker is first_worker
     assert window._pending_embedding_photos == ["second"]
+    assert first_worker.service_factory is not None
+    assert first_worker.service_factory().provider.runtime_manager is window.ai_runtime_manager
 
     first_worker.finished.emit()
 
     assert len(workers) == 2
     assert workers[1].photos == ["second"]
+    assert workers[1].service_factory is not None
     assert window.embedding_thread is threads[1]
     assert window.embedding_worker is workers[1]
 
@@ -575,6 +583,9 @@ def test_second_import_during_embedding_waits_for_cancellation_before_scanning()
 
 def _embedding_window_for_lifecycle_tests():
     window = MainWindow.__new__(MainWindow)
+    # MainWindow owns this dependency in production; lifecycle-only tests avoid
+    # constructing the full UI but still preserve the worker composition contract.
+    window.ai_runtime_manager = object()
     window.scan_thread = None
     window.scan_worker = None
     window._scan_run_id = 0

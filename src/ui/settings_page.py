@@ -7,7 +7,7 @@ from pathlib import Path
 from threading import Event
 from typing import Callable
 
-from PySide6.QtCore import Qt, Signal, QThread, Slot
+from PySide6.QtCore import Qt, Signal, QThread, QTimer, Slot
 from PySide6.QtWidgets import (
     QFileDialog,
     QButtonGroup,
@@ -34,7 +34,7 @@ from vision.evaluation_sources import (
     current_library_source,
     selected_photos_source,
 )
-from ai_runtime.manager import create_default_runtime_manager
+from ai_runtime.manager import AIRuntimeManager, create_default_runtime_manager
 from ai_runtime.models import AIRuntimeInstallationPlan
 from workers.ai_runtime_worker import AIRuntimeOperationWorker
 
@@ -55,14 +55,14 @@ class SettingsPage(QWidget):
 
     WORKSPACE_ID = SETTINGS_WORKSPACE
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, runtime_manager: AIRuntimeManager | None = None):
         t0 = time.perf_counter()
         super().__init__(parent)
         self._library_provider: Callable[[], list] = lambda: []
         self._selection_provider: Callable[[], list] = lambda: []
         self._selected_folder: Path | None = None
         self._last_source_result: EvaluationSourceResult | None = None
-        self.ai_runtime_manager = create_default_runtime_manager()
+        self.ai_runtime_manager = runtime_manager or create_default_runtime_manager()
         self._last_installation_plan: AIRuntimeInstallationPlan | None = None
         self._active_runtime_thread: QThread | None = None
         self._active_runtime_worker: AIRuntimeOperationWorker | None = None
@@ -247,6 +247,10 @@ class SettingsPage(QWidget):
         self._restore_ai_environment_selection()
         self._refresh_mobileclip_status()
         self._refresh_source_summary()
+        # Resume a verification interrupted by a previous process only after
+        # widget construction is complete and the Qt event loop can own its
+        # worker lifecycle.  Do not misreport the interruption as cancellation.
+        QTimer.singleShot(0, self._recover_interrupted_mobileclip_verification)
         logger.info("SettingsPage construction %.1f ms", (time.perf_counter() - t0) * 1000)
         root.addStretch(1)
 
@@ -265,6 +269,16 @@ class SettingsPage(QWidget):
 
     def _show_ai_runtime_logs(self) -> None:
         self.ai_plan_box.setPlainText(self.ai_runtime_manager.storage.recent_log_text())
+
+    def _recover_interrupted_mobileclip_verification(self) -> None:
+        if not self.ai_runtime_manager.prepare_verification_recovery("mobileclip"):
+            return
+        self.runtime_step_label.setText("Current step: starting verification recovery")
+        self.ai_plan_box.append(
+            "The previous verification did not reach a terminal result. "
+            "Verifying the configured runtime again."
+        )
+        self._start_ai_runtime_operation("verify")
 
     def _refresh_mobileclip_status(self) -> None:
         refresh_t0 = time.perf_counter()

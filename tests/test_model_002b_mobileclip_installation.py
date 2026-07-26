@@ -41,7 +41,11 @@ def test_verify_requires_persisted_selected_interpreter(tmp_path):
     m=create_default_runtime_manager(ApplicationDataPathService(tmp_path,tmp_path))
     result=m.verify_provider('mobileclip')
     assert result.returncode != 0
-    assert 'No persisted interpreter' in result.stderr
+    assert result.stderr == 'Dependencies Missing - No persisted interpreter is selected for this runtime.'
+    record=m.installation_record('mobileclip')
+    assert record.installation_state == AIRuntimeState.DEPENDENCIES_MISSING.value
+    assert record.last_validation_result == result.stderr
+    assert record.last_error == result.stderr
 
 
 def test_ready_requires_full_provider_verification_record(tmp_path):

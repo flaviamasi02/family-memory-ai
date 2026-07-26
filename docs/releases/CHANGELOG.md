@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### BUG-001 — MobileCLIP verification lifecycle
+
+- Corrected the managed runtime lifecycle so only verification enters `Verifying`, successful execution persists `Ready`, prerequisite and execution failures remain truthful terminal states, cancellation persists `Cancelled`, and a transient state left by an interrupted process is automatically re-verified on restart instead of being mislabeled as cancelled.
+- Added a targeted migration for the earlier BUG-001 build that had already persisted interrupted verification as `Cancelled`: only records carrying the interruption marker are recovered automatically, while genuine user-cancelled records remain `Cancelled` and can be retried explicitly.
+- Made Test Image and import-time semantic indexing consult the same authoritative runtime state, and composed Settings and indexing with one application-owned runtime manager while retaining explicit dependency injection for tests.
+- Preserved cache-first embedding reuse, strict dependency/checkpoint checks, per-image corrupt-file isolation, local-only execution, and confirmation-gated installation/download behavior.
+- Product Owner validation with the 422-photo folder and restart remains mandatory before merge.
+
 ### MODEL-004A — Face Recognition Foundation
 
 - Established stable, platform-neutral Face, Person, FaceCluster, bounding-box, landmark, quality, and versioned FaceEmbedding records.
