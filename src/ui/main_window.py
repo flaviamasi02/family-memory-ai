@@ -22,6 +22,7 @@ from album.album_draft_builder import AlbumDraftBuilder
 from album.annual_album import AnnualAlbum
 from album.album_scoring_engine import AlbumScoringEngine
 from album.candidate_selection_engine import CandidateSelectionEngine
+from ai_runtime.manager import create_default_runtime_manager
 from core.perf_stats import get_session_stats, reset_session_stats
 from core.safe_file_move_service import CLEANUP_REVIEW_FOLDER_NAME
 from models.photo_model import PhotoModel
@@ -85,6 +86,9 @@ class MainWindow(QMainWindow):
         self._first_thumbnail_logged: bool = False
         self._workspace_help_registry = WorkspaceHelpRegistry()
         self._tab_workspace_ids: list[str] = []
+        # Settings and background indexing must share one authoritative model
+        # lifecycle rather than constructing independent runtime managers.
+        self.ai_runtime_manager = create_default_runtime_manager()
 
         title = QLabel("Family Memory AI")
         title.setStyleSheet("font-size: 28px; font-weight: bold;")
@@ -134,7 +138,7 @@ class MainWindow(QMainWindow):
         self.irrelevant_media_page.categories_changed.connect(self._sync_cleanup_category_options)
         self.irrelevant_media_page.moved_photos.connect(self._handle_irrelevant_media_moved)
         self.irrelevant_media_page.faces_analyzed.connect(self._handle_faces_analyzed)
-        self.settings_page = SettingsPage()
+        self.settings_page = SettingsPage(runtime_manager=self.ai_runtime_manager)
         self.settings_page.help_requested.connect(self._on_workspace_help_requested)
         self.settings_page.set_evaluation_context_providers(
             self._mobileclip_library_photos,
@@ -418,7 +422,7 @@ class MainWindow(QMainWindow):
         self._active_embedding_run_id = run_id
 
         thread = QThread()
-        worker = EmbeddingWorker(photos)
+        worker = EmbeddingWorker(photos, runtime_manager=self.ai_runtime_manager)
         self.embedding_thread = thread
         self.embedding_worker = worker
         worker.moveToThread(thread)

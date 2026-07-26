@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### AI Runtime lifecycle regression fix
+
+- Fixed Settings and import indexing constructing independent default AI Runtime Manager instances.
+- Established one process-wide authoritative default runtime lifecycle and explicitly inject it into Settings and the import embedding worker/provider chain.
+- Preserved deep dependency, checkpoint, and provider readiness validation; no readiness check is bypassed or weakened.
+
 ### MODEL-004A — Face Recognition Foundation
 
 - Added platform-neutral Face, Person, FaceCluster, geometry, landmark, quality, and versioned FaceEmbedding domain records with stable IDs and JSON-safe serialization.

@@ -34,7 +34,7 @@ from vision.evaluation_sources import (
     current_library_source,
     selected_photos_source,
 )
-from ai_runtime.manager import create_default_runtime_manager
+from ai_runtime.manager import AIRuntimeManager, create_default_runtime_manager
 from ai_runtime.models import AIRuntimeInstallationPlan
 from workers.ai_runtime_worker import AIRuntimeOperationWorker
 
@@ -55,14 +55,14 @@ class SettingsPage(QWidget):
 
     WORKSPACE_ID = SETTINGS_WORKSPACE
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, runtime_manager: AIRuntimeManager | None = None):
         t0 = time.perf_counter()
         super().__init__(parent)
         self._library_provider: Callable[[], list] = lambda: []
         self._selection_provider: Callable[[], list] = lambda: []
         self._selected_folder: Path | None = None
         self._last_source_result: EvaluationSourceResult | None = None
-        self.ai_runtime_manager = create_default_runtime_manager()
+        self.ai_runtime_manager = runtime_manager or create_default_runtime_manager()
         self._last_installation_plan: AIRuntimeInstallationPlan | None = None
         self._active_runtime_thread: QThread | None = None
         self._active_runtime_worker: AIRuntimeOperationWorker | None = None

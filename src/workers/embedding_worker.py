@@ -6,7 +6,9 @@ from typing import Callable
 
 from PySide6.QtCore import QObject, Signal
 
+from ai_runtime.manager import AIRuntimeManager, create_default_runtime_manager
 from vision.batch_embedding_service import BatchEmbeddingProgress, BatchEmbeddingResult, BatchEmbeddingService
+from vision.managed_mobileclip_provider import ManagedMobileCLIPEmbeddingProvider
 
 
 class EmbeddingWorker(QObject):
@@ -23,10 +25,21 @@ class EmbeddingWorker(QObject):
     error = Signal(str)
     finished = Signal()
 
-    def __init__(self, photos, service_factory: Callable[[], BatchEmbeddingService] | None = None) -> None:
+    def __init__(
+        self,
+        photos,
+        service_factory: Callable[[], BatchEmbeddingService] | None = None,
+        runtime_manager: AIRuntimeManager | None = None,
+    ) -> None:
         super().__init__()
         self._photos = list(photos or [])
-        self._service_factory = service_factory or BatchEmbeddingService
+        if service_factory is not None:
+            self._service_factory = service_factory
+        else:
+            manager = runtime_manager or create_default_runtime_manager()
+            self._service_factory = lambda: BatchEmbeddingService(
+                provider=ManagedMobileCLIPEmbeddingProvider(runtime_manager=manager)
+            )
         self._cancel_event = Event()
 
     def cancel(self) -> None:
