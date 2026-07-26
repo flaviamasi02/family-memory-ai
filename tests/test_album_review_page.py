@@ -10,7 +10,15 @@ from unittest.mock import Mock, patch
 from PySide6.QtTest import QTest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import (
+    QAbstractScrollArea,
+    QApplication,
+    QLabel,
+    QMessageBox,
+    QPlainTextEdit,
+    QSizePolicy,
+    QTextEdit,
+)
 
 from album.album_scoring_engine import AlbumScoreBreakdown
 from core.category_registry import get_category_registry, reset_category_registry
@@ -132,6 +140,125 @@ class AlbumReviewPageTests(unittest.TestCase):
         pixmap.fill(color)
         saved = pixmap.save(str(path), "JPG")
         self.assertTrue(saved)
+
+    def test_redesigned_split_workspace_is_responsive_and_keeps_core_actions(self):
+        page = AlbumReviewPage()
+        self.assertFalse(page.main_splitter.childrenCollapsible())
+        self.assertEqual(page.main_splitter.count(), 2)
+        self.assertGreaterEqual(page.main_splitter.widget(0).minimumWidth(), 400)
+        self.assertGreaterEqual(page.main_splitter.widget(1).minimumWidth(), 400)
+        self.assertEqual(page.current_status_section.title(), "Current Status")
+        self.assertEqual(page.ai_suggestion_section.title(), "AI Suggestion")
+        self.assertEqual(page.classification_summary_section.title(), "Classification Summary")
+        self.assertEqual(page.photo_information_section.title(), "Photo Information")
+        self.assertEqual(page.actions_section.title(), "Actions")
+        self.assertEqual(page.apply_category_button.text(), "Apply Category to Selected")
+        self.assertGreaterEqual(page.preview_label.minimumHeight(), 160)
+        self.assertLessEqual(page.preview_label.maximumHeight(), 200)
+        self.assertIs(page.preview_section.parentWidget(), page.preview_status_row)
+        self.assertIs(page.current_status_section.parentWidget(), page.preview_status_row)
+        for section in (
+            page.current_status_section,
+            page.ai_suggestion_section,
+            page.classification_summary_section,
+            page.actions_section,
+        ):
+            self.assertEqual(
+                section.sizePolicy().verticalPolicy(), QSizePolicy.Policy.Maximum
+            )
+        self.assertFalse(page.photo_information_section.isChecked())
+        self.assertFalse(page.diagnostics_section.isChecked())
+        self.assertLess(
+            page.details_layout.indexOf(page.actions_section),
+            page.details_layout.indexOf(page.photo_information_section),
+        )
+
+        for width, height in ((1366, 768), (1920, 1080), (2560, 1440)):
+            page.resize(width, height)
+            page.show()
+            self._flush_ui()
+            sizes = page.main_splitter.sizes()
+            self.assertEqual(len(sizes), 2)
+            self.assertTrue(all(size >= 400 for size in sizes))
+            self.assertGreater(page.media_category_value.height(), 0)
+            self.assertGreater(page.user_decision_value.height(), 0)
+            self.assertGreater(page.apply_category_button.height(), 0)
+
+    def test_ai_suggestion_explanation_wraps_without_nested_scrolling(self):
+        page = AlbumReviewPage()
+        result = CategorySuggestionResult(
+            source_photo_key="suggested.jpg",
+            status="suggested",
+            suggested_category_id="family_photo",
+            suggested_category_name="Family Photo",
+            confidence=0.85,
+            evidence_counts={"family_photo": 3},
+            reasons=[
+                "This photo is visually similar to 3 photos previously confirmed as Family Photo.",
+                "The confirmed photos provide consistent semantic evidence.",
+            ],
+        )
+
+        page._render_category_suggestion(result)
+
+        self.assertIsInstance(page.ai_suggestion_reasons, QLabel)
+        self.assertNotIsInstance(
+            page.ai_suggestion_reasons,
+            (QAbstractScrollArea, QTextEdit, QPlainTextEdit),
+        )
+        self.assertTrue(page.ai_suggestion_reasons.wordWrap())
+        self.assertEqual(page.ai_suggestion_reasons.minimumHeight(), 0)
+        self.assertFalse(page.ai_suggestion_reasons.isHidden())
+        explanation_text = page.ai_suggestion_reasons.text()
+        self.assertIn("Explanation", explanation_text)
+        self.assertIn("visually similar", explanation_text)
+        self.assertIn("semantic evidence", explanation_text)
+        self.assertIn("<br>", explanation_text)
+        self.assertTrue(page.apply_suggestion_button.isEnabled())
+        self.assertTrue(page.reject_suggestion_button.isEnabled())
+        self.assertIn("Suggested category", page.ai_suggestion_value.text())
+        self.assertIn("Confidence", page.ai_suggestion_value.text())
+        self.assertIn("Supporting evidence", page.ai_suggestion_value.text())
+
+    def test_preview_and_primary_values_use_available_space(self):
+        page = AlbumReviewPage()
+        page.preview_label.resize(700, 140)
+        target_size = page._preview_target_size()
+
+        self.assertGreater(target_size.width(), 500)
+        self.assertLessEqual(target_size.height(), 190)
+        self.assertIn("font-size: 16px", page.media_category_value.styleSheet())
+        self.assertIn("font-weight: 700", page.media_category_value.styleSheet())
+        self.assertTrue(page.apply_category_button.isDefault())
+        self.assertGreaterEqual(page.category_selector.minimumWidth(), 180)
+
+    def test_classification_summary_describes_current_manual_and_unknown_states(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            manual = self._make_breakdown(
+                root, "manual.jpg", 80, 70, 60, 50, "2024:01:01 00:00:00",
+                metadata={
+                    "user_corrected_media_category": "document",
+                    "effective_media_category": "document",
+                    "media_category": "document",
+                },
+            )
+            unknown = self._make_breakdown(
+                root, "unknown.jpg", 70, 60, 50, 40, "2024:01:02 00:00:00",
+                metadata={
+                    "automatic_media_category": "unknown",
+                    "effective_media_category": "unknown",
+                    "media_category": "unknown",
+                },
+            )
+            page = AlbumReviewPage()
+            page.set_scored_photos([manual, unknown])
+            self._flush_ui()
+            self.assertTrue(page.select_photo_by_filename("manual.jpg"))
+            self.assertEqual(page.classification_summary_value.text(), "This category was selected manually.")
+            self.assertTrue(page.select_photo_by_filename("unknown.jpg"))
+            self.assertIn("No category has been confirmed yet", page.classification_summary_value.text())
+            self.assertEqual(page.category_source_value.text(), "Unconfirmed")
 
     def test_sorting_modes(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -870,9 +997,22 @@ class AlbumReviewPageTests(unittest.TestCase):
             self.assertEqual(status_by_path[str(approved_breakdown.photo.path)], "approved")
             self.assertEqual(status_by_path[str(rejected_breakdown.photo.path)], "rejected")
 
-    def test_explanations_widget_has_large_minimum_height(self):
+    def test_technical_explanations_are_secondary_and_expand_on_demand(self):
         page = AlbumReviewPage()
-        self.assertGreaterEqual(page.explanations_list.minimumHeight(), 200)
+
+        # UX-001 intentionally keeps diagnostics compact so Preview, Current Status,
+        # AI Suggestion, and category Actions receive the primary vertical space.
+        self.assertFalse(page.diagnostics_section.isChecked())
+        self.assertLessEqual(page.diagnostics_section.maximumHeight(), 30)
+        self.assertGreater(page.explanations_list.minimumHeight(), 0)
+        self.assertLess(page.explanations_list.minimumHeight(), 200)
+        self.assertFalse(page.photo_information_section.isChecked())
+        self.assertLessEqual(page.photo_information_section.maximumHeight(), 30)
+
+        page.diagnostics_section.setChecked(True)
+        self._flush_ui()
+        self.assertGreater(page.diagnostics_section.maximumHeight(), 200)
+        self.assertTrue(page.explanations_list.isEnabled())
 
     def test_setting_4000_scored_photos_uses_lazy_initial_render(self):
         breakdowns = [self._make_virtual_breakdown(index) for index in range(4000)]

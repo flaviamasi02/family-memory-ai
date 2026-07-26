@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from html import escape
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,6 +14,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QFormLayout,
     QGridLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -100,7 +102,8 @@ class AlbumReviewCardWidget(QFrame):
         self.decision_badge = QLabel("")
         for badge in (self.score_badge, self.category_badge, self.decision_badge):
             badge.setStyleSheet(
-                "background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 6px; padding: 2px 6px;"
+                "background: palette(alternate-base); border: 1px solid palette(mid); "
+                "border-radius: 6px; padding: 2px 5px;"
             )
             badge.setMaximumHeight(22)
 
@@ -193,11 +196,13 @@ class AlbumReviewCardWidget(QFrame):
         self._selected = bool(selected)
         if self._selected:
             self.setStyleSheet(
-                "QFrame#albumReviewCard { border: 2px solid #1f6feb; border-radius: 6px; background: #eef6ff; }"
+                "QFrame#albumReviewCard { border: 3px solid palette(highlight); "
+                "border-radius: 6px; background: palette(alternate-base); }"
             )
         else:
             self.setStyleSheet(
-                "QFrame#albumReviewCard { border: 1px solid #c9c9c9; border-radius: 6px; background: #ffffff; }"
+                "QFrame#albumReviewCard { border: 1px solid palette(mid); "
+                "border-radius: 6px; background: palette(base); }"
             )
 
     def mousePressEvent(self, event):
@@ -281,6 +286,8 @@ class AlbumReviewPage(QWidget):
             tip=info_content.tip,
             collapsed_label=info_content.collapsed_label,
         )
+        # Review benefits from vertical working space; guidance remains one click away.
+        self.info_panel.set_expanded(False)
 
         self.filter_combo = QComboBox()
         self.filter_combo.addItems(
@@ -308,18 +315,12 @@ class AlbumReviewPage(QWidget):
         self._search_debounce_timer.timeout.connect(self._trigger_refresh)
         self.search_input.textChanged.connect(self._on_search_text_changed)
 
-        controls_layout = QHBoxLayout()
-        controls_layout.addWidget(QLabel("Decision status:"))
-        controls_layout.addWidget(self.filter_combo)
-        controls_layout.addWidget(QLabel("Category:"))
-        controls_layout.addWidget(self.category_filter_combo)
-        controls_layout.addWidget(QLabel("Sort:"))
-        controls_layout.addWidget(self.sort_combo)
-        controls_layout.addWidget(QLabel("Search:"))
-        controls_layout.addWidget(self.search_input, 1)
         self.selection_count_label = QLabel("Selected: 0")
+        self.selection_count_label.setStyleSheet("font-weight: 600;")
         self.user_saved_label = QLabel("")
-        self.user_saved_label.setStyleSheet("font-size: 12px; color: #1f6feb;")
+        self.user_saved_label.setStyleSheet(
+            "font-size: 12px; color: palette(highlight);"
+        )
         self.user_saved_label.setVisible(False)
         self.select_all_visible_button = QPushButton("Select all visible")
         self.select_all_visible_button.clicked.connect(self.select_all_visible)
@@ -333,26 +334,54 @@ class AlbumReviewPage(QWidget):
         self.reclassify_unknowns_button.clicked.connect(
             self.reclassify_unknowns_from_learning
         )
-        controls_layout.addWidget(self.selection_count_label)
-        controls_layout.addWidget(self.user_saved_label)
-        controls_layout.addWidget(self.manage_categories_button)
-        controls_layout.addWidget(self.learning_summary_button)
-        controls_layout.addWidget(self.reclassify_unknowns_button)
-        controls_layout.addWidget(self.select_all_visible_button)
-        controls_layout.addWidget(self.clear_selection_button)
+
+        filters_group = QGroupBox("Filters")
+        filters_layout = QHBoxLayout(filters_group)
+        filters_layout.setContentsMargins(6, 2, 6, 4)
+        filters_layout.setSpacing(6)
+        filters_layout.addWidget(QLabel("Decision:"))
+        filters_layout.addWidget(self.filter_combo)
+        filters_layout.addWidget(QLabel("Category:"))
+        filters_layout.addWidget(self.category_filter_combo)
+        filters_layout.addWidget(QLabel("Sort:"))
+        filters_layout.addWidget(self.sort_combo)
+        filters_layout.addWidget(QLabel("Search:"))
+        filters_layout.addWidget(self.search_input, 1)
+
+        tools_group = QGroupBox("Selection and tools")
+        tools_layout = QHBoxLayout(tools_group)
+        tools_layout.setContentsMargins(6, 2, 6, 4)
+        tools_layout.setSpacing(6)
+        tools_layout.addWidget(self.selection_count_label)
+        tools_layout.addWidget(self.user_saved_label)
+        tools_layout.addStretch(1)
+        tools_layout.addWidget(self.manage_categories_button)
+        tools_layout.addWidget(self.learning_summary_button)
+        tools_layout.addWidget(self.reclassify_unknowns_button)
+        tools_layout.addWidget(self.select_all_visible_button)
+        tools_layout.addWidget(self.clear_selection_button)
+
+        toolbar_layout = QVBoxLayout()
+        toolbar_layout.setContentsMargins(0, 0, 0, 0)
+        toolbar_layout.setSpacing(2)
+        toolbar_layout.addWidget(filters_group)
+        toolbar_layout.addWidget(tools_group)
 
         self.results_label = QLabel("Showing 0 photos")
 
         self.grid_scroll = QScrollArea(self)
         self.grid_scroll.setWidgetResizable(True)
+        self.grid_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
 
         self.grid_content = QWidget(self.grid_scroll)
         self.grid_content.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
         )
         self.grid_layout = QGridLayout(self.grid_content)
-        self.grid_layout.setContentsMargins(10, 10, 10, 10)
-        self.grid_layout.setSpacing(8)
+        self.grid_layout.setContentsMargins(8, 8, 8, 8)
+        self.grid_layout.setSpacing(10)
         self.grid_scroll.setWidget(self.grid_content)
         self.grid_scroll.viewport().installEventFilter(self)
         self.grid_scroll.verticalScrollBar().valueChanged.connect(
@@ -361,14 +390,21 @@ class AlbumReviewPage(QWidget):
 
         self.preview_label = QLabel("No preview")
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview_label.setFixedSize(280, 160)
-        self.preview_label.setStyleSheet("border: 1px solid #aaa;")
+        self.preview_label.setMinimumWidth(300)
+        self.preview_label.setMinimumHeight(165)
+        self.preview_label.setMaximumHeight(190)
+        self.preview_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        self.preview_label.setStyleSheet("background: palette(window);")
 
         self.filename_value = QLabel("-")
         self.score_value = QLabel("-")
+        self.score_value.setWordWrap(True)
         self.pipeline_value = QLabel("-")
         self.rejection_reason_value = QLabel("-")
         self.media_category_value = QLabel("-")
+        self.media_category_value.setStyleSheet("font-weight: 700;")
         self.category_source_value = QLabel("-")
         self.classification_reason_value = QLabel("-")
         self.classification_reason_value.setWordWrap(True)
@@ -378,14 +414,24 @@ class AlbumReviewPage(QWidget):
         self.user_decision_value = QLabel("-")
         self.date_value = QLabel("-")
         self.date_source_value = QLabel("-")
-        self.ai_suggestion_title = QLabel("AI Suggestion")
-        self.ai_suggestion_title.setStyleSheet("font-weight: 700; margin-top: 8px;")
+        self.classification_summary_value = QLabel(
+            "Select a photo to see why its current category is shown."
+        )
+        self.classification_summary_value.setWordWrap(True)
+
         self.ai_suggestion_value = QLabel(
             "Select one photo to check for an advisory suggestion."
         )
         self.ai_suggestion_value.setWordWrap(True)
-        self.ai_suggestion_reasons = QListWidget()
-        self.ai_suggestion_reasons.setMaximumHeight(110)
+        self.ai_suggestion_reasons = QLabel("")
+        self.ai_suggestion_reasons.setWordWrap(True)
+        self.ai_suggestion_reasons.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self.ai_suggestion_reasons.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
+        self.ai_suggestion_reasons.setVisible(False)
         self.apply_suggestion_button = QPushButton("Apply suggestion")
         self.apply_suggestion_button.clicked.connect(self._apply_current_suggestion)
         self.reject_suggestion_button = QPushButton("Reject / Not useful")
@@ -393,90 +439,191 @@ class AlbumReviewPage(QWidget):
         self.apply_suggestion_button.setEnabled(False)
         self.reject_suggestion_button.setEnabled(False)
 
-        details_form = QFormLayout()
-        details_form.addRow("Filename:", self.filename_value)
-        details_form.addRow("Score:", self.score_value)
-        details_form.addRow("Current category:", self.media_category_value)
-        details_form.addRow("Category source:", self.category_source_value)
-        details_form.addRow("Initial technical reason:", self.classification_reason_value)
-        details_form.addRow("Visual signals:", self.visual_summary_value)
-        details_form.addRow("Confidence:", self.confidence_value)
-        details_form.addRow("User decision:", self.user_decision_value)
-        details_form.addRow("Date:", self.date_value)
-        details_form.addRow("Date source:", self.date_source_value)
-        details_form.addRow("Pipeline:", self.pipeline_value)
-        details_form.addRow("Rejection reason:", self.rejection_reason_value)
-
-        self.explanations_list = QListWidget()
-        self.explanations_list.setMinimumHeight(220)
-        self.explanations_list.setSizePolicy(
-            QSizePolicy.Policy.Preferred,
-            QSizePolicy.Policy.Expanding,
-        )
-
         self.decision_selector = QComboBox()
         for decision in UserDecision:
             self.decision_selector.addItem(decision.value)
         self.decision_selector.currentTextChanged.connect(
             self._on_decision_selector_changed
         )
-
         self.category_selector = QComboBox()
         self.category_selector.currentTextChanged.connect(
             self._on_category_selector_changed
         )
-
         self.apply_decision_button = QPushButton("Apply Decision to Selected")
         self.apply_decision_button.clicked.connect(self._apply_selector_decision)
         self.apply_category_button = QPushButton("Apply Category to Selected")
+        self.apply_category_button.setDefault(True)
         self.apply_category_button.clicked.connect(self._apply_selector_category)
-
-        actions_layout = QHBoxLayout()
-        actions_layout.addWidget(QLabel("Category:"))
-        actions_layout.addWidget(self.category_selector, 1)
-        actions_layout.addWidget(self.apply_category_button)
+        self.action_scope_label = QLabel(
+            "Select one or more photos to apply a category."
+        )
+        self.action_scope_label.setWordWrap(True)
         self.decision_action_label = QLabel("Decision:")
         self.decision_action_label.setVisible(False)
         self.decision_selector.setVisible(False)
         self.apply_decision_button.setVisible(False)
 
-        details_layout = QVBoxLayout()
-        details_layout.addWidget(QLabel("Preview"))
-        details_layout.addWidget(self.preview_label)
-        details_layout.addLayout(details_form)
-        details_layout.addWidget(self.ai_suggestion_title)
-        details_layout.addWidget(self.ai_suggestion_value)
-        details_layout.addWidget(self.ai_suggestion_reasons)
+        self.preview_section = QGroupBox("Preview")
+        preview_layout = QVBoxLayout(self.preview_section)
+        preview_layout.setContentsMargins(2, 2, 2, 2)
+        preview_layout.addWidget(self.preview_label)
+
+        self.current_status_section = QGroupBox("Current Status")
+        status_layout = QVBoxLayout(self.current_status_section)
+        status_layout.setContentsMargins(6, 4, 6, 4)
+        status_layout.setSpacing(1)
+        self.current_category_label = QLabel("Category")
+        self.category_source_label = QLabel("Source")
+        self.user_decision_label = QLabel("Decision")
+        for label in (
+            self.current_category_label,
+            self.category_source_label,
+            self.user_decision_label,
+        ):
+            label.setStyleSheet("font-size: 11px;")
+        self.media_category_value.setStyleSheet("font-size: 16px; font-weight: 700;")
+        self.category_source_value.setStyleSheet("font-weight: 600;")
+        self.user_decision_value.setStyleSheet("font-weight: 600;")
+        status_layout.addWidget(self.current_category_label)
+        status_layout.addWidget(self.media_category_value)
+        status_layout.addSpacing(3)
+        status_layout.addWidget(self.category_source_label)
+        status_layout.addWidget(self.category_source_value)
+        status_layout.addSpacing(3)
+        status_layout.addWidget(self.user_decision_label)
+        status_layout.addWidget(self.user_decision_value)
+        status_layout.addStretch(1)
+
+        self.preview_status_row = QWidget()
+        preview_status_layout = QHBoxLayout(self.preview_status_row)
+        preview_status_layout.setContentsMargins(0, 0, 0, 0)
+        preview_status_layout.setSpacing(4)
+        preview_status_layout.addWidget(self.preview_section, 3)
+        preview_status_layout.addWidget(
+            self.current_status_section, 2, Qt.AlignmentFlag.AlignTop
+        )
+
+        self.ai_suggestion_section = QGroupBox("AI Suggestion")
+        suggestion_layout = QVBoxLayout(self.ai_suggestion_section)
+        suggestion_layout.setContentsMargins(5, 3, 5, 4)
+        suggestion_layout.setSpacing(2)
+        suggestion_layout.addWidget(self.ai_suggestion_value)
+        suggestion_layout.addWidget(self.ai_suggestion_reasons)
         suggestion_actions = QHBoxLayout()
         suggestion_actions.addWidget(self.apply_suggestion_button)
         suggestion_actions.addWidget(self.reject_suggestion_button)
-        details_layout.addLayout(suggestion_actions)
-        details_layout.addWidget(QLabel("Score explanation"))
-        details_layout.addWidget(self.explanations_list, 1)
-        details_layout.addLayout(actions_layout)
+        suggestion_actions.addStretch(1)
+        suggestion_layout.addLayout(suggestion_actions)
 
-        details_panel = QWidget()
-        details_panel.setLayout(details_layout)
-        details_panel.setMinimumWidth(420)
+        self.classification_summary_section = QGroupBox("Classification Summary")
+        summary_layout = QVBoxLayout(self.classification_summary_section)
+        summary_layout.setContentsMargins(5, 3, 5, 4)
+        summary_layout.addWidget(self.classification_summary_value)
 
-        splitter = QSplitter()
+        self.photo_information_section = QGroupBox("Photo Information")
+        information_form = QFormLayout(self.photo_information_section)
+        information_form.setContentsMargins(5, 3, 5, 4)
+        information_form.addRow("Filename:", self.filename_value)
+        information_form.addRow("Date:", self.date_value)
+        information_form.addRow("Date source:", self.date_source_value)
+        information_form.addRow("Scores:", self.score_value)
+        self.photo_information_section.setCheckable(True)
+        self.photo_information_section.setChecked(False)
+        self.photo_information_section.toggled.connect(
+            lambda checked: self.photo_information_section.setMaximumHeight(
+                16777215 if checked else 28
+            )
+        )
+        self.photo_information_section.setMaximumHeight(28)
+
+        self.explanations_list = QListWidget()
+        self.explanations_list.setMinimumHeight(90)
+        self.diagnostics_section = QGroupBox("Technical details")
+        self.diagnostics_section.setCheckable(True)
+        self.diagnostics_section.setChecked(False)
+        diagnostics_form = QFormLayout(self.diagnostics_section)
+        diagnostics_form.addRow("Import reason:", self.classification_reason_value)
+        diagnostics_form.addRow("Visual signals:", self.visual_summary_value)
+        diagnostics_form.addRow("Confidence:", self.confidence_value)
+        diagnostics_form.addRow("Pipeline:", self.pipeline_value)
+        diagnostics_form.addRow("Rejection reason:", self.rejection_reason_value)
+        diagnostics_form.addRow("Score explanation:", self.explanations_list)
+        self.diagnostics_section.toggled.connect(
+            lambda checked: self.diagnostics_section.setMaximumHeight(
+                16777215 if checked else 28
+            )
+        )
+        self.diagnostics_section.setMaximumHeight(28)
+
+        self.actions_section = QGroupBox("Actions")
+        actions_layout = QVBoxLayout(self.actions_section)
+        actions_layout.setContentsMargins(5, 3, 5, 4)
+        actions_layout.setSpacing(2)
+        actions_layout.addWidget(self.action_scope_label)
+        category_actions = QHBoxLayout()
+        category_actions.setSpacing(4)
+        category_action_label = QLabel("Category")
+        category_action_label.setStyleSheet("font-size: 11px;")
+        category_actions.addWidget(category_action_label)
+        self.category_selector.setMinimumWidth(180)
+        category_actions.addWidget(self.category_selector, 1)
+        category_actions.addWidget(self.apply_category_button)
+        actions_layout.addLayout(category_actions)
+
+        details_content = QWidget()
+        self.details_layout = QVBoxLayout(details_content)
+        self.details_layout.setContentsMargins(2, 2, 2, 2)
+        self.details_layout.setSpacing(3)
+        self.details_layout.addWidget(self.preview_status_row)
+        self.details_layout.addWidget(self.ai_suggestion_section)
+        self.details_layout.addWidget(self.classification_summary_section)
+        self.details_layout.addWidget(self.actions_section)
+        self.details_layout.addWidget(self.photo_information_section)
+        self.details_layout.addWidget(self.diagnostics_section)
+        self.details_layout.addStretch(1)
+
+        for section in (
+            self.current_status_section,
+            self.ai_suggestion_section,
+            self.classification_summary_section,
+            self.actions_section,
+        ):
+            section.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum
+            )
+
+        self.details_scroll = QScrollArea()
+        self.details_scroll.setWidgetResizable(True)
+        self.details_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.details_scroll.setWidget(details_content)
+        self.details_scroll.setMinimumWidth(430)
+        self.details_scroll.viewport().installEventFilter(self)
+
         grid_panel = QWidget()
+        grid_panel.setMinimumWidth(430)
         grid_layout = QVBoxLayout(grid_panel)
         grid_layout.setContentsMargins(0, 0, 0, 0)
+        grid_layout.setSpacing(4)
         grid_layout.addWidget(self.results_label)
         grid_layout.addWidget(self.grid_scroll, 1)
 
-        splitter.addWidget(grid_panel)
-        splitter.addWidget(details_panel)
-        splitter.setStretchFactor(0, 8)
-        splitter.setStretchFactor(1, 3)
-        splitter.setSizes([1000, 420])
+        self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.main_splitter.setChildrenCollapsible(False)
+        self.main_splitter.addWidget(grid_panel)
+        self.main_splitter.addWidget(self.details_scroll)
+        self.main_splitter.setStretchFactor(0, 1)
+        self.main_splitter.setStretchFactor(1, 1)
+        self.main_splitter.setSizes([700, 700])
 
         root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(6, 3, 6, 5)
+        root_layout.setSpacing(2)
         root_layout.addWidget(self.header)
         root_layout.addWidget(self.info_panel)
-        root_layout.addLayout(controls_layout)
-        root_layout.addWidget(splitter, 1)
+        root_layout.addLayout(toolbar_layout)
+        root_layout.addWidget(self.main_splitter, 1)
 
         self._reload_category_controls()
 
@@ -965,6 +1112,14 @@ class AlbumReviewPage(QWidget):
             new_columns = self._calculate_columns()
             if new_columns != self._grid_columns:
                 self._relayout_existing_cards(new_columns)
+
+        details_scroll = getattr(self, "details_scroll", None)
+        if (
+            details_scroll is not None
+            and watched is details_scroll.viewport()
+            and event.type() == QEvent.Type.Resize
+        ):
+            self._refresh_selected_preview()
         return super().eventFilter(watched, event)
 
     def _relayout_existing_cards(self, new_columns: int) -> None:
@@ -1068,7 +1223,15 @@ class AlbumReviewPage(QWidget):
         self._update_selection_count()
 
     def _update_selection_count(self) -> None:
-        self.selection_count_label.setText(f"Selected: {len(self._selected_keys)}")
+        count = len(self._selected_keys)
+        self.selection_count_label.setText(f"Selected: {count}")
+        if count == 0:
+            scope = "Select one or more photos to apply a category."
+        elif count == 1:
+            scope = "The category action affects 1 selected photo."
+        else:
+            scope = f"The category action affects {count} selected photos."
+        self.action_scope_label.setText(scope)
 
     def _selected_rows(self) -> List[AlbumReviewRow]:
         selected = []
@@ -1144,6 +1307,31 @@ class AlbumReviewPage(QWidget):
         self.classification_reason_value.setText(
             str(getattr(photo, "classification_reason", "") or "-")
         )
+        if user_category:
+            support_count = int(
+                metadata.get("category_suggestion_support_count", 0) or 0
+            )
+            if self.category_source_value.text() == "Accepted AI suggestion":
+                evidence = (
+                    f" because it is visually similar to {support_count} confirmed "
+                    f"{media_category_label(category_value)} photos"
+                    if support_count
+                    else " from an advisory AI suggestion"
+                )
+                summary = f"This photo was accepted as {media_category_label(category_value)}{evidence}."
+            else:
+                summary = "This category was selected manually."
+        elif category_value == MediaCategory.Unknown.value:
+            summary = (
+                "No category has been confirmed yet. The app is waiting for stronger "
+                "semantic evidence or a manual decision."
+            )
+        else:
+            summary = (
+                f"The current {media_category_label(category_value)} category comes from "
+                "reliable import-time classification rules."
+            )
+        self.classification_summary_value.setText(summary)
         visual_parts = [
             str(photo.metadata.get("visual_signals_summary", "") or "").strip(),
             str(photo.metadata.get("visual_evidence", "") or "").strip(),
@@ -1180,7 +1368,8 @@ class AlbumReviewPage(QWidget):
         self.ai_suggestion_value.setText(
             "Select one photo to check for an advisory suggestion."
         )
-        self.ai_suggestion_reasons.clear()
+        self.ai_suggestion_reasons.setText("")
+        self.ai_suggestion_reasons.setVisible(False)
         self.apply_suggestion_button.setEnabled(False)
         self.reject_suggestion_button.setEnabled(False)
         for explanation in breakdown.explanation or []:
@@ -1209,6 +1398,9 @@ class AlbumReviewPage(QWidget):
         self.media_category_value.setText("-")
         self.category_source_value.setText("-")
         self.classification_reason_value.setText("-")
+        self.classification_summary_value.setText(
+            "Select a photo to see why its current category is shown."
+        )
         self.visual_summary_value.setText("-")
         self.confidence_value.setText("-")
         self.user_decision_value.setText("-")
@@ -1221,7 +1413,8 @@ class AlbumReviewPage(QWidget):
         self.ai_suggestion_value.setText(
             "Select one photo to check for an advisory suggestion."
         )
-        self.ai_suggestion_reasons.clear()
+        self.ai_suggestion_reasons.setText("")
+        self.ai_suggestion_reasons.setVisible(False)
         self.apply_suggestion_button.setEnabled(False)
         self.reject_suggestion_button.setEnabled(False)
 
@@ -1238,7 +1431,8 @@ class AlbumReviewPage(QWidget):
         request_id = self._suggestion_request_id
         self._current_suggestion = None
         self.ai_suggestion_value.setText("Checking stored visual evidence…")
-        self.ai_suggestion_reasons.clear()
+        self.ai_suggestion_reasons.setText("")
+        self.ai_suggestion_reasons.setVisible(False)
         self.apply_suggestion_button.setEnabled(False)
         self.reject_suggestion_button.setEnabled(False)
 
@@ -1261,19 +1455,32 @@ class AlbumReviewPage(QWidget):
 
     def _render_category_suggestion(self, result) -> None:
         self._current_suggestion = result if result.status == "suggested" else None
-        self.ai_suggestion_reasons.clear()
+        self.ai_suggestion_reasons.setText("")
+        self.ai_suggestion_reasons.setVisible(
+            bool(result.reasons) and result.status == "suggested"
+        )
         if result.status == "suggested":
+            support_count = result.evidence_counts.get(result.suggested_category_id, 0)
             self.ai_suggestion_value.setText(
-                f"Suggested category: {result.suggested_category_name}\nConfidence: {int(round(result.confidence * 100))}%\nSupporting evidence: {result.evidence_counts.get(result.suggested_category_id, 0)} photos"
+                "<span style='font-size: 11px'>Suggested category</span><br>"
+                f"<span style='font-size: 16px; font-weight: 700'>{escape(result.suggested_category_name)}</span><br>"
+                "<span style='font-size: 11px'>Confidence</span> "
+                f"<b>{int(round(result.confidence * 100))}%</b>&nbsp;&nbsp;"
+                "<span style='font-size: 11px'>Supporting evidence</span> "
+                f"<b>{support_count} confirmed similar photos</b>"
             )
-            for reason in result.reasons:
-                self.ai_suggestion_reasons.addItem(reason)
+            explanation = "<br>".join(
+                escape(str(reason).strip())
+                for reason in result.reasons
+                if str(reason).strip()
+            )
+            self.ai_suggestion_reasons.setText(
+                "<span style='font-size: 11px'>Explanation</span><br>" + explanation
+            )
             self.apply_suggestion_button.setEnabled(True)
             self.reject_suggestion_button.setEnabled(True)
         elif result.status == "already_accepted":
-            support_count = result.evidence_counts.get(
-                result.suggested_category_id, 0
-            )
+            support_count = result.evidence_counts.get(result.suggested_category_id, 0)
             support_text = (
                 f"\nSupporting evidence: {support_count} confirmed similar photos"
                 if support_count
@@ -1339,7 +1546,7 @@ class AlbumReviewPage(QWidget):
         self.ai_suggestion_value.setText(
             "Suggestion applied through the category correction workflow."
         )
-        self.ai_suggestion_reasons.clear()
+        self.ai_suggestion_reasons.setText("")
         self._category_suggestion_service.invalidate_cache()
 
     def _reject_current_suggestion(self) -> None:
@@ -1562,7 +1769,9 @@ class AlbumReviewPage(QWidget):
                 for name, value in previous_category_fields.items():
                     setattr(photo, name, value)
                 photo.sync_intelligence_from_metadata()
-                self._show_user_saved_indicator("Category save failed — no change applied")
+                self._show_user_saved_indicator(
+                    "Category save failed — no change applied"
+                )
                 return False
 
             if decision_changed:
@@ -1900,8 +2109,11 @@ class AlbumReviewPage(QWidget):
             if not cache_key.startswith(f"{key}|")
         }
 
-        preview_cache_key = self._thumbnail_cache_key(key, QSize(280, 160))
-        self._preview_cache.pop(preview_cache_key, None)
+        self._preview_cache = {
+            cache_key: value
+            for cache_key, value in self._preview_cache.items()
+            if not cache_key.startswith(f"{key}|")
+        }
 
         for row in self._all_rows:
             if self._row_key(row) != key:
@@ -1914,12 +2126,29 @@ class AlbumReviewPage(QWidget):
                 self._show_details(row, force=True)
             break
 
+    def _refresh_selected_preview(self) -> None:
+        row = self._selected_row()
+        if row is None:
+            return
+        preview = self._get_cached_preview(row.breakdown.photo)
+        if isinstance(preview, QPixmap) and not preview.isNull():
+            self.preview_label.setPixmap(preview)
+            self.preview_label.setText("")
+
+    def _preview_target_size(self) -> QSize:
+        available_width = max(300, self.preview_label.width() - 10)
+        # Quantizing avoids filling the cache with a new pixmap for every resize pixel.
+        target_width = max(300, (available_width // 40) * 40)
+        target_height = max(110, self.preview_label.height() - 8)
+        return QSize(target_width, target_height)
+
     def _get_cached_preview(self, photo) -> Optional[QPixmap]:
         photo_key = self._photo_key(photo)
         if not photo_key:
             return None
 
-        cache_key = self._thumbnail_cache_key(photo_key, QSize(280, 160))
+        target_size = self._preview_target_size()
+        cache_key = self._thumbnail_cache_key(photo_key, target_size)
         cached = self._preview_cache.get(cache_key)
         if cached is not None:
             return cached[1]
@@ -1927,7 +2156,7 @@ class AlbumReviewPage(QWidget):
         retained = self._retained_thumbnail_by_key.get(photo_key)
         if isinstance(retained, QPixmap) and not retained.isNull():
             scaled = retained.scaled(
-                QSize(280, 160),
+                target_size,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
@@ -1937,7 +2166,7 @@ class AlbumReviewPage(QWidget):
         photo_thumbnail = getattr(photo, "thumbnail", None)
         if isinstance(photo_thumbnail, QPixmap) and not photo_thumbnail.isNull():
             scaled = photo_thumbnail.scaled(
-                QSize(280, 160),
+                target_size,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
@@ -1947,7 +2176,7 @@ class AlbumReviewPage(QWidget):
         thumbnail_path = str(getattr(photo, "thumbnail_path", "") or "")
         pixmap = None
         if thumbnail_path and Path(thumbnail_path).exists():
-            pixmap = load_display_thumbnail(thumbnail_path, QSize(280, 160))
+            pixmap = load_display_thumbnail(thumbnail_path, target_size)
         if pixmap is not None and not pixmap.isNull():
             self._preview_cache[cache_key] = (0, pixmap)
             return pixmap

@@ -1,5 +1,9 @@
 # Family Memory AI - Project State
 
+## UX-001 Memory Review redesign (awaiting Product Owner validation)
+
+Memory Review now uses a compact grouped toolbar and a balanced resizable split between its responsive thumbnail grid and a structured selected-photo workspace. Current Status, advisory AI Suggestion, current-state Classification Summary, Photo Information, and selection-aware category Actions replace the former dense primary metadata list; diagnostics remain available as secondary details. Classification and MODEL-003D behavior are unchanged. Automated validation is recorded with the implementation, but manual Product Owner approval remains required before merge.
+
 ## Current Version
 
 - Version: v0.1.0
