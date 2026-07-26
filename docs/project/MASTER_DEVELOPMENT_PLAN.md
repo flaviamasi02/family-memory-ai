@@ -41,7 +41,7 @@ The long-term mission is:
 
 "Help families preserve, organize, understand and rediscover the memories that matter most while continuously learning what is important for each family."
 
-Platform strategy: DEC-0049 defines Family Memory AI as a desktop-first, mobile-ready platform. Product planning must prioritize the validated Windows desktop workflow first, keep reusable Family Memory Intelligence logic separate from PySide6 presentation code wherever practical, and treat Android as a later focused companion client rather than a parallel full-product implementation.
+Platform strategy: DEC-0049 defines Family Memory AI as a desktop-first, mobile-ready platform. Product planning must prioritize the Windows desktop product, keep reusable Family Memory Intelligence logic separate from PySide6 presentation code wherever practical, and treat planned Android and iOS applications as later evolutions of the same product rather than parallel full-product implementations.
 
 Current strategic priority order:
 
@@ -144,6 +144,7 @@ Future MEM direction:
 - Memory Review should preserve scroll position, selection, and user context during category changes.
 - Memory Review should make AI teaching visible to users.
 - Memory Review should focus on category correction, preference learning, and classification validation rather than decision editing.
+- Memory Review is the primary AI workspace; related category, people, event, learning, semantic-suggestion, and future AI-assisted review flows should extend it whenever appropriate rather than create parallel interfaces.
 
 ### CLEAN
 

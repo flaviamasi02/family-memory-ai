@@ -693,7 +693,7 @@ Desktop-First, Mobile-Ready Platform Strategy
 **Value:** Both
 **Impact:** High
 
-Approved by the Product Owner on 2026-07-24. Family Memory AI is a reusable Family Memory platform whose first client is the Windows desktop application. The Windows desktop app remains the only active implementation target until the representative desktop workflow is validated; full desktop and mobile applications must not be built in parallel. New work must keep reusable business and domain logic independent from PySide6 wherever practical, keep Windows-specific access behind platform boundaries, preserve portable or migratable persistence with stable identifiers, and prepare incrementally for a later focused Android companion application without a large mobile-preparation rewrite or mandatory cloud upload.
+Approved by the Product Owner on 2026-07-24. Family Memory AI is a reusable Family Memory platform whose primary and first client is the Windows desktop application. Planned Android and iOS applications are evolutions of the same product. The Windows desktop app remains the only active implementation target until the representative desktop workflow is validated; full desktop and mobile applications must not be built in parallel. New work must keep reusable business and domain logic independent from PySide6 wherever practical, prefer reusable services over UI-specific implementations, keep Windows-specific access behind platform boundaries, preserve portable or migratable persistence with stable identifiers, and avoid desktop-only architecture that would force a complete mobile redesign, mandatory cloud upload, or a large mobile-preparation rewrite.
 
 Canonical detailed strategy: `docs/architecture/PLATFORM_STRATEGY.md`.
 

@@ -123,7 +123,9 @@ Current workspace baseline after UX-001: a grouped toolbar and balanced grid/wor
 
 **Purpose: Teach the AI.**
 
-Memory Review is the workspace where the user reviews memories, corrects AI decisions, confirms important photos, assigns categories, improves people recognition, validates events, and increases the AI knowledge base.
+Memory Review is the primary workspace where users interact with the AI. It is where the user reviews memories, corrects AI decisions, confirms important photos, assigns categories, improves people recognition, validates events, and increases the AI knowledge base.
+
+Future category review, AI suggestions, people review, event review, learning, semantic suggestions, and other AI-assisted workflows should extend Memory Review whenever appropriate rather than create parallel review interfaces. This keeps the product simple and consistent.
 
 The objective of Memory Review is improving the knowledge base through media category correction, AI teaching, preference learning, and classification validation.
 

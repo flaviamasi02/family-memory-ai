@@ -76,7 +76,7 @@ Recently completed domain milestones relevant to Learning readiness:
 - MEM-REVIEW-FIX Asynchronous Memory Review synchronization and root-cause-first loading fix
 - UX-001 Memory Review Redesign (completed and merged; identifier reused in the later redesign specification)
 
-Current UX backlog is maintained in `docs/project/DOMAIN_ROADMAP.md`: UX-002 Visual Language & Badges is the next recommended milestone, followed by UX-003 Memory Review Workspace Polish.
+Current UX backlog is maintained in `docs/project/DOMAIN_ROADMAP.md`: UX-002 Visual Language of Family Memory AI is the next recommended milestone, followed by UX-003 Memory Review Workspace Polish. UX-002 establishes shared badges, colours, icons, typography, spacing, reusable components, and visual identity for the entire application rather than only improving Memory Review.
 
 ### Phase 3 - Memory Intelligence
 
@@ -113,7 +113,7 @@ Product-direction update:
 
 The approved platform strategy is **desktop first, mobile ready**.
 
-The project will not build complete desktop and mobile applications in parallel. The Windows desktop application remains the active product implementation while the reusable Family Memory Engine is validated and incrementally separated from PySide6.
+The project will not build complete desktop and mobile applications in parallel. The Windows desktop application remains the primary product and active implementation while the reusable Family Memory Engine is validated and incrementally separated from PySide6. Planned Android and iOS applications are an evolution of the same product, so new features must favor reusable services and avoid desktop-only design that would require a complete mobile redesign.
 
 ### Platform Phase A - Validated Windows Desktop
 
@@ -142,7 +142,7 @@ The project will not build complete desktop and mobile applications in parallel.
 ### Platform Phase E - Greater Mobile Independence
 
 - Add heavier classification, similarity, duplicate analysis, and complete album generation only after the companion workflow is stable.
-- iPhone and web remain future options, not current parallel workstreams.
+- iOS and web remain future options, not current parallel workstreams.
 
 The canonical decision and detailed gates are defined in `docs/architecture/PLATFORM_STRATEGY.md`.
 
