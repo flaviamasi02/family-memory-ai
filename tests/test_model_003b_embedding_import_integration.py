@@ -605,6 +605,52 @@ def test_second_import_during_embedding_waits_for_cancellation_before_scanning()
     assert window.embedding_worker is None
 
 
+def test_third_import_also_resumes_exactly_once_after_embedding_cleanup():
+    window = _embedding_window_for_lifecycle_tests()
+    scans_started = []
+
+    class RunningThread:
+        def isRunning(self):
+            return True
+
+    class RunningWorker:
+        def __init__(self):
+            self.cancelled = False
+
+        def cancel(self):
+            self.cancelled = True
+
+    window._start_scan = scans_started.append
+    expected_scans = []
+    for run_id, folder in ((1, "/second-folder"), (2, "/third-folder")):
+        worker = RunningWorker()
+        window.embedding_thread = RunningThread()
+        window.embedding_worker = worker
+        window._active_embedding_run_id = run_id
+
+        window._queue_or_start_scan(folder)
+        assert worker.cancelled is True
+        assert window._pending_import_folder_path == folder
+        assert window.status_label.text == "Cancelling previous embedding job before scanning next folder…"
+
+        window._on_embedding_thread_finished(run_id)
+        window._on_embedding_thread_finished(run_id)  # duplicate/stale delivery
+        expected_scans.append(folder)
+        assert scans_started == expected_scans
+        assert window._pending_import_folder_path is None
+        assert window.embedding_thread is None
+        assert window.embedding_worker is None
+        assert window.status_label.text == "Scanning folder…"
+        assert window._embedding_close_requested is False
+
+
+def test_worker_shutdown_does_not_depend_on_queued_gui_delivery():
+    source = Path("src/ui/main_window.py").read_text(encoding="utf-8")
+    assert source.count(
+        "worker.finished.connect(thread.quit, Qt.ConnectionType.DirectConnection)"
+    ) == 2
+
+
 def _embedding_window_for_lifecycle_tests():
     window = MainWindow.__new__(MainWindow)
     # MainWindow owns this dependency in production; lifecycle-only tests avoid

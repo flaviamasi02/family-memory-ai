@@ -38,6 +38,8 @@ PR #41 was incomplete: application startup was effectively implemented inside Se
 
 Partial Product Owner validation confirmed `Ready`, successful Verify, a finite 512-dimensional embedding, and a first import of 422 processed images with zero failures. The second import exposed an independent worker-lifecycle defect: thumbnail startup replaced the application-owned reference to a still-running `QThread`, and embedding UI callbacks used context-free lambdas whose execution context was unsafe on some PySide6 builds. Repeated imports now cooperatively cancel and serialize thumbnail jobs, retain each live thread until its finished signal, queue the next thumbnail set only after cleanup, and route embedding callbacks through queued QObject slots. Regression coverage reopens the SQLite store across repeated cache-only runs and verifies no provider loading or embedding recreation occurs.
 
+The next validation no longer crashed but remained at “preparing new import”: worker completion had queued `QThread.quit()` through the GUI event queue, so a repeat request could be queued while the prior thread never reached the deterministic `thread.finished` cleanup that consumes it. Terminal worker signals now call the thread-safe `quit()` directly. The thread-finished UI callback remains the sole cleanup/resume path: it clears worker/thread references, consumes one pending folder, changes the UI to scanning, and starts that scan exactly once. No sleeps, polling recovery, or concurrent indexing workers were introduced.
+
 
 ## MODEL chain current validation update
 

@@ -366,8 +366,8 @@ class MainWindow(QMainWindow):
         thread.started.connect(worker.run)
         worker.scan_complete.connect(self._on_scan_complete)
         worker.scan_error.connect(self._on_scan_error)
-        worker.finished.connect(thread.quit)
         worker.finished.connect(worker.deleteLater)
+        worker.finished.connect(thread.quit)
         thread.finished.connect(lambda rid=run_id, finished_thread=thread: self._on_scan_thread_finished(rid, finished_thread))
         thread.finished.connect(thread.deleteLater)
 
@@ -470,8 +470,8 @@ class MainWindow(QMainWindow):
         worker.progress.connect(self._on_active_embedding_progress, Qt.ConnectionType.QueuedConnection)
         worker.complete.connect(self._on_active_embedding_complete, Qt.ConnectionType.QueuedConnection)
         worker.error.connect(self._on_active_embedding_error, Qt.ConnectionType.QueuedConnection)
-        worker.finished.connect(thread.quit)
         worker.finished.connect(worker.deleteLater)
+        worker.finished.connect(thread.quit, Qt.ConnectionType.DirectConnection)
         thread.finished.connect(self._on_active_embedding_thread_finished, Qt.ConnectionType.QueuedConnection)
         thread.finished.connect(thread.deleteLater)
 
@@ -992,8 +992,8 @@ class MainWindow(QMainWindow):
 
         thread.started.connect(worker.run)
         worker.thumbnail_ready.connect(self.update_thumbnail)
-        worker.finished.connect(thread.quit)
         worker.finished.connect(worker.deleteLater)
+        worker.finished.connect(thread.quit, Qt.ConnectionType.DirectConnection)
         thread.finished.connect(self._on_active_thumbnail_thread_finished, Qt.ConnectionType.QueuedConnection)
         thread.finished.connect(thread.deleteLater)
 
