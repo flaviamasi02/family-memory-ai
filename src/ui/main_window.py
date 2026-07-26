@@ -422,7 +422,10 @@ class MainWindow(QMainWindow):
         self._active_embedding_run_id = run_id
 
         thread = QThread()
-        worker = EmbeddingWorker(photos, runtime_manager=self.ai_runtime_manager)
+        worker = EmbeddingWorker(photos)
+        set_runtime_manager = getattr(worker, "set_runtime_manager", None)
+        if callable(set_runtime_manager):
+            set_runtime_manager(self.ai_runtime_manager)
         self.embedding_thread = thread
         self.embedding_worker = worker
         worker.moveToThread(thread)

@@ -52,6 +52,15 @@ def test_import_worker_generates_embeddings_skips_unchanged_and_reuses_cache(tmp
     assert second_provider.embed_call_count == 0
 
 
+def test_embedding_worker_accepts_runtime_through_stable_setter():
+    runtime_manager = object()
+    worker = EmbeddingWorker([])
+
+    worker.set_runtime_manager(runtime_manager)
+
+    assert worker._runtime_manager is runtime_manager
+
+
 def test_changed_image_is_regenerated_but_unchanged_image_is_skipped(tmp_path):
     p1 = image(tmp_path / "changed.jpg", b"old")
     p2 = image(tmp_path / "same.jpg", b"same")
@@ -575,6 +584,7 @@ def test_second_import_during_embedding_waits_for_cancellation_before_scanning()
 
 def _embedding_window_for_lifecycle_tests():
     window = MainWindow.__new__(MainWindow)
+    window.ai_runtime_manager = object()
     window.scan_thread = None
     window.scan_worker = None
     window._scan_run_id = 0

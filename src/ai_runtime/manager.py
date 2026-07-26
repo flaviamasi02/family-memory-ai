@@ -1,7 +1,7 @@
 from __future__ import annotations
 import importlib.util, json, logging, shutil, sys, time, urllib.request
 from pathlib import Path
-from threading import Event, Lock
+from threading import Event
 from core.application_data import ApplicationDataPathService, get_app_data_service
 from vision.embedding_provider import now_iso
 from ai_runtime.executor import AIRuntimeCommandExecutor, CommandResult
@@ -12,8 +12,6 @@ from ai_runtime.storage import AIRuntimeStorage
 
 ProgressCallback = Callable[[str, str], None]
 logger = logging.getLogger(__name__)
-_default_runtime_manager: AIRuntimeManager | None = None
-_default_runtime_manager_lock = Lock()
 
 class AIRuntimeManager:
     def __init__(self, registry: AIRuntimeRegistry|None=None, app_data: ApplicationDataPathService|None=None, executor: AIRuntimeCommandExecutor|None=None):
@@ -231,22 +229,13 @@ assert finite
         return {'providers_registered':len(statuses),'ready':statuses.count(AIRuntimeState.READY.value),'not_installed':statuses.count(AIRuntimeState.MODEL_NOT_DOWNLOADED.value)+statuses.count(AIRuntimeState.NOT_INSTALLED.value),'failed':statuses.count(AIRuntimeState.FAILED.value),'installations_started':sum(1 for h in hist if h.action=='installation started'),'installations_completed':sum(1 for h in hist if h.action=='installation completed'),'installations_failed':sum(1 for h in hist if 'failed' in h.outcome),'verifications_completed':sum(1 for h in hist if h.action=='verification completed'),'removals_completed':sum(1 for h in hist if h.action=='removal completed')}
 
 def create_default_runtime_manager(app_data:ApplicationDataPathService|None=None) -> AIRuntimeManager:
-    """Return the process-wide runtime manager, or an isolated injected instance.
+    """Build a registered runtime manager for an application composition root.
 
-    Production callers share one manager so Settings, import workers, and model
-    providers observe one authoritative runtime lifecycle.  Tests and migration
-    tools can still request an isolated manager by supplying an application-data
-    service explicitly.
+    The application creates this once in ``MainWindow`` and injects it into its
+    consumers. Keeping this function a factory avoids hidden process-global state
+    when application-data roots change in tests, tools, or future mobile clients.
     """
     from ai_runtime.mobileclip_registration import register_mobileclip_runtime
-    if app_data is not None:
-        manager=AIRuntimeManager(app_data=app_data)
-        register_mobileclip_runtime(manager.registry)
-        return manager
-
-    global _default_runtime_manager
-    with _default_runtime_manager_lock:
-        if _default_runtime_manager is None:
-            _default_runtime_manager=AIRuntimeManager()
-            register_mobileclip_runtime(_default_runtime_manager.registry)
-        return _default_runtime_manager
+    manager=AIRuntimeManager(app_data=app_data)
+    register_mobileclip_runtime(manager.registry)
+    return manager

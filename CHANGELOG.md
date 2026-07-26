@@ -5,7 +5,7 @@
 ### AI Runtime lifecycle regression fix
 
 - Fixed Settings and import indexing constructing independent default AI Runtime Manager instances.
-- Established one process-wide authoritative default runtime lifecycle and explicitly inject it into Settings and the import embedding worker/provider chain.
+- Established one MainWindow-owned authoritative runtime lifecycle and explicitly inject it into Settings and the import embedding worker/provider chain without hidden global state.
 - Preserved deep dependency, checkpoint, and provider readiness validation; no readiness check is bypassed or weakened.
 
 ### MODEL-004A — Face Recognition Foundation

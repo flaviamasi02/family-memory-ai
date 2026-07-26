@@ -31,12 +31,12 @@ def test_startup_with_no_ml_dependencies_and_mobileclip_registered(tmp_path):
     assert {c.value for c in d.capabilities} == {'image_embeddings','text_embeddings','zero_shot_classification'}
     assert 'torch' in [dep.import_name for dep in d.required_python_packages]
 
-def test_default_runtime_manager_is_process_authority():
+def test_default_runtime_manager_factory_has_no_hidden_process_state():
     first = create_default_runtime_manager()
     second = create_default_runtime_manager()
 
-    assert first is second
-    assert first.registry.require('mobileclip') is second.registry.require('mobileclip')
+    assert first is not second
+    assert first.registry.require('mobileclip').provider_id == second.registry.require('mobileclip').provider_id
 
 def test_explicit_app_data_keeps_test_managers_isolated(tmp_path):
     first = create_default_runtime_manager(ApplicationDataPathService(tmp_path / 'one', tmp_path))

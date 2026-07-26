@@ -5,7 +5,7 @@
 ### AI Runtime lifecycle regression fix
 
 - Root cause: Settings owned one default `AIRuntimeManager`, while import indexing created another through `EmbeddingWorker` -> `BatchEmbeddingService` -> `ManagedMobileCLIPEmbeddingProvider`. Settings rendered its persisted cached state while import performed a deep readiness transition through its separate manager, allowing the two workflows to report different lifecycle states.
-- The default manager is now process-scoped and explicitly shared by MainWindow, Settings, EmbeddingWorker, and the managed provider. Explicit application-data injection still creates isolated managers for tests and tools.
+- MainWindow is now the application composition root: its manager is explicitly shared by Settings, EmbeddingWorker, and the managed provider. The manager factory has no hidden process-global state, so persisted application-data root changes remain correct in tests, tools, and future clients.
 - Deep runtime validation remains mandatory for import inference. No dependency, checkpoint, or provider verification was bypassed or weakened.
 
 ### MODEL-004A — Face Recognition Foundation

@@ -29,18 +29,24 @@ class EmbeddingWorker(QObject):
         self,
         photos,
         service_factory: Callable[[], BatchEmbeddingService] | None = None,
-        runtime_manager: AIRuntimeManager | None = None,
     ) -> None:
         super().__init__()
         self._photos = list(photos or [])
-        if service_factory is not None:
-            self._service_factory = service_factory
-        else:
-            manager = runtime_manager or create_default_runtime_manager()
-            self._service_factory = lambda: BatchEmbeddingService(
-                provider=ManagedMobileCLIPEmbeddingProvider(runtime_manager=manager)
-            )
+        self._service_factory = service_factory
+        self._runtime_manager: AIRuntimeManager | None = None
         self._cancel_event = Event()
+
+    def set_runtime_manager(self, runtime_manager: AIRuntimeManager) -> None:
+        """Inject the composition root's runtime before the worker is started."""
+        self._runtime_manager = runtime_manager
+
+    def _create_service(self) -> BatchEmbeddingService:
+        if self._service_factory is not None:
+            return self._service_factory()
+        manager = self._runtime_manager or create_default_runtime_manager()
+        return BatchEmbeddingService(
+            provider=ManagedMobileCLIPEmbeddingProvider(runtime_manager=manager)
+        )
 
     def cancel(self) -> None:
         """Request cancellation before or between sequential image processing."""
@@ -48,7 +54,7 @@ class EmbeddingWorker(QObject):
 
     def run(self) -> None:
         try:
-            service = self._service_factory()
+            service = self._create_service()
             if self._cancel_event.is_set():
                 result = BatchEmbeddingResult(
                     total_images_received=len(self._photos),
