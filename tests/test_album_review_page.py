@@ -10,7 +10,15 @@ from unittest.mock import Mock, patch
 from PySide6.QtTest import QTest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QApplication, QLabel, QMessageBox, QSizePolicy
+from PySide6.QtWidgets import (
+    QAbstractScrollArea,
+    QApplication,
+    QLabel,
+    QMessageBox,
+    QPlainTextEdit,
+    QSizePolicy,
+    QTextEdit,
+)
 
 from album.album_scoring_engine import AlbumScoreBreakdown
 from core.category_registry import get_category_registry, reset_category_registry
@@ -192,12 +200,18 @@ class AlbumReviewPageTests(unittest.TestCase):
         page._render_category_suggestion(result)
 
         self.assertIsInstance(page.ai_suggestion_reasons, QLabel)
+        self.assertNotIsInstance(
+            page.ai_suggestion_reasons,
+            (QAbstractScrollArea, QTextEdit, QPlainTextEdit),
+        )
         self.assertTrue(page.ai_suggestion_reasons.wordWrap())
         self.assertEqual(page.ai_suggestion_reasons.minimumHeight(), 0)
         self.assertFalse(page.ai_suggestion_reasons.isHidden())
-        self.assertIn("Explanation:", page.ai_suggestion_reasons.text())
-        self.assertIn("visually similar", page.ai_suggestion_reasons.text())
-        self.assertIn("semantic evidence", page.ai_suggestion_reasons.text())
+        explanation_text = page.ai_suggestion_reasons.text()
+        self.assertIn("Explanation", explanation_text)
+        self.assertIn("visually similar", explanation_text)
+        self.assertIn("semantic evidence", explanation_text)
+        self.assertIn("<br>", explanation_text)
         self.assertTrue(page.apply_suggestion_button.isEnabled())
         self.assertTrue(page.reject_suggestion_button.isEnabled())
         self.assertIn("Suggested category", page.ai_suggestion_value.text())

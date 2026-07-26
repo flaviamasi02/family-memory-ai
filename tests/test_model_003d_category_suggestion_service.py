@@ -251,8 +251,10 @@ def test_memory_review_ui_entry_point_is_existing_panel_not_new_tab():
     assert "AI Suggestion" in ui
     assert "Apply suggestion" in ui
     assert "Reject / Not useful" in ui
-    assert 'status_form.addRow("Current category:"' in ui
-    assert 'status_form.addRow("Source:"' in ui
+    assert 'QGroupBox("Current Status")' in ui
+    assert 'QLabel("Current category")' in ui
+    assert "status_form.addRow(self.current_category_label, self.media_category_value)" in ui
+    assert 'QLabel("Source")' in ui
     assert "Accepted AI suggestion" in ui
     assert 'QGroupBox("Classification Summary")' in ui
     assert 'QGroupBox("Technical details")' in ui
