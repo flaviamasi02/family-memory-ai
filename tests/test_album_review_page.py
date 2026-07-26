@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 from PySide6.QtTest import QTest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QApplication, QMessageBox, QSizePolicy
+from PySide6.QtWidgets import QApplication, QLabel, QMessageBox, QSizePolicy
 
 from album.album_scoring_engine import AlbumScoreBreakdown
 from core.category_registry import get_category_registry, reset_category_registry
@@ -173,6 +173,33 @@ class AlbumReviewPageTests(unittest.TestCase):
             self.assertGreater(page.media_category_value.height(), 0)
             self.assertGreater(page.user_decision_value.height(), 0)
             self.assertGreater(page.apply_category_button.height(), 0)
+
+    def test_ai_suggestion_explanation_wraps_without_nested_scrolling(self):
+        page = AlbumReviewPage()
+        result = CategorySuggestionResult(
+            source_photo_key="suggested.jpg",
+            status="suggested",
+            suggested_category_id="family_photo",
+            suggested_category_name="Family Photo",
+            confidence=0.85,
+            evidence_counts={"family_photo": 3},
+            reasons=[
+                "This photo is visually similar to 3 photos previously confirmed as Family Photo.",
+                "The confirmed photos provide consistent semantic evidence.",
+            ],
+        )
+
+        page._render_category_suggestion(result)
+
+        self.assertIsInstance(page.ai_suggestion_reasons, QLabel)
+        self.assertTrue(page.ai_suggestion_reasons.wordWrap())
+        self.assertEqual(page.ai_suggestion_reasons.minimumHeight(), 0)
+        self.assertFalse(page.ai_suggestion_reasons.isHidden())
+        self.assertIn("Explanation:", page.ai_suggestion_reasons.text())
+        self.assertIn("visually similar", page.ai_suggestion_reasons.text())
+        self.assertIn("semantic evidence", page.ai_suggestion_reasons.text())
+        self.assertTrue(page.apply_suggestion_button.isEnabled())
+        self.assertTrue(page.reject_suggestion_button.isEnabled())
 
     def test_classification_summary_describes_current_manual_and_unknown_states(self):
         with tempfile.TemporaryDirectory() as tmpdir:

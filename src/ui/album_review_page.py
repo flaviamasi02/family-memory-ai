@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from html import escape
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -424,8 +425,14 @@ class AlbumReviewPage(QWidget):
             "Select one photo to check for an advisory suggestion."
         )
         self.ai_suggestion_value.setWordWrap(True)
-        self.ai_suggestion_reasons = QListWidget()
-        self.ai_suggestion_reasons.setMaximumHeight(48)
+        self.ai_suggestion_reasons = QLabel("")
+        self.ai_suggestion_reasons.setWordWrap(True)
+        self.ai_suggestion_reasons.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self.ai_suggestion_reasons.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
         self.ai_suggestion_reasons.setVisible(False)
         self.apply_suggestion_button = QPushButton("Apply suggestion")
         self.apply_suggestion_button.clicked.connect(self._apply_current_suggestion)
@@ -1323,7 +1330,7 @@ class AlbumReviewPage(QWidget):
         self.ai_suggestion_value.setText(
             "Select one photo to check for an advisory suggestion."
         )
-        self.ai_suggestion_reasons.clear()
+        self.ai_suggestion_reasons.setText("")
         self.ai_suggestion_reasons.setVisible(False)
         self.apply_suggestion_button.setEnabled(False)
         self.reject_suggestion_button.setEnabled(False)
@@ -1368,7 +1375,7 @@ class AlbumReviewPage(QWidget):
         self.ai_suggestion_value.setText(
             "Select one photo to check for an advisory suggestion."
         )
-        self.ai_suggestion_reasons.clear()
+        self.ai_suggestion_reasons.setText("")
         self.ai_suggestion_reasons.setVisible(False)
         self.apply_suggestion_button.setEnabled(False)
         self.reject_suggestion_button.setEnabled(False)
@@ -1386,7 +1393,7 @@ class AlbumReviewPage(QWidget):
         request_id = self._suggestion_request_id
         self._current_suggestion = None
         self.ai_suggestion_value.setText("Checking stored visual evidence…")
-        self.ai_suggestion_reasons.clear()
+        self.ai_suggestion_reasons.setText("")
         self.ai_suggestion_reasons.setVisible(False)
         self.apply_suggestion_button.setEnabled(False)
         self.reject_suggestion_button.setEnabled(False)
@@ -1410,16 +1417,21 @@ class AlbumReviewPage(QWidget):
 
     def _render_category_suggestion(self, result) -> None:
         self._current_suggestion = result if result.status == "suggested" else None
-        self.ai_suggestion_reasons.clear()
+        self.ai_suggestion_reasons.setText("")
         self.ai_suggestion_reasons.setVisible(
             bool(result.reasons) and result.status == "suggested"
         )
         if result.status == "suggested":
+            support_count = result.evidence_counts.get(result.suggested_category_id, 0)
             self.ai_suggestion_value.setText(
-                f"Suggested category: {result.suggested_category_name}\nConfidence: {int(round(result.confidence * 100))}%\nSupporting evidence: {result.evidence_counts.get(result.suggested_category_id, 0)} photos"
+                f"<b>Suggested category:</b> {escape(result.suggested_category_name)}<br>"
+                f"<b>Confidence:</b> {int(round(result.confidence * 100))}%<br>"
+                f"<b>Supporting evidence:</b> {support_count} confirmed similar photos"
             )
-            for reason in result.reasons:
-                self.ai_suggestion_reasons.addItem(reason)
+            explanation = "\n".join(
+                str(reason).strip() for reason in result.reasons if str(reason).strip()
+            )
+            self.ai_suggestion_reasons.setText(f"Explanation:\n{explanation}")
             self.apply_suggestion_button.setEnabled(True)
             self.reject_suggestion_button.setEnabled(True)
         elif result.status == "already_accepted":
@@ -1489,7 +1501,7 @@ class AlbumReviewPage(QWidget):
         self.ai_suggestion_value.setText(
             "Suggestion applied through the category correction workflow."
         )
-        self.ai_suggestion_reasons.clear()
+        self.ai_suggestion_reasons.setText("")
         self._category_suggestion_service.invalidate_cache()
 
     def _reject_current_suggestion(self) -> None:
