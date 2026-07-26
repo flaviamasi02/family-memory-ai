@@ -36,6 +36,8 @@ PR #41 was incomplete: application startup was effectively implemented inside Se
 
 `AIRuntimeManager` continues to own and persist all lifecycle transitions. Settings visibly refreshes at recovery start and completion, while Test Image and semantic import indexing retain the same application-owned manager. Dependency, interpreter, checkpoint, provider execution, finite-embedding, and cache checks are unchanged. Product Owner validation must use the existing metadata without deletion: launch, observe `Cancelled -> Verifying -> Ready`, run Test Image and confirm a finite 512-dimensional embedding, import the 422-photo folder twice to confirm processing then cache reuse, restart, and confirm a truthful usable `Ready` state.
 
+Partial Product Owner validation confirmed `Ready`, successful Verify, a finite 512-dimensional embedding, and a first import of 422 processed images with zero failures. The second import exposed an independent worker-lifecycle defect: thumbnail startup replaced the application-owned reference to a still-running `QThread`, and embedding UI callbacks used context-free lambdas whose execution context was unsafe on some PySide6 builds. Repeated imports now cooperatively cancel and serialize thumbnail jobs, retain each live thread until its finished signal, queue the next thumbnail set only after cleanup, and route embedding callbacks through queued QObject slots. Regression coverage reopens the SQLite store across repeated cache-only runs and verifies no provider loading or embedding recreation occurs.
+
 
 ## MODEL chain current validation update
 

@@ -52,6 +52,30 @@ def test_import_worker_generates_embeddings_skips_unchanged_and_reuses_cache(tmp
     assert second_provider.embed_call_count == 0
 
 
+def test_repeated_imports_reopen_store_and_remain_cache_only(tmp_path):
+    paths = [image(tmp_path / f"repeat-{index}.jpg", str(index).encode()) for index in range(4)]
+    db = tmp_path / "embeddings.sqlite3"
+    first_provider = FakeEmbeddingProvider()
+    first = BatchEmbeddingService(first_provider, EmbeddingStore(db)).embed_images(paths)
+
+    assert first.processed_successfully == 4
+    assert first.skipped_cached == 0
+    assert first.failed == 0
+
+    for _ in range(3):
+        provider = FakeEmbeddingProvider()
+        # Production creates a service and reopens the persistent store for
+        # every worker run; repeat that lifecycle rather than reusing objects.
+        result = BatchEmbeddingService(provider, EmbeddingStore(db)).embed_images(paths)
+        assert result.total_images_received == 4
+        assert result.processed_successfully == 0
+        assert result.skipped_cached == 4
+        assert result.failed == 0
+        assert result.cancelled == 0
+        assert provider.load_count == 0
+        assert provider.embed_call_count == 0
+
+
 def test_changed_image_is_regenerated_but_unchanged_image_is_skipped(tmp_path):
     p1 = image(tmp_path / "changed.jpg", b"old")
     p2 = image(tmp_path / "same.jpg", b"same")
@@ -160,7 +184,7 @@ class _Signal:
     def __init__(self):
         self._callbacks = []
 
-    def connect(self, callback):
+    def connect(self, callback, *_args):
         self._callbacks.append(callback)
 
     def emit(self, *args):
@@ -597,9 +621,78 @@ def _embedding_window_for_lifecycle_tests():
     window._pending_embedding_photos = None
     window._pending_import_folder_path = None
     window._embedding_close_requested = False
+    window.thumbnail_thread = None
+    window.thumbnail_worker = None
+    window._thumbnail_run_id = 0
+    window._active_thumbnail_run_id = 0
+    window._pending_thumbnail_photos = None
     window.status_label = _StatusLabel()
     window.ai_status_label = _StatusLabel()
     return window
+
+
+def test_repeated_thumbnail_import_waits_for_prior_worker_shutdown(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    threads = []
+    workers = []
+
+    class FakeThread:
+        def __init__(self):
+            self.started = _Signal()
+            self.finished = _Signal()
+            self.running = False
+            threads.append(self)
+
+        def start(self):
+            self.running = True
+
+        def isRunning(self):
+            return self.running
+
+        def quit(self):
+            self.running = False
+            self.finished.emit()
+
+        def deleteLater(self):
+            pass
+
+    class FakeThumbnailWorker:
+        def __init__(self, photos, **_kwargs):
+            self.photos = list(photos)
+            self.thumbnail_ready = _Signal()
+            self.finished = _Signal()
+            self.cancelled = False
+            workers.append(self)
+
+        def moveToThread(self, _thread):
+            pass
+
+        def run(self):
+            pass
+
+        def cancel(self):
+            self.cancelled = True
+
+        def deleteLater(self):
+            pass
+
+    monkeypatch.setattr("ui.main_window.QThread", FakeThread)
+    monkeypatch.setattr("ui.main_window.ThumbnailWorker", FakeThumbnailWorker)
+
+    window.start_thumbnail_loading(["first"])
+    first_thread = threads[0]
+    window.start_thumbnail_loading(["second"])
+
+    assert len(workers) == 1
+    assert workers[0].cancelled is True
+    assert window.thumbnail_thread is first_thread
+    assert window._pending_thumbnail_photos == ["second"]
+
+    workers[0].finished.emit()
+
+    assert len(workers) == 2
+    assert workers[1].photos == ["second"]
+    assert window.thumbnail_thread is threads[1]
 
 
 class _StatusLabel:

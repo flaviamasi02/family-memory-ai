@@ -10,6 +10,7 @@
 - Made Test Image and import-time semantic indexing consult the same authoritative runtime state, and composed Settings and indexing with one application-owned runtime manager while retaining explicit dependency injection for tests.
 - Preserved cache-first embedding reuse, strict dependency/checkpoint checks, per-image corrupt-file isolation, local-only execution, and confirmation-gated installation/download behavior.
 - Product Owner validation from the existing persisted `Cancelled` metadata, including the 422-photo import, cache reuse, Test Image, and restart, remains mandatory before merge.
+- Follow-up validation reached `Ready`, produced a finite 512-dimensional Test Image embedding, and indexed all 422 photos, but exposed a repeated-import crash. Repeated imports now serialize thumbnail workers instead of replacing a live `QThread`, cooperatively cancel superseded thumbnail work, wait for thread shutdown during application close, and deliver embedding UI callbacks through explicitly queued QObject slots. Persistent embedding stores are reopened safely and unchanged images are reported as cache reuse without loading the model.
 
 ### MODEL-004A — Face Recognition Foundation
 

@@ -2,7 +2,7 @@ import sys
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QCoreApplication, Qt, QThread, QTimer
+from PySide6.QtCore import QCoreApplication, Qt, QThread, QTimer, Slot
 from PySide6.QtGui import QGuiApplication, QImage, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
@@ -69,6 +69,9 @@ class MainWindow(QMainWindow):
 
         self.thumbnail_thread = None
         self.thumbnail_worker = None
+        self._thumbnail_run_id = 0
+        self._active_thumbnail_run_id = 0
+        self._pending_thumbnail_photos = None
         self.scan_thread = None
         self.scan_worker = None
         self._scan_run_id = 0
@@ -223,9 +226,15 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         self._embedding_close_requested = True
         self._request_embedding_worker_cancel()
+        if self.thumbnail_worker is not None:
+            self.thumbnail_worker.cancel()
         app = QCoreApplication.instance()
         while self.embedding_thread is not None and self.embedding_thread.isRunning():
             self.embedding_thread.wait(250)
+            if app is not None:
+                app.processEvents()
+        while self._thumbnail_thread_is_running():
+            self.thumbnail_thread.wait(250)
             if app is not None:
                 app.processEvents()
         if app is not None:
@@ -440,6 +449,7 @@ class MainWindow(QMainWindow):
         self._active_embedding_run_id = run_id
 
         thread = QThread()
+        thread._family_memory_run_id = run_id
         worker = EmbeddingWorker(
             photos,
             service_factory=lambda: BatchEmbeddingService(
@@ -453,15 +463,42 @@ class MainWindow(QMainWindow):
         worker.moveToThread(thread)
 
         thread.started.connect(worker.run)
-        worker.progress.connect(lambda progress, rid=run_id: self._on_embedding_progress(rid, progress))
-        worker.complete.connect(lambda result, rid=run_id: self._on_embedding_complete(rid, result))
-        worker.error.connect(lambda message, rid=run_id: self._on_embedding_error(rid, message))
+        # Use QObject-bound queued slots rather than context-free lambdas.  The
+        # latter may execute Python UI work on the worker thread on some PySide6
+        # builds, which made a cache-fast second import especially crash-prone.
+        worker.progress.connect(self._on_active_embedding_progress, Qt.ConnectionType.QueuedConnection)
+        worker.complete.connect(self._on_active_embedding_complete, Qt.ConnectionType.QueuedConnection)
+        worker.error.connect(self._on_active_embedding_error, Qt.ConnectionType.QueuedConnection)
         worker.finished.connect(thread.quit)
         worker.finished.connect(worker.deleteLater)
-        thread.finished.connect(lambda rid=run_id: self._on_embedding_thread_finished(rid))
+        thread.finished.connect(self._on_active_embedding_thread_finished, Qt.ConnectionType.QueuedConnection)
         thread.finished.connect(thread.deleteLater)
 
         thread.start()
+
+    @Slot(object)
+    def _on_active_embedding_progress(self, progress) -> None:
+        if self.sender() is self.embedding_worker:
+            self._on_embedding_progress(self._active_embedding_run_id, progress)
+
+    @Slot(object)
+    def _on_active_embedding_complete(self, result) -> None:
+        if self.sender() is self.embedding_worker:
+            self._on_embedding_complete(self._active_embedding_run_id, result)
+
+    @Slot(str)
+    def _on_active_embedding_error(self, message: str) -> None:
+        if self.sender() is self.embedding_worker:
+            self._on_embedding_error(self._active_embedding_run_id, message)
+
+    @Slot()
+    def _on_active_embedding_thread_finished(self) -> None:
+        try:
+            thread = self.sender()
+        except RuntimeError:
+            thread = None
+        thread = thread or self.embedding_thread
+        self._on_embedding_thread_finished(int(getattr(thread, "_family_memory_run_id", 0)))
 
     def _request_embedding_worker_cancel(self) -> None:
         """Cooperatively request cancellation without destroying a running QThread."""
@@ -915,19 +952,73 @@ class MainWindow(QMainWindow):
         )
 
     def start_thumbnail_loading(self, photos):
-        self.thumbnail_thread = QThread()
-        self.thumbnail_worker = ThumbnailWorker(photos, batch_size=20, delay_ms=0)
+        """Serialize thumbnail jobs so a repeated import cannot orphan a QThread."""
+        requested_photos = list(photos or [])
+        if self._thumbnail_thread_is_running():
+            self._pending_thumbnail_photos = requested_photos
+            self.thumbnail_worker.cancel()
+            return
 
-        self.thumbnail_worker.moveToThread(self.thumbnail_thread)
+        self._launch_thumbnail_worker(requested_photos)
 
-        self.thumbnail_thread.started.connect(self.thumbnail_worker.run)
-        self.thumbnail_worker.thumbnail_ready.connect(self.update_thumbnail)
-        self.thumbnail_worker.finished.connect(self._on_thumbnail_worker_finished)
-        self.thumbnail_worker.finished.connect(self.thumbnail_thread.quit)
-        self.thumbnail_worker.finished.connect(self.thumbnail_worker.deleteLater)
-        self.thumbnail_thread.finished.connect(self.thumbnail_thread.deleteLater)
+    def _thumbnail_thread_is_running(self) -> bool:
+        thread = self.thumbnail_thread
+        if thread is None:
+            return False
+        try:
+            return bool(thread.isRunning())
+        except RuntimeError:
+            self.thumbnail_thread = None
+            self.thumbnail_worker = None
+            self._active_thumbnail_run_id = 0
+            return False
 
-        self.thumbnail_thread.start()
+    def _launch_thumbnail_worker(self, photos) -> None:
+        self._thumbnail_run_id += 1
+        run_id = self._thumbnail_run_id
+        self._active_thumbnail_run_id = run_id
+        thread = QThread()
+        thread._family_memory_run_id = run_id
+        worker = ThumbnailWorker(photos, batch_size=20, delay_ms=0)
+        self.thumbnail_thread = thread
+        self.thumbnail_worker = worker
+
+        worker.moveToThread(thread)
+
+        thread.started.connect(worker.run)
+        worker.thumbnail_ready.connect(self.update_thumbnail)
+        worker.finished.connect(self._on_thumbnail_worker_finished)
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(self._on_active_thumbnail_thread_finished, Qt.ConnectionType.QueuedConnection)
+        thread.finished.connect(thread.deleteLater)
+
+        thread.start()
+
+    @Slot()
+    def _on_active_thumbnail_thread_finished(self) -> None:
+        try:
+            thread = self.sender()
+        except RuntimeError:
+            thread = None
+        thread = thread or self.thumbnail_thread
+        self._on_thumbnail_thread_finished(
+            int(getattr(thread, "_family_memory_run_id", 0)), thread
+        )
+
+    def _on_thumbnail_thread_finished(self, run_id: int, finished_thread) -> None:
+        if run_id != self._active_thumbnail_run_id or self.thumbnail_thread is not finished_thread:
+            return
+        self.thumbnail_thread = None
+        self.thumbnail_worker = None
+        self._active_thumbnail_run_id = 0
+        if self._embedding_close_requested:
+            self._pending_thumbnail_photos = None
+            return
+        pending = self._pending_thumbnail_photos
+        self._pending_thumbnail_photos = None
+        if pending is not None:
+            self._launch_thumbnail_worker(pending)
 
     def _on_thumbnail_worker_finished(self) -> None:
         """Called on the UI thread when the thumbnail worker has processed all photos."""
