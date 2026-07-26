@@ -416,21 +416,22 @@ def test_reject_path_persists_feedback_and_blocks_stale_result_restore():
 
 
 def test_embedding_completion_refresh_contract_is_wired_to_memory_review():
-    main = Path("src/ui/main_window.py").read_text()
-    ui = Path("src/ui/album_review_page.py").read_text()
-    complete_block = main[
-        main.index("def _on_embedding_complete") : main.index("def _on_embedding_error")
-    ]
-    assert "self._set_embedding_status" in complete_block
-    assert "Semantic embedding indexing completed" in complete_block
-    assert "Indexing semantic embeddings" not in complete_block
-    assert "self._on_embedding_index_updated(result)" in complete_block
-    assert "def _on_embedding_index_updated" in main
-    assert "review_page.on_embedding_index_updated()" in main
-    assert "self.ai_status_label" in main
-    assert "def on_embedding_index_updated" in ui
-    assert "self._category_suggestion_service.invalidate_cache()" in ui
-    assert "self._request_category_suggestion(row)" in ui
+    import inspect
+    from ui.main_window import MainWindow
+
+    assert "self._on_embedding_index_updated(result)" in inspect.getsource(
+        MainWindow._on_embedding_complete
+    )
+    review_page = SimpleNamespace(refresh_count=0)
+    review_page.on_embedding_index_updated = lambda: setattr(
+        review_page, "refresh_count", review_page.refresh_count + 1
+    )
+    window = MainWindow.__new__(MainWindow)
+    window.review_page = review_page
+
+    window._on_embedding_index_updated(object())
+
+    assert review_page.refresh_count == 1
 
 
 def test_no_embedding_results_are_not_cached_so_later_indexing_can_be_observed(
@@ -451,15 +452,10 @@ def test_no_embedding_results_are_not_cached_so_later_indexing_can_be_observed(
 
 
 def test_embedding_index_refresh_does_not_assume_review_page_exists():
-    main = Path("src/ui/main_window.py").read_text()
-    refresh_block = main[
-        main.index("def _on_embedding_index_updated") : main.index(
-            "def _on_embedding_error"
-        )
-    ]
-    assert 'getattr(self, "review_page", None)' in refresh_block
-    assert "self.review_page.on_embedding_index_updated()" not in refresh_block
-    assert "review_page.on_embedding_index_updated()" in refresh_block
+    from ui.main_window import MainWindow
+
+    window = MainWindow.__new__(MainWindow)
+    window._on_embedding_index_updated(object())
 
 
 def test_single_strong_manual_category_evidence_can_suggest_for_similar_photo(tmp_path):

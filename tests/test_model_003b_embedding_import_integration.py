@@ -300,7 +300,7 @@ def test_slow_worker_is_not_abandoned_and_second_import_waits_for_finish(monkeyp
 
     # A real worker emits one terminal result before finished.  This lifecycle
     # test supplies the same contract without running the service.
-    window._embedding_run_lifecycle[1]["terminal"] = True
+    window._embedding_run_lifecycle[1]["terminal_state"] = "Cancelled"
     first_worker.finished.emit()
 
     assert len(workers) == 2
@@ -528,7 +528,7 @@ def test_deleted_embedding_thread_wrapper_does_not_block_worker_launch(monkeypat
     window.embedding_thread = DeletedThread()
     window.embedding_worker = object()
     window._active_embedding_run_id = 4
-    window._embedding_run_lifecycle[4] = {"thread_finished": False, "terminal": False}
+    window._embedding_run_lifecycle[4] = {"thread_finished": False, "terminal_state": None}
     monkeypatch.setattr(window, "_launch_embedding_worker", launched.append)
 
     window._start_embedding_indexing(["photo"])
@@ -599,7 +599,7 @@ def test_thread_and_worker_references_clear_only_after_thread_completion():
     window.embedding_thread = thread
     window.embedding_worker = worker
     window._active_embedding_run_id = 3
-    window._embedding_run_lifecycle[3] = {"thread_finished": False, "terminal": True}
+    window._embedding_run_lifecycle[3] = {"thread_finished": False, "terminal_state": "Completed"}
 
     window._request_embedding_worker_cancel()
     assert window.embedding_thread is thread
@@ -633,7 +633,7 @@ def test_second_import_during_embedding_waits_for_cancellation_before_scanning()
     window.embedding_thread = RunningThread()
     window.embedding_worker = worker
     window._active_embedding_run_id = 7
-    window._embedding_run_lifecycle[7] = {"thread_finished": False, "terminal": True}
+    window._embedding_run_lifecycle[7] = {"thread_finished": False, "terminal_state": "Cancelled"}
     window._start_scan = scans_started.append
 
     window._queue_or_start_scan("/second-folder")
@@ -673,7 +673,7 @@ def test_third_import_also_resumes_exactly_once_after_embedding_cleanup():
         window.embedding_thread = RunningThread()
         window.embedding_worker = worker
         window._active_embedding_run_id = run_id
-        window._embedding_run_lifecycle[run_id] = {"thread_finished": False, "terminal": True}
+        window._embedding_run_lifecycle[run_id] = {"thread_finished": False, "terminal_state": "Cancelled"}
 
         window._queue_or_start_scan(folder)
         assert worker.cancelled is True
@@ -704,7 +704,7 @@ def test_terminal_result_survives_thread_cleanup_overtaking_queued_progress(caps
     window._active_embedding_run_id = run_id
     window.embedding_thread = object()
     window.embedding_worker = object()
-    window._embedding_run_lifecycle[run_id] = {"thread_finished": False, "terminal": False}
+    window._embedding_run_lifecycle[run_id] = {"thread_finished": False, "terminal_state": None}
 
     # Reproduce the Product Owner ordering: the worker thread exits while many
     # cache-hit progress events and the terminal result are still queued.
@@ -728,7 +728,7 @@ def test_terminal_callback_exception_becomes_explicit_failure(monkeypatch):
     window._active_embedding_run_id = run_id
     window.embedding_thread = object()
     window.embedding_worker = object()
-    window._embedding_run_lifecycle[run_id] = {"thread_finished": True, "terminal": False}
+    window._embedding_run_lifecycle[run_id] = {"thread_finished": True, "terminal_state": None}
     monkeypatch.setattr(window, "_on_embedding_complete", lambda *_args: (_ for _ in ()).throw(RuntimeError("callback broke")))
 
     window._on_embedding_complete_for_run(run_id, _embedding_result(0, 1, 0))

@@ -511,7 +511,7 @@ class MainWindow(QMainWindow):
         # Use QObject-bound queued slots rather than context-free lambdas.  The
         # latter may execute Python UI work on the worker thread on some PySide6
         # builds, which made a cache-fast second import especially crash-prone.
-        self._embedding_run_lifecycle[run_id] = {"thread_finished": False, "terminal": False}
+        self._embedding_run_lifecycle[run_id] = {"thread_finished": False, "terminal_state": None}
         worker.progress.connect(self._on_embedding_progress_for_run, Qt.ConnectionType.QueuedConnection)
         worker.complete.connect(self._on_embedding_complete_for_run, Qt.ConnectionType.QueuedConnection)
         worker.error.connect(self._on_embedding_error_for_run, Qt.ConnectionType.QueuedConnection)
@@ -530,31 +530,40 @@ class MainWindow(QMainWindow):
     @Slot(int, object)
     def _on_embedding_complete_for_run(self, run_id: int, result) -> None:
         lifecycle = self._embedding_run_lifecycle.get(run_id)
-        if lifecycle is None or lifecycle["terminal"]:
+        if lifecycle is None or lifecycle["terminal_state"] is not None:
             return
         try:
             self._on_embedding_complete(run_id, result)
         except Exception as exc:  # noqa: BLE001
             logger.exception("Embedding terminal callback failed run_id=%s", run_id)
             self._set_embedding_status(f"Embedding completion failed: {exc}", severity="error")
-            self._import_phase = "Failed"
+            lifecycle["terminal_state"] = "Failed"
+        else:
+            processed = int(getattr(result, "processed_successfully", 0) or 0)
+            cached = int(getattr(result, "skipped_cached", 0) or 0)
+            failed = int(getattr(result, "failed", 0) or 0)
+            cancelled = int(getattr(result, "cancelled", 0) or 0)
+            lifecycle["terminal_state"] = (
+                "Cancelled" if cancelled
+                else "Failed" if failed and not (processed or cached)
+                else "Completed"
+            )
         finally:
-            lifecycle["terminal"] = True
             self._finalize_embedding_run(run_id)
 
     @Slot(int, str)
     def _on_embedding_error_for_run(self, run_id: int, message: str) -> None:
         lifecycle = self._embedding_run_lifecycle.get(run_id)
-        if lifecycle is None or lifecycle["terminal"]:
+        if lifecycle is None or lifecycle["terminal_state"] is not None:
             return
         try:
             self._on_embedding_error(run_id, message)
         except Exception as exc:  # noqa: BLE001
             logger.exception("Embedding error callback failed run_id=%s", run_id)
             self._set_embedding_status(f"Embedding failure reporting failed: {exc}", severity="error")
-            self._import_phase = "Failed"
+            lifecycle["terminal_state"] = "Failed"
         finally:
-            lifecycle["terminal"] = True
+            lifecycle["terminal_state"] = "Failed"
             self._finalize_embedding_run(run_id)
 
     @Slot()
@@ -581,7 +590,7 @@ class MainWindow(QMainWindow):
     def _finalize_embedding_run(self, run_id: int) -> None:
         """Clean up only after both terminal result and thread exit arrived."""
         lifecycle = self._embedding_run_lifecycle.get(run_id)
-        if lifecycle is None or not all(lifecycle.values()):
+        if lifecycle is None or not lifecycle["thread_finished"] or lifecycle["terminal_state"] is None:
             return
         self._embedding_run_lifecycle.pop(run_id, None)
         if run_id != self._active_embedding_run_id:
@@ -604,8 +613,8 @@ class MainWindow(QMainWindow):
         if pending_photos is not None:
             self._launch_embedding_worker(pending_photos)
             return
-        self._import_phase = "Completed"
-        logger.info("Import lifecycle generation=%s phase=Completed", self._import_generation)
+        self._import_phase = str(lifecycle["terminal_state"])
+        logger.info("Import lifecycle generation=%s phase=%s", self._import_generation, self._import_phase)
 
     def _on_embedding_progress(self, run_id: int, progress) -> None:
         if run_id != self._active_embedding_run_id:
@@ -674,7 +683,8 @@ class MainWindow(QMainWindow):
                 f"{processed} new · {cached} reused from cache · 0 failed",
                 severity="success",
             )
-        self._on_embedding_index_updated(result)
+        if ready and not cancelled:
+            self._on_embedding_index_updated(result)
 
     def _set_embedding_status(self, message: str, severity: str = "progress") -> None:
         """Update the dedicated persistent AI status (or test-compatible fallback)."""
