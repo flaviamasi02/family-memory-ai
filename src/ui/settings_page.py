@@ -475,6 +475,10 @@ class SettingsPage(QWidget):
             err = getattr(result, "stderr", "") or ""
             code = getattr(result, "returncode", "")
             self.ai_plan_box.append(f"Final result: exit_code={code}\n{out}\n{err}".strip())
+            if operation == "verify" and code != 0:
+                self.runtime_step_label.setText("Current step: verification failed")
+                self._refresh_mobileclip_status()
+                return
         if operation == "test" and hasattr(result, "stdout"):
             try:
                 payload = json.loads(result.stdout.strip())

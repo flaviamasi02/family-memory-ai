@@ -6,6 +6,7 @@
 
 - Root cause: Settings owned one default `AIRuntimeManager`, while import indexing created another through `EmbeddingWorker` -> `BatchEmbeddingService` -> `ManagedMobileCLIPEmbeddingProvider`. Settings rendered its persisted cached state while import performed a deep readiness transition through its separate manager, allowing the two workflows to report different lifecycle states.
 - MainWindow is now the application composition root: its manager is explicitly shared by Settings, EmbeddingWorker, and the managed provider. The manager factory has no hidden process-global state, so persisted application-data root changes remain correct in tests, tools, and future clients.
+- A second root cause left Settings indefinitely `Verifying`: cached status gave a stale persisted transient state priority over the completed `provider verification passed` result, and nonzero verification results traveled through the completion signal without a failure presentation. Verification now persists an explicit start and terminal Ready/Failed/Cancelled state, cached startup repairs completed success, interrupted prior verification becomes a visible failure, and Settings refreshes the shared state for both successful and unsuccessful completion.
 - Deep runtime validation remains mandatory for import inference. No dependency, checkpoint, or provider verification was bypassed or weakened.
 
 ### MODEL-004A — Face Recognition Foundation
