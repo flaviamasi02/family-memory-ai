@@ -136,7 +136,9 @@ def test_verification_failure_and_cancellation_are_terminal(tmp_path):
     cancelled = _verification_ready_manager(tmp_path / 'cancelled', CommandResult('verify_provider', -1, '', 'Cancelled', 0.1, cancelled=True))
     cancelled.verify_provider('fake')
     assert cancelled.status('fake', deep=False).state == 'Cancelled'
-    assert cancelled.needs_verification_recovery('fake') is False
+    # Cancellation is terminal and truthful in this session.  A newly composed
+    # application may nevertheless recover the persisted record on startup.
+    assert cancelled.installation_record('fake').last_validation_result == 'provider verification cancelled'
 
     cancelled.executor.run_action = lambda *args, **kwargs: CommandResult('verify_provider', 0, 'ok', '', 0.1)
     assert cancelled.verify_provider('fake').returncode == 0
@@ -173,6 +175,28 @@ def test_legacy_interruption_cancelled_state_is_migrated_and_reverified(tmp_path
     pending = restarted.installation_record('fake')
     assert pending.installation_state == 'Verifying'
     assert pending.last_validation_result == 'provider verification recovery pending'
+    assert restarted.verify_provider('fake').returncode == 0
+    assert restarted.status('fake', deep=False).state == 'Ready'
+
+
+def test_prior_session_explicit_cancelled_state_is_recovered_and_reverified(tmp_path):
+    m = _verification_ready_manager(
+        tmp_path,
+        CommandResult('verify_provider', -1, '', 'Cancelled', 0.1, cancelled=True),
+    )
+    m.verify_provider('fake')
+    assert m.installation_record('fake').last_validation_result == 'provider verification cancelled'
+
+    restarted = AIRuntimeManager(m.registry, ApplicationDataPathService(tmp_path, tmp_path), m.executor)
+    assert restarted.needs_verification_recovery('fake') is True
+    assert restarted.prepare_verification_recovery('fake') is True
+    pending = restarted.installation_record('fake')
+    assert pending.installation_state == 'Verifying'
+    assert pending.last_validation_result == 'provider verification recovery pending'
+
+    restarted.executor.run_action = lambda *args, **kwargs: CommandResult(
+        'verify_provider', 0, '{"embedding_dimension": 512}', '', 0.1
+    )
     assert restarted.verify_provider('fake').returncode == 0
     assert restarted.status('fake', deep=False).state == 'Ready'
 

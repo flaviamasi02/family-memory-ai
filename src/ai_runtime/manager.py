@@ -70,34 +70,37 @@ class AIRuntimeManager:
             self.storage.save_installation(rec)
         return AIRuntimeStatus(provider_id,state,state==AIRuntimeState.READY.value,not missing_deps,not missing_files,'Unknown',rec.last_error,rec.last_status_check,missing_deps,missing_files,env)
     def needs_verification_recovery(self, provider_id:str) -> bool:
-        """Return whether startup found an orphaned transient verification."""
+        """Return whether persisted state needs a new-session verification.
+
+        ``Cancelled`` is truthful for the session in which cancellation was
+        observed, but it is not a permanent installation condition.  On a new
+        application start there is no live cancellation request, so the
+        composition layer may recover it just like an orphaned ``Verifying``
+        operation.  This also recovers cancellation records written by older
+        builds during application shutdown, whose metadata cannot reliably be
+        distinguished from an explicit cancellation.
+        """
         rec=self.installation_record(provider_id)
         with self._verification_lock:
             stale_verifying=rec.installation_state == AIRuntimeState.VERIFYING.value
-            legacy_interruption=(
-                rec.installation_state == AIRuntimeState.CANCELLED.value
-                and rec.last_validation_result == 'provider verification interrupted'
-            )
-            return (stale_verifying or legacy_interruption) and provider_id not in self._active_verifications
+            prior_session_cancelled=rec.installation_state == AIRuntimeState.CANCELLED.value
+            return (stale_verifying or prior_session_cancelled) and provider_id not in self._active_verifications
     def prepare_verification_recovery(self, provider_id:str) -> bool:
         """Restore an interrupted prior-session operation to a retryable transient state.
 
-        Older BUG-001 builds persisted an inferred interruption as Cancelled.
-        The validation marker distinguishes that legacy state from an explicit
-        cancellation, whose marker is ``provider verification cancelled``.
+        Cancellation remains truthful in the session where it occurs.  This
+        method is called only by the application startup coordinator, so any
+        persisted Cancelled record belongs to a prior session and is retryable.
         """
         with self._verification_lock:
             if provider_id in self._active_verifications:
                 return False
             rec=self.installation_record(provider_id)
             stale_verifying=rec.installation_state == AIRuntimeState.VERIFYING.value
-            legacy_interruption=(
-                rec.installation_state == AIRuntimeState.CANCELLED.value
-                and rec.last_validation_result == 'provider verification interrupted'
-            )
-            if not (stale_verifying or legacy_interruption):
+            prior_session_cancelled=rec.installation_state == AIRuntimeState.CANCELLED.value
+            if not (stale_verifying or prior_session_cancelled):
                 return False
-            if legacy_interruption:
+            if prior_session_cancelled:
                 rec.installation_state=AIRuntimeState.VERIFYING.value
                 rec.last_validation_result='provider verification recovery pending'
                 rec.last_error=''

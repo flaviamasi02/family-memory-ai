@@ -203,6 +203,22 @@ class MainWindow(QMainWindow):
 
         self._build_workspace_help_dock()
         self._on_tab_changed(self.tabs.currentIndex())
+        self._mobileclip_startup_recovery_scheduled = False
+        # Application composition owns the one explicit startup decision; the
+        # shared manager remains authoritative for persisted transitions and
+        # Settings owns only the worker presentation.
+        QTimer.singleShot(0, self._recover_mobileclip_runtime_on_startup)
+
+    def _recover_mobileclip_runtime_on_startup(self) -> None:
+        """Schedule at most one verification for recoverable persisted state."""
+        if self._mobileclip_startup_recovery_scheduled:
+            return
+        if not self.ai_runtime_manager.needs_verification_recovery("mobileclip"):
+            return
+        if not self.ai_runtime_manager.prepare_verification_recovery("mobileclip"):
+            return
+        self._mobileclip_startup_recovery_scheduled = True
+        self.settings_page.start_mobileclip_verification_recovery()
 
     def closeEvent(self, event):
         self._embedding_close_requested = True

@@ -30,9 +30,11 @@ The redesign changed presentation only. MODEL-003D remains advisory and explaina
 
 - 2026-07-26
 
-## BUG-001 MobileCLIP lifecycle correction
+## BUG-001B MobileCLIP cancelled-state startup recovery
 
-Implementation corrects the persisted verification lifecycle that could leave MobileCLIP indefinitely `Verifying` and consequently reject every uncached import image. Verification now owns the transient state and persists every terminal outcome; startup automatically re-verifies an interrupted transient record rather than falsely reporting user cancellation. It also migrates the legacy BUG-001 `Cancelled` record only when its validation marker identifies an interruption; genuinely user-cancelled verification remains terminal and retryable. Settings, Test Image, and import indexing share the application-owned runtime manager and observe the same state. Strict package/checkpoint/provider execution checks and persistent cache reuse remain unchanged. Automated coverage is included, but Product Owner validation with the specified 422-photo folder, repeat import, and restart is mandatory before merge.
+PR #41 was incomplete: application startup was effectively implemented inside Settings and recovered stale `Verifying` plus only a specially marked legacy interruption. The Product Owner's persisted `Cancelled` record carried the normal cancellation marker, so it was treated as permanently authoritative and no verification worker started. BUG-001B gives application composition one idempotent startup recovery decision. Any `Cancelled` record from a prior process, including records produced when older builds cancelled work during shutdown, is retryable at the next launch and transitions through `Verifying` to the truthful verification outcome. An explicit cancellation remains `Cancelled` during its current session and the existing Verify control can retry it.
+
+`AIRuntimeManager` continues to own and persist all lifecycle transitions. Settings visibly refreshes at recovery start and completion, while Test Image and semantic import indexing retain the same application-owned manager. Dependency, interpreter, checkpoint, provider execution, finite-embedding, and cache checks are unchanged. Product Owner validation must use the existing metadata without deletion: launch, observe `Cancelled -> Verifying -> Ready`, run Test Image and confirm a finite 512-dimensional embedding, import the 422-photo folder twice to confirm processing then cache reuse, restart, and confirm a truthful usable `Ready` state.
 
 
 ## MODEL chain current validation update
