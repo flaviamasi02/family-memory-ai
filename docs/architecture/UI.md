@@ -46,6 +46,20 @@ The interface should never feel like a developer tool.
 
 Every new feature must integrate naturally into the existing interface.
 
+## Interaction Philosophy
+
+- Prefer simplicity over information density.
+- Use progressive disclosure instead of showing every detail immediately.
+- Keep advanced information available through collapsed-by-default sections.
+- Keep primary workflows visible without unnecessary scrolling during normal maximized desktop use.
+- Make AI reasoning understandable and user-friendly rather than exposing developer-oriented diagnostics in the primary flow.
+
+## Visual Language of Family Memory AI (UX-002)
+
+UX-002 establishes the visual language for the entire application; it is not a Memory Review-only improvement. It defines score badges, category colours, decision colours, icons, typography hierarchy, spacing consistency, reusable UI components, and a consistent visual identity across current and future pages.
+
+All future pages must follow the patterns established by UX-002 rather than inventing an independent visual style. Memory Review is the first proving ground for this shared system, not its boundary.
+
 ---
 
 # Photo Cards

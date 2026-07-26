@@ -12,7 +12,7 @@ Family Memory AI will follow a **desktop-first, mobile-ready** product strategy.
 
 The Windows desktop application remains the only active implementation target until the desktop core workflow is sufficiently validated on a real family photo library. The project will not build complete desktop and mobile applications in parallel.
 
-At the same time, all new implementation work must preserve a clear separation between reusable product logic and the PySide6 presentation layer so that an Android application can later become a second client of the same Family Memory Engine.
+At the same time, all new implementation work must preserve a clear separation between reusable product logic and the PySide6 presentation layer so that planned Android and iOS applications can later become clients of the same Family Memory Engine. Mobile is an evolution of the same product, not a separate redesign.
 
 ## Product interpretation
 
@@ -93,7 +93,7 @@ Only after the companion workflow is stable should mobile take on heavier classi
 5. **Photo, person, profile, album, and decision records require stable identifiers.**
 6. **Persistence formats must remain portable or explicitly migratable.**
 7. **Windows-specific file access must stay behind platform boundaries.**
-8. **Every new feature should be designed as though a second UI will eventually consume it.**
+8. **Every new feature should be designed as though Android and iOS UIs will eventually consume it. Prefer reusable services over UI-specific implementations and avoid desktop-only architecture that would force a complete mobile redesign.**
 9. **No large rewrite is approved solely to prepare for mobile; extraction is incremental and evidence-driven.**
 10. **Cloud upload must not become mandatory merely to support mobile. Local-first and privacy-preserving behavior remains the default.**
 
@@ -106,7 +106,7 @@ The following are not part of the current execution scope:
 - reproducing desktop screens one-for-one on mobile;
 - mandatory cloud storage or photo upload;
 - processing the entire historical 50,000-photo library on a phone in the first mobile release;
-- simultaneous Android, iPhone, Windows, and web development.
+- simultaneous Android, iOS, Windows, and web development.
 
 ## Mobile start gate
 

@@ -77,7 +77,7 @@ Small incremental improvements are preferred over large rewrites.
 
 Architecture should evolve continuously.
 
-Platform strategy is governed by DEC-0049: Family Memory AI is desktop-first and mobile-ready. The Windows desktop application is the only active implementation target until the core workflow is validated on a representative real family photo library, while reusable domain and business logic must stay independent from PySide6 wherever practical so a later focused Android companion can consume the same Family Memory Engine.
+Platform strategy is governed by DEC-0049: Family Memory AI is desktop-first and mobile-ready. The Windows desktop application is the primary product and only active implementation target until the core workflow is validated on a representative real family photo library. Planned Android and iOS applications are evolutions of that same product, so reusable domain, service, and AI logic must stay independent from PySide6 wherever practical and desktop-only architecture must not force a later mobile redesign.
 
 ---
 
@@ -234,4 +234,4 @@ MobileCLIP is currently the first managed provider and remains local-only, CPU-c
 
 ## Current Memory Review UX baseline
 
-UX-001 Memory Review Redesign is complete and merged. The established desktop baseline is a grouped toolbar, balanced grid/workspace split, horizontal Preview + Current Status row, then AI Suggestion, Classification Summary, and Actions, with Photo Information and Technical Details collapsed by default. The primary workflow fits without vertical scrolling during normal maximized desktop use. This presentation preserves MODEL-003D's advisory, explicit-apply behavior and existing application logic. Future UI work should extend this baseline rather than restoring the former dense details-sidebar layout; UX-002 Visual Language & Badges is the next recommended milestone, followed by UX-003 workspace polish.
+UX-001 Memory Review Redesign is complete and merged. The established desktop baseline is a grouped toolbar, balanced grid/workspace split, horizontal Preview + Current Status row, then AI Suggestion, Classification Summary, and Actions, with Photo Information and Technical Details collapsed by default. The primary workflow fits without vertical scrolling during normal maximized desktop use. This presentation preserves MODEL-003D's advisory, explicit-apply behavior and existing application logic. Future UI work should extend this simple, progressively disclosed baseline rather than restoring the former dense details-sidebar layout; UX-002 Visual Language of Family Memory AI is the next recommended milestone and establishes shared visual identity for every page, followed by UX-003 workspace polish.

@@ -37,7 +37,7 @@ Instead, new work should create or continue milestones inside the appropriate fu
 
 MASTER_DEVELOPMENT_PLAN.md defines the product-level purpose of the domains.
 
-DEC-0049 platform rule: domain milestones target the Windows desktop application first while preserving reusable core boundaries for a later Android companion. Roadmap items must not assume parallel full desktop/mobile delivery, mandatory cloud upload, or a large mobile-preparation rewrite.
+DEC-0049 platform rule: domain milestones target the Windows desktop application first while preserving reusable core boundaries for planned future Android and iOS applications. Mobile is an evolution of the same product. Roadmap items must not assume parallel full desktop/mobile delivery, mandatory cloud upload, or a large mobile-preparation rewrite.
 
 ---
 
@@ -87,6 +87,8 @@ Review meaningful memories through category correction, AI teaching, preference 
 Mission:
 Teach the system what memories matter while preserving explainability and user context.
 
+Memory Review is the primary AI interaction workspace. Future category review, AI suggestions, people review, event review, learning, semantic suggestions, and other AI-assisted workflows should extend this workspace whenever appropriate instead of creating parallel review interfaces.
+
 Example milestones:
 
 - MEM-003 Multi-Select Bulk Category Editing (completed)
@@ -94,11 +96,14 @@ Example milestones:
 - MEM-005 True multi-column Memory Review grid (completed)
 - MEM-006 Memory Review UX polishing and keyboard workflow improvements
 - UX-001 Memory Review Redesign (completed and merged)
-- UX-002 Visual Language & Badges (backlog; next recommended milestone)
-  - colour-coded, user-friendly score badge replacing the compact “S 68” label
+- UX-002 Visual Language of Family Memory AI (backlog; next recommended milestone)
+  - establishes the application-wide visual language, not only a Memory Review enhancement
+  - colour-coded, user-friendly score badges, including replacement of the compact “S 68” label
   - category colours and decision colours
   - icons for category and decision badges
-  - consistent badge sizing and a project-wide visual language
+  - typography hierarchy and spacing consistency
+  - reusable UI components and consistent visual identity across every future page
+  - future pages follow UX-002 instead of inventing their own visual style
 - UX-003 Memory Review Workspace Polish (backlog)
   - slightly larger preview
   - approximately 75/25 Preview-to-Current-Status ratio
