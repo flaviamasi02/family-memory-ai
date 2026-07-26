@@ -83,6 +83,8 @@ class MainWindow(QMainWindow):
         self._active_embedding_run_id = 0
         self._pending_embedding_photos = None
         self._pending_import_folder_path = None
+        self._import_phase = "Idle"
+        self._current_import_photos = []
         self._embedding_close_requested = False
         self.selected_photo = None
         self._review_cache_signature = None
@@ -334,15 +336,27 @@ class MainWindow(QMainWindow):
         self._queue_or_start_scan(folder_path)
 
     def _queue_or_start_scan(self, folder_path: str) -> None:
-        """Start scanning now unless an embedding run must finish cancellation first."""
-        self._set_embedding_status("Indexing semantic embeddings: preparing new import…")
-        if self._embedding_thread_is_running():
+        """Enter the single import state machine or replace its queued request."""
+        active = (
+            (self.scan_thread is not None and self._scan_thread_is_running(self.scan_thread))
+            or self._thumbnail_thread_is_running()
+            or self._embedding_thread_is_running()
+        )
+        if active:
             self._pending_import_folder_path = folder_path
             self._pending_embedding_photos = None
             self._request_embedding_worker_cancel()
-            self.status_label.setText("Cancelling previous embedding job before scanning next folder…")
+            if self.thumbnail_worker is not None:
+                self.thumbnail_worker.cancel()
+            self._set_embedding_status("Waiting for the current import worker to finish before starting the queued import…")
+            self.status_label.setText("Queued new import; finishing the current worker…")
             return
+        self._begin_import_scan(folder_path)
 
+    def _begin_import_scan(self, folder_path: str) -> None:
+        self._pending_import_folder_path = None
+        self._import_phase = "Preparing"
+        self._set_embedding_status("Preparing import: scanning folder…")
         self.status_label.setText("Scanning folder…")
         self._start_scan(folder_path)
 
@@ -358,6 +372,7 @@ class MainWindow(QMainWindow):
         self._active_scan_run_id = run_id
 
         thread = QThread()
+        thread._family_memory_run_id = run_id
         worker = ScanWorker(folder_path)
         self.scan_thread = thread
         self.scan_worker = worker
@@ -367,11 +382,22 @@ class MainWindow(QMainWindow):
         worker.scan_complete.connect(self._on_scan_complete)
         worker.scan_error.connect(self._on_scan_error)
         worker.finished.connect(worker.deleteLater)
-        worker.finished.connect(thread.quit)
-        thread.finished.connect(lambda rid=run_id, finished_thread=thread: self._on_scan_thread_finished(rid, finished_thread))
+        worker.finished.connect(thread.quit, Qt.ConnectionType.DirectConnection)
+        thread.finished.connect(self._on_active_scan_thread_finished, Qt.ConnectionType.QueuedConnection)
         thread.finished.connect(thread.deleteLater)
 
         thread.start()
+
+    @Slot()
+    def _on_active_scan_thread_finished(self) -> None:
+        try:
+            thread = self.sender()
+        except RuntimeError:
+            thread = None
+        thread = thread or self.scan_thread
+        self._on_scan_thread_finished(
+            int(getattr(thread, "_family_memory_run_id", 0)), thread
+        )
 
     def _scan_thread_is_running(self, thread) -> bool:
         try:
@@ -389,8 +415,15 @@ class MainWindow(QMainWindow):
         self.scan_thread = None
         self.scan_worker = None
         self._active_scan_run_id = 0
+        if self._pending_import_folder_path is not None:
+            folder = self._pending_import_folder_path
+            self._begin_import_scan(folder)
 
     def _on_scan_complete(self, photos: list) -> None:
+        # A newer folder request owns the next transition.  Let this scan's
+        # thread-finished cleanup start it; do not create workers for stale data.
+        if self._pending_import_folder_path is not None:
+            return
         stats = get_session_stats()
         n = len(photos or [])
 
@@ -408,11 +441,9 @@ class MainWindow(QMainWindow):
             f"Scan complete — showing {n} photos. Loading thumbnails…"
         )
 
-        # Start background embedding generation for missing/outdated images.
-        self._start_embedding_indexing(photos)
-
-        # Start the thumbnail worker *immediately* so thumbnails begin arriving
-        # in the browser before Cleanup Review and Memory Review are prepared.
+        self._current_import_photos = list(photos or [])
+        self._import_phase = "Thumbnail generation"
+        self._set_embedding_status("Preparing import: generating thumbnails…")
         self.start_thumbnail_loading(photos)
 
         # ── Phase 2 & 3 (deferred) ────────────────────────────────────────────
@@ -516,16 +547,16 @@ class MainWindow(QMainWindow):
             return
 
         pending_folder = self._pending_import_folder_path
-        self._pending_import_folder_path = None
         if pending_folder is not None:
-            self.status_label.setText("Scanning folder…")
-            self._start_scan(pending_folder)
+            self._begin_import_scan(pending_folder)
             return
 
         pending_photos = self._pending_embedding_photos
         self._pending_embedding_photos = None
         if pending_photos is not None:
             self._launch_embedding_worker(pending_photos)
+            return
+        self._import_phase = "Completed"
 
     def _on_embedding_progress(self, run_id: int, progress) -> None:
         if run_id != self._active_embedding_run_id:
@@ -558,6 +589,7 @@ class MainWindow(QMainWindow):
         received = int(getattr(result, "total_images_received", 0) or 0)
         ready = processed + cached
         total = ready + failed + cancelled
+        self._import_phase = "Cache reuse" if cached else "Embedding indexing"
         if received <= 0:
             self._set_embedding_status(
                 "AI embeddings: no eligible photos to index.",
@@ -655,7 +687,9 @@ class MainWindow(QMainWindow):
             )
 
     def _on_scan_error(self, error_message: str) -> None:
+        self._import_phase = "Completed"
         self.status_label.setText(f"Scan error: {error_message}")
+        self._set_embedding_status(f"Import scan failed: {error_message}", severity="error")
 
     def load_photos(self, photos):
         self._all_photos = list(photos or [])
@@ -1021,10 +1055,20 @@ class MainWindow(QMainWindow):
         if self._embedding_close_requested:
             self._pending_thumbnail_photos = None
             return
+        if self._pending_import_folder_path is not None:
+            folder = self._pending_import_folder_path
+            self._pending_thumbnail_photos = None
+            self._begin_import_scan(folder)
+            return
         pending = self._pending_thumbnail_photos
         self._pending_thumbnail_photos = None
         if pending is not None:
             self._launch_thumbnail_worker(pending)
+            return
+        photos = self._current_import_photos
+        self._import_phase = "Embedding indexing"
+        self._set_embedding_status("Indexing semantic embeddings: starting…")
+        self._start_embedding_indexing(photos)
 
     def _on_thumbnail_worker_finished(self, run_id: int) -> None:
         """Record timing only for the import that owns this finished run."""

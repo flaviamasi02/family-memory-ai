@@ -40,6 +40,8 @@ Partial Product Owner validation confirmed `Ready`, successful Verify, a finite 
 
 The next validation no longer crashed but remained at “preparing new import”: worker completion had queued `QThread.quit()` through the GUI event queue, so a repeat request could be queued while the prior thread never reached the deterministic `thread.finished` cleanup that consumes it. Terminal worker signals now call the thread-safe `quit()` directly. The thread-finished UI callback remains the sole cleanup/resume path: it clears worker/thread references, consumes one pending folder, changes the UI to scanning, and starts that scan exactly once. No sleeps, polling recovery, or concurrent indexing workers were introduced.
 
+After further Product Owner validation showed that even a first new import could remain at “preparing”, the independent scan/thumbnail/embedding launch paths were replaced by one serialized `MainWindow` import state machine. Scan completion owns the transition to thumbnails; thumbnail thread cleanup owns the transition to embedding indexing; embedding completion reports processing or cache reuse; embedding thread cleanup owns `Completed` or the next queued scan. Requests arriving during any active stage replace one pending folder and cooperatively cancel cancellable work. Scan, thumbnail, and embedding thread references are cleared only by their matching thread-finished handlers, and every worker terminal signal directly requests its thread to quit. This removes the `Preparing`/no-worker and permanent-pending states without sleeps, polling, or duplicate workers.
+
 
 ## MODEL chain current validation update
 

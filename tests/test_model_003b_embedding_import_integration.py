@@ -170,7 +170,7 @@ def test_main_window_startup_succeeds_and_scan_complete_starts_embedding_indexin
 
     monkeypatch.setattr("ui.main_window.QThread", FakeThread)
     monkeypatch.setattr("ui.main_window.EmbeddingWorker", FakeWorker)
-    monkeypatch.setattr(MainWindow, "start_thumbnail_loading", lambda self, photos: None)
+    monkeypatch.setattr(MainWindow, "start_thumbnail_loading", lambda self, photos: self._start_embedding_indexing(photos))
     monkeypatch.setattr(MainWindow, "_deferred_setup_cleanup_review", lambda self: None)
     window = MainWindow()
     window._on_scan_complete([])
@@ -595,7 +595,7 @@ def test_second_import_during_embedding_waits_for_cancellation_before_scanning()
     assert worker.cancelled is True
     assert scans_started == []
     assert window._pending_import_folder_path == "/second-folder"
-    assert window.status_label.text == "Cancelling previous embedding job before scanning next folder…"
+    assert window.status_label.text == "Queued new import; finishing the current worker…"
 
     window._on_embedding_thread_finished(7)
 
@@ -631,7 +631,7 @@ def test_third_import_also_resumes_exactly_once_after_embedding_cleanup():
         window._queue_or_start_scan(folder)
         assert worker.cancelled is True
         assert window._pending_import_folder_path == folder
-        assert window.status_label.text == "Cancelling previous embedding job before scanning next folder…"
+        assert window.status_label.text == "Queued new import; finishing the current worker…"
 
         window._on_embedding_thread_finished(run_id)
         window._on_embedding_thread_finished(run_id)  # duplicate/stale delivery
@@ -648,7 +648,38 @@ def test_worker_shutdown_does_not_depend_on_queued_gui_delivery():
     source = Path("src/ui/main_window.py").read_text(encoding="utf-8")
     assert source.count(
         "worker.finished.connect(thread.quit, Qt.ConnectionType.DirectConnection)"
-    ) == 2
+    ) == 3
+
+
+def test_import_state_machine_reaches_embedding_after_thumbnail_completion(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    displayed = []
+    thumbnail_inputs = []
+    embedding_inputs = []
+    window.photo_model = type("PhotoModel", (), {"set_photos": lambda self, photos: displayed.append(list(photos))})()
+    window._apply_browser_filter = lambda: None
+    window._deferred_setup_cleanup_review = lambda: None
+    window.start_thumbnail_loading = thumbnail_inputs.append
+    window._start_embedding_indexing = embedding_inputs.append
+    monkeypatch.setattr("ui.main_window.QTimer.singleShot", lambda _ms, callback: callback())
+
+    window._on_scan_complete(["photo"])
+
+    assert window._import_phase == "Thumbnail generation"
+    assert displayed == [["photo"]]
+    assert thumbnail_inputs == [["photo"]]
+    assert embedding_inputs == []
+
+    thread = object()
+    window.thumbnail_thread = thread
+    window.thumbnail_worker = object()
+    window._active_thumbnail_run_id = 1
+    window._thumbnail_import_started_at[1] = 0.0
+    window._on_thumbnail_thread_finished(1, thread)
+
+    assert window._import_phase == "Embedding indexing"
+    assert embedding_inputs == [["photo"]]
+    assert window.ai_status_label.text == "Indexing semantic embeddings: starting…"
 
 
 def _embedding_window_for_lifecycle_tests():
@@ -667,6 +698,8 @@ def _embedding_window_for_lifecycle_tests():
     window._pending_embedding_photos = None
     window._pending_import_folder_path = None
     window._embedding_close_requested = False
+    window._import_phase = "Idle"
+    window._current_import_photos = []
     window.thumbnail_thread = None
     window.thumbnail_worker = None
     window._thumbnail_run_id = 0
