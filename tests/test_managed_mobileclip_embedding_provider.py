@@ -116,14 +116,6 @@ def test_automatic_embedding_uses_configured_managed_interpreter_and_stores_embe
     assert store.get_valid(p, provider.metadata) is not None
 
 
-def test_injected_runtime_manager_is_retained_as_lifecycle_authority():
-    manager = FakeRuntimeManager()
-
-    provider = ManagedMobileCLIPEmbeddingProvider(runtime_manager=manager)
-
-    assert provider.runtime_manager is manager
-
-
 def test_main_application_environment_does_not_need_torch_for_managed_embedding(tmp_path, monkeypatch):
     manager = FakeRuntimeManager()
     provider = ManagedMobileCLIPEmbeddingProvider(runtime_manager=manager)

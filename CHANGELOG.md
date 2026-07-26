@@ -2,14 +2,6 @@
 
 ## Unreleased
 
-### AI Runtime lifecycle regression fix
-
-- Fixed Settings and import indexing constructing independent default AI Runtime Manager instances.
-- Established one MainWindow-owned authoritative runtime lifecycle and explicitly inject it into Settings and the import embedding worker/provider chain without hidden global state.
-- Fixed stale or interrupted `Verifying` records: successful verification now persists and renders `Ready`, failed verification persists and renders a diagnostic `Failed`, and an incomplete prior run cannot remain indefinitely `Verifying` after restart.
-- Preserved specific terminal diagnostics in Settings: missing model files render `Checkpoint Missing`, while provider/model execution errors with an available checkpoint render `Failed`.
-- Preserved deep dependency, checkpoint, and provider readiness validation; no readiness check is bypassed or weakened.
-
 ### MODEL-004A — Face Recognition Foundation
 
 - Added platform-neutral Face, Person, FaceCluster, geometry, landmark, quality, and versioned FaceEmbedding domain records with stable IDs and JSON-safe serialization.

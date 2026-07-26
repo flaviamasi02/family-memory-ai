@@ -6,9 +6,7 @@ from typing import Callable
 
 from PySide6.QtCore import QObject, Signal
 
-from ai_runtime.manager import AIRuntimeManager, create_default_runtime_manager
 from vision.batch_embedding_service import BatchEmbeddingProgress, BatchEmbeddingResult, BatchEmbeddingService
-from vision.managed_mobileclip_provider import ManagedMobileCLIPEmbeddingProvider
 
 
 class EmbeddingWorker(QObject):
@@ -25,28 +23,11 @@ class EmbeddingWorker(QObject):
     error = Signal(str)
     finished = Signal()
 
-    def __init__(
-        self,
-        photos,
-        service_factory: Callable[[], BatchEmbeddingService] | None = None,
-    ) -> None:
+    def __init__(self, photos, service_factory: Callable[[], BatchEmbeddingService] | None = None) -> None:
         super().__init__()
         self._photos = list(photos or [])
-        self._service_factory = service_factory
-        self._runtime_manager: AIRuntimeManager | None = None
+        self._service_factory = service_factory or BatchEmbeddingService
         self._cancel_event = Event()
-
-    def set_runtime_manager(self, runtime_manager: AIRuntimeManager) -> None:
-        """Inject the composition root's runtime before the worker is started."""
-        self._runtime_manager = runtime_manager
-
-    def _create_service(self) -> BatchEmbeddingService:
-        if self._service_factory is not None:
-            return self._service_factory()
-        manager = self._runtime_manager or create_default_runtime_manager()
-        return BatchEmbeddingService(
-            provider=ManagedMobileCLIPEmbeddingProvider(runtime_manager=manager)
-        )
 
     def cancel(self) -> None:
         """Request cancellation before or between sequential image processing."""
@@ -54,7 +35,7 @@ class EmbeddingWorker(QObject):
 
     def run(self) -> None:
         try:
-            service = self._create_service()
+            service = self._service_factory()
             if self._cancel_event.is_set():
                 result = BatchEmbeddingResult(
                     total_images_received=len(self._photos),

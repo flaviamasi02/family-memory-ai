@@ -1,7 +1,7 @@
 from __future__ import annotations
 import importlib.util, json, logging, shutil, sys, time, urllib.request
 from pathlib import Path
-from threading import Event, Lock
+from threading import Event
 from core.application_data import ApplicationDataPathService, get_app_data_service
 from vision.embedding_provider import now_iso
 from ai_runtime.executor import AIRuntimeCommandExecutor, CommandResult
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class AIRuntimeManager:
     def __init__(self, registry: AIRuntimeRegistry|None=None, app_data: ApplicationDataPathService|None=None, executor: AIRuntimeCommandExecutor|None=None):
-        t0=time.perf_counter(); self.registry=registry or AIRuntimeRegistry(); self.app_data=app_data or get_app_data_service(); self.storage=AIRuntimeStorage(self.app_data); self.executor=executor or AIRuntimeCommandExecutor(); self._verification_lock=Lock(); self._active_verifications:set[str]=set(); logger.info("AI Runtime Manager construction %.1f ms", (time.perf_counter()-t0)*1000)
+        t0=time.perf_counter(); self.registry=registry or AIRuntimeRegistry(); self.app_data=app_data or get_app_data_service(); self.storage=AIRuntimeStorage(self.app_data); self.executor=executor or AIRuntimeCommandExecutor(); logger.info("AI Runtime Manager construction %.1f ms", (time.perf_counter()-t0)*1000)
     def inspect_environment(self, interpreter: str|Path|None=None) -> PythonEnvironmentInfo: return self.executor.validate_interpreter(interpreter or sys.executable)
     def installation_record(self, provider_id:str) -> AIRuntimeInstallationRecord:
         t0=time.perf_counter(); rec=self.storage.installations().get(provider_id); logger.debug("AI runtime installation record loading for %s %.1f ms", provider_id, (time.perf_counter()-t0)*1000)
@@ -48,19 +48,11 @@ class AIRuntimeManager:
         state=AIRuntimeState.READY.value if verified else AIRuntimeState.VERIFYING.value
         if not deep and rec.installation_state:
             state=rec.installation_state
-            # A completed provider verification is stronger evidence than a
-            # stale transient state left by an older/interrupted UI lifecycle.
-            if state == AIRuntimeState.VERIFYING.value and verified:
-                state=AIRuntimeState.READY.value
-            elif state == AIRuntimeState.VERIFYING.value and not self._verification_is_active(provider_id):
-                state=AIRuntimeState.FAILED.value
-                rec.last_validation_result='provider verification failed'
-                rec.last_error=rec.last_error or 'Previous provider verification did not complete.'
         if d.planned: state=AIRuntimeState.UNSUPPORTED.value
         elif not env.valid: state=AIRuntimeState.DEPENDENCIES_MISSING.value
         elif missing_deps: state=AIRuntimeState.DEPENDENCIES_MISSING.value
         elif missing_files: state=AIRuntimeState.CHECKPOINT_MISSING.value
-        elif not verified and deep: state=AIRuntimeState.VERIFYING.value
+        elif not verified: state=AIRuntimeState.VERIFYING.value
         if state == AIRuntimeState.CHECKPOINT_MISSING.value and (not missing_deps) and 'missing Python packages' in (rec.last_error or ''):
             rec.last_error='Checkpoint Missing - missing model files: '+', '.join(missing_files)
             rec.last_validation_result=rec.last_error
@@ -125,25 +117,12 @@ print(json.dumps({m: (md.version(m) if m in {d.metadata['Name'] for d in md.dist
             part.unlink(missing_ok=True); return CommandResult(action.action_type.value,1,'',str(exc),time.perf_counter()-start)
     def verify_provider(self, provider_id:str, cancel_event:Event|None=None, progress:ProgressCallback|None=None) -> CommandResult:
         rec=self.installation_record(provider_id)
-        if not rec.interpreter_path:
-            message='No persisted interpreter is selected for this runtime.'
-            rec.installation_state=AIRuntimeState.FAILED.value; rec.last_validation_result='provider verification failed'; rec.last_error=message; rec.last_status_check=now_iso(); self.storage.save_installation(rec)
-            return CommandResult(AIRuntimeActionType.VERIFY_PROVIDER.value,1,'',message,0)
+        if not rec.interpreter_path: return CommandResult(AIRuntimeActionType.VERIFY_PROVIDER.value,1,'','No persisted interpreter is selected for this runtime.',0)
         interp=rec.interpreter_path; cache=Path(rec.local_model_cache_path or self.storage.cache_dir_for(provider_id))
         d=self.registry.require(provider_id)
+        missing_deps=self.executor.imports_available(interp, tuple(dep.import_name for dep in d.required_python_packages))
+        missing_files=tuple(f.relative_path for f in d.required_model_files if not (cache/f.relative_path).exists())
         run_log=self.storage.start_run_log(provider_id,'verification',interp)
-        with self._verification_lock: self._active_verifications.add(provider_id)
-        rec.installation_state=AIRuntimeState.VERIFYING.value; rec.last_validation_result='provider verification in progress'; rec.last_error=''; rec.last_status_check=now_iso(); self.storage.save_installation(rec)
-        try:
-            missing_deps=self.executor.imports_available(interp, tuple(dep.import_name for dep in d.required_python_packages))
-            missing_files=tuple(f.relative_path for f in d.required_model_files if not (cache/f.relative_path).exists())
-        except Exception as exc:
-            message=f'Provider verification preflight failed: {exc}'
-            rec.installation_state=AIRuntimeState.FAILED.value; rec.last_validation_result='provider verification failed'; rec.last_error=message; rec.last_status_check=now_iso(); self.storage.save_installation(rec)
-            self.storage.append_history(AIRuntimeHistoryRecord(provider_id,now_iso(),'verification completed','failed',interpreter_path=interp,error_summary=message))
-            run_log.exception(exc); run_log.finish('Verification Failed')
-            with self._verification_lock: self._active_verifications.discard(provider_id)
-            return CommandResult(AIRuntimeActionType.VERIFY_PROVIDER.value,1,'',message,0)
         if missing_deps or missing_files:
             details=[]
             if missing_deps: details.append('missing Python packages: '+', '.join(missing_deps))
@@ -153,7 +132,6 @@ print(json.dumps({m: (md.version(m) if m in {d.metadata['Name'] for d in md.dist
             self.storage.append_history(AIRuntimeHistoryRecord(provider_id,now_iso(),'verification completed','not installed',interpreter_path=interp,error_summary=message))
             run_log.write({'event':'preflight','stdout':'','stderr':message,'exit_code':1,'time':now_iso()}); run_log.finish(rec.installation_state)
             if progress: progress('verification', message)
-            with self._verification_lock: self._active_verifications.discard(provider_id)
             return CommandResult(AIRuntimeActionType.VERIFY_PROVIDER.value,1,'',message,0)
         if progress: progress('verification','Running provider verification')
         script="""
@@ -180,15 +158,9 @@ print(json.dumps({'embedding_dimension':len(vec),'tokenizer':bool(tok)}))
             if not rec.install_date: rec.install_date=now_iso()
             self.storage.append_history(AIRuntimeHistoryRecord(provider_id,now_iso(),'verification completed','passed',interpreter_path=interp,message=res.stdout)); run_log.finish('Ready')
         else:
-            cancelled=bool(res.cancelled or (cancel_event and cancel_event.is_set()))
-            rec.last_validation_result='provider verification cancelled' if cancelled else 'provider verification failed'; rec.installation_state=AIRuntimeState.CANCELLED.value if cancelled else AIRuntimeState.FAILED.value; rec.last_error=res.stderr or res.stdout or rec.last_validation_result
-            self.storage.append_history(AIRuntimeHistoryRecord(provider_id,now_iso(),'verification completed','cancelled' if cancelled else 'failed',interpreter_path=interp,error_summary=rec.last_error)); run_log.finish('Cancelled' if cancelled else 'Verification Failed')
-        self.storage.save_installation(rec)
-        with self._verification_lock: self._active_verifications.discard(provider_id)
-        return res
-
-    def _verification_is_active(self, provider_id:str) -> bool:
-        with self._verification_lock: return provider_id in self._active_verifications
+            rec.last_validation_result='provider verification failed'; rec.installation_state=AIRuntimeState.FAILED.value; rec.last_error=res.stderr or res.stdout
+            self.storage.append_history(AIRuntimeHistoryRecord(provider_id,now_iso(),'verification completed','failed',interpreter_path=interp,error_summary=rec.last_error)); run_log.finish('Verification Failed')
+        self.storage.save_installation(rec); return res
     def execute_installation_plan(self, plan:AIRuntimeInstallationPlan, cancel_event:Event|None=None, progress:ProgressCallback|None=None):
         if not plan.confirmed: raise PermissionError('Installation plan must be explicitly confirmed before execution.')
         rec=self.installation_record(plan.provider_id); rec.interpreter_path=plan.python_environment.interpreter_path; rec.python_version=plan.python_environment.python_version; rec.environment_path=plan.python_environment.environment_path; rec.environment_type=plan.python_environment.environment_type; rec.local_model_cache_path=plan.destination_path; rec.local_installation_path=plan.destination_path; self.storage.save_installation(rec)
@@ -257,13 +229,5 @@ assert finite
         return {'providers_registered':len(statuses),'ready':statuses.count(AIRuntimeState.READY.value),'not_installed':statuses.count(AIRuntimeState.MODEL_NOT_DOWNLOADED.value)+statuses.count(AIRuntimeState.NOT_INSTALLED.value),'failed':statuses.count(AIRuntimeState.FAILED.value),'installations_started':sum(1 for h in hist if h.action=='installation started'),'installations_completed':sum(1 for h in hist if h.action=='installation completed'),'installations_failed':sum(1 for h in hist if 'failed' in h.outcome),'verifications_completed':sum(1 for h in hist if h.action=='verification completed'),'removals_completed':sum(1 for h in hist if h.action=='removal completed')}
 
 def create_default_runtime_manager(app_data:ApplicationDataPathService|None=None) -> AIRuntimeManager:
-    """Build a registered runtime manager for an application composition root.
-
-    The application creates this once in ``MainWindow`` and injects it into its
-    consumers. Keeping this function a factory avoids hidden process-global state
-    when application-data roots change in tests, tools, or future mobile clients.
-    """
     from ai_runtime.mobileclip_registration import register_mobileclip_runtime
-    manager=AIRuntimeManager(app_data=app_data)
-    register_mobileclip_runtime(manager.registry)
-    return manager
+    m=AIRuntimeManager(app_data=app_data); register_mobileclip_runtime(m.registry); return m

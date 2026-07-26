@@ -19,7 +19,6 @@ class MainWindowLayoutTests(unittest.TestCase):
 
         self.assertGreaterEqual(minimum.width(), 1200)
         self.assertGreaterEqual(minimum.height(), 800)
-        self.assertIs(window.settings_page.ai_runtime_manager, window.ai_runtime_manager)
 
 
 if __name__ == "__main__":
