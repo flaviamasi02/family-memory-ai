@@ -1,5 +1,29 @@
 # Family Memory AI Architecture
 
+## DATA-001 — Central Metadata Storage (approved; not started)
+
+DATA-001 establishes one central, application-owned SQLite database named `family_memory.db` for each managed photo library. Multiple databases split by photos, embeddings, people, review, or albums are not approved. The logical database includes Libraries, Photos, Embeddings, Categories, Review, Albums, Preferences, ImportHistory, Faces, and People; exact tables and physical schema may evolve during design without reopening the durable one-database decision.
+
+The platform-neutral storage layout maps on the primary Windows target to:
+
+```text
+AppData/
+  Local/
+    FamilyMemoryAI/
+      metadata/
+        libraries/
+          <LibraryID>/
+            family_memory.db
+      cache/
+        thumbnails/
+        models/
+      logs/
+```
+
+Application data must not be written beside originals, and original images must never be modified to carry app metadata. Original folders remain clean. Export or portable-project support must be explicit and user-controlled. The architecture supports multiple libraries and future backup/export and mobile synchronization while the Windows desktop remains the only active implementation target and Android comes later.
+
+DATA-001 must plan an idempotent, duplicate-safe migration of existing app-generated JSON and sidecars that preserves decisions/classifications, supplies logs and a migration summary, retains old data until confirmed success, defines rollback/recovery, and maintains transition compatibility. DATA-001 is not implemented yet.
+
 ## Purpose
 
 This document describes the technical architecture of Family Memory AI.
@@ -843,7 +867,6 @@ Current environment strategy:
 - Main application: PySide6 desktop application running from the normal project `.venv`; it orchestrates work and persists results.
 - Managed MobileCLIP runtime: a dedicated configured Python interpreter managed by the Generic AI Runtime Manager; it contains torch, MobileCLIP dependencies, and model access.
 - Runtime boundary: inference runs across a managed subprocess boundary; interpreter discovery comes from runtime configuration, with no hard-coded environment path and no dependency leakage into the main application environment.
-
 
 ## Current AI Runtime Architecture
 

@@ -686,7 +686,6 @@ AI Models metadata rendering bugs require layout diagnostics first.
 
 Approved. If Settings -> AI Models metadata appears blank, future agents must inspect Qt widget hierarchy, row counts, size hints, geometry, visibility, and layout order before changing provider data or runtime verification logic. MODEL-002D/002E showed that valid label text can be hidden by layout sizing.
 
-
 ### DEC-0049
 Desktop-First, Mobile-Ready Platform Strategy
 
@@ -748,3 +747,39 @@ Approved by the MODEL-004A architecture specification. Face, Person, and FaceClu
 MODEL-004A supplies contracts and inert placeholders only. It must not be described as face detection or recognition, and introduces no InsightFace, DeepFace, or face-recognition dependency.
 
 Canonical detail: `docs/architecture/FACE_RECOGNITION.md`.
+
+### DEC-0052
+Central Metadata Storage and Original Photo Protection
+
+**Value:** Both
+**Impact:** High
+
+Approved on 2026-07-27 for DATA-001. Each managed photo library will use one application-owned SQLite database named `family_memory.db`; separate databases for photos, embeddings, people, review, and albums are not approved. Logical scope includes Libraries, Photos, Embeddings, Categories, Review, Albums, Preferences, ImportHistory, Faces, and People. The exact physical schema may evolve during DATA-001 design, but the one-database-per-library decision is durable.
+
+Metadata belongs under application-managed storage, with a platform-neutral equivalent of the Windows-primary shape `AppData/Local/FamilyMemoryAI/metadata/libraries/<LibraryID>/family_memory.db`; caches (including thumbnails and models) and logs remain separate application-managed concerns. Original images and folders must remain untouched and clean: no app-generated JSON or metadata beside photos and no image modification for metadata storage. Portable-project/export behavior must be explicit and user-controlled. The design must support multiple libraries and future backup/export and mobile synchronization without coupling the desktop implementation to a mobile application now.
+
+DATA-001 planning must define an idempotent migration that detects existing app-generated JSON and sidecars, imports them without duplication, preserves user decisions and classifications, logs work and presents a summary, retains old metadata until success is confirmed, defines rollback/recovery, and keeps existing libraries compatible during transition. These are requirements, not unapproved implementation details.
+
+DATA-001 precedes PERF-001 so centralized indexed storage is stable before semantic-embedding optimization.
+
+**Impacted documents:**
+- docs/project/PROJECT_STATE.md
+- docs/project/ROADMAP.md
+- docs/architecture/ARCHITECTURE.md
+- docs/architecture/DATA_MODEL.md
+- docs/development/AI_PROJECT_PLAYBOOK.md
+- docs/releases/CHANGELOG.md
+
+### DEC-0053
+AUTO REVIEW MODE and ROOT CAUSE MODE
+
+**Value:** Method
+**Impact:** High
+
+AUTO REVIEW MODE is the official PR-review workflow. ChatGPT reviews PR state and scope, Actions and failures, regression risk, and manual-validation evidence whenever the Product Owner supplies a PR link. Failed CI blocks merge. Green CI is necessary but insufficient: successful Product Owner manual validation is also required, and Product Owner validation remains the authoritative human gate. ChatGPT supplies the exact correction prompt when a correction is required. After merge, delete the branch, synchronize `main`, and update the roadmap.
+
+ROOT CAUSE MODE activates automatically after more than two correction cycles on one PR. Incremental workarounds stop; the correction must identify and simplify the architectural cause, remove obsolete/redundant paths, prefer deterministic coordination for lifecycle complexity, and test the cause. Full CI and Product Owner manual validation remain mandatory.
+
+GitHub `@codex` comments are not a reliable same-task continuation mechanism. Complex corrections use the existing Codex task as the authoritative channel, and correction prompts must require the existing PR and branch and prohibit new or follow-up PRs.
+
+Canonical workflow detail: `docs/development/AI_PROJECT_PLAYBOOK.md`.
