@@ -1,5 +1,32 @@
 # Family Memory AI - Roadmap
 
+## Approved delivery sequence — 2026-07-27
+
+### Completed
+
+- UX-001
+- MODEL-004A — Face Recognition Foundation
+- BUG-001 — MobileCLIP Verification Lifecycle (PR #41)
+- BUG-001B — MobileCLIP Recovery and Repeated Import Stability (PR #42)
+
+### Next
+
+1. DATA-001 — Central Metadata Storage (**approved; not started**)
+2. PERF-001 — Semantic Embedding Performance (**planned; not started**)
+3. MODEL-004B — Face Detection (**planned; not started**)
+4. MODEL-004C — Face Embeddings (**planned; not started**)
+5. MODEL-004D — Face Clustering (**planned; not started**)
+6. MODEL-004E — Person Management (**planned; not started**)
+7. MODEL-004F — Memory Review Integration (**planned; not started**)
+
+DATA-001 must be completed before PERF-001. Stabilizing central metadata architecture first allows PERF-001 to use centralized indexed storage and avoids optimizing a storage design that will immediately change. This approved sequence supersedes older “next recommended” statements retained below as historical context.
+
+### PERF-001 scope baseline
+
+The Product Owner measured approximately 190.643 seconds for a CPU-based first semantic indexing pass over 422 photos (approximately 0.45 seconds per photo). PERF-001 will measure bottlenecks and investigate model-load reuse, batching, image resize/decode efficiency, cache efficiency, responsive UI, progress and ETA, and possible hardware acceleration where available. Cache reuse is expected to make repeats substantially faster. No PERF-001 improvement has been implemented.
+
+---
+
 ## Purpose
 
 This document tracks planned milestones only.
@@ -44,8 +71,8 @@ Current completed foundation work includes:
 - DEV-003 Candidate Selection Engine
 - DEV-004 Album Scoring Engine
 - DEV-005 Hybrid Album Review UI
-- BUG-001 Robust Date Extraction Pipeline
-- PERF-001 Album Review Performance Optimization
+- Legacy BUG-001 Robust Date Extraction Pipeline (historical identifier; unrelated to the current MobileCLIP BUG-001)
+- Legacy PERF-001 Album Review Performance Optimization (historical identifier; unrelated to Semantic Embedding Performance)
 - DEV-006 Album Draft Builder
 - DEV-007 Photo Cleanup & Relevance Engine
 
@@ -61,7 +88,7 @@ Current status:
 
 - LEARN-001 is complete.
 - LEARN-002 is complete.
-- LEARN-003 is the next milestone focus.
+- LEARN-003 was the next milestone focus in this historical phase.
 - This file is historical and transitional only; use docs/project/DOMAIN_ROADMAP.md for future milestones.
 
 Recently completed domain milestones relevant to Learning readiness:
@@ -76,7 +103,7 @@ Recently completed domain milestones relevant to Learning readiness:
 - MEM-REVIEW-FIX Asynchronous Memory Review synchronization and root-cause-first loading fix
 - UX-001 Memory Review Redesign (completed and merged; identifier reused in the later redesign specification)
 
-Current UX backlog is maintained in `docs/project/DOMAIN_ROADMAP.md`: UX-002 Visual Language of Family Memory AI is the next recommended milestone, followed by UX-003 Memory Review Workspace Polish. UX-002 establishes shared badges, colours, icons, typography, spacing, reusable components, and visual identity for the entire application rather than only improving Memory Review.
+Historical UX backlog context: UX-002 Visual Language of Family Memory AI was formerly recommended next, followed by UX-003 Memory Review Workspace Polish. UX-002 establishes shared badges, colours, icons, typography, spacing, reusable components, and visual identity for the entire application rather than only improving Memory Review.
 
 ### Phase 3 - Memory Intelligence
 

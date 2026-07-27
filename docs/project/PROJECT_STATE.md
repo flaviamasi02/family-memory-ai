@@ -1,40 +1,38 @@
 # Family Memory AI - Project State
 
-## MODEL-004A — Face Recognition Foundation
+## Current status — 2026-07-27
 
-MODEL-004A is implemented and awaiting Product Owner manual validation. The project now has platform-neutral Face, Person, FaceCluster, and versioned FaceEmbedding domain records; detection, embedding, clustering, and person-management contracts; inert no-AI placeholders; repository-backed manual identity operations; and portable SQLite persistence with stable IDs, source-fingerprint validity, incremental updates, and embedding invalidation.
+Family Memory AI remains a Windows-desktop-first, mobile-ready product. The completed baseline is **UX-001**, **MODEL-004A — Face Recognition Foundation**, **BUG-001 — MobileCLIP Verification Lifecycle** (PR #41), and **BUG-001B — MobileCLIP Recovery and Repeated Import Stability** (PR #42). PR #42 is merged in the repository at merge commit `d981a7e`; CI passed before merge and Product Owner manual validation passed.
 
-This milestone is architecture only. It is not connected to import, workers, classification, Memory Review, or PySide6; it performs no new face detection or recognition and makes no visible UX change. InsightFace, DeepFace, and face-recognition libraries were not introduced. Next face milestones remain MODEL-004B through MODEL-004F after validation.
+The next approved architectural initiative is **DATA-001 — Central Metadata Storage**. DATA-001 is approved but not started. **PERF-001 — Semantic Embedding Performance** is planned and not started, and must follow DATA-001. MODEL-004B through MODEL-004F remain planned and not started.
 
-## Current Application State — after UX-001 Memory Review redesign
+### Validated MobileCLIP outcomes
 
-UX-001 is complete and merged in PR #37. Memory Review now uses a compact grouped toolbar and a balanced, resizable split between the responsive thumbnail grid and the selected-photo workspace. Preview and Current Status share a horizontal first row, followed by AI Suggestion, Classification Summary, and selection-aware Actions. Photo Information and Technical Details are collapsed secondary sections, so the primary workflow requires no vertical scrolling during normal maximized desktop use.
+The PR #41/#42 validation established that MobileCLIP reaches `Ready`; stale `Verifying` and persisted `Cancelled` states are recoverable; Verify and Test Image work; and Test Image produces a finite 512-dimensional embedding. First semantic indexing completes, persistent embedding cache entries are reused, and second and third imports complete. The former repeat-run stall at 374/422 is resolved, worker/thread lifecycle is stable, and restart restores a truthful, usable `Ready` state.
 
-The redesign changed presentation only. MODEL-003D remains advisory and explainable: suggestions use stored semantic evidence, Apply remains explicit, Reject leaves the category unchanged, manual categories remain authoritative, and existing suggestion state, persistence, sidecar, classification, embedding-cache, filters, thumbnail virtualization, and review-action behavior is preserved.
+The measured Product Owner baseline for a 422-photo first semantic indexing run was approximately 190.643 seconds on CPU, or approximately 0.45 seconds per photo. This is a baseline, not a performance improvement claim. Cache reuse is expected to make repeated runs substantially faster.
 
-## Current Version
+### Active sequence
 
-- Version: v0.1.0
+1. **DATA-001 — Central Metadata Storage** — approved, not started.
+2. **PERF-001 — Semantic Embedding Performance** — planned, not started.
+3. **MODEL-004B — Face Detection** — planned, not started.
+4. **MODEL-004C — Face Embeddings** — planned, not started.
+5. **MODEL-004D — Face Clustering** — planned, not started.
+6. **MODEL-004E — Person Management** — planned, not started.
+7. **MODEL-004F — Memory Review Integration** — planned, not started.
 
-## Current Sprint and Status
+DATA-001 must be completed before PERF-001 so metadata architecture is stable before optimization, centralized indexed storage can inform performance work, and the project does not optimize a storage design that will immediately change.
 
-- Status: In Development
-- UX-001 — Memory Review Redesign: **Completed and merged** (PR #37).
-- MODEL-003D — Explainable Category Suggestions: **Completed and present in Memory Review**.
-- The current Windows desktop application includes the redesigned Memory Review workspace, staged/asynchronous import preparation, persistent embeddings, advisory category suggestions, category correction and learning signals, Cleanup Review, Album Draft, and the existing local-first workflows.
-- Production automatic category replacement remains intentionally unimplemented; semantic suggestions require explicit user action.
-- DEC-0049 remains active: Windows desktop is the current implementation target and reusable domain logic stays mobile-ready.
-- Next recommended UI milestone remains **UX-002 — Visual Language & Badges**, followed by **UX-003 — Memory Review Workspace Polish**. The face-recognition sequence can continue with **MODEL-004B — Face Detection** after MODEL-004A validation.
+## Completed milestone context
 
-## Last Updated
-
-- 2026-07-26
+MODEL-004A is completed as an architecture foundation. It introduced platform-neutral face-intelligence records, contracts, and persistence foundations, but no detection or recognition algorithm. UX-001 is completed and merged through PR #37. Production automatic category replacement remains intentionally unimplemented.
 
 ## BUG-001B MobileCLIP cancelled-state startup recovery
 
 PR #41 was incomplete: application startup was effectively implemented inside Settings and recovered stale `Verifying` plus only a specially marked legacy interruption. The Product Owner's persisted `Cancelled` record carried the normal cancellation marker, so it was treated as permanently authoritative and no verification worker started. BUG-001B gives application composition one idempotent startup recovery decision. Any `Cancelled` record from a prior process, including records produced when older builds cancelled work during shutdown, is retryable at the next launch and transitions through `Verifying` to the truthful verification outcome. An explicit cancellation remains `Cancelled` during its current session and the existing Verify control can retry it.
 
-`AIRuntimeManager` continues to own and persist all lifecycle transitions. Settings visibly refreshes at recovery start and completion, while Test Image and semantic import indexing retain the same application-owned manager. Dependency, interpreter, checkpoint, provider execution, finite-embedding, and cache checks are unchanged. Product Owner validation must use the existing metadata without deletion: launch, observe `Cancelled -> Verifying -> Ready`, run Test Image and confirm a finite 512-dimensional embedding, import the 422-photo folder twice to confirm processing then cache reuse, restart, and confirm a truthful usable `Ready` state.
+`AIRuntimeManager` continues to own and persist all lifecycle transitions. Settings visibly refreshes at recovery start and completion, while Test Image and semantic import indexing retain the same application-owned manager. Dependency, interpreter, checkpoint, provider execution, finite-embedding, and cache checks are unchanged. Product Owner validation used the existing metadata without deletion: launch, observe `Cancelled -> Verifying -> Ready`, run Test Image and confirm a finite 512-dimensional embedding, import the 422-photo folder repeatedly to confirm processing and cache reuse, restart, and confirm a truthful usable `Ready` state.
 
 Partial Product Owner validation confirmed `Ready`, successful Verify, a finite 512-dimensional embedding, and a first import of 422 processed images with zero failures. The second import exposed an independent worker-lifecycle defect: thumbnail startup replaced the application-owned reference to a still-running `QThread`, and embedding UI callbacks used context-free lambdas whose execution context was unsafe on some PySide6 builds. Repeated imports now cooperatively cancel and serialize thumbnail jobs, retain each live thread until its finished signal, queue the next thumbnail set only after cleanup, and route embedding callbacks through queued QObject slots. Regression coverage reopens the SQLite store across repeated cache-only runs and verifies no provider loading or embedding recreation occurs.
 
@@ -451,13 +449,10 @@ Future development priority becomes:
 
 Album Builder becomes one consumer of the Memory Intelligence system rather than the sole center of the product mission.
 
-## Current Active Domain
+## Historical domain snapshot
 
-- LEARN
-
-## Current Milestone
-
-- LEARN-002 Preference Learning and Aggregation Foundations (completed)
+- Active domain at the time: LEARN
+- Milestone at the time: LEARN-002 Preference Learning and Aggregation Foundations (completed)
 
 ## Recently Completed Milestones
 
@@ -1133,7 +1128,7 @@ Current MODEL-003 direction: reuse validated local MobileCLIP embeddings safely 
 
 ### MODEL-003A — Persistent Batch Embedding Engine
 
-Status: implemented in PR branch; awaiting Product Owner manual validation before merge.
+Historical status at implementation time: implemented in the PR branch and awaiting Product Owner manual validation. This milestone subsequently completed and merged.
 
 - Backend service: `vision.batch_embedding_service.BatchEmbeddingService` processes supported image paths or `Photo`-like records sequentially, loads the embedding provider once per batch, skips unchanged cached images, validates 512-dimensional finite embeddings, records per-image failures, and exposes typed batch result/progress dataclasses.
 - Persistence: embeddings are stored in the existing application data cache at `cache/embeddings/semantic_embeddings.sqlite3` through `vision.embedding_provider.EmbeddingStore`. Embedding vectors are stored as compact little-endian float32 BLOBs instead of verbose JSON arrays. The migration preserves legacy JSON rows and adds model-key/blob/update/schema columns and lookup indexes.

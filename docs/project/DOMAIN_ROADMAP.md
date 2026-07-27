@@ -1,5 +1,13 @@
 # Family Memory AI - Domain Roadmap
 
+## Current approved sequence — 2026-07-27
+
+Completed: UX-001; MODEL-004A — Face Recognition Foundation; BUG-001 — MobileCLIP Verification Lifecycle; BUG-001B — MobileCLIP Recovery and Repeated Import Stability.
+
+Next: (1) DATA-001 — Central Metadata Storage; (2) PERF-001 — Semantic Embedding Performance; (3) MODEL-004B — Face Detection; (4) MODEL-004C — Face Embeddings; (5) MODEL-004D — Face Clustering; (6) MODEL-004E — Person Management; (7) MODEL-004F — Memory Review Integration. DATA-001 is approved but not started; every later item is planned and not started. DATA-001 must finish before PERF-001.
+
+This sequence supersedes stale “current” or “next recommended” labels retained below as historical domain context.
+
 ## Purpose
 
 This document is the official roadmap for future development by domain.
@@ -96,7 +104,7 @@ Example milestones:
 - MEM-005 True multi-column Memory Review grid (completed)
 - MEM-006 Memory Review UX polishing and keyboard workflow improvements
 - UX-001 Memory Review Redesign (completed and merged)
-- UX-002 Visual Language of Family Memory AI (backlog; next recommended milestone)
+- UX-002 Visual Language of Family Memory AI (backlog; not in the current approved seven-item sequence)
   - establishes the application-wide visual language, not only a Memory Review enhancement
   - colour-coded, user-friendly score badges, including replacement of the compact “S 68” label
   - category colours and decision colours
@@ -284,13 +292,10 @@ Scope examples:
 
 ---
 
-## Current Active Domain
+## Historical domain snapshot
 
-- LEARN
-
-## Current Milestone
-
-- LEARN-002 Preference Learning and Aggregation Foundations (completed)
+- Active domain at the time: LEARN
+- Milestone at the time: LEARN-002 Preference Learning and Aggregation Foundations (completed)
 
 ## Recently Completed Domains and Infrastructure
 

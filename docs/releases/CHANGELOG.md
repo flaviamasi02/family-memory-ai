@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### DOCSYNC PC FULL — workflow, MobileCLIP completion, and DATA-001
+
+- Recorded AUTO REVIEW MODE, ROOT CAUSE MODE, the non-reliable continuation semantics of GitHub `@codex` comments, and the mandatory dual merge gate of green CI plus successful Product Owner manual validation.
+- Marked BUG-001 (PR #41) and BUG-001B (merged PR #42) completed with their validated Ready/recovery/embedding/import/cache/restart outcomes.
+- Approved DATA-001 — Central Metadata Storage: one `family_memory.db` per managed library, application-owned metadata, original-photo protection, multi-library/mobile-ready direction, and migration requirements. No schema implementation began.
+- Reordered the roadmap so DATA-001 precedes the planned, not-started PERF-001 and MODEL-004B through MODEL-004F; recorded the 422-photo CPU baseline without claiming an improvement.
+- Documentation-only synchronization; no application code or tests changed.
+
 ### BUG-001B — MobileCLIP cancelled-state startup recovery
 
 - Completed the incomplete PR #41 lifecycle fix: its startup path recovered stale `Verifying` and only one specially marked legacy `Cancelled` record, so the Product Owner's persisted `provider verification cancelled` record remained permanently authoritative and Settings never started verification.
@@ -9,7 +17,7 @@
 - Settings now refreshes visibly when recovery begins as well as when it completes. Verification still reports dependency, checkpoint, execution, and cancellation outcomes truthfully and never hard-codes `Ready`.
 - Made Test Image and import-time semantic indexing consult the same authoritative runtime state, and composed Settings and indexing with one application-owned runtime manager while retaining explicit dependency injection for tests.
 - Preserved cache-first embedding reuse, strict dependency/checkpoint checks, per-image corrupt-file isolation, local-only execution, and confirmation-gated installation/download behavior.
-- Product Owner validation from the existing persisted `Cancelled` metadata, including the 422-photo import, cache reuse, Test Image, and restart, remains mandatory before merge.
+- Product Owner validation from the existing persisted `Cancelled` metadata passed before PR #42 merged, including Ready recovery, Verify, Test Image, the 422-photo import, cache reuse across repeated imports, and restart.
 - Follow-up validation reached `Ready`, produced a finite 512-dimensional Test Image embedding, and indexed all 422 photos, but exposed a repeated-import crash. Repeated imports now serialize thumbnail workers instead of replacing a live `QThread`, cooperatively cancel superseded thumbnail work, wait for thread shutdown during application close, and deliver embedding UI callbacks through explicitly queued QObject slots. Persistent embedding stores are reopened safely and unchanged images are reported as cache reuse without loading the model.
 - A subsequent repeated-import validation exposed a queued-shutdown stall at “preparing new import”. Worker terminal signals now invoke the thread-safe `QThread.quit()` directly; the queued UI cleanup remains the single place that clears references and consumes a pending folder exactly once, so a second or third import resumes automatically without concurrent workers or polling.
 - Import coordination is now one serialized state machine owned by `MainWindow`: `Idle -> Preparing/scan -> Thumbnail generation -> Embedding indexing -> Cache reuse -> Completed`. A new request during scan, thumbnail work, embedding work, or cleanup replaces the single pending folder; the active stage finishes or cancels cooperatively, its thread-finished owner clears references, and the pending scan starts exactly once. The UI reports the active/waiting stage rather than remaining at “preparing” with no worker.
@@ -42,7 +50,6 @@
 - Fixed the deferred category-learning visual analysis pass so it loads and merges an existing photo sidecar before adding visual features; manual categories, accepted suggestions, and Keep decisions are no longer overwritten by a freshly reconstructed Photo.
 - Memory Review now renders an accepted suggestion as a completed informational state with its category and saved supporting-evidence count, rather than labeling it as insufficient evidence; Apply and Reject remain disabled.
 
-
 ### DOCSYNC DEC-0049 platform strategy propagation
 
 - Propagated DEC-0049 consistently across canonical documentation: Windows desktop remains the only active implementation target until the real-library desktop workflow is validated, while reusable core logic stays mobile-ready for a later focused Android companion.
@@ -64,7 +71,6 @@
 - Documented dedicated MobileCLIP runtime environment support, explicit Product Owner confirmation, background operation support, checkpoint handling, verification and one-image test architecture, and safe model-file removal.
 - Recorded that MODEL-002B detailed Product Owner manual validation is still pending; do not claim installation succeeded, runtime Ready, real embedding quality, or CPU performance results yet.
 - Preserved workflow, prompt-link, repository cleanup, stash-inspection, user-data, virtual-environment, and model-file safety rules.
-
 
 ### DOCSYNC - PC FULL post PR #9 and UX-001
 - Updated canonical status docs to reflect completed PR #9 baseline, completed UX-001, and validated Memory Review synchronization fix.
@@ -633,7 +639,6 @@
 - Added an optional `VisionEmbeddingProvider` boundary, SQLite semantic embedding cache, and evaluation-only MobileCLIP-S0 provider.
 - Added bounded MobileCLIP evaluation reporting with zero-shot prompt aggregation and personalized category prototype evaluation.
 - Updated Settings and Learning Summary surfaces to expose MobileCLIP status without replacing the production classifier.
-
 
 ### DOCSYNC GITHUB FULL after MODEL-002E (historical pre-MODEL-002F record)
 

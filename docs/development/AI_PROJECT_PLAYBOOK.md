@@ -1,5 +1,17 @@
 # Family Memory AI - AI Project Playbook
 
+## AUTO REVIEW MODE
+
+AUTO REVIEW MODE is the official default when the Product Owner sends ChatGPT a pull-request link. ChatGPT, acting as Chief Architect and Quality Gate, automatically reviews PR status, changed scope, GitHub Actions, failed tests, likely regressions, and the Product Owner manual-validation outcome. A CI failure blocks merge and ChatGPT prepares the exact Codex correction prompt. Green CI never authorizes merge by itself: merge is authorized only when CI is green **and** Product Owner manual validation succeeds. Product Owner manual validation is authoritative and can block merge even when CI is green.
+
+After merge, delete the merged branch, synchronize `main`, and update the roadmap. Every code change requires Product Owner manual validation before merge. Documentation-only PRs require documentation verification; that review does not replace manual validation of any future code change. Product Owner approval remains final.
+
+GitHub `@codex` comments can trigger a Codex reaction or follow-up, but do not reliably guarantee continuation in the same task, branch, or PR. For complex fixes and ROOT CAUSE MODE, the existing Codex task is authoritative. Every correction prompt must explicitly say: **continue on the existing PR; use the existing branch; do not create a new PR; do not create a follow-up PR.**
+
+## ROOT CAUSE MODE
+
+ROOT CAUSE MODE activates automatically after more than two correction cycles on the same PR. Stop incremental patching and do not add local flags, conditions, sleeps, polling loops, or workarounds. Analyze and identify the architectural cause, simplify the affected design, remove obsolete paths and redundant state, and add regression tests for the cause rather than only the visible symptom. When lifecycle complexity is involved, prefer a deterministic coordinator or state machine. Complete CI and Product Owner manual validation are required before merge.
+
 ## Purpose
 
 This document defines the development methodology used by AI assistants working on Family Memory AI.
@@ -34,7 +46,6 @@ The canonical prompt structure is owned by docs/development/PROMPT_TEMPLATE.md. 
 Every implementation prompt must include Execution Environment, Target, Estimated Task Size, Purpose, Expected Outcome, Repository, Definition of Done, Manual Test Plan, Acceptance Checklist, and Suggested Commit Message.
 
 Every implementation prompt should make the testing purpose explicit before the first code change is requested and end with the Acceptance Checklist.
-
 
 ---
 
@@ -209,7 +220,7 @@ New implementation work should normally go to Codex Cloud.
 
 Local Windows debugging, manual reproduction, environment-specific testing, and local-only repository work should use Codex Local (VS Code).
 
-Follow-up changes to an existing Pull Request, including review feedback and check-fix refinements, should use GitHub Copilot through a Pull Request comment whenever practical.
+Follow-up changes must continue through the existing authoritative Codex task and existing PR/branch; a GitHub `@codex` comment is only a possible trigger and is not a reliable continuation channel.
 
 Existing Pull Request improvement prompts must name the Pull Request and branch when known, and must explicitly say not to create a new Pull Request unless the Product Owner approves one.
 
@@ -257,7 +268,7 @@ Family Memory AI uses a focused pull request lifecycle:
 - keep the pull request focused on its stated purpose;
 - merge only after review;
 - merge only when the pull request is mergeable;
-- merge only after required checks pass, unless the Product Owner explicitly approves an exception.
+- merge only after required checks pass and Product Owner manual validation succeeds; CI failures always block merge.
 
 When review feedback, test failures, or GitHub Actions failures occur, update the same pull request instead of opening a replacement PR unless the original PR is technically unrecoverable or the Product Owner approves a reset.
 
@@ -271,7 +282,7 @@ When GitHub Actions fail:
 2. Identify the root cause.
 3. Fix the root cause in the repository.
 4. Update the same pull request.
-5. Repeat until required checks pass or the Product Owner explicitly approves an exception.
+5. Repeat until required checks pass; after more than two correction cycles, activate ROOT CAUSE MODE.
 
 Never guess. Do not treat a failing workflow as resolved until the cause is understood and the relevant verification has passed or the limitation has been explicitly documented.
 
@@ -636,7 +647,6 @@ Permanent prevention rules:
 - Stashes must be inspected before deletion.
 - Runtime metadata, model files, user profiles, and learning data should use application-data storage outside the repository rather than repository-local storage.
 - Private learning-profile contents must never be copied into documentation or PR descriptions.
-
 
 ## AI Runtime implementation rules
 
