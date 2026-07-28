@@ -760,7 +760,7 @@ Metadata belongs under application-managed storage, with a platform-neutral equi
 
 DATA-001 planning must define an idempotent migration that detects existing app-generated JSON and sidecars, imports them without duplication, preserves user decisions and classifications, logs work and presents a summary, retains old metadata until success is confirmed, defines rollback/recovery, and keeps existing libraries compatible during transition. These are requirements, not unapproved implementation details.
 
-DATA-001 precedes PERF-001 so centralized indexed storage is stable before semantic-embedding optimization.
+DATA-001 precedes PERF-001 so centralized indexed storage is stable before semantic-embedding optimization. The approved decision is realised as an implementation contract in `docs/architecture/DATA_001_CENTRAL_METADATA_STORAGE.md`; that specification is ready for Product Owner review and does not mark implementation started.
 
 **Impacted documents:**
 - docs/project/PROJECT_STATE.md

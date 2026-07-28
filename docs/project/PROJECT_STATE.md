@@ -4,7 +4,7 @@
 
 Family Memory AI remains a Windows-desktop-first, mobile-ready product. The completed baseline is **UX-001**, **MODEL-004A — Face Recognition Foundation**, **BUG-001 — MobileCLIP Verification Lifecycle** (PR #41), and **BUG-001B — MobileCLIP Recovery and Repeated Import Stability** (PR #42). PR #42 is merged in the repository at merge commit `d981a7e`; CI passed before merge and Product Owner manual validation passed.
 
-The next approved architectural initiative is **DATA-001 — Central Metadata Storage**. DATA-001 is approved but not started. **PERF-001 — Semantic Embedding Performance** is planned and not started, and must follow DATA-001. MODEL-004B through MODEL-004F remain planned and not started.
+The next approved architectural initiative is **DATA-001 — Central Metadata Storage**. Its authoritative specification is `docs/architecture/DATA_001_CENTRAL_METADATA_STORAGE.md`, covering current-state evidence, schema, identity, migration, concurrency, recovery, and DATA-001A–H delivery increments. DATA-001 architecture is ready for Product Owner review; implementation is not started. **PERF-001 — Semantic Embedding Performance** is planned and not started, and must follow DATA-001. MODEL-004B through MODEL-004F remain planned and not started.
 
 ### Validated MobileCLIP outcomes
 
@@ -14,7 +14,7 @@ The measured Product Owner baseline for a 422-photo first semantic indexing run 
 
 ### Active sequence
 
-1. **DATA-001 — Central Metadata Storage** — approved, not started.
+1. **DATA-001 — Central Metadata Storage** — architecture ready for Product Owner review; implementation not started.
 2. **PERF-001 — Semantic Embedding Performance** — planned, not started.
 3. **MODEL-004B — Face Detection** — planned, not started.
 4. **MODEL-004C — Face Embeddings** — planned, not started.
