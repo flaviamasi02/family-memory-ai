@@ -11,7 +11,7 @@
 
 ### Next
 
-1. DATA-001 — Central Metadata Storage (**architecture ready for Product Owner review; implementation not started**)
+1. DATA-001 — Central Metadata Storage (**DATA-001A implemented; Product Owner validation pending; DATA-001B–H planned**)
 2. PERF-001 — Semantic Embedding Performance (**planned; not started**)
 3. MODEL-004B — Face Detection (**planned; not started**)
 4. MODEL-004C — Face Embeddings (**planned; not started**)

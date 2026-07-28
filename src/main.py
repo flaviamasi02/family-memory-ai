@@ -4,6 +4,7 @@ import sys
 from PySide6.QtCore import QLoggingCategory
 from PySide6.QtWidgets import QApplication
 
+from core.application_services import build_application_services
 from ui.main_window import MainWindow
 
 
@@ -27,7 +28,9 @@ def main():
     if _jpeg_rule not in _existing:
         os.environ["QT_LOGGING_RULES"] = (_existing.rstrip("\n") + "\n" + _jpeg_rule).lstrip("\n")
 
+    services = build_application_services()
     app = QApplication(sys.argv)
+    app.aboutToQuit.connect(services.close)
 
     # Belt-and-suspenders: also apply via the runtime API after QApplication is
     # created, in case the env var was already set to something else or the

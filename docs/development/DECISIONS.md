@@ -783,3 +783,7 @@ ROOT CAUSE MODE activates automatically after more than two correction cycles on
 GitHub `@codex` comments are not a reliable same-task continuation mechanism. Complex corrections use the existing Codex task as the authoritative channel, and correction prompts must require the existing PR and branch and prohibit new or follow-up PRs.
 
 Canonical workflow detail: `docs/development/AI_PROJECT_PLAYBOOK.md`.
+
+### DATA-001A implementation record — 2026-07-28
+
+The approved bootstrap registry is the architecture-specified, atomically replaced `metadata/library_registry.json`, not a per-library sidecar. Library identity is canonical lowercase UUIDv4; database paths derive only from that ID. The minimal version-1 per-library SQLite foundation contains `schema_migrations` and `libraries`, and all access is behind a connection-per-work-unit `MetadataStore`. This implements DATA-001A infrastructure only: legacy JSON/sidecars and current caches remain authoritative, and DATA-001B–H remain planned. Product Owner manual validation is still required.

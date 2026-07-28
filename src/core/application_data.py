@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json, os, shutil, tempfile
+import json, logging, os, shutil, tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -8,17 +8,22 @@ from typing import Any
 
 APP_DIR_NAME = "FamilyMemoryAI"
 SCHEMA_VERSION = 1
+logger = logging.getLogger(__name__)
+
+
+class ApplicationDataError(RuntimeError):
+    """Raised when application-managed storage cannot be prepared."""
 
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def default_app_data_root() -> Path:
+def default_app_data_root(*, platform_name: str | None = None) -> Path:
     override = os.environ.get("FAMILY_MEMORY_APP_DATA_ROOT")
     if override:
         return Path(override).expanduser()
-    if os.name == "nt":
+    if (platform_name or os.name) == "nt":
         base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Local")
         return Path(base) / APP_DIR_NAME
     if sys_xdg := os.environ.get("XDG_DATA_HOME"):
@@ -87,6 +92,61 @@ class ApplicationDataPathService:
         return self.root / "cache" / name
     def reports_dir(self) -> Path:
         return self.root / "reports"
+
+    @property
+    def metadata_dir(self) -> Path:
+        return self.root / "metadata"
+
+    @property
+    def libraries_dir(self) -> Path:
+        return self.metadata_dir / "libraries"
+
+    @property
+    def registry_path(self) -> Path:
+        return self.metadata_dir / "library_registry.json"
+
+    @property
+    def thumbnails_dir(self) -> Path:
+        return self.cache_dir("thumbnails")
+
+    @property
+    def models_dir(self) -> Path:
+        return self.cache_dir("models")
+
+    @property
+    def logs_dir(self) -> Path:
+        return self.root / "logs"
+
+    def initialise(self) -> None:
+        """Create the approved application-owned directory tree idempotently."""
+        try:
+            for directory in (
+                self.libraries_dir,
+                self.thumbnails_dir,
+                self.models_dir,
+                self.logs_dir,
+            ):
+                directory.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise ApplicationDataError(
+                f"Unable to create the application data directories: {exc}"
+            ) from exc
+        logger.info("Application data root initialised")
+
+    def library_dir(self, library_id: str) -> Path:
+        """Return a safe directory for a canonical UUID LibraryID."""
+        from uuid import UUID
+
+        try:
+            canonical = str(UUID(library_id))
+        except (ValueError, AttributeError, TypeError) as exc:
+            raise ApplicationDataError("LibraryID must be a canonical UUID") from exc
+        if canonical != library_id.lower():
+            raise ApplicationDataError("LibraryID must be a canonical UUID")
+        return self.libraries_dir / canonical
+
+    def library_database_path(self, library_id: str) -> Path:
+        return self.library_dir(library_id) / "family_memory.db"
 
     def legacy_familymemory_dir(self) -> Path:
         return self.legacy_root / ".familymemory"
