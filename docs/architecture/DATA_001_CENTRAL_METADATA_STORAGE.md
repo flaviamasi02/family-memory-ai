@@ -1,11 +1,11 @@
 # DATA-001 — Central Metadata Storage Architecture Specification
 
-Status: **DATA-001A implemented; automated validation complete; Product Owner validation pending**
+Status: **DATA-001A–B implemented; automated validation complete; Product Owner validation pending**
 
 Owner: Architecture
 Last updated: 2026-07-28
 
-This document is the authoritative technical contract for DATA-001. The durable decisions are recorded in `docs/development/DECISIONS.md`; this specification defines how later implementation increments must realize them. DATA-001A now implements only the application-data, registry, and minimal database/store foundation described below. DATA-001B–H, PERF-001, and MODEL-004B remain planned.
+This document is the authoritative technical contract for DATA-001. The durable decisions are recorded in `docs/development/DECISIONS.md`; this specification defines how later implementation increments must realize them. DATA-001A implements the application-data, registry, and minimal database/store foundation; DATA-001B implements schema version 2 and database operations described below. DATA-001C–H, PERF-001, and MODEL-004B remain planned.
 
 ## 1. Executive Summary
 
@@ -423,3 +423,17 @@ DATA-001A extends `ApplicationDataPathService` with idempotent `metadata/librari
 Each registration creates only `metadata/libraries/<LibraryID>/family_memory.db`; it never writes below the source root. The minimal schema contains `schema_migrations` and the database self-description `libraries` row. Version 1 is transactional, checksum-labelled, forward-only, and configures foreign keys, a 5-second busy timeout, WAL, and normal synchronous mode. `MetadataStore` provides open/close, initialise/version/health, database and LibraryID properties, and connection-per-work-unit transactions; no connection is shared between PySide6 workers.
 
 Existing sidecars, JSON profiles, embedding/face caches, import, review, album, and MobileCLIP flows remain authoritative and unchanged. No metadata migration, compatibility fallback, write cutover, legacy deletion, cache move, or original-photo mutation occurred. DATA-001B–H remain planned. Manual validation: run `PYTHONPATH=src python -m storage.diagnostics`, confirm the reported application root and library count, then use a temporary diagnostic script/service call to register a test folder, open it, and confirm the UUID directory, `family_memory.db`, schema version 1, healthy result, and an unchanged source folder. Product Owner approval is required before merge.
+
+## DATA-001B implementation note (2026-07-28)
+
+DATA-001B adds immutable migration version 2, `data_001b_full_schema`, after the unchanged version-1 `data_001a_foundation`. Version 2 extends migration and library self-description fields and creates `photos`, `photo_locations`, `embeddings`, `categories`, `photo_categories`, `reviews`, `albums`, `album_items`, `preferences`, `import_runs`, `import_run_items`, `people`, `faces`, `face_embeddings`, and `metadata_migration_history`. Primary/foreign keys, state and numeric checks, library/path/model/idempotency uniqueness, partial current-record indexes, album ordering, and expected lookup indexes prepare repository work without populating any table.
+
+`MetadataStore` verifies ordered migration names and SHA-256 checksums, rejects newer schemas, applies each migration under a per-store re-entrant operation lock and `BEGIN IMMEDIATE`, and rolls a failed migration back without recording it. Health reports database/LibraryID, actual and expected versions, integrity and foreign-key results, migration consistency, missing required tables, newer-schema state, read/write availability, and overall status.
+
+`backup(destination_path, overwrite=False)` uses SQLite's online backup API into a temporary file, integrity/schema-validates it, and atomically publishes it; destinations are never silently overwritten. `validate_backup(path)` rejects corrupt, incomplete, foreign-key-invalid, and unsupported databases. `restore(path)` validates first, retains a uniquely named pre-restore safety copy, stages and atomically replaces the live database under the exclusive operation lock, clears stale WAL companions, and health-checks the replacement; failure restores from the retained safety copy.
+
+Diagnostic usage is explicit and non-destructive: `PYTHONPATH=src python -m storage.diagnostics --help`, then `root`, `list`, `register <chosen-test-root>`, `open <LibraryID>`, `backup <LibraryID> <destination>`, or `validate <LibraryID> <backup>`. Use `--app-data-root <temporary-directory>` to isolate validation. Registration never occurs implicitly.
+
+This increment makes **no persistence cutover**. Normal import is not connected to SQLite; no photos, imports, categories, reviews, embeddings, albums, preferences, face data, JSON, or sidecar content were migrated. Current legacy sidecars, JSON profiles, semantic cache, face-foundation database, and in-memory albums remain authoritative, and original photo folders remain untouched. DATA-001C–H remain planned before PERF-001 and MODEL-004B.
+
+Product Owner manual validation is mandatory: use a temporary app-data root and explicitly chosen test photo directory; register/open it; confirm schema version 2 and healthy diagnostics; create and validate a backup; add disposable test metadata through a test script, restore, and confirm the safety copy and restored health; run the current application/import, Cleanup Review, Memory Review, Photo Browser, album draft, MobileCLIP verification and repeated semantic-cache flow; finally confirm the source tree, legacy sidecars/JSON, and existing cache files are unchanged. Do not merge until ChatGPT has reviewed the pull request and GitHub Actions and the Product Owner has completed this checklist.

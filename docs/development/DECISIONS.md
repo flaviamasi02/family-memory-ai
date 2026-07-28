@@ -787,3 +787,7 @@ Canonical workflow detail: `docs/development/AI_PROJECT_PLAYBOOK.md`.
 ### DATA-001A implementation record — 2026-07-28
 
 The approved bootstrap registry is the architecture-specified, atomically replaced `metadata/library_registry.json`, not a per-library sidecar. Library identity is canonical lowercase UUIDv4; database paths derive only from that ID. The minimal version-1 per-library SQLite foundation contains `schema_migrations` and `libraries`, and all access is behind a connection-per-work-unit `MetadataStore`. This implements DATA-001A infrastructure only: legacy JSON/sidecars and current caches remain authoritative, and DATA-001B–H remain planned. Product Owner manual validation is still required.
+
+### DATA-001B implementation record — 2026-07-28
+
+Schema version 2 is the complete DATA-001 foundation: all domain tables share the one managed `family_memory.db`; semantic and face vectors are constrained float32 little-endian BLOBs. Ordered migrations are checksum-verified, forward-only, individually transactional, and serialized with work units. Online backup, validated safety-copy restore, structured health reporting, and explicit non-destructive diagnostics are service responsibilities. DATA-001B does not connect import or migrate/cut over legacy content; DATA-001C–H remain planned and Product Owner validation is required.
