@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### DATA-001 — Central Metadata Storage architecture specification
+
+- Added the authoritative documentation-only DATA-001 technical contract, including the repository-evidenced persistence inventory, one-library/one-database layout, stable LibraryID/PhotoID models, explicit logical schema, and repository/service boundary.
+- Selected versioned float32 SQLite BLOBs for semantic embeddings and defined WAL/connection-per-work-unit concurrency, worker lifecycle, schema migration, backup/recovery, and privacy contracts.
+- Defined idempotent migration for current photo sidecars, category and learning JSON, semantic embedding SQLite cache, face-foundation SQLite data, and in-memory album limitations, with non-destructive compatibility and split-brain prevention.
+- Split future implementation into DATA-001A–H with tests, visible results, rollback boundaries, and acceptance criteria. Architecture is ready for Product Owner review; no application code, tests, database, code migration, PERF-001, or MODEL-004B work changed.
+
 ### DOCSYNC PC FULL — workflow, MobileCLIP completion, and DATA-001
 
 - Recorded AUTO REVIEW MODE, ROOT CAUSE MODE, the non-reliable continuation semantics of GitHub `@codex` comments, and the mandatory dual merge gate of green CI plus successful Product Owner manual validation.

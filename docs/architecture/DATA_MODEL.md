@@ -6,9 +6,9 @@ This document describes the data model architecture of Family Memory AI.
 
 ## Status
 
-DATA-001 — Central Metadata Storage is approved and not started. Its durable boundary is one `family_memory.db` SQLite database per managed library, owned by the application rather than stored beside source photos. The logical scope is Libraries, Photos, Embeddings, Categories, Review, Albums, Preferences, ImportHistory, Faces, and People. Exact physical tables, keys, and migrations remain DATA-001 design work.
+DATA-001 — Central Metadata Storage architecture is ready for Product Owner review and is not implemented. Its durable boundary is one `family_memory.db` SQLite database per managed library, owned by the application rather than stored beside source photos.
 
-Original folders must remain clean and original images unmodified. DATA-001 must plan idempotent migration of existing JSON/sidecars, preserve decisions and classifications, prevent duplicate import, produce logs and a summary, retain old metadata pending confirmed success, define rollback/recovery, and maintain compatibility during transition.
+The explicit target schema, constraints, identity rules, embedding representation, lifecycle, and migration mappings are authoritative in [DATA-001 — Central Metadata Storage Architecture Specification](DATA_001_CENTRAL_METADATA_STORAGE.md). Original folders remain clean and images immutable; migration is idempotent, counted, recoverable, and retains all legacy sources until separately approved cleanup.
 
 Initial placeholder created during documentation structure refactoring.
 
