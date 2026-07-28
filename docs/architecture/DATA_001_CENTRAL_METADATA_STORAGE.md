@@ -1,11 +1,11 @@
 # DATA-001 — Central Metadata Storage Architecture Specification
 
-Status: **Ready for Product Owner review; not implemented**
+Status: **DATA-001A implemented; automated validation complete; Product Owner validation pending**
 
 Owner: Architecture
-Last updated: 2026-07-27
+Last updated: 2026-07-28
 
-This document is the authoritative technical contract for DATA-001. The durable decisions are recorded in `docs/development/DECISIONS.md`; this specification defines how later implementation increments must realize them. It does not implement DATA-001, PERF-001, or MODEL-004B.
+This document is the authoritative technical contract for DATA-001. The durable decisions are recorded in `docs/development/DECISIONS.md`; this specification defines how later implementation increments must realize them. DATA-001A now implements only the application-data, registry, and minimal database/store foundation described below. DATA-001B–H, PERF-001, and MODEL-004B remain planned.
 
 ## 1. Executive Summary
 
@@ -281,16 +281,20 @@ Every increment is a separate reviewable PR, leaves the application working, upd
 ### DATA-001A — Application data paths and library registry
 
 - **Scope:** target directories, platform provider extension, atomic registry, UUID LibraryID, root normalisation/status/relocation contract.
-- **Excluded:** SQLite schema, metadata migration, UI redesign.
+- **Included foundation for this approved implementation increment:** minimal
+  `schema_migrations` and `libraries` tables, `MetadataStore` lifecycle,
+  connection-per-work-unit transactions, pragmas, and health checks.
+- **Excluded:** the full target schema, backup/restore, metadata migration, and UI redesign.
 - **Dependencies:** this approved specification.
 - **Tests:** path platforms/override, registry atomicity/corruption, duplicate path variants, disconnected/relocated roots.
 - **PO result:** register/reopen/locate a library without changing originals; clear status for missing root.
 - **Rollback:** registry backup/atomic file restore; old import remains usable.
-- **Acceptance:** one stable ID per physical root, no database yet required, no photo-adjacent writes added.
+- **Acceptance:** one stable ID and one minimal `family_memory.db` per registered physical root; no photo-adjacent writes added.
 
-### DATA-001B — SQLite foundation and schema migrations
+### DATA-001B — Full SQLite schema and migration operations
 
-- **Scope:** `MetadataStore`, connection factory/pragmas, initial tables, migration ledger, health check, online backup/restore foundation.
+- **Scope:** extend the DATA-001A store with all approved DATA-001 tables,
+  immutable ordered migrations, and online backup/restore foundations.
 - **Excluded:** UI cutover, legacy content import, PERF-001/MODEL-004B.
 - **Dependencies:** A.
 - **Tests:** schema/constraints/indexes, migration ordering/failure/backup, concurrency basics, unsupported/corrupt DB.
@@ -411,3 +415,11 @@ These are implementation calibration questions, not reopened durable decisions.
 | Whether to create empty MODEL-004 tables in schema v1 or add them immediately before face consolidation | Create now; deferred ordered migration | Create the minimal reserved tables now because the approved single-database boundary and existing MODEL-004A database make their purpose concrete; do not expose detection behaviour. | No. |
 
 No open question changes Windows-first/mobile-ready direction, the database name/count/location, original-file immutability, migration safety, roadmap order, or mandatory Product Owner validation.
+
+## DATA-001A implementation note (2026-07-28)
+
+DATA-001A extends `ApplicationDataPathService` with idempotent `metadata/libraries`, `cache/thumbnails`, `cache/models`, and `logs` paths. Windows resolves from `%LOCALAPPDATA%/FamilyMemoryAI`; constructor and environment overrides isolate tests. The application-level locator is the specification-approved, atomically replaced `metadata/library_registry.json` (registry format version 1). It stores UUIDv4 LibraryIDs, display and normalised roots, timestamps/status, schema mirror, and a database-relative path. Windows comparison keys normalise case, slashes, redundant/trailing separators, and absolute input. Disconnected mapped/network roots cannot be proven physically equivalent without access; DATA-001A does not content-scan them.
+
+Each registration creates only `metadata/libraries/<LibraryID>/family_memory.db`; it never writes below the source root. The minimal schema contains `schema_migrations` and the database self-description `libraries` row. Version 1 is transactional, checksum-labelled, forward-only, and configures foreign keys, a 5-second busy timeout, WAL, and normal synchronous mode. `MetadataStore` provides open/close, initialise/version/health, database and LibraryID properties, and connection-per-work-unit transactions; no connection is shared between PySide6 workers.
+
+Existing sidecars, JSON profiles, embedding/face caches, import, review, album, and MobileCLIP flows remain authoritative and unchanged. No metadata migration, compatibility fallback, write cutover, legacy deletion, cache move, or original-photo mutation occurred. DATA-001B–H remain planned. Manual validation: run `PYTHONPATH=src python -m storage.diagnostics`, confirm the reported application root and library count, then use a temporary diagnostic script/service call to register a test folder, open it, and confirm the UUID directory, `family_memory.db`, schema version 1, healthy result, and an unchanged source folder. Product Owner approval is required before merge.

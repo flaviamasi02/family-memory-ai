@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### DATA-001A — Application data paths and library registry
+
+- Added platform-aware application storage paths, an atomic JSON library registry with stable UUIDv4 identity and deterministic root matching, per-library directories, and a minimal `family_memory.db` schema.
+- Added the connection-per-work-unit `MetadataStore`, lifecycle/health diagnostics, composition wiring, and automated DATA-001A coverage. Existing metadata remains authoritative; no migration, cutover, cache move, or source-folder write occurred. Product Owner validation is pending.
+
 ### DATA-001 — Central Metadata Storage architecture specification
 
 - Added the authoritative documentation-only DATA-001 technical contract, including the repository-evidenced persistence inventory, one-library/one-database layout, stable LibraryID/PhotoID models, explicit logical schema, and repository/service boundary.
