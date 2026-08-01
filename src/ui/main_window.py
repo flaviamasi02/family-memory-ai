@@ -27,7 +27,6 @@ from ai_runtime.manager import create_default_runtime_manager
 from core.application_services import ApplicationServices, build_application_services
 from core.perf_stats import get_session_stats, reset_session_stats
 from core.safe_file_move_service import CLEANUP_REVIEW_FOLDER_NAME
-from core.supported_media import supported_image_items, supported_media_items
 from models.photo_model import PhotoModel
 from ui.album_draft_page import AlbumDraftPage
 from ui.album_review_page import AlbumReviewPage
@@ -437,9 +436,6 @@ class MainWindow(QMainWindow):
         # thread-finished cleanup start it; do not create workers for stale data.
         if self._pending_import_folder_path is not None:
             return
-        # Scanner owns the canonical boundary; retain a defensive service-level
-        # guard so programmatic callers cannot feed non-media into any view.
-        photos = supported_media_items(photos or [])
         stats = get_session_stats()
         n = len(photos or [])
 
@@ -760,8 +756,7 @@ class MainWindow(QMainWindow):
         self._set_embedding_status(f"Import scan failed: {error_message}", severity="error")
 
     def load_photos(self, photos):
-        photos = supported_media_items(photos or [])
-        self._all_photos = list(photos)
+        self._all_photos = list(photos or [])
         self.photo_model.set_photos(photos)
         self._apply_browser_filter()
         self._start_embedding_indexing(self._all_photos)
@@ -1057,7 +1052,7 @@ class MainWindow(QMainWindow):
 
     def start_thumbnail_loading(self, photos):
         """Serialize thumbnail jobs so a repeated import cannot orphan a QThread."""
-        requested_photos = supported_image_items(photos or [])
+        requested_photos = list(photos or [])
         if self._thumbnail_thread_is_running():
             self._pending_thumbnail_photos = requested_photos
             self.thumbnail_worker.cancel()

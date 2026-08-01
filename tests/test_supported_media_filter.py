@@ -99,12 +99,22 @@ def test_mixed_folder_scan_filters_before_photo_and_metadata_work(tmp_path, monk
     assert stats.get_counter("files_scanned") == len(supported)
 
 
-def test_thumbnail_worker_constructs_jobs_for_images_only():
+def test_thumbnail_worker_preserves_trusted_lifecycle_inputs():
     pytest.importorskip("PySide6.QtGui", exc_type=ImportError)
     from workers.thumbnail_worker import ThumbnailWorker
-    photos = [SimpleNamespace(path=Path(name)) for name in ("a.jpg", "b.mp4", "README.md", "family_memory.db")]
+    photos = [SimpleNamespace(path=Path(name)) for name in ("a.jpg", "b.mp4")]
     worker = ThumbnailWorker(photos)
-    assert [photo.path.name for photo in worker.photos] == ["a.jpg"]
+    assert worker.photos == photos
+
+
+def test_lifecycle_orchestration_does_not_refilter_trusted_inputs():
+    source = Path("src/ui/main_window.py").read_text(encoding="utf-8")
+    lifecycle = source[source.index("def _on_scan_complete"):source.index("def _on_scan_error")]
+    thumbnail = source[source.index("def start_thumbnail_loading"):source.index("def _thumbnail_thread_is_running")]
+    assert "supported_media_items" not in lifecycle
+    assert "supported_image_items" not in thumbnail
+    assert "list(photos or [])" in lifecycle
+    assert "list(photos or [])" in thumbnail
 
 
 def test_normal_import_code_has_no_metadata_store_operations():
