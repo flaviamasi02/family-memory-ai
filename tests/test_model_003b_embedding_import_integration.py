@@ -857,6 +857,77 @@ def test_import_state_machine_reaches_embedding_after_thumbnail_completion(monke
     assert window.ai_status_label.text == "Indexing semantic embeddings: starting…"
 
 
+def test_scan_complete_does_not_require_last_import_result(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    displayed = []
+    window.photo_model = type(
+        "PhotoModel", (), {"set_photos": lambda self, photos: displayed.extend(photos)}
+    )()
+    window._apply_browser_filter = lambda: None
+    window.start_thumbnail_loading = lambda _photos: None
+    window._deferred_setup_cleanup_review = lambda: None
+    monkeypatch.setattr("ui.main_window.QTimer.singleShot", lambda _ms, _callback: None)
+
+    assert not hasattr(window, "_last_import_result")
+    window._on_scan_complete(["photo"])
+
+    assert displayed == ["photo"]
+    assert window._import_phase == "Thumbnail generation"
+
+
+def test_embedding_finalization_finishes_session_without_settings(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    window._embedding_run_lifecycle[7] = {
+        "thread_finished": True, "terminal_state": "Completed"
+    }
+    window._active_embedding_run_id = 7
+    session = type("Session", (), {"print_summary": lambda self: None})()
+    finished = []
+    monkeypatch.setattr(
+        "ui.main_window.finish_import_performance_session",
+        lambda: finished.append(True) or session,
+    )
+
+    assert not hasattr(window, "settings_page")
+    window._finalize_embedding_run(7)
+
+    assert finished == [True]
+    assert window._import_phase == "Completed"
+    assert window.embedding_thread is None
+    assert window.embedding_worker is None
+
+
+def test_optional_performance_diagnostics_refreshes_only_when_available(caplog):
+    window = _embedding_window_for_lifecycle_tests()
+    refreshed = []
+
+    window._refresh_performance_diagnostics_if_available()
+    window.settings_page = object()
+    window._refresh_performance_diagnostics_if_available()
+    window.settings_page = type("Settings", (), {
+        "refresh_developer_diagnostics": lambda self: refreshed.append(True),
+    })()
+    window._refresh_performance_diagnostics_if_available()
+
+    assert refreshed == [True]
+    assert not caplog.records
+
+
+def test_optional_diagnostics_failure_cannot_change_completed_lifecycle(caplog):
+    window = _embedding_window_for_lifecycle_tests()
+    window._import_phase = "Completed"
+
+    def fail_refresh():
+        raise RuntimeError("diagnostics unavailable")
+
+    window.settings_page = type("Settings", (), {})()
+    window.settings_page.refresh_developer_diagnostics = fail_refresh
+    window._refresh_performance_diagnostics_if_available()
+
+    assert window._import_phase == "Completed"
+    assert "Optional performance diagnostics refresh failed" in caplog.text
+
+
 def _embedding_window_for_lifecycle_tests():
     window = MainWindow.__new__(MainWindow)
     # MainWindow owns this dependency in production; lifecycle-only tests avoid

@@ -40,6 +40,7 @@ from ai_runtime.manager import AIRuntimeManager, create_default_runtime_manager
 from ai_runtime.models import AIRuntimeInstallationPlan
 from workers.ai_runtime_worker import AIRuntimeOperationWorker
 from core.application_services import ApplicationServices, build_application_services
+from core.perf_stats import export_performance_report, performance_history
 from storage.errors import StorageError
 from storage.schema import SCHEMA_VERSION
 
@@ -311,6 +312,20 @@ class SettingsPage(QWidget):
         self.diagnostics_report.setMaximumHeight(160)
         panel.addWidget(self.diagnostics_report)
 
+        self.import_performance_title = QLabel("Import Performance")
+        self.import_performance_title.setStyleSheet("font-size: 15px; font-weight: 700;")
+        panel.addWidget(self.import_performance_title)
+        self.performance_history_selector = QComboBox()
+        self.performance_history_selector.currentIndexChanged.connect(self._show_performance_session)
+        panel.addWidget(self.performance_history_selector)
+        self.import_performance_report = QTextEdit()
+        self.import_performance_report.setReadOnly(True)
+        self.import_performance_report.setMaximumHeight(240)
+        panel.addWidget(self.import_performance_report)
+        self.export_performance_button = QPushButton("Export Performance Report")
+        self.export_performance_button.clicked.connect(self._export_performance_report)
+        panel.addWidget(self.export_performance_button)
+
         actions = QGridLayout()
         action_specs = (
             ("diagnostics_refresh_button", "Refresh", self.refresh_developer_diagnostics),
@@ -380,6 +395,70 @@ class SettingsPage(QWidget):
                        self.open_database_folder_button):
             button.setEnabled(active)
         self.open_selected_library_button.setEnabled(bool(records))
+        self._refresh_performance_history()
+
+    def _refresh_performance_history(self) -> None:
+        sessions = performance_history()
+        current_id = self.performance_history_selector.currentData()
+        self.performance_history_selector.blockSignals(True)
+        self.performance_history_selector.clear()
+        for session in reversed(sessions):
+            self.performance_history_selector.addItem(
+                f"{session.created_at} — {session.total_ms:.1f} ms", session.session_id)
+        if current_id:
+            index = self.performance_history_selector.findData(current_id)
+            if index >= 0:
+                self.performance_history_selector.setCurrentIndex(index)
+        self.performance_history_selector.blockSignals(False)
+        self._show_performance_session()
+
+    def _selected_performance_session(self):
+        session_id = self.performance_history_selector.currentData()
+        return next((item for item in performance_history() if item.session_id == session_id), None)
+
+    def _show_performance_session(self, _index: int = -1) -> None:
+        session = self._selected_performance_session()
+        if session is None:
+            self.import_performance_report.setPlainText("No completed import measurements yet.")
+            self.export_performance_button.setEnabled(False)
+            return
+        counters = session.counters
+        def average(stage_name: str) -> float:
+            values = [stage.average_ms_per_item for stage in session.stages
+                      if stage.name == stage_name and stage.average_ms_per_item is not None]
+            return sum(values) / len(values) if values else 0.0
+        lines = [
+            f"Last import total time: {session.total_ms:.1f} ms",
+            f"Processed photos: {counters.get('processed_photos', 0)}",
+            f"Reused photos: {counters.get('reused_photos', 0)}",
+            f"Embedded photos: {counters.get('embedded_photos', 0)}",
+            f"Thumbnails generated: {counters.get('thumbnails_generated', 0)}",
+            f"Average embedding time: {average('Embedding execution'):.2f} ms/item",
+            f"Average thumbnail time: {average('Thumbnail generation'):.2f} ms/item",
+            f"Average DB write: {average('SQLite writes'):.2f} ms/item",
+            f"Average DB read: {average('SQLite reads'):.2f} ms/item",
+            f"Slowest stage: {session.identify_bottleneck() or 'Not available'}",
+            "", "Per-stage timings:",
+        ]
+        lines.extend(
+            f"{stage.name}: {stage.elapsed_ms:.1f} ms "
+            f"({stage.elapsed_ms * 100 / session.total_ms if session.total_ms else 0:.1f}%) · "
+            f"items={stage.item_count} · avg={stage.average_ms_per_item or 0:.2f} ms/item · {stage.thread_kind}"
+            for stage in session.stages
+        )
+        self.import_performance_report.setPlainText("\n".join(lines))
+        self.export_performance_button.setEnabled(True)
+
+    def _export_performance_report(self) -> None:
+        session = self._selected_performance_session()
+        if session is None:
+            return
+        selected, _ = QFileDialog.getSaveFileName(
+            self, "Export Performance Report", "import-performance-report.json", "JSON (*.json)")
+        if selected:
+            library_size = session.get_counter("processed_photos")
+            export_performance_report(selected, session, library_size)
+            self._set_diagnostics_status(f"Performance report exported to {selected}")
 
     @staticmethod
     def _availability_text(health: dict[str, object] | None, key: str) -> str:

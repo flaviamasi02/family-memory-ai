@@ -718,6 +718,10 @@ Never block the UI thread.
 
 # Performance Strategy
 
+PERF-001A instruments imports with bounded, session-scoped profiling as detailed
+in `docs/architecture/PERF_001_IMPORT_PROFILING.md`. It preserves pipeline
+behavior and supplies evidence for PERF-001B.
+
 The architecture must support large libraries of photos without becoming slow or unstable.
 
 ## Target

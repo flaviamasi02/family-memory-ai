@@ -25,7 +25,8 @@ from album.album_scoring_engine import AlbumScoringEngine
 from album.candidate_selection_engine import CandidateSelectionEngine
 from ai_runtime.manager import create_default_runtime_manager
 from core.application_services import ApplicationServices, build_application_services
-from core.perf_stats import get_session_stats, reset_session_stats
+from core.perf_stats import (begin_import_performance_session,
+                             finish_import_performance_session, get_session_stats)
 from core.safe_file_move_service import CLEANUP_REVIEW_FOLDER_NAME
 from models.photo_model import PhotoModel
 from ui.album_draft_page import AlbumDraftPage
@@ -327,6 +328,7 @@ class MainWindow(QMainWindow):
         self.resize(width, height)
 
     def import_photos(self):
+        selection_started = time.perf_counter()
         folder_path = QFileDialog.getExistingDirectory(
             self,
             "Select photo folder",
@@ -337,7 +339,9 @@ class MainWindow(QMainWindow):
             return
 
         # Reset per-session stats and start the wall-clock timer.
-        reset_session_stats()
+        session = begin_import_performance_session(folder_path)
+        session.record("Folder selection", (time.perf_counter() - selection_started) * 1000,
+                       1, "UI thread")
         self._import_wall_t0 = time.perf_counter()
         self._first_thumbnail_logged = False
 
@@ -459,7 +463,10 @@ class MainWindow(QMainWindow):
         self._all_photos = list(photos or [])
         self.photo_model.set_photos(photos)
         self._apply_browser_filter()
-        stats.record("photo_browser_setup [UI]", (time.perf_counter() - t0) * 1000)
+        stats.record("UI refresh", (time.perf_counter() - t0) * 1000, n, "UI thread")
+        import_result = getattr(self, "_last_import_result", None)
+        if import_result is not None:
+            stats.inc("reused_photos", int(getattr(import_result, "reused", 0)))
 
         self.status_label.setText(
             f"Scan complete — showing {n} photos. Loading thumbnails…"
@@ -501,7 +508,7 @@ class MainWindow(QMainWindow):
                 return None
             if completion.library is not None:
                 self.application_services.publish_active_library(completion.library)
-                self.settings_page.refresh_developer_diagnostics()
+                self._refresh_performance_diagnostics_if_available()
             self._last_import_result = completion.import_result
             return completion.photos
         # Direct domain-list calls remain supported by load/lifecycle tests.
@@ -569,6 +576,7 @@ class MainWindow(QMainWindow):
             return False
 
     def _launch_embedding_worker(self, photos: list) -> None:
+        queue_started = time.perf_counter()
         self._embedding_run_id += 1
         run_id = self._embedding_run_id
         self._active_embedding_run_id = run_id
@@ -586,6 +594,9 @@ class MainWindow(QMainWindow):
         )
         self.embedding_thread = thread
         self.embedding_worker = worker
+        get_session_stats().record("Embedding queue creation",
+                                   (time.perf_counter() - queue_started) * 1000,
+                                   len(photos), "UI thread")
         worker.moveToThread(thread)
 
         thread.started.connect(worker.run)
@@ -696,6 +707,25 @@ class MainWindow(QMainWindow):
             return
         self._import_phase = str(lifecycle["terminal_state"])
         logger.info("Import lifecycle generation=%s phase=%s", self._import_generation, self._import_phase)
+        session = finish_import_performance_session()
+        session.print_summary()
+        self._refresh_performance_diagnostics_if_available()
+
+    def _refresh_performance_diagnostics_if_available(self) -> None:
+        """Refresh optional diagnostics without making it a lifecycle dependency.
+
+        Lightweight lifecycle harnesses and shutdown paths may not own Settings.
+        A refresh failure is reported, but cannot invalidate an otherwise
+        completed import or recreate any UI/storage objects.
+        """
+        settings_page = getattr(self, "settings_page", None)
+        refresh = getattr(settings_page, "refresh_developer_diagnostics", None)
+        if not callable(refresh):
+            return
+        try:
+            refresh()
+        except Exception:  # noqa: BLE001
+            logger.exception("Optional performance diagnostics refresh failed")
 
     def _on_embedding_progress(self, run_id: int, progress) -> None:
         if run_id != self._active_embedding_run_id:
@@ -726,6 +756,7 @@ class MainWindow(QMainWindow):
         failed = int(getattr(result, "failed", 0) or 0)
         cancelled = int(getattr(result, "cancelled", 0) or 0)
         received = int(getattr(result, "total_images_received", 0) or 0)
+        get_session_stats().inc("embedded_photos", processed)
         ready = processed + cached
         total = ready + failed + cancelled
         self._import_phase = "Cache reuse" if cached else "Embedding indexing"
@@ -807,7 +838,8 @@ class MainWindow(QMainWindow):
             print(f"[MainWindow] Cleanup Review setup error: {exc}", file=sys.stderr, flush=True)
         finally:
             get_session_stats().record(
-                "cleanup_review_setup [UI]", (time.perf_counter() - t0) * 1000
+                "Cleanup Review preparation", (time.perf_counter() - t0) * 1000,
+                len(self._all_photos), "UI thread"
             )
         QTimer.singleShot(0, self._deferred_setup_memory_review)
 
@@ -823,8 +855,12 @@ class MainWindow(QMainWindow):
             self.status_label.setText("Memory Review preparation encountered an error.")
         finally:
             get_session_stats().record(
-                "memory_review_setup [UI]", (time.perf_counter() - t0) * 1000
+                "Memory Review preparation", (time.perf_counter() - t0) * 1000,
+                len(relevant), "UI thread"
             )
+            get_session_stats().record("Album Draft preparation",
+                                       (time.perf_counter() - t0) * 1000,
+                                       len(relevant), "UI thread")
 
     def _on_scan_error(self, error_message: str) -> None:
         self._import_phase = "Completed"

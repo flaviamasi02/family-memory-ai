@@ -50,7 +50,10 @@ def find_photos(folder_path, synchronization_service=None):
             raw_files.append((file, file.stat()))
         except OSError:
             unsupported_files += 1
-    stats.record("folder_scan [BG]", (time.perf_counter() - t0) * 1000)
+    scan_ms = (time.perf_counter() - t0) * 1000
+    stats.record("Filesystem scan", scan_ms, entries_discovered, "Background thread")
+    stats.record("Supported-media filtering", scan_ms, files_discovered, "Background thread")
+    stats.record("folder_scan", scan_ms, entries_discovered, "Background thread")
     stats.inc("filesystem_entries_discovered", entries_discovered)
     stats.inc("files_discovered", files_discovered)
     stats.inc("supported_media_candidates", len(raw_files))
@@ -69,7 +72,10 @@ def find_photos(folder_path, synchronization_service=None):
             observations.append(FileObservation(
                 file.resolve(strict=False), relative, normalise_relative_path(relative),
                 file.name, int(stat.st_size), int(stat.st_mtime_ns)))
+        plan_t0 = time.perf_counter()
         sync_plan = synchronization_service.plan_changes(observations)
+        stats.record("Incremental synchronization planning",
+                     (time.perf_counter() - plan_t0) * 1000, len(observations), "Background thread")
         sync_items_by_path = {
             item.observation.path: item for item in sync_plan.items
         }
@@ -116,7 +122,10 @@ def find_photos(folder_path, synchronization_service=None):
             })
             photo.sync_intelligence_from_metadata()
         photos.append(photo)
-    stats.record("metadata_extraction [BG]", (time.perf_counter() - t1) * 1000)
+    creation_ms = (time.perf_counter() - t1) * 1000
+    stats.record("Photo object creation", creation_ms, len(photos), "Background thread")
+    stats.record("Metadata loading", creation_ms, len(expensive_photos), "Background thread")
+    stats.record("metadata_extraction", creation_ms, len(expensive_photos), "Background thread")
 
     _media_classifier.classify_photos(expensive_photos)
 
@@ -130,4 +139,5 @@ def find_photos(folder_path, synchronization_service=None):
 
     stats.inc("files_scanned", len(photos))
     stats.inc("photos_expensively_processed", len(expensive_photos))
+    stats.inc("processed_photos", len(photos))
     return photos

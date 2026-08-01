@@ -15,6 +15,7 @@ from storage.photo_repository import (
     PhotoLocationRecord, PhotoRepository, normalise_relative_path, utc_now,
 )
 from storage.schema import SCHEMA_VERSION
+from core.perf_stats import get_session_stats
 
 if TYPE_CHECKING:
     from models.photo import Photo
@@ -115,8 +116,11 @@ class ImportRegistrationService:
             )
 
     def plan_changes(self, observations: list[FileObservation]) -> SyncPlan:
+        read_started = time.perf_counter()
         locations = self.repository.list_locations()
         photos_by_id = {photo.photo_id: photo for photo in self.repository.list_library_photos()}
+        get_session_stats().record("SQLite reads", (time.perf_counter() - read_started) * 1000,
+                                   2, "Background thread")
         by_key = {location.normalised_path_key: location for location in locations}
         observed_keys = {item.normalised_path_key for item in observations}
         unmatched = [location for location in locations
@@ -185,6 +189,7 @@ class ImportRegistrationService:
         counts = {name: 0 for name in ("added", "unchanged", "removed", "moved", "renamed", "updated")}
         discovered = len(plan.items) + skipped
         try:
+            write_started = time.perf_counter()
             with self.store.work_unit() as connection:
                 for item in plan.items:
                     photo = photos_by_key[item.observation.normalised_path_key]
@@ -269,6 +274,8 @@ class ImportRegistrationService:
                      counts["updated"], counts["removed"], skipped, counts["unchanged"],
                      counts["added"], counts["removed"], counts["moved"], counts["renamed"],
                      counts["updated"], elapsed_ms, self.import_run_id))
+            get_session_stats().record("SQLite writes", (time.perf_counter() - write_started) * 1000,
+                                       len(plan.items) + len(plan.removed), "Background thread")
         except Exception as exc:
             self.fail(str(exc), discovered=discovered, skipped=skipped)
             raise

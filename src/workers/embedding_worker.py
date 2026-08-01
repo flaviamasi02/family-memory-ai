@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import logging
+import time
 from threading import Event
 from typing import Callable
 
 from PySide6.QtCore import QObject, Signal
 
 from vision.batch_embedding_service import BatchEmbeddingProgress, BatchEmbeddingResult, BatchEmbeddingService
+from core.perf_stats import get_session_stats
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,7 @@ class EmbeddingWorker(QObject):
         self._cancel_event.set()
 
     def run(self) -> None:
+        started = time.perf_counter()
         logger.info("Embedding worker start run_id=%s inputs=%s", self.run_id, len(self._photos))
         try:
             service = self._service_factory()
@@ -66,6 +69,10 @@ class EmbeddingWorker(QObject):
             logger.exception("Embedding worker failed run_id=%s", self.run_id)
             self.error.emit(self.run_id, str(exc))
         finally:
+            elapsed = (time.perf_counter() - started) * 1000
+            stats = get_session_stats()
+            stats.record("Embedding execution", elapsed, len(self._photos), "Background thread")
+            stats.record("EmbeddingWorker", elapsed, len(self._photos), "Background thread")
             logger.info("Embedding worker finish run_id=%s", self.run_id)
             self.finished.emit()
 
