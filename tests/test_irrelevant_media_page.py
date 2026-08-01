@@ -361,6 +361,111 @@ class IrrelevantMediaPageTests(unittest.TestCase):
             page.clear_selection()
             self.assertEqual(page.selected_count(), 0)
 
+    def test_one_photo_category_success_message_is_visible_after_persistence(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            photo = self._make_photo(root, "one.jpg", {"relevance_category": "unknown"})
+            page = IrrelevantMediaPage()
+            page.show()
+            page.set_photos([photo], root, total_imported_count=1)
+            self._flush_ui(wait_ms=80)
+            page.select_all_visible()
+            labels_during_save = []
+            original_save = page._user_metadata_service.save_photo_metadata
+
+            def save(photo_to_save):
+                labels_during_save.append(page.user_saved_label.text())
+                return original_save(photo_to_save)
+
+            with patch.object(page._user_metadata_service, "save_photo_metadata", side_effect=save), \
+                 patch.object(QMessageBox, "information") as success_modal:
+                page._apply_category_to_selected("meme")
+
+            self.assertEqual(labels_during_save, ["Applying category to 1 photo..."])
+            self.assertEqual(page.user_saved_label.text(), "Category applied to 1 photo.")
+            self.assertTrue(page.user_saved_label.isVisible())
+            success_modal.assert_not_called()
+            self._flush_ui(wait_ms=100)
+            self.assertEqual(page.user_saved_label.text(), "Category applied to 1 photo.")
+            self.assertTrue(page.user_saved_label.isVisible())
+
+    def test_multi_photo_category_success_message_is_visible_and_deduplicated(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            photos = [
+                self._make_photo(root, f"bulk_{index}.jpg", {"relevance_category": "unknown"})
+                for index in range(3)
+            ]
+            page = IrrelevantMediaPage()
+            page.show()
+            page.set_photos(photos, root, total_imported_count=3)
+            self._flush_ui(wait_ms=80)
+            page.select_all_visible()
+
+            page._apply_category_to_selected("document")
+            message_count = page._user_message_show_count
+            page._show_user_saved_indicator("Category applied to 3 photos.")
+
+            self.assertEqual(page.user_saved_label.text(), "Category applied to 3 photos.")
+            self.assertTrue(page.user_saved_label.isVisible())
+            self.assertEqual(page._user_message_show_count, message_count)
+
+    def test_partial_category_failure_message_reports_exact_counts(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            photos = [
+                self._make_photo(root, f"partial_{index}.jpg", {"relevance_category": "unknown"})
+                for index in range(3)
+            ]
+            page = IrrelevantMediaPage()
+            page.show()
+            page.set_photos(photos, root, total_imported_count=3)
+            self._flush_ui(wait_ms=80)
+            page.select_all_visible()
+            calls = 0
+
+            def save(_photo):
+                nonlocal calls
+                calls += 1
+                if calls == 3:
+                    raise OSError("synthetic sidecar failure")
+
+            with patch.object(page._user_metadata_service, "save_photo_metadata", side_effect=save):
+                page._apply_category_to_selected("meme")
+
+            self.assertEqual(
+                page.user_saved_label.text(),
+                "Category applied to 2 of 3 photos. 1 could not be updated.",
+            )
+            self.assertTrue(page.user_saved_label.isVisible())
+
+    def test_complete_category_failure_shows_error_without_success_claim(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            photos = [
+                self._make_photo(root, f"failed_{index}.jpg", {"relevance_category": "unknown"})
+                for index in range(2)
+            ]
+            page = IrrelevantMediaPage()
+            page.show()
+            page.set_photos(photos, root, total_imported_count=2)
+            self._flush_ui(wait_ms=80)
+            page.select_all_visible()
+
+            with patch.object(
+                page._user_metadata_service, "save_photo_metadata",
+                side_effect=OSError("synthetic sidecar failure"),
+            ), patch.object(QMessageBox, "warning") as error_modal:
+                page._apply_category_to_selected("meme")
+
+            self.assertEqual(
+                page.user_saved_label.text(),
+                "Category could not be applied to 2 photos.",
+            )
+            self.assertNotIn("Category applied to", page.user_saved_label.text())
+            self.assertTrue(page.user_saved_label.isVisible())
+            error_modal.assert_not_called()
+
     def test_cleanup_category_change_preserves_scroll_and_selection(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

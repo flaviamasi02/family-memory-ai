@@ -140,8 +140,20 @@ class IrrelevantMediaPage(QWidget):
 
         self.selection_count_label = QLabel("Selected: 0")
         self.user_saved_label = QLabel("")
-        self.user_saved_label.setStyleSheet("font-size: 12px; color: #1f6feb;")
+        self.user_saved_label.setWordWrap(True)
+        self.user_saved_label.setMinimumHeight(30)
+        self.user_saved_label.setStyleSheet(
+            "font-size: 13px; font-weight: 600; color: #1f6feb; "
+            "background: #eef6ff; border: 1px solid #b6d4fe; "
+            "border-radius: 4px; padding: 5px 8px;"
+        )
         self.user_saved_label.setVisible(False)
+        self._user_message_timer = QTimer(self)
+        self._user_message_timer.setSingleShot(True)
+        self._user_message_timer.setInterval(8000)
+        self._user_message_timer.timeout.connect(self.user_saved_label.hide)
+        self._last_user_message = ""
+        self._user_message_show_count = 0
         self.select_all_button = QPushButton("Select All Visible")
         self.select_all_button.clicked.connect(self.select_all_visible)
         self.clear_selection_button = QPushButton("Clear Selection")
@@ -168,7 +180,6 @@ class IrrelevantMediaPage(QWidget):
         toolbar.addWidget(QLabel("Search:"))
         toolbar.addWidget(self.search_input, 1)
         toolbar.addWidget(self.selection_count_label)
-        toolbar.addWidget(self.user_saved_label)
         toolbar.addWidget(self.manage_categories_button)
         toolbar.addWidget(self.reclassify_unknowns_button)
         toolbar.addWidget(self.analyze_faces_button)
@@ -252,6 +263,7 @@ class IrrelevantMediaPage(QWidget):
         grid_panel = QWidget()
         grid_layout = QVBoxLayout(grid_panel)
         grid_layout.setContentsMargins(0, 0, 0, 0)
+        grid_layout.addWidget(self.user_saved_label)
         grid_layout.addWidget(self.results_label)
         grid_layout.addWidget(self.thumbnail_grid, 1)
 
@@ -882,7 +894,12 @@ class IrrelevantMediaPage(QWidget):
         started = time.perf_counter()
         self._bulk_category_in_progress = True
         self.apply_category_button.setEnabled(False)
-        self.user_saved_label.setText(f"Applying category to {len(selected_rows)} photos...")
+        self._user_message_timer.stop()
+        busy_noun = "photo" if len(selected_rows) == 1 else "photos"
+        self.user_saved_label.setText(
+            f"Applying category to {len(selected_rows)} {busy_noun}..."
+        )
+        self.user_saved_label.setStyleSheet(self._user_message_style(error=False))
         self.user_saved_label.setVisible(True)
 
         affected_keys = [self._photo_key(row.photo) for row in selected_rows]
@@ -946,13 +963,23 @@ class IrrelevantMediaPage(QWidget):
             self._build_row(row.photo) if self._photo_key(row.photo) in successful_key_set else row
             for row in self._rows
         ]
-        if failures:
+        if failures == len(selected_rows):
+            noun = "photo" if len(selected_rows) == 1 else "photos"
+            self._show_user_saved_indicator(
+                f"Category could not be applied to {len(selected_rows)} {noun}.",
+                error=True,
+            )
+        elif failures:
             self._show_user_saved_indicator(
                 f"Category applied to {len(successful_rows)} of {len(selected_rows)} photos. "
-                f"{failures} could not be updated."
+                f"{failures} could not be updated.",
+                error=True,
             )
         else:
-            self._show_user_saved_indicator(f"Category applied to {len(successful_rows)} photos.")
+            noun = "photo" if len(successful_rows) == 1 else "photos"
+            self._show_user_saved_indicator(
+                f"Category applied to {len(successful_rows)} {noun}."
+            )
         self._refresh_group_options()
         ui_started = time.perf_counter()
         self._refresh_after_category_change(
@@ -1230,7 +1257,28 @@ class IrrelevantMediaPage(QWidget):
 
         self._rows = [self._build_row(row.photo) for row in self._rows]
 
-    def _show_user_saved_indicator(self, text: str) -> None:
+    def _user_message_style(self, *, error: bool) -> str:
+        if error:
+            return (
+                "font-size: 13px; font-weight: 600; color: #9b1c1c; "
+                "background: #fff1f0; border: 1px solid #f1aeb5; "
+                "border-radius: 4px; padding: 5px 8px;"
+            )
+        return (
+            "font-size: 13px; font-weight: 600; color: #1f6feb; "
+            "background: #eef6ff; border: 1px solid #b6d4fe; "
+            "border-radius: 4px; padding: 5px 8px;"
+        )
+
+    def _show_user_saved_indicator(self, text: str, *, error: bool = False) -> None:
+        text = str(text or "").strip()
+        if not text:
+            return
+        if text == self._last_user_message and not self.user_saved_label.isHidden():
+            return
+        self._last_user_message = text
+        self._user_message_show_count += 1
         self.user_saved_label.setText(text)
+        self.user_saved_label.setStyleSheet(self._user_message_style(error=error))
         self.user_saved_label.setVisible(True)
-        QTimer.singleShot(2500, lambda: self.user_saved_label.setVisible(False))
+        self._user_message_timer.start()
