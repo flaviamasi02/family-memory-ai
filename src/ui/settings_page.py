@@ -346,7 +346,11 @@ class SettingsPage(QWidget):
         )
         for index, (label, icon, help_text) in enumerate(efficiency_cards):
             card = QFrame(); card.setFrameShape(QFrame.Shape.StyledPanel)
-            card.setStyleSheet("QFrame { background: white; border: 1px solid #dfe4e8; border-radius: 6px; padding: 5px; }")
+            card.setObjectName("importEfficiencyCard")
+            card.setStyleSheet(
+                "#importEfficiencyCard { background: white; border: 1px solid #dfe4e8; "
+                "border-radius: 6px; padding: 5px; }"
+            )
             card.setToolTip(help_text)
             card_layout = QVBoxLayout(card)
             heading = QLabel(f"{icon}  {label}"); heading.setStyleSheet("font-weight: 600; border: none;")

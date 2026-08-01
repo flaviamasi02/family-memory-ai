@@ -72,7 +72,7 @@ def test_import_efficiency_no_session_is_clear_and_explained(page):
 
 
 def test_import_efficiency_uses_friendly_labels_and_keeps_timing_detail(page):
-    widget, _, _, _ = page
+    widget, _, app, _ = page
     from core.perf_stats import begin_import_performance_session, finish_import_performance_session
     session = begin_import_performance_session("/test")
     for key, value in {
@@ -102,8 +102,23 @@ def test_import_efficiency_uses_friendly_labels_and_keeps_timing_detail(page):
     assert "filesystem_stat_calls_avoided" not in report
     assert "path_resolutions_avoided" not in report
     assert "sqlite_queries_avoided" not in report
-    widget.technical_details_toggle.setChecked(True)
+    # QWidget.isVisible() includes ancestor visibility. Exercise the actual UI
+    # lifecycle rather than inspecting a child of the intentionally collapsed
+    # Developer Diagnostics panel.
+    assert not widget.technical_details_toggle.isChecked()
+    assert widget.import_performance_report.isHidden()
+    assert widget.technical_details_toggle.text() == "▸ Technical Details"
+    widget.show()
+    widget.developer_diagnostics_toggle.click()
+    app.processEvents()
+    widget.technical_details_toggle.click()
+    app.processEvents()
     assert widget.import_performance_report.isVisible()
+    assert widget.technical_details_toggle.text() == "▾ Technical Details"
+    widget.technical_details_toggle.click()
+    app.processEvents()
+    assert widget.import_performance_report.isHidden()
+    assert widget.technical_details_toggle.text() == "▸ Technical Details"
 
 
 def test_import_efficiency_status_levels_are_deterministic(page):
