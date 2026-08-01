@@ -220,11 +220,20 @@ V4_STATEMENTS = (
     "ALTER TABLE import_runs ADD COLUMN renamed_count INTEGER NOT NULL DEFAULT 0 CHECK(renamed_count>=0)",
     "ALTER TABLE import_runs ADD COLUMN updated_count INTEGER NOT NULL DEFAULT 0 CHECK(updated_count>=0)",
 )
+V5_STATEMENTS = (
+    "ALTER TABLE photos ADD COLUMN automatic_media_category TEXT",
+    "ALTER TABLE photos ADD COLUMN effective_media_category TEXT",
+    "ALTER TABLE photos ADD COLUMN relevance_category TEXT",
+    "ALTER TABLE photos ADD COLUMN is_album_relevant_candidate INTEGER CHECK(is_album_relevant_candidate IS NULL OR is_album_relevant_candidate IN (0,1))",
+    "ALTER TABLE photos ADD COLUMN classification_confidence REAL CHECK(classification_confidence IS NULL OR (classification_confidence>=0 AND classification_confidence<=1))",
+    "ALTER TABLE photos ADD COLUMN classification_reason TEXT",
+)
 MIGRATIONS = (
     Migration(1, "data_001a_foundation", V1_STATEMENTS),
     Migration(2, "data_001b_full_schema", V2_STATEMENTS),
     Migration(3, "data_001c_import_registration", V3_STATEMENTS),
     Migration(4, "data_001d_incremental_photo_sync", V4_STATEMENTS),
+    Migration(5, "data_001d_classification_snapshot", V5_STATEMENTS),
 )
 SCHEMA_VERSION = MIGRATIONS[-1].version
 

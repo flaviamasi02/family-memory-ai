@@ -49,6 +49,7 @@ class SyncItem:
     previous_location: PhotoLocationRecord | None = None
     fingerprint: str | None = None
     captured_at: str | None = None
+    classification: tuple[str | None, str | None, str | None, int | None, float | None, str | None] | None = None
 
 
 @dataclass(frozen=True)
@@ -133,7 +134,8 @@ class ImportRegistrationService:
                     fingerprint = partial_fingerprint(observation.path, observation.file_size)
                 planned.append(SyncItem(observation, "unchanged" if unchanged else "updated",
                                         existing.photo_id, existing, fingerprint,
-                                        photos_by_id[existing.photo_id].captured_at))
+                                        photos_by_id[existing.photo_id].captured_at,
+                                        _classification_snapshot(photos_by_id[existing.photo_id])))
                 matched_location_ids.add(existing.location_id)
                 continue
 
@@ -150,7 +152,8 @@ class ImportRegistrationService:
                 state = "moved" if parent_changed else "renamed" if name_changed else "moved"
                 planned.append(SyncItem(observation, state, previous.photo_id,
                                         previous, fingerprint,
-                                        photos_by_id[previous.photo_id].captured_at))
+                                        photos_by_id[previous.photo_id].captured_at,
+                                        _classification_snapshot(photos_by_id[previous.photo_id])))
                 matched_location_ids.add(previous.location_id)
             else:
                 planned.append(SyncItem(observation, "added", fingerprint=fingerprint))
@@ -183,7 +186,8 @@ class ImportRegistrationService:
                             media_type="video" if photo.extension.lower() in {".mp4", ".mov", ".avi", ".mkv"} else "image",
                             width=_positive_int(photo.metadata.get("width")),
                             height=_positive_int(photo.metadata.get("height")),
-                            captured_at=_text(photo.metadata.get("date_taken")), connection=connection)
+                            captured_at=_text(photo.metadata.get("date_taken")),
+                            **_photo_classification_values(photo), connection=connection)
                         location = self.repository.create_location(
                             record.photo_id, source_path=str(photo.path),
                             relative_path=item.observation.relative_path, filename=photo.filename,
@@ -212,9 +216,20 @@ class ImportRegistrationService:
                             import_run_id=self.import_run_id, connection=connection)
                         self.repository.set_location_fingerprint(
                             location.location_id, item.fingerprint, connection=connection)
+                        self.repository.update_photo(
+                            item.photo_id, connection=connection,
+                            **_photo_classification_values(photo))
                     elif not location.partial_fingerprint:
                         self.repository.set_location_fingerprint(
                             location.location_id, item.fingerprint, connection=connection)
+
+                    if item.state in {"unchanged", "moved", "renamed"} and item.classification is None:
+                        # One-time upgrade for DATA-001C/early-D rows that
+                        # predate the classifier snapshot. The scanner has
+                        # classified this item because its projection was absent.
+                        self.repository.update_photo(
+                            item.photo_id, connection=connection,
+                            **_photo_classification_values(photo))
 
                     photo.id = item.photo_id or location.photo_id
                     counts[item.state] += 1
@@ -274,6 +289,26 @@ def _observation(root: Path, photo) -> FileObservation:
 def _legacy_event(state: str) -> str:
     return {"added": "created", "unchanged": "reused", "updated": "changed",
             "moved": "changed", "renamed": "changed"}[state]
+
+
+def _classification_snapshot(photo) -> tuple | None:
+    snapshot = (
+        photo.automatic_media_category, photo.effective_media_category,
+        photo.relevance_category, photo.is_album_relevant_candidate,
+        photo.classification_confidence, photo.classification_reason,
+    )
+    return None if all(value is None for value in snapshot) else snapshot
+
+
+def _photo_classification_values(photo) -> dict[str, object]:
+    return {
+        "automatic_media_category": str(getattr(photo, "automatic_media_category", "") or "unknown"),
+        "effective_media_category": str(getattr(photo, "effective_media_category", "") or "unknown"),
+        "relevance_category": str(getattr(photo, "relevance_category", "") or "unknown"),
+        "is_album_relevant_candidate": bool(getattr(photo, "is_album_relevant_candidate", True)),
+        "classification_confidence": float(getattr(photo, "classification_confidence", 0.0) or 0.0),
+        "classification_reason": str(getattr(photo, "classification_reason", "") or ""),
+    }
 
 
 def _positive_int(value) -> int | None:

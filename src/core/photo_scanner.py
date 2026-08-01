@@ -88,7 +88,8 @@ def find_photos(folder_path, synchronization_service=None):
         photo.id = sync_item.photo_id if sync_item else None
         if sync_item and sync_item.previous_location and sync_item.state in {"moved", "renamed"}:
             photo.previous_path = Path(sync_item.previous_location.source_path)
-        if photo.sync_state in {"added", "updated"}:
+        needs_classification_snapshot = bool(sync_item and sync_item.classification is None)
+        if photo.sync_state in {"added", "updated"} or needs_classification_snapshot:
             photo.metadata = extract_basic_metadata(file)
             photo.sync_intelligence_from_metadata()
             expensive_photos.append(photo)
@@ -97,6 +98,22 @@ def find_photos(folder_path, synchronization_service=None):
             # Memory Review groups by this domain date after restart as well as
             # during a same-session incremental import.
             photo.metadata = {"date_taken": sync_item.captured_at}
+            photo.sync_intelligence_from_metadata()
+        if sync_item and sync_item.classification:
+            (photo.automatic_media_category, photo.effective_media_category,
+             photo.relevance_category, relevant, photo.classification_confidence,
+             photo.classification_reason) = sync_item.classification
+            photo.is_album_relevant_candidate = bool(relevant)
+            photo.media_category = photo.effective_media_category or photo.media_category
+            photo.metadata.update({
+                "automatic_media_category": photo.automatic_media_category,
+                "effective_media_category": photo.effective_media_category,
+                "media_category": photo.media_category,
+                "relevance_category": photo.relevance_category,
+                "is_album_relevant_candidate": photo.is_album_relevant_candidate,
+                "classification_confidence": photo.classification_confidence,
+                "classification_reason": photo.classification_reason,
+            })
             photo.sync_intelligence_from_metadata()
         photos.append(photo)
     stats.record("metadata_extraction [BG]", (time.perf_counter() - t1) * 1000)

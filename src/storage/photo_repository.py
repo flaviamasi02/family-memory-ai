@@ -35,6 +35,12 @@ class PhotoRecord:
     hash_version: int | None
     status: str
     metadata_revision: int
+    automatic_media_category: str | None
+    effective_media_category: str | None
+    relevance_category: str | None
+    is_album_relevant_candidate: int | None
+    classification_confidence: float | None
+    classification_reason: str | None
 
 
 @dataclass(frozen=True)
@@ -75,7 +81,9 @@ class PhotoRepository:
     @staticmethod
     def _photo_columns() -> str:
         return ("photo_id,library_id,media_type,width,height,captured_at,content_hash,"
-                "hash_algorithm,hash_version,status,metadata_revision")
+                "hash_algorithm,hash_version,status,metadata_revision,automatic_media_category,"
+                "effective_media_category,relevance_category,is_album_relevant_candidate,"
+                "classification_confidence,classification_reason")
 
     @staticmethod
     def _location_columns() -> str:
@@ -86,25 +94,46 @@ class PhotoRepository:
     def create_photo(self, *, media_type: str = "image", width: int | None = None,
                      height: int | None = None, captured_at: str | None = None,
                      content_hash: str | None = None, hash_algorithm: str | None = None,
-                     hash_version: int | None = None, connection=None) -> PhotoRecord:
+                     hash_version: int | None = None,
+                     automatic_media_category: str | None = None,
+                     effective_media_category: str | None = None,
+                     relevance_category: str | None = None,
+                     is_album_relevant_candidate: bool | None = None,
+                     classification_confidence: float | None = None,
+                     classification_reason: str | None = None,
+                     connection=None) -> PhotoRecord:
         if connection is None:
             with self.store.work_unit() as transaction:
                 return self.create_photo(media_type=media_type, width=width, height=height,
                     captured_at=captured_at, content_hash=content_hash,
                     hash_algorithm=hash_algorithm, hash_version=hash_version,
+                    automatic_media_category=automatic_media_category,
+                    effective_media_category=effective_media_category,
+                    relevance_category=relevance_category,
+                    is_album_relevant_candidate=is_album_relevant_candidate,
+                    classification_confidence=classification_confidence,
+                    classification_reason=classification_reason,
                     connection=transaction)
         photo_id = str(uuid4())
         connection.execute(
             "INSERT INTO photos(photo_id,library_id,media_type,width,height,captured_at,"
-            "content_hash,hash_algorithm,hash_version) VALUES (?,?,?,?,?,?,?,?,?)",
+            "content_hash,hash_algorithm,hash_version,automatic_media_category,"
+            "effective_media_category,relevance_category,is_album_relevant_candidate,"
+            "classification_confidence,classification_reason) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (photo_id, self.store.library_id, media_type, width, height, captured_at,
-             content_hash, hash_algorithm, hash_version),
+             content_hash, hash_algorithm, hash_version, automatic_media_category,
+             effective_media_category, relevance_category,
+             None if is_album_relevant_candidate is None else int(is_album_relevant_candidate),
+             classification_confidence, classification_reason),
         )
         return self.get_by_id(photo_id, connection=connection)
 
     def update_photo(self, photo_id: str, *, connection=None, **changes) -> PhotoRecord:
         allowed = {"media_type", "width", "height", "captured_at", "camera_make",
                    "camera_model", "content_hash", "hash_algorithm", "hash_version", "status"}
+        allowed.update({"automatic_media_category", "effective_media_category",
+                        "relevance_category", "is_album_relevant_candidate",
+                        "classification_confidence", "classification_reason"})
         invalid = set(changes) - allowed
         if invalid:
             raise ValueError(f"Unsupported photo fields: {', '.join(sorted(invalid))}")

@@ -90,6 +90,43 @@ def test_unchanged_plan_rehydrates_durable_capture_date_for_review(opened):
     assert plan.item_for(repeated.path).captured_at == "2024-05-06T12:00:00"
 
 
+def test_repeated_import_rehydrates_cleanup_classification(opened):
+    root, store, _ = opened
+    original = photo(root, "document.jpg")
+    original.automatic_media_category = "document"
+    original.effective_media_category = "document"
+    original.relevance_category = "document_or_scan"
+    original.is_album_relevant_candidate = False
+    original.classification_confidence = 0.91
+    original.classification_reason = "document evidence"
+    synchronize(store, root, [original])
+
+    repeated = photo(root, "document.jpg")
+    service = ImportRegistrationService(store, root)
+    planned = service.plan_changes([observation(root, repeated)]).item_for(repeated.path)
+
+    assert planned.state == "unchanged"
+    assert planned.classification == (
+        "document", "document", "document_or_scan", 0, 0.91, "document evidence")
+
+
+def test_pre_snapshot_rows_are_marked_for_one_time_classification(opened):
+    root, store, _ = opened
+    legacy = photo(root, "legacy.jpg")
+    synchronize(store, root, [legacy])
+    with store.work_unit() as connection:
+        connection.execute(
+            "UPDATE photos SET automatic_media_category=NULL,effective_media_category=NULL,"
+            "relevance_category=NULL,is_album_relevant_candidate=NULL,"
+            "classification_confidence=NULL,classification_reason=NULL")
+
+    repeated = photo(root, "legacy.jpg")
+    service = ImportRegistrationService(store, root)
+    planned = service.plan_changes([observation(root, repeated)]).item_for(repeated.path)
+    assert planned.state == "unchanged"
+    assert planned.classification is None
+
+
 def test_added_updated_removed_statistics_and_restart_persistence(opened):
     root, store, record = opened
     original = photo(root, "original.jpg", b"old")
