@@ -7,10 +7,12 @@ from pathlib import Path
 from threading import Event
 from typing import Callable
 
-from PySide6.QtCore import Qt, Signal, QThread, Slot
+from PySide6.QtCore import QUrl, Qt, Signal, QThread, Slot
+from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import (
     QFileDialog,
     QButtonGroup,
+    QComboBox,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -37,6 +39,9 @@ from vision.evaluation_sources import (
 from ai_runtime.manager import AIRuntimeManager, create_default_runtime_manager
 from ai_runtime.models import AIRuntimeInstallationPlan
 from workers.ai_runtime_worker import AIRuntimeOperationWorker
+from core.application_services import ApplicationServices, build_application_services
+from storage.errors import StorageError
+from storage.schema import SCHEMA_VERSION
 
 from ui.components.workspace_header import WorkspaceHeader
 from ui.components.workspace_info_content import WORKSPACE_INFO_CONTENT
@@ -55,7 +60,12 @@ class SettingsPage(QWidget):
 
     WORKSPACE_ID = SETTINGS_WORKSPACE
 
-    def __init__(self, parent=None, runtime_manager: AIRuntimeManager | None = None):
+    def __init__(
+        self,
+        parent=None,
+        runtime_manager: AIRuntimeManager | None = None,
+        application_services: ApplicationServices | None = None,
+    ):
         t0 = time.perf_counter()
         super().__init__(parent)
         self._library_provider: Callable[[], list] = lambda: []
@@ -63,6 +73,7 @@ class SettingsPage(QWidget):
         self._selected_folder: Path | None = None
         self._last_source_result: EvaluationSourceResult | None = None
         self.ai_runtime_manager = runtime_manager or create_default_runtime_manager()
+        self.application_services = application_services or build_application_services()
         self._last_installation_plan: AIRuntimeInstallationPlan | None = None
         self._active_runtime_thread: QThread | None = None
         self._active_runtime_worker: AIRuntimeOperationWorker | None = None
@@ -104,6 +115,7 @@ class SettingsPage(QWidget):
         root.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         root.addWidget(self.info_panel)
         root.addWidget(self.description_label)
+        self._build_developer_diagnostics(root)
         page_layout.addWidget(self.settings_scroll_area, 1)
         self.settings_scroll_area.setWidget(self.settings_scroll_content)
 
@@ -249,6 +261,223 @@ class SettingsPage(QWidget):
         self._refresh_source_summary()
         logger.info("SettingsPage construction %.1f ms", (time.perf_counter() - t0) * 1000)
         root.addStretch(1)
+
+    def _build_developer_diagnostics(self, root: QVBoxLayout) -> None:
+        self.developer_diagnostics_toggle = QPushButton("Developer Diagnostics")
+        self.developer_diagnostics_toggle.setCheckable(True)
+        self.developer_diagnostics_toggle.setChecked(False)
+        self.developer_diagnostics_toggle.setStyleSheet("font-size: 16px; font-weight: 700; text-align: left;")
+        root.addWidget(self.developer_diagnostics_toggle)
+
+        self.developer_diagnostics_panel = QFrame()
+        self.developer_diagnostics_panel.setObjectName("developerDiagnosticsPanel")
+        self.developer_diagnostics_panel.setFrameShape(QFrame.Shape.StyledPanel)
+        self.developer_diagnostics_panel.setStyleSheet(
+            "#developerDiagnosticsPanel { border: 1px solid #d4d9df; border-radius: 8px; padding: 8px; background: #fbfcfe; }"
+        )
+        panel = QVBoxLayout(self.developer_diagnostics_panel)
+        explanation = QLabel(
+            "Safely inspect application-managed metadata storage. Libraries are registered only when you choose a folder; photos are never scanned here."
+        )
+        explanation.setWordWrap(True)
+        panel.addWidget(explanation)
+        self.diagnostics_library_selector = QComboBox()
+        panel.addWidget(self.diagnostics_library_selector)
+        self.diagnostics_labels: dict[str, QLabel] = {}
+        grid = QGridLayout()
+        fields = (
+            "Application data root", "Registered library count", "Active LibraryID",
+            "Active database path", "Schema version", "Expected schema version",
+            "Database health status", "Integrity-check status", "Foreign-key-check status",
+            "Migration-history status", "Missing required tables", "Read availability",
+            "Write availability",
+        )
+        for row, field in enumerate(fields):
+            key = QLabel(f"{field}:"); key.setStyleSheet("font-weight: 600;")
+            value = QLabel("Not available"); value.setWordWrap(True)
+            self.diagnostics_labels[field] = value
+            grid.addWidget(key, row, 0); grid.addWidget(value, row, 1)
+        grid.setColumnStretch(1, 1)
+        panel.addLayout(grid)
+        self.diagnostics_status_label = QLabel("Ready")
+        self.diagnostics_status_label.setWordWrap(True)
+        panel.addWidget(self.diagnostics_status_label)
+        self.diagnostics_report = QTextEdit()
+        self.diagnostics_report.setReadOnly(True)
+        self.diagnostics_report.setMaximumHeight(160)
+        panel.addWidget(self.diagnostics_report)
+
+        actions = QGridLayout()
+        action_specs = (
+            ("diagnostics_refresh_button", "Refresh", self.refresh_developer_diagnostics),
+            ("open_application_data_button", "Open Application Data Folder", self._open_application_data_folder),
+            ("register_test_library_button", "Register Test Library", self._choose_test_library),
+            ("open_selected_library_button", "Open Selected Library", self._open_selected_library),
+            ("run_health_check_button", "Run Health Check", self._run_health_check),
+            ("show_schema_summary_button", "Show Schema Summary", self._show_schema_summary),
+            ("create_backup_button", "Create Backup", self._choose_backup_destination),
+            ("validate_backup_button", "Validate Backup", self._choose_backup_to_validate),
+            ("open_database_folder_button", "Open Database Folder", self._open_database_folder),
+            ("copy_diagnostic_report_button", "Copy Diagnostic Report", self._copy_diagnostic_report),
+        )
+        for index, (attribute, text, callback) in enumerate(action_specs):
+            button = QPushButton(text); setattr(self, attribute, button)
+            button.clicked.connect(callback); actions.addWidget(button, index // 2, index % 2)
+        panel.addLayout(actions)
+        root.addWidget(self.developer_diagnostics_panel)
+        self.developer_diagnostics_toggle.toggled.connect(self.developer_diagnostics_panel.setVisible)
+        self.developer_diagnostics_panel.setVisible(False)
+        self.refresh_developer_diagnostics()
+
+    def _set_diagnostics_status(self, text: str) -> None:
+        self.diagnostics_status_label.setText(text)
+
+    def refresh_developer_diagnostics(self) -> None:
+        services = self.application_services
+        records = services.library_registry.list_libraries()
+        selected_id = self.diagnostics_library_selector.currentData()
+        self.diagnostics_library_selector.blockSignals(True)
+        self.diagnostics_library_selector.clear()
+        for record in records:
+            self.diagnostics_library_selector.addItem(f"{record.display_name} — {record.library_id}", record.library_id)
+        if selected_id:
+            index = self.diagnostics_library_selector.findData(selected_id)
+            if index >= 0:
+                self.diagnostics_library_selector.setCurrentIndex(index)
+        self.diagnostics_library_selector.blockSignals(False)
+        store = services.metadata_store
+        health = store.health_check() if store.library_id else None
+        values = {
+            "Application data root": str(services.paths.root),
+            "Registered library count": str(len(records)),
+            "Active LibraryID": store.library_id or "No active library",
+            "Active database path": str(store.database_path) if store.database_path else "No active database",
+            "Schema version": str(health["schema_version"]) if health else "Not available",
+            "Expected schema version": str(SCHEMA_VERSION),
+            "Database health status": "Healthy" if health and health["healthy"] else ("Unhealthy" if health else "Not available"),
+            "Integrity-check status": str(health["integrity_check"]) if health else "Not available",
+            "Foreign-key-check status": str(health["foreign_key_check"]) if health else "Not available",
+            "Migration-history status": ("Consistent" if health and health["migration_history_consistent"] else ("Inconsistent" if health else "Not available")),
+            "Missing required tables": ", ".join(health["missing_required_tables"]) if health and health["missing_required_tables"] else "None",
+            "Read availability": self._availability_text(health, "read_available"),
+            "Write availability": self._availability_text(health, "write_available"),
+        }
+        for key, value in values.items():
+            self.diagnostics_labels[key].setText(value)
+        active = bool(store.library_id)
+        for button in (self.run_health_check_button, self.show_schema_summary_button,
+                       self.create_backup_button, self.validate_backup_button,
+                       self.open_database_folder_button):
+            button.setEnabled(active)
+        self.open_selected_library_button.setEnabled(bool(records))
+
+    @staticmethod
+    def _availability_text(health: dict[str, object] | None, key: str) -> str:
+        return "Available" if health and health[key] else ("Unavailable" if health else "Not available")
+
+    def register_test_library(self, source_root: str | Path) -> str | None:
+        """Register/open an explicitly chosen root without scanning or touching it."""
+        try:
+            record = self.application_services.library_registry.register(source_root)
+            store = self.application_services.metadata_store
+            if store.library_id and store.library_id != record.library_id:
+                store.close_library()
+            store.open_library(record.library_id)
+            self._set_diagnostics_status(f"Test library ready. Schema version {store.get_schema_version()}.")
+            self.refresh_developer_diagnostics()
+            return record.library_id
+        except (StorageError, OSError, ValueError) as exc:
+            self._set_diagnostics_status(f"The test library could not be registered: {exc}")
+            self.refresh_developer_diagnostics()
+            return None
+
+    def _choose_test_library(self) -> None:
+        selected = QFileDialog.getExistingDirectory(self, "Select an empty test library folder")
+        if selected:
+            self.register_test_library(selected)
+
+    def _open_selected_library(self) -> None:
+        library_id = self.diagnostics_library_selector.currentData()
+        if not library_id:
+            self._set_diagnostics_status("Select a registered library first."); return
+        try:
+            store = self.application_services.metadata_store
+            if store.library_id and store.library_id != library_id:
+                store.close_library()
+            store.open_library(library_id)
+            self._set_diagnostics_status("Selected library opened successfully.")
+        except StorageError as exc:
+            self._set_diagnostics_status(f"The selected library could not be opened: {exc}")
+        self.refresh_developer_diagnostics()
+
+    def _run_health_check(self) -> None:
+        try:
+            health = self.application_services.metadata_store.health_check()
+            lines = ["Database health: " + ("Healthy" if health["healthy"] else "Unhealthy")]
+            lines += [f"Integrity check: {health['integrity_check']}", f"Foreign-key check: {health['foreign_key_check']}",
+                      f"Migration history: {'Consistent' if health['migration_history_consistent'] else 'Inconsistent'}"]
+            self.diagnostics_report.setPlainText("\n".join(lines))
+            self._set_diagnostics_status(lines[0])
+        except StorageError as exc:
+            self._set_diagnostics_status(f"Health check could not run: {exc}")
+        self.refresh_developer_diagnostics()
+
+    def _show_schema_summary(self) -> None:
+        summary = self.application_services.metadata_store.schema_summary()
+        migrations = ", ".join(f"{item['version']}: {item['name']}" for item in summary["migrations"])
+        missing = ", ".join(summary["missing_required_tables"]) or "None"
+        self.diagnostics_report.setPlainText(
+            f"Schema version: {summary['schema_version']}\nExpected schema version: {summary['expected_schema_version']}\n"
+            f"Required tables: {summary['required_table_count']}\nMissing tables: {missing}\nMigrations: {migrations}"
+        )
+        self._set_diagnostics_status("Schema summary displayed.")
+
+    def create_backup(self, destination: str | Path) -> bool:
+        try:
+            result = self.application_services.metadata_store.backup(destination)
+            self._set_diagnostics_status(f"Backup created successfully. Schema version {result.schema_version}.")
+            return True
+        except StorageError as exc:
+            self._set_diagnostics_status(f"Backup was not created: {exc}")
+            return False
+
+    def _choose_backup_destination(self) -> None:
+        selected, _ = QFileDialog.getSaveFileName(self, "Create metadata backup", "family_memory-backup.db", "SQLite database (*.db)")
+        if selected:
+            self.create_backup(selected)
+
+    def validate_backup(self, candidate: str | Path) -> bool:
+        try:
+            result = self.application_services.metadata_store.validate_backup(candidate)
+            self._set_diagnostics_status(f"Backup is valid. Schema version {result.schema_version}; integrity {result.integrity}.")
+            return True
+        except StorageError as exc:
+            self._set_diagnostics_status(f"Backup is invalid: {exc}")
+            return False
+
+    def _choose_backup_to_validate(self) -> None:
+        selected, _ = QFileDialog.getOpenFileName(self, "Validate metadata backup", "", "SQLite database (*.db);;All files (*)")
+        if selected:
+            self.validate_backup(selected)
+
+    @staticmethod
+    def _open_folder(path: Path) -> None:
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path.resolve())))
+
+    def _open_application_data_folder(self) -> None:
+        self._open_folder(self.application_services.paths.root)
+
+    def _open_database_folder(self) -> None:
+        path = self.application_services.metadata_store.database_path
+        if path:
+            self._open_folder(path.parent)
+
+    def diagnostic_report_text(self) -> str:
+        return "\n".join(f"{key}: {label.text()}" for key, label in self.diagnostics_labels.items())
+
+    def _copy_diagnostic_report(self) -> None:
+        QGuiApplication.clipboard().setText(self.diagnostic_report_text())
+        self._set_diagnostics_status("Diagnostic report copied to the clipboard.")
 
     def set_evaluation_context_providers(self, library_provider: Callable[[], list], selection_provider: Callable[[], list]) -> None:
         self._library_provider = library_provider

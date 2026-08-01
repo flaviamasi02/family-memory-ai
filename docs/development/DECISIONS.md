@@ -791,3 +791,7 @@ The approved bootstrap registry is the architecture-specified, atomically replac
 ### DATA-001B implementation record — 2026-07-28
 
 Schema version 2 is the complete DATA-001 foundation: all domain tables share the one managed `family_memory.db`; semantic and face vectors are constrained float32 little-endian BLOBs. Ordered migrations are checksum-verified, forward-only, individually transactional, and serialized with work units. Online backup, validated safety-copy restore, structured health reporting, and explicit non-destructive diagnostics are service responsibilities. DATA-001B does not connect import or migrate/cut over legacy content; DATA-001C–H remain planned and Product Owner validation is required.
+
+### DEV-007 developer validation surface — 2026-08-01
+
+DATA-001B manual validation is available through a collapsed Settings section using the existing application-composed storage services. It is read-only by default and exposes only explicit registration/open, health/schema inspection, online backup/validation, safe managed-folder opening, and a minimized clipboard report. There is no restore/delete/SQL console, scanning, import integration, or legacy migration. The CLI remains supported, while DATA-001C remains next.

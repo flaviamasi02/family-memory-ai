@@ -260,6 +260,23 @@ class MetadataStore:
         except (InvalidBackupError, ChecksumMismatchError, sqlite3.Error):
             return result
 
+    def schema_summary(self) -> dict[str, object]:
+        """Return the supported schema contract without exposing SQL to callers."""
+        version = self.get_schema_version() if self.library_id else 0
+        missing: list[str] = []
+        if self.library_id:
+            missing = list(self.health_check()["missing_required_tables"])
+        return {
+            "schema_version": version,
+            "expected_schema_version": SCHEMA_VERSION,
+            "required_table_count": len(REQUIRED_TABLES),
+            "missing_required_tables": missing,
+            "migrations": [
+                {"version": migration.version, "name": migration.name}
+                for migration in MIGRATIONS
+            ],
+        }
+
     def backup(self, destination_path: str | Path, *, overwrite: bool = False) -> BackupResult:
         with self._operation_lock:
             source, destination = self._require_path().resolve(), Path(destination_path).resolve()

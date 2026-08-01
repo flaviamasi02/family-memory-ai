@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### DEV-007 — Developer Diagnostics UI
+
+- Added a collapsed Settings diagnostics section for non-terminal DATA-001B validation, using the composed registry and metadata store for explicit test-library registration/open, structured health/schema display, backup creation/validation, safe managed-folder opening, and a minimized clipboard report.
+- The surface has no Restore, Delete, SQL console, scan, import integration, or legacy migration action. CLI diagnostics remain supported; normal import remains disconnected from SQLite and DATA-001C remains next.
+
 ### DATA-001B — Full SQLite schema and migration operations
 
 - Added immutable schema migration version 2 with the full photo, location, embedding, category, review, album, preference, import-history, reserved face/person, and legacy-migration-ledger foundation, including domain constraints and lookup indexes.
