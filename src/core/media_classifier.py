@@ -9,6 +9,10 @@ from PySide6.QtCore import QCoreApplication, QThread
 
 from core.category_registry import get_category_registry
 from core.feature_flags import ENABLE_VISUAL_CONTENT_ANALYSIS
+from core.supported_media import (
+    SUPPORTED_IMAGE_EXTENSIONS as IMAGE_EXTENSIONS,
+    SUPPORTED_VIDEO_EXTENSIONS as VIDEO_EXTENSIONS,
+)
 from core.visual_content_analyzer import VisualContentAnalyzer
 from learning.category_learning_engine import get_category_learning_engine
 
@@ -140,9 +144,6 @@ def ordered_media_category_values() -> list[str]:
     registry = get_category_registry()
     return registry.ordered_ids()
 
-
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic"}
-VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv"}
 
 MEME_FILENAME_INDICATORS = {
     "meme",

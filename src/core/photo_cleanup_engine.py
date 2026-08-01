@@ -5,11 +5,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from core.category_registry import get_category_registry
+from core.supported_media import (
+    SUPPORTED_IMAGE_EXTENSIONS as IMAGE_EXTENSIONS,
+    SUPPORTED_VIDEO_EXTENSIONS as VIDEO_EXTENSIONS,
+)
 from models.photo import Photo
 
-
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic"}
-VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv"}
 LOW_QUALITY_MIN_DIMENSION = 480
 LOW_QUALITY_MIN_AREA = 640 * 480
 LOW_QUALITY_MISSING_DIMENSION_MIN_FILE_SIZE = 32 * 1024

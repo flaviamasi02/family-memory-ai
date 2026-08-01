@@ -4,6 +4,8 @@
 
 ### DEV-007 — Developer Diagnostics UI
 
+- Corrected the pre-existing mixed-folder scanner boundary: one shared supported-media extension contract now rejects databases, WAL/SHM files, sidecars, JSON, project/configuration, hidden non-media, and extensionless files before metadata, model, review, album, semantic, or thumbnail work. Added deterministic discovered/supported/skipped/job-count coverage; DATA-001B services remain isolated from normal import.
+
 - Added a collapsed Settings diagnostics section for non-terminal DATA-001B validation, using the composed registry and metadata store for explicit test-library registration/open, structured health/schema display, backup creation/validation, safe managed-folder opening, and a minimized clipboard report.
 - The surface has no Restore, Delete, SQL console, scan, import integration, or legacy migration action. CLI diagnostics remain supported; normal import remains disconnected from SQLite and DATA-001C remains next.
 

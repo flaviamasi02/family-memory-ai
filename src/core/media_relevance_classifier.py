@@ -5,9 +5,11 @@ from pathlib import Path
 from typing import Any, Mapping, Optional
 
 
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv"}
-SUPPORTED_LIBRARY_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
+from core.supported_media import (
+    SUPPORTED_IMAGE_EXTENSIONS as IMAGE_EXTENSIONS,
+    SUPPORTED_MEDIA_EXTENSIONS as SUPPORTED_LIBRARY_EXTENSIONS,
+    SUPPORTED_VIDEO_EXTENSIONS as VIDEO_EXTENSIONS,
+)
 
 
 @dataclass(frozen=True)

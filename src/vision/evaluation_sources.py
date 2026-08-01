@@ -4,10 +4,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+from core.supported_media import SUPPORTED_IMAGE_EXTENSIONS
+
 EXCLUDED_IMPORT_FOLDERS = {"_family_memory_deleted_review", "_family_memory_cleanup_review"}
 SIDECAR_SUFFIX = ".familymemory.json"
 
-EVALUATION_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic"}
+EVALUATION_IMAGE_EXTENSIONS = SUPPORTED_IMAGE_EXTENSIONS
 
 
 @dataclass(frozen=True)

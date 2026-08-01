@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from core.date_extraction_service import DateExtractionService
+from core.supported_media import SUPPORTED_IMAGE_EXTENSIONS
 
 
 try:
@@ -16,7 +17,7 @@ EXIF_TAGS = {
     "orientation": 274,
 }
 
-IMAGE_METADATA_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+IMAGE_METADATA_EXTENSIONS = SUPPORTED_IMAGE_EXTENSIONS
 
 
 _date_extraction_service = DateExtractionService()

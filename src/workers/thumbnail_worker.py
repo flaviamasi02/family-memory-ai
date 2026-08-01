@@ -8,9 +8,10 @@ from PySide6.QtGui import QImage
 from cache.thumbnail_cache import get_thumbnail_cache_path
 from core.image_display_loader import load_display_thumbnail_image, is_decode_failed
 from core.perf_stats import get_session_stats
+from core.supported_media import SUPPORTED_IMAGE_EXTENSIONS, supported_image_items
 
 
-THUMBNAIL_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic"}
+THUMBNAIL_IMAGE_EXTENSIONS = SUPPORTED_IMAGE_EXTENSIONS
 
 
 class ThumbnailWorker(QObject):
@@ -21,7 +22,8 @@ class ThumbnailWorker(QObject):
 
     def __init__(self, photos, thumbnail_size=160, batch_size=20, delay_ms=0):
         super().__init__()
-        self.photos = photos
+        # Unsupported files and videos never become thumbnail jobs.
+        self.photos = supported_image_items(photos or [])
         self.thumbnail_size = thumbnail_size
         self.batch_size = batch_size
         self.delay_ms = delay_ms
