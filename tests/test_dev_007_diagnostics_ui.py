@@ -64,6 +64,7 @@ def test_refresh_register_reuse_health_schema_and_source_unchanged(page):
     assert "1: data_001a_foundation" in summary
     assert "2: data_001b_full_schema" in summary
     assert "3: data_001c_import_registration" in summary
+    assert "4: data_001d_incremental_photo_sync" in summary
     widget.refresh_developer_diagnostics()
     assert widget.diagnostics_labels["Registered library count"].text() == "1"
 

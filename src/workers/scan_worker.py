@@ -14,7 +14,9 @@ from PySide6.QtCore import QObject, Signal
 from core.application_services import ApplicationServices
 from core.perf_stats import get_session_stats
 from core.photo_scanner import find_photos
+from cache.thumbnail_cache import preserve_thumbnail_for_relocation
 from storage.import_registration import ImportRegistrationService
+from vision.embedding_provider import EmbeddingStore
 
 
 class ScanWorker(QObject):
@@ -34,12 +36,27 @@ class ScanWorker(QObject):
                 store = self._application_services.metadata_store
                 self._application_services.open_or_register_library(self._folder_path)
                 registration = ImportRegistrationService(store, self._folder_path)
-            photos = find_photos(self._folder_path)
+            photos = find_photos(self._folder_path, registration)
             if registration is not None:
                 registration.register(
                     photos,
                     skipped=get_session_stats().get_counter("unsupported_files_skipped"),
                 )
+                relocated = [photo for photo in photos
+                             if photo.sync_state in {"moved", "renamed"} and photo.previous_path]
+                embedding_store = (
+                    EmbeddingStore(
+                        self._application_services.paths.cache_dir("embeddings")
+                        / "semantic_embeddings.sqlite3"
+                    ) if relocated else None
+                )
+                for photo in relocated:
+                    item = registration.plan.item_for(photo.path)
+                    previous = item.previous_location
+                    preserve_thumbnail_for_relocation(
+                        previous.source_path, previous.modified_time_ns,
+                        previous.file_size, str(photo.path))
+                    embedding_store.preserve_for_relocation(photo.previous_path, photo.path)
             self.scan_complete.emit(photos)
         except Exception as exc:  # noqa: BLE001
             if registration is not None:

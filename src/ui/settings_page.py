@@ -291,6 +291,8 @@ class SettingsPage(QWidget):
             "Database health status", "Integrity-check status", "Foreign-key-check status",
             "Migration-history status", "Missing required tables", "Read availability",
             "Write availability",
+            "Total registered photos", "Active photos", "Removed photos",
+            "Last incremental sync", "Last import summary",
         )
         for row, field in enumerate(fields):
             key = QLabel(f"{field}:"); key.setStyleSheet("font-weight: 600;")
@@ -347,6 +349,7 @@ class SettingsPage(QWidget):
         self.diagnostics_library_selector.blockSignals(False)
         store = services.metadata_store
         health = store.health_check() if store.library_id else None
+        sync = store.incremental_sync_summary() if store.library_id else None
         values = {
             "Application data root": str(services.paths.root),
             "Registered library count": str(len(records)),
@@ -361,6 +364,11 @@ class SettingsPage(QWidget):
             "Missing required tables": ", ".join(health["missing_required_tables"]) if health and health["missing_required_tables"] else "None",
             "Read availability": self._availability_text(health, "read_available"),
             "Write availability": self._availability_text(health, "write_available"),
+            "Total registered photos": str(sync["total_photos"]) if sync else "Not available",
+            "Active photos": str(sync["active_photos"]) if sync else "Not available",
+            "Removed photos": str(sync["removed_photos"]) if sync else "Not available",
+            "Last incremental sync": str(sync["last_incremental_sync"] or "Never") if sync else "Not available",
+            "Last import summary": str(sync["last_import_summary"]) if sync else "Not available",
         }
         for key, value in values.items():
             self.diagnostics_labels[key].setText(value)

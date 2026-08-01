@@ -185,6 +185,17 @@ class PhotoRepository:
             (self.store.library_id, key),
         ).fetchone())
 
+    def list_locations(self, *, connection=None) -> list[PhotoLocationRecord]:
+        if connection is None:
+            with self.store.read_connection() as reader:
+                return self.list_locations(connection=reader)
+        rows = connection.execute(
+            f"SELECT {self._location_columns()} FROM photo_locations "
+            "WHERE library_id=? AND availability!='deleted' ORDER BY normalised_path_key",
+            (self.store.library_id,),
+        ).fetchall()
+        return [self._location(row) for row in rows]
+
     def create_location(self, photo_id: str, *, source_path: str, relative_path: str,
                         filename: str, file_size: int, modified_time_ns: int,
                         import_run_id: str, partial_fingerprint: str | None = None,
@@ -223,4 +234,32 @@ class PhotoRepository:
             "removed_at=NULL,updated_at=? WHERE location_id=? AND library_id=?",
             (source_path, filename, Path(filename).suffix.lower(), file_size, modified_time_ns,
              import_run_id, utc_now(), utc_now(), location_id, self.store.library_id),
+        )
+        connection.execute(
+            "UPDATE photos SET status='active',deleted_at=NULL,updated_at=? WHERE photo_id="
+            "(SELECT photo_id FROM photo_locations WHERE location_id=?) AND status!='active'",
+            (utc_now(), location_id),
+        )
+
+    def set_location_fingerprint(self, location_id: str, fingerprint: str, *, connection) -> None:
+        connection.execute(
+            "UPDATE photo_locations SET partial_fingerprint=?,fingerprint_algorithm=?,"
+            "fingerprint_version=?,updated_at=? WHERE location_id=? AND library_id=?",
+            (fingerprint, "sha256-first-1mib-size", 1, utc_now(), location_id,
+             self.store.library_id),
+        )
+
+    def mark_location_missing(self, location_id: str, import_run_id: str, *, connection) -> None:
+        now = utc_now()
+        connection.execute(
+            "UPDATE photo_locations SET availability='missing',last_seen_run_id=?,removed_at=?,"
+            "updated_at=? WHERE location_id=? AND library_id=? AND availability='available'",
+            (import_run_id, now, now, location_id, self.store.library_id),
+        )
+        connection.execute(
+            "UPDATE photos SET status='missing',updated_at=? WHERE photo_id=(SELECT photo_id "
+            "FROM photo_locations WHERE location_id=?) AND NOT EXISTS (SELECT 1 FROM photo_locations "
+            "WHERE photo_id=(SELECT photo_id FROM photo_locations WHERE location_id=?) "
+            "AND availability='available')",
+            (now, location_id, location_id),
         )

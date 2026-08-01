@@ -1,11 +1,11 @@
 # DATA-001 — Central Metadata Storage Architecture Specification
 
-Status: **DATA-001A–C implemented; automated validation complete; Product Owner validation pending**
+Status: **DATA-001A–D implemented; automated validation complete; Product Owner validation pending**
 
 Owner: Architecture
 Last updated: 2026-07-28
 
-This document is the authoritative technical contract for DATA-001. The durable decisions are recorded in `docs/development/DECISIONS.md`; this specification defines how later implementation increments must realize them. DATA-001A implements the application-data, registry, and minimal database/store foundation; DATA-001B implements schema version 2 and database operations; DATA-001C implements photo/import repositories and normal-import registration. DATA-001D–H, PERF-001, and MODEL-004B remain planned.
+This document is the authoritative technical contract for DATA-001. The durable decisions are recorded in `docs/development/DECISIONS.md`; this specification defines how later implementation increments must realize them. DATA-001A implements the application-data, registry, and minimal database/store foundation; DATA-001B implements schema version 2 and database operations; DATA-001C implements photo/import repositories and normal-import registration; DATA-001D implements incremental synchronization. DATA-001E–H, PERF-001, and MODEL-004B remain planned.
 
 ## 1. Executive Summary
 
@@ -312,15 +312,15 @@ Every increment is a separate reviewable PR, leaves the application working, upd
 - **Rollback:** feature gate returns import identity to legacy/in-memory path; new DB retained for diagnosis.
 - **Acceptance:** stable PhotoIDs, transactional batches, originals unchanged, each cancelled run accurately recorded.
 
-### DATA-001D — Category and review migration
+### DATA-001D — Incremental photo synchronization
 
-- **Scope:** categories, sidecar classifications/confirmation/suggestion feedback, Cleanup/Memory/album decisions, learning profile preservation, SQLite write ownership for these domains.
-- **Excluded:** embedding and album entity migration.
+- **Scope:** lightweight file-evidence comparison, unchanged/new/updated/removed/moved/renamed outcomes, stable identity/location reconciliation, change-only metadata/thumbnail/embedding work, and sync diagnostics.
+- **Excluded:** category/review/embedding storage cutover and album migration.
 - **Dependencies:** C.
-- **Tests:** real-format fixtures, conflict precedence, corrupt sidecars, idempotency, Cleanup/Memory/Photo Browser UI integration.
-- **PO result:** existing categories and decisions appear unchanged; new edits survive restart without new sidecar writes.
-- **Rollback:** before-cutover backup plus domain state reset to legacy; never dual-write.
-- **Acceptance:** reconciled counts/report, legacy retained/read-only, sidecar writes disabled after cutover.
+- **Tests:** unchanged/repeated imports, additions/removals/relocations, stable PhotoID, preserved decisions/embeddings/thumbnails, restart, statistics, duplicate prevention, and constant-batch performance.
+- **PO result:** a second unchanged import reuses existing identities and expensive artifacts while reporting a clear incremental summary.
+- **Rollback:** retain schema/history and return the worker to full processing; originals and historical rows remain untouched.
+- **Acceptance:** one filesystem traversal, no expensive work or database location updates for unchanged files, conservative fingerprint relocation, durable counters, and lightweight UI/diagnostics reporting.
 
 ### DATA-001E — Embedding migration
 
@@ -461,4 +461,10 @@ The first mixed-folder correction redundantly filtered already trusted collectio
 
 DATA-001C connects the existing single-pass background import to managed metadata without changing the scanner, classification, sidecar, MobileCLIP, Cleanup Review, Memory Review, Album Draft, or semantic-embedding behavior. Import idempotently registers the selected root, opens its existing LibraryID when known, creates a durable `ImportRun` before scanning, and transactionally registers the scanner's existing `Photo` results afterward. Schema version 3 adds the measured elapsed-time field to import history; start/completion timestamps, terminal state, discovered/created/reused/changed/skipped/failed counters, and per-file outcomes are retained.
 
-`PhotoRepository` allocates UUIDv4 PhotoIDs and provides create, update, PhotoID, relative-path, fingerprint/hash, and library-list operations behind `MetadataStore`. The registrar first matches the indexed normalized relative path, reuses stable PhotoIDs on repeated import and changed observations, refreshes `photo_locations`, and assigns the PhotoID to the existing domain object. It performs one durable run-start transaction and one batch transaction rather than per-photo connections or a duplicate filesystem walk. A failed batch rolls back all photo/location/items together and marks the independently durable run failed. Original folders and legacy JSON/sidecars remain unchanged and authoritative for their existing workflows; no legacy metadata is migrated. DATA-001D–H remain planned, and Product Owner manual validation is required before merge.
+`PhotoRepository` allocates UUIDv4 PhotoIDs and provides create, update, PhotoID, relative-path, fingerprint/hash, and library-list operations behind `MetadataStore`. The registrar first matches the indexed normalized relative path, reuses stable PhotoIDs on repeated import and changed observations, refreshes `photo_locations`, and assigns the PhotoID to the existing domain object. It performs one durable run-start transaction and one batch transaction rather than per-photo connections or a duplicate filesystem walk. A failed batch rolls back all photo/location/items together and marks the independently durable run failed. Original folders and legacy JSON/sidecars remain unchanged and authoritative for their existing workflows; no legacy metadata is migrated. DATA-001E–H remain planned, and Product Owner manual validation is required before merge.
+
+## DATA-001D implementation note (2026-08-01)
+
+DATA-001D adds a lightweight evidence-planning phase inside the existing single filesystem traversal. Indexed relative path plus size and nanosecond mtime identifies unchanged files without image decoding, EXIF extraction, classification, eager hashing, location updates, thumbnail regeneration, or semantic embedding submission. New and updated files retain the established expensive pipeline. Path-independent SHA-256 size/first-1-MiB fingerprints conservatively reconcile a unique missing observation to a moved or renamed file, preserve PhotoID and related database metadata, retain the old location as missing history, and re-key disposable thumbnail and legacy semantic caches without inference.
+
+Schema version 4 adds explicit unchanged, added, removed, moved, renamed, and updated counters to `ImportRun`. Completed scans mark newly absent locations and logical photos missing without physical deletion, while later reappearance restores availability. Developer Diagnostics reports total, active, and removed photo counts plus the last incremental-sync timestamp and summary. Original files, sidecars, MobileCLIP behavior, review decisions, albums, and future DATA-001E–H migration scope are unchanged. Product Owner validation and ChatGPT review remain mandatory before merge.

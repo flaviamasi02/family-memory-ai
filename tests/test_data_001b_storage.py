@@ -29,7 +29,8 @@ def test_complete_schema_indexes_and_history(opened):
     assert REQUIRED_TABLES <= tables
     assert {'uq_photo_categories_current','uq_reviews_current','idx_photo_locations_fingerprint'} <= indexes
     assert history == [(1,'data_001a_foundation',64),(2,'data_001b_full_schema',64),
-                       (3,'data_001c_import_registration',64)]
+                       (3,'data_001c_import_registration',64),
+                       (4,'data_001d_incremental_photo_sync',64)]
     assert row == (record.library_id,SCHEMA_VERSION)
 
 def add_photo(c, library_id, photo_id='photo'):

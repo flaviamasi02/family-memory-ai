@@ -158,5 +158,5 @@ def test_automatic_registration_reuses_library_and_worker_has_one_scan(tmp_path)
     second = services.open_or_register_library(root / ".")
     assert first.library_id == second.library_id and len(registry.list_libraries()) == 1
     source = (Path(__file__).parents[1] / "src/workers/scan_worker.py").read_text()
-    assert source.count("find_photos(self._folder_path)") == 1
+    assert source.count("find_photos(self._folder_path, registration)") == 1
     assert "open_or_register_library(self._folder_path)" in source

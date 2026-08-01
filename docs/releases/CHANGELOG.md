@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### DATA-001D — Incremental photo synchronization
+
+- Added single-traversal change planning for unchanged, added, removed, moved, renamed, and updated photos with stable PhotoID and retained location history.
+- Unchanged imports now bypass image metadata/classification, thumbnail regeneration, semantic embedding submission, fingerprint reads after initial capture, and unnecessary location updates. Content-confirmed relocations preserve database metadata and re-key existing thumbnail/semantic caches without inference.
+- Added schema-version-4 synchronization counters, missing-photo lifecycle, bounded Developer Diagnostics summaries, lightweight status text, and automated synchronization/restart/performance/duplicate-preservation coverage. DATA-001E–H remain planned.
+
 ### DATA-001C — Photo repository and import registration
 
 - Added automatic idempotent library registration to the existing background folder import, with stable persisted PhotoIDs and indexed `photo_locations`; original folders remain untouched.

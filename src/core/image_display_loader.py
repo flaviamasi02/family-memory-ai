@@ -5,6 +5,7 @@ from typing import Optional
 
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QImage, QImageReader, QPixmap
+from core.display_constants import DISPLAY_THUMBNAIL_VERSION
 
 
 _full_pixmap_cache: dict[str, QPixmap] = {}
@@ -16,10 +17,6 @@ _thumbnail_image_cache: dict[str, QImage] = {}
 # process so that a single corrupted file does not cause repeated Qt/libjpeg
 # error messages or wasted decode work.
 _decode_failed_paths: set[str] = set()
-
-
-# Bump this when display-orientation behavior changes so stale on-disk thumbs are bypassed.
-DISPLAY_THUMBNAIL_VERSION = "display-v2"
 
 
 def load_display_pixmap(file_path: str | Path) -> Optional[QPixmap]:

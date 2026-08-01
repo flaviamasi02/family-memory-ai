@@ -212,10 +212,19 @@ V2_STATEMENTS = tuple(part.strip() for part in V2_SQL.split(";") if part.strip()
 V3_STATEMENTS = (
     "ALTER TABLE import_runs ADD COLUMN elapsed_time_ms REAL CHECK(elapsed_time_ms IS NULL OR elapsed_time_ms>=0)",
 )
+V4_STATEMENTS = (
+    "ALTER TABLE import_runs ADD COLUMN unchanged_count INTEGER NOT NULL DEFAULT 0 CHECK(unchanged_count>=0)",
+    "ALTER TABLE import_runs ADD COLUMN added_count INTEGER NOT NULL DEFAULT 0 CHECK(added_count>=0)",
+    "ALTER TABLE import_runs ADD COLUMN removed_count INTEGER NOT NULL DEFAULT 0 CHECK(removed_count>=0)",
+    "ALTER TABLE import_runs ADD COLUMN moved_count INTEGER NOT NULL DEFAULT 0 CHECK(moved_count>=0)",
+    "ALTER TABLE import_runs ADD COLUMN renamed_count INTEGER NOT NULL DEFAULT 0 CHECK(renamed_count>=0)",
+    "ALTER TABLE import_runs ADD COLUMN updated_count INTEGER NOT NULL DEFAULT 0 CHECK(updated_count>=0)",
+)
 MIGRATIONS = (
     Migration(1, "data_001a_foundation", V1_STATEMENTS),
     Migration(2, "data_001b_full_schema", V2_STATEMENTS),
     Migration(3, "data_001c_import_registration", V3_STATEMENTS),
+    Migration(4, "data_001d_incremental_photo_sync", V4_STATEMENTS),
 )
 SCHEMA_VERSION = MIGRATIONS[-1].version
 

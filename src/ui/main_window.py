@@ -368,8 +368,8 @@ class MainWindow(QMainWindow):
         self._import_generation += 1
         self._import_phase = "Preparing"
         logger.info("Import lifecycle generation=%s phase=Scanning", self._import_generation)
-        self._set_embedding_status("Preparing import: scanning folder…")
-        self.status_label.setText("Scanning folder…")
+        self._set_embedding_status("Scanning changes…")
+        self.status_label.setText("Scanning changes…")
         self._start_scan(folder_path)
 
     def _start_scan(self, folder_path: str) -> None:
@@ -453,13 +453,20 @@ class MainWindow(QMainWindow):
             f"Scan complete — showing {n} photos. Loading thumbnails…"
         )
 
-        self._current_import_photos = list(photos or [])
+        self._current_import_photos = [
+            photo for photo in (photos or [])
+            if getattr(photo, "sync_state", "added") in {"added", "updated"}
+        ]
         self._import_phase = "Thumbnail generation"
         logger.info(
             "Import lifecycle generation=%s phase=ScanCompleted submitted=%s next=ThumbnailGeneration",
             self._import_generation, len(self._current_import_photos),
         )
-        self._set_embedding_status("Preparing import: generating thumbnails…")
+        added = sum(getattr(photo, "sync_state", "added") == "added" for photo in photos or [])
+        renamed = sum(getattr(photo, "sync_state", "added") == "renamed" for photo in photos or [])
+        self._set_embedding_status(
+            f"Reusing existing metadata… Found {added} new photos and {renamed} renamed photos."
+        )
         self.start_thumbnail_loading(photos)
 
         # ── Phase 2 & 3 (deferred) ────────────────────────────────────────────

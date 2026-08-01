@@ -74,6 +74,11 @@ class ThumbnailWorker(QObject):
                             continue
 
                         _cache_misses += 1
+                        if getattr(photo, "sync_state", "added") not in {"added", "updated"}:
+                            # Incremental sync never decodes unchanged content.
+                            # A missing disposable cache can be regenerated only
+                            # after the file itself changes or is newly added.
+                            continue
                         photo.set_status("thumbnail_loading")
                         self.thumbnail_status_updated.emit(photo)
 

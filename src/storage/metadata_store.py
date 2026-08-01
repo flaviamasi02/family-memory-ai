@@ -150,6 +150,31 @@ class MetadataStore:
         except sqlite3.OperationalError:
             return 0
 
+    def incremental_sync_summary(self) -> dict[str, object]:
+        """Return bounded aggregate diagnostics for the active library."""
+        with self.read_connection() as connection:
+            photo_counts = connection.execute(
+                "SELECT COUNT(*),SUM(CASE WHEN status='active' THEN 1 ELSE 0 END),"
+                "SUM(CASE WHEN status IN ('missing','deleted') THEN 1 ELSE 0 END) "
+                "FROM photos WHERE library_id=?", (self.library_id,)).fetchone()
+            last = connection.execute(
+                "SELECT completed_at,unchanged_count,added_count,removed_count,moved_count,"
+                "renamed_count,updated_count,elapsed_time_ms FROM import_runs "
+                "WHERE library_id=? AND status='completed' ORDER BY completed_at DESC LIMIT 1",
+                (self.library_id,)).fetchone()
+        summary = {
+            "total_photos": int(photo_counts[0] or 0),
+            "active_photos": int(photo_counts[1] or 0),
+            "removed_photos": int(photo_counts[2] or 0),
+            "last_incremental_sync": last[0] if last else None,
+            "last_import_summary": "No completed import",
+        }
+        if last:
+            summary["last_import_summary"] = (
+                f"unchanged={last[1]} added={last[2]} removed={last[3]} moved={last[4]} "
+                f"renamed={last[5]} updated={last[6]} elapsed_ms={float(last[7] or 0):.1f}")
+        return summary
+
     def _verify_history(self, connection: sqlite3.Connection) -> None:
         try:
             rows = connection.execute("SELECT version,name,checksum FROM schema_migrations ORDER BY version").fetchall()

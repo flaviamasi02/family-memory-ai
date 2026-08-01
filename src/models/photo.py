@@ -40,6 +40,8 @@ class Photo:
     classification_reason: str = ""
     classification_confidence: float = 0.0
     modified_time_ns: int = 0
+    sync_state: str = "added"
+    previous_path: Optional[Path] = None
 
     def __post_init__(self) -> None:
         if self.intelligence is None:
@@ -49,9 +51,9 @@ class Photo:
         self.sync_visual_features_from_metadata()
 
     @classmethod
-    def from_path(cls, path: Path) -> "Photo":
+    def from_path(cls, path: Path, *, stat_result=None) -> "Photo":
         path = Path(path)
-        stat = path.stat()
+        stat = stat_result or path.stat()
 
         return cls(
             path=path,
