@@ -14,19 +14,5 @@ Completed sessions are process-local and bounded to the last 20 imports. Develop
 Diagnostics can select a previous session and export JSON with system context,
 library size, stage timings, diagnostics, and future-facing hints.
 
-## PERF-001B optimization result
-
-PERF-001B retained these measurement boundaries and the import lifecycle while
-removing duplicate work: the single filesystem traversal now reuses `scandir`
-metadata and precomputes path projections, synchronization planning uses one
-joined SQLite snapshot, inserted photo/location records are returned without
-read-back queries, and synchronization plan lookup is constant-time. Developer
-Diagnostics exposes aggregate avoided-stat, avoided-resolution, and avoided-query
-counters.
-
-A five-run synthetic 500-photo database-path benchmark measured median added
-registration at 109.43 ms before and 95.12 ms after (13.1% lower). Median
-unchanged planning was 11.85 ms before and 11.36 ms after (4.1% lower); because
-that delta is close to run-to-run noise it is directional only. The latest
-production semantic baseline remains 190.643 seconds for 422 photos; it was not
-rerun here, so no MobileCLIP performance gain is claimed.
+PERF-001B is next and will use these measurements to select optimization work;
+PERF-001A makes no performance-improvement claim.

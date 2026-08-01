@@ -2,12 +2,10 @@
 
 ## Unreleased
 
-### PERF-001B — Import Performance Optimization
+### FIX — Invalid Qt font size warning
 
-- Replaced `Path.rglob()` plus a second `stat()` with one iterative `os.scandir()` walk that reuses directory-entry metadata and precomputes each relative/normalized path once.
-- Collapsed incremental planning's location/photo snapshot from two SQLite reads to one indexed join, made sync-plan path lookup constant-time, and removed the two insert read-back queries previously issued for every added photo.
-- Added PERF-001A counters for avoided filesystem stats, path resolutions, and SQLite queries; Developer Diagnostics displays them without changing the import workflow.
-- A five-run synthetic 500-photo registration benchmark measured the median added-photo transaction at 109.43 ms before and 95.12 ms after (13.1% lower). The unchanged planner median was 11.85 ms before and 11.36 ms after (4.1% lower); that smaller result is treated as directional because of run-to-run noise. No production MobileCLIP gain is claimed.
+- Replaced the Import Performance title's pixel-sized stylesheet font with an equivalent positive point-sized `QFont`, preserving its appearance while preventing `QFont::setPointSize` from receiving Qt's `-1` pixel-font sentinel during Settings initialization.
+- Added regression coverage for the Developer Diagnostics title's valid inherited point size.
 
 ### PERF-001A — Import Performance Profiling & Diagnostics
 

@@ -8,7 +8,7 @@ from threading import Event
 from typing import Callable
 
 from PySide6.QtCore import QUrl, Qt, Signal, QThread, Slot
-from PySide6.QtGui import QDesktopServices, QGuiApplication
+from PySide6.QtGui import QDesktopServices, QFont, QGuiApplication
 from PySide6.QtWidgets import (
     QFileDialog,
     QButtonGroup,
@@ -313,7 +313,17 @@ class SettingsPage(QWidget):
         panel.addWidget(self.diagnostics_report)
 
         self.import_performance_title = QLabel("Import Performance")
-        self.import_performance_title.setStyleSheet("font-size: 15px; font-weight: 700;")
+        # A pixel-sized QSS font has pointSizeF() == -1. Qt's stylesheet/font
+        # resolution later copies that font through setPointSize(), producing
+        # ``QFont::setPointSize: Point size <= 0 (-1)`` when this diagnostics
+        # heading is initialized. Use an equivalent positive point
+        # size so the rendered height stays the same without an invalid inherited
+        # point-size sentinel.
+        title_font = QFont(self.import_performance_title.font())
+        logical_dpi = max(1, self.import_performance_title.logicalDpiY())
+        title_font.setPointSizeF(15 * 72 / logical_dpi)
+        title_font.setWeight(QFont.Weight.Bold)
+        self.import_performance_title.setFont(title_font)
         panel.addWidget(self.import_performance_title)
         self.performance_history_selector = QComboBox()
         self.performance_history_selector.currentIndexChanged.connect(self._show_performance_session)
@@ -437,9 +447,6 @@ class SettingsPage(QWidget):
             f"Average thumbnail time: {average('Thumbnail generation'):.2f} ms/item",
             f"Average DB write: {average('SQLite writes'):.2f} ms/item",
             f"Average DB read: {average('SQLite reads'):.2f} ms/item",
-            f"Avoided filesystem stat calls: {counters.get('filesystem_stat_calls_avoided', 0)}",
-            f"Avoided path resolutions: {counters.get('path_resolutions_avoided', 0)}",
-            f"Avoided SQLite queries: {counters.get('sqlite_queries_avoided', 0)}",
             f"Slowest stage: {session.identify_bottleneck() or 'Not available'}",
             "", "Per-stage timings:",
         ]

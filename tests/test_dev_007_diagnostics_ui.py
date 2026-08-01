@@ -43,6 +43,16 @@ def test_section_present_collapsed_and_safe_without_active_library(page):
     assert "Delete" not in diagnostics_actions
 
 
+def test_import_performance_title_has_valid_point_size(page):
+    widget, _, _, _ = page
+    font = widget.import_performance_title.font()
+    assert font.pointSizeF() > 0
+    assert font.bold()
+    # Pixel-sized QSS fonts report pointSizeF() == -1 and caused Qt's warning
+    # when its stylesheet-resolved title font was copied internally.
+    assert "font-size" not in widget.import_performance_title.styleSheet()
+
+
 def test_refresh_register_reuse_health_schema_and_source_unchanged(page):
     widget, services, _, tmp_path = page
     source = tmp_path / "empty-test-library"

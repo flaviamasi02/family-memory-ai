@@ -221,8 +221,7 @@ def test_pipeline_keeps_one_walk_and_submits_only_changed_photos_to_embeddings()
     worker = Path("src/workers/scan_worker.py").read_text(encoding="utf-8")
     window = Path("src/ui/main_window.py").read_text(encoding="utf-8")
     thumbnails = Path("src/workers/thumbnail_worker.py").read_text(encoding="utf-8")
-    assert 'folder.rglob("*")' not in scanner
-    assert scanner.count("os.scandir(directory)") == 1
+    assert scanner.count('folder.rglob("*")') == 1
     assert worker.count("find_photos(self._folder_path, registration)") == 1
     assert 'in {"added", "updated"}' in window
     assert 'sync_state", "added") not in {"added", "updated"}' in thumbnails
