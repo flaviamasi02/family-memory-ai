@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### DEV-007 — Developer Diagnostics UI
+
+- Corrected the pre-existing mixed-folder scanner boundary: one shared supported-media extension contract now rejects databases, WAL/SHM files, sidecars, JSON, project/configuration, hidden non-media, and extensionless files before metadata, model, review, album, semantic, or thumbnail work. Added deterministic discovered/supported/skipped/job-count coverage; DATA-001B services remain isolated from normal import.
+- Restored lifecycle compatibility by removing redundant extension filtering from already validated scanner output, downstream queues, and thumbnail-worker construction; the strict filesystem boundary remains authoritative and CI test doubles/domain values pass through unchanged.
+
+- Added a collapsed Settings diagnostics section for non-terminal DATA-001B validation, using the composed registry and metadata store for explicit test-library registration/open, structured health/schema display, backup creation/validation, safe managed-folder opening, and a minimized clipboard report.
+- The surface has no Restore, Delete, SQL console, scan, import integration, or legacy migration action. CLI diagnostics remain supported; normal import remains disconnected from SQLite and DATA-001C remains next.
+
+### DATA-001B — Full SQLite schema and migration operations
+
+- Added immutable schema migration version 2 with the full photo, location, embedding, category, review, album, preference, import-history, reserved face/person, and legacy-migration-ledger foundation, including domain constraints and lookup indexes.
+- Added checksum-verified transactional migrations, unsupported-schema handling, structured health reporting, validated SQLite online backup, safety-copy atomic restore, and explicit diagnostic commands.
+- Existing imports, sidecars, JSON profiles, semantic/face caches, UI workflows, and original photo folders remain unchanged and authoritative. No legacy content migration or SQLite cutover occurred; DATA-001C–H remain planned and Product Owner validation is pending.
+
 ### DATA-001A — Application data paths and library registry
 
 - Added platform-aware application storage paths, an atomic JSON library registry with stable UUIDv4 identity and deterministic root matching, per-library directories, and a minimal `family_memory.db` schema.

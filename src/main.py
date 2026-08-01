@@ -37,7 +37,7 @@ def main():
     # platform ignored the env var during initialisation.
     QLoggingCategory.setFilterRules(_jpeg_rule + "\n")
 
-    window = MainWindow()
+    window = MainWindow(application_services=services)
     window.show()
 
     sys.exit(app.exec())

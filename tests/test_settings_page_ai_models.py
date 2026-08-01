@@ -327,7 +327,7 @@ def test_settings_refreshes_when_cancelled_startup_recovery_begins(monkeypatch, 
 def test_main_window_composes_one_runtime_manager_for_settings_and_indexing():
     source = Path('src/ui/main_window.py').read_text(encoding='utf-8')
     assert source.count('self.ai_runtime_manager = create_default_runtime_manager()') == 1
-    assert 'SettingsPage(runtime_manager=self.ai_runtime_manager)' in source
+    assert 'application_services=self.application_services' in source
     assert 'runtime_manager=self.ai_runtime_manager' in source[source.index('def _launch_embedding_worker'):]
     assert 'QTimer.singleShot(0, self._recover_mobileclip_runtime_on_startup)' in source
     assert 'self.settings_page.start_mobileclip_verification_recovery()' in source

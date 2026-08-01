@@ -24,6 +24,7 @@ from album.annual_album import AnnualAlbum
 from album.album_scoring_engine import AlbumScoringEngine
 from album.candidate_selection_engine import CandidateSelectionEngine
 from ai_runtime.manager import create_default_runtime_manager
+from core.application_services import ApplicationServices, build_application_services
 from core.perf_stats import get_session_stats, reset_session_stats
 from core.safe_file_move_service import CLEANUP_REVIEW_FOLDER_NAME
 from models.photo_model import PhotoModel
@@ -61,8 +62,9 @@ class MainWindow(QMainWindow):
     BROWSER_FILTER_LOW_QUALITY = "Low quality"
     BROWSER_FILTER_UNKNOWN = "Unknown"
 
-    def __init__(self):
+    def __init__(self, application_services: ApplicationServices | None = None):
         super().__init__()
+        self.application_services = application_services or build_application_services()
         # One composition-owned manager is shared by Settings and import
         # indexing.  Providers may still receive explicit managers in tests.
         self.ai_runtime_manager = create_default_runtime_manager()
@@ -151,7 +153,10 @@ class MainWindow(QMainWindow):
         self.irrelevant_media_page.categories_changed.connect(self._sync_cleanup_category_options)
         self.irrelevant_media_page.moved_photos.connect(self._handle_irrelevant_media_moved)
         self.irrelevant_media_page.faces_analyzed.connect(self._handle_faces_analyzed)
-        self.settings_page = SettingsPage(runtime_manager=self.ai_runtime_manager)
+        self.settings_page = SettingsPage(
+            runtime_manager=self.ai_runtime_manager,
+            application_services=self.application_services,
+        )
         self.settings_page.help_requested.connect(self._on_workspace_help_requested)
         self.settings_page.set_evaluation_context_providers(
             self._mobileclip_library_photos,
