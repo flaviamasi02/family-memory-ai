@@ -437,6 +437,9 @@ class SettingsPage(QWidget):
             f"Average thumbnail time: {average('Thumbnail generation'):.2f} ms/item",
             f"Average DB write: {average('SQLite writes'):.2f} ms/item",
             f"Average DB read: {average('SQLite reads'):.2f} ms/item",
+            f"Avoided filesystem stat calls: {counters.get('filesystem_stat_calls_avoided', 0)}",
+            f"Avoided path resolutions: {counters.get('path_resolutions_avoided', 0)}",
+            f"Avoided SQLite queries: {counters.get('sqlite_queries_avoided', 0)}",
             f"Slowest stage: {session.identify_bottleneck() or 'Not available'}",
             "", "Per-stage timings:",
         ]

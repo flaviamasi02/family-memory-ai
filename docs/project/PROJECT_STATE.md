@@ -23,7 +23,7 @@ The measured Product Owner baseline for a 422-photo first semantic indexing run 
 ### Active sequence
 
 1. **DATA-001 — Central Metadata Storage** — DATA-001A–D implemented and Product Owner validated; DATA-001E–H planned.
-2. **PERF-001 — Semantic Embedding Performance** — PERF-001A profiling implemented; PERF-001B is next.
+2. **PERF-001 — Semantic Embedding Performance** — PERF-001A profiling and PERF-001B import-pipeline optimization are implemented.
 3. **MODEL-004B — Face Detection** — planned, not started.
 4. **MODEL-004C — Face Embeddings** — planned, not started.
 5. **MODEL-004D — Face Clustering** — planned, not started.

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### PERF-001B — Import Performance Optimization
+
+- Kept exactly one background filesystem walk while replacing redundant path/stat work with `os.scandir()` metadata reuse and a single precomputed observation per supported file.
+- Reduced SQLite planning to one joined snapshot query, removed per-insert record read-backs, and indexed each immutable synchronization plan by resolved path for constant-time relocation lookup.
+- Preserved transaction batching, connection-per-work-unit ownership, unchanged-photo embedding/thumbnail reuse, UI-thread publication, monotonic scan IDs, and stale-completion rejection.
+- Extended PERF-001A diagnostics with avoided-work counters. A local five-run synthetic 500-photo benchmark measured median added registration at 109.43 ms before versus 95.12 ms after; unchanged planning measured 11.85 ms versus 11.36 ms. These are synthetic database-path measurements, not a claim about production MobileCLIP runtime.
+
 ### PERF-001A — Import Performance Profiling & Diagnostics
 
 - Added thread-safe `perf_counter()` import sessions, aggregate `[PERF]` logging,
