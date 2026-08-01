@@ -2,6 +2,8 @@ import json
 import threading
 import time
 
+import pytest
+
 from core.perf_stats import (
     ImportPerformanceSession,
     begin_import_performance_session,
@@ -9,6 +11,7 @@ from core.perf_stats import (
     export_performance_report,
     finish_import_performance_session,
     performance_history,
+    import_efficiency_status,
 )
 
 
@@ -49,6 +52,42 @@ def test_json_export_contains_environment_breakdown_and_hints(tmp_path):
     assert report["library_size"] == 3
     assert report["stage_breakdown"]
     assert report["future_optimization_hints"]
+
+
+def test_json_export_retains_internal_counter_names_and_exact_stage_data(tmp_path):
+    session = ImportPerformanceSession()
+    session.inc("filesystem_stat_calls_avoided", 7)
+    session.inc("path_resolutions_avoided", 14)
+    session.inc("sqlite_queries_avoided", 3)
+    session.inc("thumbnail_cache_hits", 5)
+    session.inc("embedding_cache_hits", 4)
+    session.record("SQLite reads", 2.5, 1, "Background thread")
+    report = json.loads(export_performance_report(tmp_path / "report.json", session).read_text())
+    assert report["diagnostics"] == {
+        "filesystem_stat_calls_avoided": 7,
+        "path_resolutions_avoided": 14,
+        "sqlite_queries_avoided": 3,
+        "thumbnail_cache_hits": 5,
+        "embedding_cache_hits": 4,
+    }
+    assert report["stage_breakdown"][0]["elapsed_ms"] == pytest.approx(2.5)
+    assert report["stage_breakdown"][0]["thread_kind"] == "Background thread"
+    assert report["hardware_info"] and report["os"] and report["python_version"]
+
+
+def test_import_efficiency_status_is_deterministic_from_existing_counters():
+    assert import_efficiency_status(None) == "No completed import available"
+    assert import_efficiency_status({"processed_photos": 10}) == "Full processing required"
+    assert import_efficiency_status({
+        "processed_photos": 10, "reused_photos": 5,
+    }) == "Some work reused"
+    assert import_efficiency_status({
+        "processed_photos": 10, "reused_photos": 9,
+        "thumbnails_generated": 0, "embedded_photos": 0,
+    }) == "Efficient reuse detected"
+    assert import_efficiency_status({
+        "processed_photos": 10, "reused_photos": 9, "embedded_photos": 1,
+    }) == "Some work reused"
 
 
 def test_zero_photo_session_and_thread_safe_worker_aggregation():

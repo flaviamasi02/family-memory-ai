@@ -58,9 +58,14 @@ class SyncPlan:
     items: tuple[SyncItem, ...]
     removed: tuple[PhotoLocationRecord, ...]
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_items_by_path", {
+            item.observation.path: item for item in self.items
+        })
+
     def item_for(self, path: Path) -> SyncItem:
         resolved = path.resolve(strict=False)
-        return next(item for item in self.items if item.observation.path == resolved)
+        return self._items_by_path[resolved]
 
 
 @dataclass(frozen=True)
@@ -117,10 +122,12 @@ class ImportRegistrationService:
 
     def plan_changes(self, observations: list[FileObservation]) -> SyncPlan:
         read_started = time.perf_counter()
-        locations = self.repository.list_locations()
-        photos_by_id = {photo.photo_id: photo for photo in self.repository.list_library_photos()}
+        sync_state = self.repository.list_sync_state()
+        locations = [location for location, _photo in sync_state]
+        photos_by_id = {photo.photo_id: photo for _location, photo in sync_state}
         get_session_stats().record("SQLite reads", (time.perf_counter() - read_started) * 1000,
-                                   2, "Background thread")
+                                   1, "Background thread")
+        get_session_stats().inc("sqlite_queries_avoided", 1)
         by_key = {location.normalised_path_key: location for location in locations}
         observed_keys = {item.normalised_path_key for item in observations}
         unmatched = [location for location in locations
@@ -276,6 +283,7 @@ class ImportRegistrationService:
                      counts["updated"], elapsed_ms, self.import_run_id))
             get_session_stats().record("SQLite writes", (time.perf_counter() - write_started) * 1000,
                                        len(plan.items) + len(plan.removed), "Background thread")
+            get_session_stats().inc("sqlite_queries_avoided", counts["added"] * 2)
         except Exception as exc:
             self.fail(str(exc), discovered=discovered, skipped=skipped)
             raise

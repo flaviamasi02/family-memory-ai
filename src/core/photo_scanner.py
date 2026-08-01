@@ -1,5 +1,6 @@
 import time
 import logging
+import os
 from pathlib import Path
 
 from core.media_classifier import MediaClassifier
@@ -29,25 +30,44 @@ def find_photos(folder_path, synchronization_service=None):
 
     # Phase 1: file walk — enumerate qualifying paths (no image I/O).
     t0 = time.perf_counter()
-    raw_files: list[tuple[Path, object]] = []
+    raw_files: list[tuple[Path, object, FileObservation]] = []
     entries_discovered = 0
     files_discovered = 0
     unsupported_files = 0
-    for file in folder.rglob("*"):
-        entries_discovered += 1
-        if not file.is_file():
-            continue
-        files_discovered += 1
-        if any(excluded_folder in file.parts for excluded_folder in EXCLUDED_IMPORT_FOLDERS):
-            unsupported_files += 1
-            continue
-        # Reject unsupported files before Photo construction, metadata/EXIF
-        # extraction, classification, sidecar lookup, or thumbnail scheduling.
-        if not is_supported_media_path(file):
-            unsupported_files += 1
-            continue
+    root = folder.resolve(strict=False)
+    pending = [(root, Path())]
+    while pending:
+        directory, relative_directory = pending.pop()
         try:
-            raw_files.append((file, file.stat()))
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    entries_discovered += 1
+                    relative = relative_directory / entry.name
+                    try:
+                        if entry.is_dir(follow_symlinks=False):
+                            if entry.name not in EXCLUDED_IMPORT_FOLDERS:
+                                pending.append((Path(entry.path), relative))
+                            else:
+                                unsupported_files += 1
+                            continue
+                        # Match pathlib's prior behavior: do not recurse through
+                        # directory symlinks, but accept a symlink to a file.
+                        if not entry.is_file():
+                            continue
+                        files_discovered += 1
+                        file = Path(entry.path)
+                        if not is_supported_media_path(file):
+                            unsupported_files += 1
+                            continue
+                        stat = entry.stat()
+                    except OSError:
+                        unsupported_files += 1
+                        continue
+                    relative_text = str(relative)
+                    resolved = root / relative
+                    raw_files.append((file, stat, FileObservation(
+                        resolved, relative_text, normalise_relative_path(relative_text),
+                        entry.name, int(stat.st_size), int(stat.st_mtime_ns))))
         except OSError:
             unsupported_files += 1
     scan_ms = (time.perf_counter() - t0) * 1000
@@ -58,6 +78,8 @@ def find_photos(folder_path, synchronization_service=None):
     stats.inc("files_discovered", files_discovered)
     stats.inc("supported_media_candidates", len(raw_files))
     stats.inc("unsupported_files_skipped", unsupported_files)
+    stats.inc("filesystem_stat_calls_avoided", len(raw_files))
+    stats.inc("path_resolutions_avoided", len(raw_files) * 2)
     logger.info(
         "Import scan filtered entries=%s files=%s supported_media=%s unsupported_skipped=%s",
         entries_discovered, files_discovered, len(raw_files), unsupported_files,
@@ -65,13 +87,7 @@ def find_photos(folder_path, synchronization_service=None):
 
     sync_plan = None
     if synchronization_service is not None:
-        observations = []
-        root = folder.resolve(strict=False)
-        for file, stat in raw_files:
-            relative = str(file.resolve(strict=False).relative_to(root))
-            observations.append(FileObservation(
-                file.resolve(strict=False), relative, normalise_relative_path(relative),
-                file.name, int(stat.st_size), int(stat.st_mtime_ns)))
+        observations = [observation for _file, _stat, observation in raw_files]
         plan_t0 = time.perf_counter()
         sync_plan = synchronization_service.plan_changes(observations)
         stats.record("Incremental synchronization planning",
@@ -87,9 +103,9 @@ def find_photos(folder_path, synchronization_service=None):
     photos: list[Photo] = []
     expensive_photos: list[Photo] = []
     t1 = time.perf_counter()
-    for file, stat in raw_files:
+    for file, stat, observation in raw_files:
         photo = Photo.from_path(file, stat_result=stat)
-        sync_item = sync_items_by_path.get(file.resolve(strict=False))
+        sync_item = sync_items_by_path.get(observation.path)
         photo.sync_state = sync_item.state if sync_item else "added"
         photo.id = sync_item.photo_id if sync_item else None
         if sync_item and sync_item.previous_location and sync_item.state in {"moved", "renamed"}:

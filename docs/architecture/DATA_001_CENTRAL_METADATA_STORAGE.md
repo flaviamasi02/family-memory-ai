@@ -484,4 +484,11 @@ The current expected schema is **version 5**: version 3 adds import elapsed time
 
 Developer Diagnostics displays active LibraryID and database path, actual and expected schema versions, database health, integrity, foreign-key status, migration consistency, total/active/removed photo counts, last incremental sync, and last import summary. The CLI remains available but is not required for normal Product Owner validation.
 
+The Import Performance portion includes a plain-English **Import Efficiency**
+summary and explanations for photo, thumbnail, embedding, file-information, path,
+and database reuse. Product Owner labels do not replace the technical record:
+the complete per-stage timing table remains visible and exported reports preserve
+the internal counter keys, thread attribution, environment details, and exact
+values.
+
 Product Owner validation passed for initial and repeated import, added-photo incremental work and reuse, Photo Browser, Memory Review, Cleanup Review, MobileCLIP lifecycle, embedding reuse, active-library diagnostics, schema/version health, duplicate prevention, non-media filtering, and diagnostics-UI backup creation/validation. No regression remained blocking at merge. This manual record does not claim that every rename/move/remove permutation was exercised; automated tests cover those reconciliation paths, restart persistence, duplicate prevention, lifecycle rejection, and UI regressions. Legacy sidecars, JSON profiles, semantic cache, and face database remain until their approved migrations; all metadata is not yet authoritative in the central database.

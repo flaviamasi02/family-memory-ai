@@ -126,7 +126,13 @@ class PhotoRepository:
              None if is_album_relevant_candidate is None else int(is_album_relevant_candidate),
              classification_confidence, classification_reason),
         )
-        return self.get_by_id(photo_id, connection=connection)
+        return PhotoRecord(
+            photo_id, str(self.store.library_id), media_type, width, height, captured_at,
+            content_hash, hash_algorithm, hash_version, "active", 1,
+            automatic_media_category, effective_media_category, relevance_category,
+            None if is_album_relevant_candidate is None else int(is_album_relevant_candidate),
+            classification_confidence, classification_reason,
+        )
 
     def update_photo(self, photo_id: str, *, connection=None, **changes) -> PhotoRecord:
         allowed = {"media_type", "width", "height", "captured_at", "camera_make",
@@ -225,6 +231,26 @@ class PhotoRepository:
         ).fetchall()
         return [self._location(row) for row in rows]
 
+    def list_sync_state(self, *, connection=None) -> list[tuple[PhotoLocationRecord, PhotoRecord]]:
+        """Load the import planner projection with one indexed database query."""
+        if connection is None:
+            with self.store.read_connection() as reader:
+                return self.list_sync_state(connection=reader)
+        location_columns = ",".join(f"l.{column}" for column in self._location_columns().split(","))
+        photo_columns = ",".join(f"p.{column}" for column in self._photo_columns().split(","))
+        rows = connection.execute(
+            f"SELECT {location_columns},{photo_columns} FROM photo_locations l "
+            "JOIN photos p ON p.photo_id=l.photo_id "
+            "WHERE l.library_id=? AND l.availability!='deleted' "
+            "ORDER BY l.normalised_path_key",
+            (self.store.library_id,),
+        ).fetchall()
+        location_count = len(self._location_columns().split(","))
+        return [
+            (self._location(row[:location_count]), self._photo(row[location_count:]))
+            for row in rows
+        ]
+
     def create_location(self, photo_id: str, *, source_path: str, relative_path: str,
                         filename: str, file_size: int, modified_time_ns: int,
                         import_run_id: str, partial_fingerprint: str | None = None,
@@ -252,7 +278,11 @@ class PhotoRepository:
         )
         connection.execute("UPDATE photos SET preferred_location_id=? WHERE photo_id=?",
                            (location_id, photo_id))
-        return self.get_location(key, connection=connection)
+        return PhotoLocationRecord(
+            location_id, photo_id, str(self.store.library_id), source_path, relative_path,
+            key, filename, file_size, modified_time_ns, partial_fingerprint,
+            fingerprint_algorithm, fingerprint_version, "available",
+        )
 
     def refresh_location(self, location_id: str, *, source_path: str, filename: str,
                          file_size: int, modified_time_ns: int, import_run_id: str,

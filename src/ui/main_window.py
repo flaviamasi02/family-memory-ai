@@ -757,6 +757,7 @@ class MainWindow(QMainWindow):
         cancelled = int(getattr(result, "cancelled", 0) or 0)
         received = int(getattr(result, "total_images_received", 0) or 0)
         get_session_stats().inc("embedded_photos", processed)
+        get_session_stats().inc("embedding_cache_hits", cached)
         ready = processed + cached
         total = ready + failed + cancelled
         self._import_phase = "Cache reuse" if cached else "Embedding indexing"

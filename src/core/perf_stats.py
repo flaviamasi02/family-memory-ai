@@ -22,6 +22,27 @@ from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
+IMPORT_EFFICIENCY_NO_IMPORT = "No completed import available"
+IMPORT_EFFICIENCY_HIGH_REUSE = "Efficient reuse detected"
+IMPORT_EFFICIENCY_PARTIAL_REUSE = "Some work reused"
+IMPORT_EFFICIENCY_FULL_PROCESSING = "Full processing required"
+
+
+def import_efficiency_status(counters: dict[str, int] | None) -> str:
+    """Return a descriptive, deterministic reuse summary, not a score."""
+    if counters is None:
+        return IMPORT_EFFICIENCY_NO_IMPORT
+    processed = max(0, int(counters.get("processed_photos", 0)))
+    reused = max(0, int(counters.get("reused_photos", 0)))
+    thumbnails_generated = max(0, int(counters.get("thumbnails_generated", 0)))
+    embeddings_generated = max(0, int(counters.get("embedded_photos", 0)))
+    if processed > 0 and reused * 2 > processed \
+            and thumbnails_generated == 0 and embeddings_generated == 0:
+        return IMPORT_EFFICIENCY_HIGH_REUSE
+    if reused > 0:
+        return IMPORT_EFFICIENCY_PARTIAL_REUSE
+    return IMPORT_EFFICIENCY_FULL_PROCESSING
+
 
 @dataclass
 class PerformanceStage:
