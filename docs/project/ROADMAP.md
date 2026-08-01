@@ -12,21 +12,36 @@
 ### Next
 
 1. DATA-001 — Central Metadata Storage (**DATA-001A–D implemented and Product Owner validated; DATA-001E–H planned**)
-2. PERF-001 — Semantic Embedding Performance (**PERF-001A profiling implemented; PERF-001B next**)
-3. MODEL-004B — Face Detection (**planned; not started**)
-4. MODEL-004C — Face Embeddings (**planned; not started**)
-5. MODEL-004D — Face Clustering (**planned; not started**)
-6. MODEL-004E — Person Management (**planned; not started**)
-7. MODEL-004F — Memory Review Integration (**planned; not started**)
+2. PERF-001 — Semantic Embedding Performance (**PERF-001A and PERF-001B implemented**)
+3. PERF-002 — Cleanup Review bulk interaction performance (**planned; not started**)
+4. MODEL-004B — Face Detection (**planned; not started**)
+5. MODEL-004C — Face Embeddings (**planned; not started**)
+6. MODEL-004D — Face Clustering (**planned; not started**)
+7. MODEL-004E — Person Management (**planned; not started**)
+8. MODEL-004F — Memory Review Integration (**planned; not started**)
 
 DATA-001A, DATA-001B, DATA-001C, DATA-001D, and DEV-007 Developer Diagnostics UI are implemented. DATA-001E and the later approved DATA-001 increments remain planned; no additional DATA-001E scope is introduced here. DATA-001 must be completed before PERF-001. Stabilizing central metadata architecture first allows PERF-001 to use centralized indexed storage and avoids optimizing a storage design that will immediately change. This approved sequence supersedes older “next recommended” statements retained below as historical context.
 
 ### PERF-001 scope baseline
 
-PERF-001A now provides import-stage, worker, SQLite, thread, history, diagnostics,
-and JSON-export measurements without optimization. PERF-001B is next.
+PERF-001A provides import-stage, worker, SQLite, thread, history, diagnostics,
+and JSON-export measurements. PERF-001B used those boundaries to remove duplicate
+filesystem metadata/path work, collapse planner reads, eliminate insert read-backs,
+and expose avoided-work counters. A synthetic 500-photo benchmark measured added
+registration medians of 109.43 ms before and 95.12 ms after; no production
+MobileCLIP improvement is inferred from that database-path measurement.
 
-The Product Owner measured approximately 190.643 seconds for a CPU-based first semantic indexing pass over 422 photos (approximately 0.45 seconds per photo). PERF-001 will measure bottlenecks and investigate model-load reuse, batching, image resize/decode efficiency, cache efficiency, responsive UI, progress and ETA, and possible hardware acceleration where available. Cache reuse is expected to make repeats substantially faster. No PERF-001 improvement has been implemented.
+The Product Owner measured approximately 190.643 seconds for a CPU-based first semantic indexing pass over 422 photos (approximately 0.45 seconds per photo). That remains the latest production profiler baseline; PERF-001B did not rerun MobileCLIP and therefore does not claim a semantic-inference gain. Existing cache validation continues to avoid recomputing unchanged embeddings.
+
+### PERF-002 planned follow-up
+
+The Product Owner observed that selecting multiple Cleanup Review images and
+assigning a category feels a little slow. PERF-002 will investigate
+multi-selection responsiveness, bulk category assignment, repeated
+sidecar/database writes, unnecessary full-grid rebuilds, repaint frequency,
+preservation of scroll position and selection, and asynchronous or batched
+persistence where safe. PERF-002 is not implemented. Because no baseline
+comparison was performed, the observation is not attributed to PR #50.
 
 ---
 

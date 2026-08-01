@@ -8,7 +8,7 @@ from threading import Event
 from typing import Callable
 
 from PySide6.QtCore import QUrl, Qt, Signal, QThread, Slot
-from PySide6.QtGui import QDesktopServices, QGuiApplication
+from PySide6.QtGui import QDesktopServices, QFont, QGuiApplication
 from PySide6.QtWidgets import (
     QFileDialog,
     QButtonGroup,
@@ -40,7 +40,11 @@ from ai_runtime.manager import AIRuntimeManager, create_default_runtime_manager
 from ai_runtime.models import AIRuntimeInstallationPlan
 from workers.ai_runtime_worker import AIRuntimeOperationWorker
 from core.application_services import ApplicationServices, build_application_services
-from core.perf_stats import export_performance_report, performance_history
+from core.perf_stats import (
+    export_performance_report,
+    import_efficiency_status,
+    performance_history,
+)
 from storage.errors import StorageError
 from storage.schema import SCHEMA_VERSION
 
@@ -313,7 +317,17 @@ class SettingsPage(QWidget):
         panel.addWidget(self.diagnostics_report)
 
         self.import_performance_title = QLabel("Import Performance")
-        self.import_performance_title.setStyleSheet("font-size: 15px; font-weight: 700;")
+        # A pixel-sized QSS font has pointSizeF() == -1. Qt's stylesheet/font
+        # resolution later copies that font through setPointSize(), producing
+        # ``QFont::setPointSize: Point size <= 0 (-1)`` when this diagnostics
+        # heading is initialized. Use an equivalent positive point
+        # size so the rendered height stays the same without an invalid inherited
+        # point-size sentinel.
+        title_font = QFont(self.import_performance_title.font())
+        logical_dpi = max(1, self.import_performance_title.logicalDpiY())
+        title_font.setPointSizeF(15 * 72 / logical_dpi)
+        title_font.setWeight(QFont.Weight.Bold)
+        self.import_performance_title.setFont(title_font)
         panel.addWidget(self.import_performance_title)
         self.performance_history_selector = QComboBox()
         self.performance_history_selector.currentIndexChanged.connect(self._show_performance_session)
@@ -321,6 +335,14 @@ class SettingsPage(QWidget):
         self.import_performance_report = QTextEdit()
         self.import_performance_report.setReadOnly(True)
         self.import_performance_report.setMaximumHeight(240)
+        self.import_performance_report.setToolTip(
+            "Photos reused: Photos already known to the library were reused instead of being fully processed again.\n"
+            "Thumbnails reused: Existing thumbnail files were reused.\n"
+            "Embeddings reused: Existing AI image analysis was reused instead of recalculated.\n"
+            "File checks avoided: The application reused file information already collected during the folder scan.\n"
+            "Path processing avoided: The application reused normalized file locations instead of processing the same paths again.\n"
+            "Database queries avoided: The application reused results or batch operations instead of performing additional database lookups."
+        )
         panel.addWidget(self.import_performance_report)
         self.export_performance_button = QPushButton("Export Performance Report")
         self.export_performance_button.clicked.connect(self._export_performance_report)
@@ -419,7 +441,11 @@ class SettingsPage(QWidget):
     def _show_performance_session(self, _index: int = -1) -> None:
         session = self._selected_performance_session()
         if session is None:
-            self.import_performance_report.setPlainText("No completed import measurements yet.")
+            self.import_performance_report.setPlainText(
+                "Import Efficiency\n"
+                f"Status: {import_efficiency_status(None)}\n\n"
+                "Complete an import to see reuse and detailed timing information."
+            )
             self.export_performance_button.setEnabled(False)
             return
         counters = session.counters
@@ -428,16 +454,31 @@ class SettingsPage(QWidget):
                       if stage.name == stage_name and stage.average_ms_per_item is not None]
             return sum(values) / len(values) if values else 0.0
         lines = [
-            f"Last import total time: {session.total_ms:.1f} ms",
-            f"Processed photos: {counters.get('processed_photos', 0)}",
-            f"Reused photos: {counters.get('reused_photos', 0)}",
-            f"Embedded photos: {counters.get('embedded_photos', 0)}",
+            "Import Efficiency",
+            f"Status: {import_efficiency_status(counters)}",
+            f"Photos processed: {counters.get('processed_photos', 0)}",
+            f"Photos reused: {counters.get('reused_photos', 0)}",
+            "  Photos already known to the library were reused instead of being fully processed again.",
+            f"Thumbnails reused: {counters.get('thumbnail_cache_hits', 0)}",
+            "  Existing thumbnail files were reused.",
+            f"Embeddings reused: {counters.get('embedding_cache_hits', 0)}",
+            "  Existing AI image analysis was reused instead of recalculated.",
+            f"File checks avoided: {counters.get('filesystem_stat_calls_avoided', 0)}",
+            "  The application reused file information already collected during the folder scan.",
+            f"Path processing avoided: {counters.get('path_resolutions_avoided', 0)}",
+            "  The application reused normalized file locations instead of processing the same paths again.",
+            f"Database queries avoided: {counters.get('sqlite_queries_avoided', 0)}",
+            "  The application reused results or batch operations instead of performing additional database lookups.",
+            f"Slowest stage: {session.identify_bottleneck() or 'Not available'}",
+            f"Total import time: {session.total_ms:.1f} ms",
+            "",
+            "Technical timing details",
+            f"Photos newly embedded: {counters.get('embedded_photos', 0)}",
             f"Thumbnails generated: {counters.get('thumbnails_generated', 0)}",
             f"Average embedding time: {average('Embedding execution'):.2f} ms/item",
             f"Average thumbnail time: {average('Thumbnail generation'):.2f} ms/item",
             f"Average DB write: {average('SQLite writes'):.2f} ms/item",
             f"Average DB read: {average('SQLite reads'):.2f} ms/item",
-            f"Slowest stage: {session.identify_bottleneck() or 'Not available'}",
             "", "Per-stage timings:",
         ]
         lines.extend(
