@@ -57,6 +57,7 @@ class SettingsPage(QWidget):
 
     help_requested = Signal(str)
     mobileclip_evaluation_requested = Signal(object)
+    runtime_operation_finished = Signal(str)
 
     WORKSPACE_ID = SETTINGS_WORKSPACE
 
@@ -78,6 +79,7 @@ class SettingsPage(QWidget):
         self._active_runtime_thread: QThread | None = None
         self._active_runtime_worker: AIRuntimeOperationWorker | None = None
         self._active_cancel_event: Event | None = None
+        self._active_runtime_operation: str | None = None
 
         self.header = WorkspaceHeader("Settings")
         self.header.help_clicked.connect(self._on_help_clicked)
@@ -683,17 +685,21 @@ class SettingsPage(QWidget):
         thread.finished.connect(self._clear_ai_runtime_worker, Qt.ConnectionType.QueuedConnection)
         self._active_runtime_thread = thread
         self._active_runtime_worker = worker
+        self._active_runtime_operation = operation
         self._set_runtime_buttons_enabled(False)
         self.runtime_progress_bar.setRange(0, 0)
         thread.start()
 
     def _clear_ai_runtime_worker(self) -> None:
+        completed_operation = self._active_runtime_operation or ""
         self._active_runtime_thread = None
         self._active_runtime_worker = None
         self._active_cancel_event = None
+        self._active_runtime_operation = None
         self._set_runtime_buttons_enabled(True)
         self.runtime_progress_bar.setRange(0, 1); self.runtime_progress_bar.setValue(1)
         self._refresh_mobileclip_status()
+        self.runtime_operation_finished.emit(completed_operation)
 
     @Slot(str)
     def _on_ai_runtime_current_step(self, step: str) -> None:

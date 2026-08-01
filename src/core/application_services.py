@@ -14,11 +14,18 @@ class ApplicationServices:
     metadata_store: MetadataStore
 
     def open_or_register_library(self, source_root):
-        """Idempotently select the managed library for an imported root."""
+        """Idempotently select a library without dropping a healthy active one."""
         record = self.library_registry.register(source_root)
-        if self.metadata_store.library_id != record.library_id:
-            self.metadata_store.close_library()
-            self.metadata_store.open_library(record.library_id)
+        current = self.metadata_store
+        if current.library_id != record.library_id:
+            # Opening can fail for an unavailable root, migration, or health
+            # reason. Prepare the replacement completely before publishing it
+            # so diagnostics and UI readers never observe a transient/failed
+            # close of the previously active library.
+            replacement = MetadataStore(self.paths, self.library_registry)
+            replacement.open_library(record.library_id)
+            self.metadata_store = replacement
+            current.close_library()
         return record
 
     def close(self) -> None:

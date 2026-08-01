@@ -160,3 +160,26 @@ def test_automatic_registration_reuses_library_and_worker_has_one_scan(tmp_path)
     source = (Path(__file__).parents[1] / "src/workers/scan_worker.py").read_text()
     assert source.count("find_photos(self._folder_path, registration)") == 1
     assert "open_or_register_library(self._folder_path)" in source
+
+
+def test_failed_library_switch_preserves_active_diagnostics_context(tmp_path, monkeypatch):
+    first_root = tmp_path / "first"; first_root.mkdir()
+    second_root = tmp_path / "second"; second_root.mkdir()
+    paths = ApplicationDataPathService(tmp_path / "app")
+    registry = LibraryRegistry(paths)
+    services = ApplicationServices(paths, registry, MetadataStore(paths, registry))
+    first = services.open_or_register_library(first_root)
+    active_store = services.metadata_store
+    original_open = MetadataStore.open_library
+
+    def fail_second(store, library_id):
+        if library_id != first.library_id:
+            raise RuntimeError("injected open failure")
+        return original_open(store, library_id)
+
+    monkeypatch.setattr(MetadataStore, "open_library", fail_second)
+    with pytest.raises(RuntimeError, match="injected open failure"):
+        services.open_or_register_library(second_root)
+    assert services.metadata_store is active_store
+    assert services.metadata_store.library_id == first.library_id
+    assert services.diagnostics()["database_health"] is True

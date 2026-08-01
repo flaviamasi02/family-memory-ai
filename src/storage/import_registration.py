@@ -48,6 +48,7 @@ class SyncItem:
     photo_id: str | None = None
     previous_location: PhotoLocationRecord | None = None
     fingerprint: str | None = None
+    captured_at: str | None = None
 
 
 @dataclass(frozen=True)
@@ -106,6 +107,7 @@ class ImportRegistrationService:
 
     def plan_changes(self, observations: list[FileObservation]) -> SyncPlan:
         locations = self.repository.list_locations()
+        photos_by_id = {photo.photo_id: photo for photo in self.repository.list_library_photos()}
         by_key = {location.normalised_path_key: location for location in locations}
         observed_keys = {item.normalised_path_key for item in observations}
         unmatched = [location for location in locations
@@ -130,7 +132,8 @@ class ImportRegistrationService:
                 if not fingerprint:
                     fingerprint = partial_fingerprint(observation.path, observation.file_size)
                 planned.append(SyncItem(observation, "unchanged" if unchanged else "updated",
-                                        existing.photo_id, existing, fingerprint))
+                                        existing.photo_id, existing, fingerprint,
+                                        photos_by_id[existing.photo_id].captured_at))
                 matched_location_ids.add(existing.location_id)
                 continue
 
@@ -146,7 +149,8 @@ class ImportRegistrationService:
                 name_changed = old_relative.name != new_relative.name
                 state = "moved" if parent_changed else "renamed" if name_changed else "moved"
                 planned.append(SyncItem(observation, state, previous.photo_id,
-                                        previous, fingerprint))
+                                        previous, fingerprint,
+                                        photos_by_id[previous.photo_id].captured_at))
                 matched_location_ids.add(previous.location_id)
             else:
                 planned.append(SyncItem(observation, "added", fingerprint=fingerprint))

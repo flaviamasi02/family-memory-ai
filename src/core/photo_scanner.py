@@ -92,6 +92,12 @@ def find_photos(folder_path, synchronization_service=None):
             photo.metadata = extract_basic_metadata(file)
             photo.sync_intelligence_from_metadata()
             expensive_photos.append(photo)
+        elif sync_item and sync_item.captured_at:
+            # Rehydrate the durable capture date without reopening the image.
+            # Memory Review groups by this domain date after restart as well as
+            # during a same-session incremental import.
+            photo.metadata = {"date_taken": sync_item.captured_at}
+            photo.sync_intelligence_from_metadata()
         photos.append(photo)
     stats.record("metadata_extraction [BG]", (time.perf_counter() - t1) * 1000)
 

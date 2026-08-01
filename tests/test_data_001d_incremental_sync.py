@@ -78,6 +78,18 @@ def test_unchanged_sync_reuses_identity_without_hash_or_location_update(opened, 
     assert after == before
 
 
+def test_unchanged_plan_rehydrates_durable_capture_date_for_review(opened):
+    root, store, _ = opened
+    original = photo(root, "dated.jpg")
+    original.metadata = {"date_taken": "2024-05-06T12:00:00"}
+    synchronize(store, root, [original])
+    repeated = photo(root, "dated.jpg")
+    service = ImportRegistrationService(store, root)
+    plan = service.plan_changes([observation(root, repeated)])
+    assert plan.item_for(repeated.path).state == "unchanged"
+    assert plan.item_for(repeated.path).captured_at == "2024-05-06T12:00:00"
+
+
 def test_added_updated_removed_statistics_and_restart_persistence(opened):
     root, store, record = opened
     original = photo(root, "original.jpg", b"old")

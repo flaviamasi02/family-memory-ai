@@ -163,6 +163,7 @@ class MainWindow(QMainWindow):
             self._mobileclip_selected_photos,
         )
         self.settings_page.mobileclip_evaluation_requested.connect(self._handle_mobileclip_evaluation_requested)
+        self.settings_page.runtime_operation_finished.connect(self._on_runtime_operation_finished)
 
         browser_page = QWidget()
         browser_layout = QVBoxLayout(browser_page)
@@ -436,6 +437,7 @@ class MainWindow(QMainWindow):
         # thread-finished cleanup start it; do not create workers for stale data.
         if self._pending_import_folder_path is not None:
             return
+        photos = self._reconcile_incremental_photos(photos)
         stats = get_session_stats()
         n = len(photos or [])
 
@@ -475,15 +477,52 @@ class MainWindow(QMainWindow):
         # remains responsive throughout.
         QTimer.singleShot(0, self._deferred_setup_cleanup_review)
 
+    def _reconcile_incremental_photos(self, photos: list) -> list:
+        """Reuse rich domain objects for unchanged files in the active session."""
+        previous_by_id = {
+            getattr(photo, "id", None): photo for photo in getattr(self, "_all_photos", [])
+            if getattr(photo, "id", None)
+        }
+        reconciled = []
+        for incoming in photos or []:
+            state = getattr(incoming, "sync_state", "added")
+            existing = previous_by_id.get(getattr(incoming, "id", None))
+            if existing is None or state in {"added", "updated"}:
+                reconciled.append(incoming)
+                continue
+            for attribute in (
+                "path", "filename", "extension", "file_size", "created_at",
+                "modified_at", "modified_time_ns", "sync_state", "previous_path",
+            ):
+                setattr(existing, attribute, getattr(incoming, attribute))
+            reconciled.append(existing)
+        return reconciled
+
     def _start_embedding_indexing(self, photos: list) -> None:
         """Launch import/index embedding generation without blocking the UI."""
         requested_photos = list(photos or [])
+        settings_page = getattr(self, "settings_page", None)
+        if requested_photos and getattr(settings_page, "_active_runtime_thread", None) is not None:
+            # Incremental scans can finish before startup verification. Keep the
+            # same shared-manager lifecycle as before and resume only after the
+            # authoritative runtime operation reaches a terminal state.
+            self._pending_embedding_photos = requested_photos
+            self._set_embedding_status("Waiting for MobileCLIP verification to finish…")
+            return
         if self._embedding_thread_is_running():
             self._pending_embedding_photos = requested_photos
             self._request_embedding_worker_cancel()
             return
 
         self._launch_embedding_worker(requested_photos)
+
+    @Slot(str)
+    def _on_runtime_operation_finished(self, _operation: str) -> None:
+        pending = self._pending_embedding_photos
+        if pending is None or self._embedding_thread_is_running():
+            return
+        self._pending_embedding_photos = None
+        self._launch_embedding_worker(pending)
 
     def _embedding_thread_is_running(self) -> bool:
         """Return thread state while discarding a deleted Qt wrapper safely."""

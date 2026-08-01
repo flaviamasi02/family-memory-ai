@@ -33,8 +33,8 @@ class ScanWorker(QObject):
         registration = None
         try:
             if self._application_services is not None:
-                store = self._application_services.metadata_store
                 self._application_services.open_or_register_library(self._folder_path)
+                store = self._application_services.metadata_store
                 registration = ImportRegistrationService(store, self._folder_path)
             photos = find_photos(self._folder_path, registration)
             if registration is not None:

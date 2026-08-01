@@ -437,6 +437,50 @@ def test_cached_embedding_completion_is_success_not_warning():
     assert "⚠" not in window.ai_status_label.text
 
 
+def test_incremental_embedding_waits_for_mobileclip_recovery_then_resumes_once(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    window.settings_page = type("Settings", (), {"_active_runtime_thread": object()})()
+    launched = []
+    monkeypatch.setattr(window, "_launch_embedding_worker", launched.append)
+
+    window._start_embedding_indexing(["new-photo"])
+
+    assert launched == []
+    assert window._pending_embedding_photos == ["new-photo"]
+    assert window.ai_status_label.text == "Waiting for MobileCLIP verification to finish…"
+
+    window.settings_page._active_runtime_thread = None
+    window._on_runtime_operation_finished("verify")
+    window._on_runtime_operation_finished("verify")
+    assert launched == [["new-photo"]]
+
+
+def test_incremental_reconciliation_preserves_rich_review_domain_object():
+    window = _embedding_window_for_lifecycle_tests()
+    intelligence = type("Intelligence", (), {"year": 2024})()
+    existing = type("Photo", (), {
+        "id": "stable-photo", "path": Path("old/photo.jpg"),
+        "filename": "photo.jpg", "extension": ".jpg", "file_size": 10,
+        "created_at": None, "modified_at": None, "modified_time_ns": 1,
+        "sync_state": "added", "previous_path": None,
+        "intelligence": intelligence, "user_decision": "keep",
+    })()
+    incoming = type("Photo", (), {
+        "id": "stable-photo", "path": Path("new/photo.jpg"),
+        "filename": "photo.jpg", "extension": ".jpg", "file_size": 10,
+        "created_at": None, "modified_at": None, "modified_time_ns": 2,
+        "sync_state": "moved", "previous_path": Path("old/photo.jpg"),
+    })()
+    window._all_photos = [existing]
+
+    reconciled = window._reconcile_incremental_photos([incoming])
+
+    assert reconciled == [existing]
+    assert existing.path == Path("new/photo.jpg")
+    assert existing.intelligence.year == 2024
+    assert existing.user_decision == "keep"
+
+
 def test_mixed_new_and_cached_embedding_completion_is_success():
     window = _embedding_window_for_lifecycle_tests()
     window._active_embedding_run_id = 1
