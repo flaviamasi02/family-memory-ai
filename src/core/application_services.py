@@ -3,8 +3,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from core.application_data import ApplicationDataPathService, get_app_data_service
-from storage.library_registry import LibraryRegistry
+from storage.library_registry import LibraryRecord, LibraryRegistry
 from storage.metadata_store import MetadataStore
+
+
+@dataclass(frozen=True)
+class PreparedLibraryContext:
+    """Worker-ready library that is not active until explicitly published."""
+
+    record: LibraryRecord
+    store: MetadataStore
 
 
 @dataclass
@@ -12,6 +20,35 @@ class ApplicationServices:
     paths: ApplicationDataPathService
     library_registry: LibraryRegistry
     metadata_store: MetadataStore
+
+    def open_or_register_library(self, source_root):
+        """Idempotently select a library without dropping a healthy active one."""
+        prepared = self.prepare_import_library(source_root)
+        self.publish_active_library(prepared)
+        return prepared.record
+
+    def prepare_import_library(self, source_root) -> PreparedLibraryContext:
+        """Open a worker-ready context without changing the published active library."""
+        record = self.library_registry.register(source_root)
+        if self.metadata_store.library_id == record.library_id:
+            return PreparedLibraryContext(record, self.metadata_store)
+        store = MetadataStore(self.paths, self.library_registry)
+        store.open_library(record.library_id)
+        return PreparedLibraryContext(record, store)
+
+    def publish_active_library(self, prepared: PreparedLibraryContext) -> None:
+        """Publish a completed import's library as the one authoritative context."""
+        if prepared.store.library_id != prepared.record.library_id:
+            raise ValueError("Prepared library identity does not match its MetadataStore")
+        current = self.metadata_store
+        if current is prepared.store:
+            return
+        self.metadata_store = prepared.store
+        current.close_library()
+
+    def discard_prepared_library(self, prepared: PreparedLibraryContext) -> None:
+        if prepared.store is not self.metadata_store:
+            prepared.store.close_library()
 
     def close(self) -> None:
         self.metadata_store.close()

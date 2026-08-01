@@ -9,6 +9,7 @@ from core.application_data import ApplicationDataPathService
 from core.application_services import ApplicationServices
 from storage.library_registry import LibraryRegistry
 from storage.metadata_store import MetadataStore
+from storage.schema import SCHEMA_VERSION
 
 
 @pytest.fixture
@@ -52,16 +53,19 @@ def test_refresh_register_reuse_health_schema_and_source_unchanged(page):
     assert first == second
     assert len(services.library_registry.list_libraries()) == 1
     assert list(source.iterdir()) == before
-    assert widget.diagnostics_labels["Schema version"].text() == "2"
+    assert widget.diagnostics_labels["Schema version"].text() == str(SCHEMA_VERSION)
     assert widget.diagnostics_labels["Database health status"].text() == "Healthy"
     widget._run_health_check()
     assert "Database health: Healthy" in widget.diagnostics_report.toPlainText()
     widget._show_schema_summary()
     summary = widget.diagnostics_report.toPlainText()
-    assert "Schema version: 2" in summary
+    assert f"Schema version: {SCHEMA_VERSION}" in summary
     assert "Required tables: 17" in summary
     assert "1: data_001a_foundation" in summary
     assert "2: data_001b_full_schema" in summary
+    assert "3: data_001c_import_registration" in summary
+    assert "4: data_001d_incremental_photo_sync" in summary
+    assert "5: data_001d_classification_snapshot" in summary
     widget.refresh_developer_diagnostics()
     assert widget.diagnostics_labels["Registered library count"].text() == "1"
 
@@ -94,6 +98,26 @@ def test_unavailable_registered_library_is_reported_without_traceback(page):
     widget._open_selected_library()
     assert "could not be opened" in widget.diagnostics_status_label.text()
     assert widget.diagnostics_labels["Active LibraryID"].text() == "No active library"
+
+
+def test_settings_reopen_and_refresh_preserve_imported_active_context(page):
+    widget, services, _, tmp_path = page
+    source = tmp_path / "imported"; source.mkdir()
+    record = services.open_or_register_library(source)
+    widget.refresh_developer_diagnostics()
+    assert widget.diagnostics_labels["Active LibraryID"].text() == record.library_id
+    assert widget.diagnostics_labels["Schema version"].text() == str(SCHEMA_VERSION)
+    assert widget.diagnostics_labels["Database health status"].text() == "Healthy"
+
+    from ui.settings_page import SettingsPage
+    reopened = SettingsPage(application_services=services)
+    try:
+        reopened.refresh_developer_diagnostics()
+        assert reopened.diagnostics_labels["Active LibraryID"].text() == record.library_id
+        assert reopened.diagnostics_labels["Active database path"].text() != "No active database"
+        assert reopened.diagnostics_labels["Schema version"].text() == "5"
+    finally:
+        reopened.close(); reopened.deleteLater()
 
 
 def test_ui_uses_storage_services_not_sqlite_directly():

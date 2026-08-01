@@ -57,12 +57,13 @@ class UserMetadataService:
     ) -> Optional[Path]:
         return self.save_for_photo(photo, app_version=app_version)
 
-    def apply_for_photo(self, photo) -> UserMetadataLoadResult:
+    def apply_for_photo(self, photo, *, sidecar_source_path: str | Path | None = None,
+                        trusted_relocation: bool = False) -> UserMetadataLoadResult:
         photo_path = Path(getattr(photo, "path", ""))
         if not photo_path:
             return UserMetadataLoadResult(False, False, False, None)
 
-        sidecar_path = self.sidecar_path_for(photo_path)
+        sidecar_path = self.sidecar_path_for(sidecar_source_path or photo_path)
         if not sidecar_path.exists():
             return UserMetadataLoadResult(False, False, False, sidecar_path)
 
@@ -73,6 +74,11 @@ class UserMetadataService:
 
         current_identity = self._current_identity(photo_path)
         identity_match = self._identity_matches(data, current_identity)
+        if trusted_relocation:
+            try:
+                identity_match = int(data.get("file_size", -1)) == int(current_identity["file_size"])
+            except (TypeError, ValueError):
+                identity_match = False
         stored_filename = str(data.get("file_name", "") or "").strip()
         filename_matches = (
             stored_filename.lower() == str(photo_path.name).strip().lower()

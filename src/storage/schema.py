@@ -209,7 +209,32 @@ CREATE INDEX idx_metadata_migration_status ON metadata_migration_history(library
 """
 
 V2_STATEMENTS = tuple(part.strip() for part in V2_SQL.split(";") if part.strip())
-MIGRATIONS = (Migration(1, "data_001a_foundation", V1_STATEMENTS), Migration(2, "data_001b_full_schema", V2_STATEMENTS))
+V3_STATEMENTS = (
+    "ALTER TABLE import_runs ADD COLUMN elapsed_time_ms REAL CHECK(elapsed_time_ms IS NULL OR elapsed_time_ms>=0)",
+)
+V4_STATEMENTS = (
+    "ALTER TABLE import_runs ADD COLUMN unchanged_count INTEGER NOT NULL DEFAULT 0 CHECK(unchanged_count>=0)",
+    "ALTER TABLE import_runs ADD COLUMN added_count INTEGER NOT NULL DEFAULT 0 CHECK(added_count>=0)",
+    "ALTER TABLE import_runs ADD COLUMN removed_count INTEGER NOT NULL DEFAULT 0 CHECK(removed_count>=0)",
+    "ALTER TABLE import_runs ADD COLUMN moved_count INTEGER NOT NULL DEFAULT 0 CHECK(moved_count>=0)",
+    "ALTER TABLE import_runs ADD COLUMN renamed_count INTEGER NOT NULL DEFAULT 0 CHECK(renamed_count>=0)",
+    "ALTER TABLE import_runs ADD COLUMN updated_count INTEGER NOT NULL DEFAULT 0 CHECK(updated_count>=0)",
+)
+V5_STATEMENTS = (
+    "ALTER TABLE photos ADD COLUMN automatic_media_category TEXT",
+    "ALTER TABLE photos ADD COLUMN effective_media_category TEXT",
+    "ALTER TABLE photos ADD COLUMN relevance_category TEXT",
+    "ALTER TABLE photos ADD COLUMN is_album_relevant_candidate INTEGER CHECK(is_album_relevant_candidate IS NULL OR is_album_relevant_candidate IN (0,1))",
+    "ALTER TABLE photos ADD COLUMN classification_confidence REAL CHECK(classification_confidence IS NULL OR (classification_confidence>=0 AND classification_confidence<=1))",
+    "ALTER TABLE photos ADD COLUMN classification_reason TEXT",
+)
+MIGRATIONS = (
+    Migration(1, "data_001a_foundation", V1_STATEMENTS),
+    Migration(2, "data_001b_full_schema", V2_STATEMENTS),
+    Migration(3, "data_001c_import_registration", V3_STATEMENTS),
+    Migration(4, "data_001d_incremental_photo_sync", V4_STATEMENTS),
+    Migration(5, "data_001d_classification_snapshot", V5_STATEMENTS),
+)
 SCHEMA_VERSION = MIGRATIONS[-1].version
 
 REQUIRED_TABLES = frozenset({

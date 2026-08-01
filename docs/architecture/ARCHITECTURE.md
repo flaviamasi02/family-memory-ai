@@ -1,6 +1,6 @@
 # Family Memory AI Architecture
 
-## DATA-001 — Central Metadata Storage (DATA-001A–B implemented; Product Owner validation pending)
+## DATA-001 — Central Metadata Storage (DATA-001A–D implemented; Product Owner validation pending)
 
 DATA-001 establishes one central, application-owned SQLite database named `family_memory.db` for each managed photo library. Multiple databases split by photos, embeddings, people, review, or albums are not approved. The logical database includes Libraries, Photos, Embeddings, Categories, Review, Albums, Preferences, ImportHistory, Faces, and People; exact tables and physical schema may evolve during design without reopening the durable one-database decision.
 
@@ -22,7 +22,7 @@ AppData/
 
 Application data must not be written beside originals, and original images must never be modified to carry app metadata. Original folders remain clean. Export or portable-project support must be explicit and user-controlled. The architecture supports multiple libraries and future backup/export and mobile synchronization while the Windows desktop remains the only active implementation target and Android comes later.
 
-The authoritative technical contract is [DATA-001 — Central Metadata Storage Architecture Specification](DATA_001_CENTRAL_METADATA_STORAGE.md). It defines the current persistence inventory, stable library/photo identities, explicit schema, SQLite-BLOB embedding decision, service and concurrency boundaries, idempotent migration, backup/recovery, testing, and DATA-001A–H increments. The DATA-001A–B infrastructure is implemented; DATA-001 as a whole and DATA-001C–H remain incomplete.
+The authoritative technical contract is [DATA-001 — Central Metadata Storage Architecture Specification](DATA_001_CENTRAL_METADATA_STORAGE.md). It defines the current persistence inventory, stable library/photo identities, explicit schema, SQLite-BLOB embedding decision, service and concurrency boundaries, idempotent migration, backup/recovery, testing, and DATA-001A–H increments. The DATA-001A–D infrastructure is implemented; DATA-001 as a whole and DATA-001E–H remain incomplete.
 
 ## Purpose
 

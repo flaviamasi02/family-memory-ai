@@ -8,6 +8,8 @@ from core.perf_stats import get_session_stats
 from core.user_metadata_service import UserMetadataService
 from core.supported_media import is_supported_media_path
 from models.photo import Photo
+from storage.import_registration import FileObservation
+from storage.photo_repository import normalise_relative_path
 
 EXCLUDED_IMPORT_FOLDERS = {
     "_family_memory_deleted_review",
@@ -21,13 +23,13 @@ _user_metadata_service = UserMetadataService()
 logger = logging.getLogger(__name__)
 
 
-def find_photos(folder_path):
+def find_photos(folder_path, synchronization_service=None):
     stats = get_session_stats()
     folder = Path(folder_path)
 
     # Phase 1: file walk — enumerate qualifying paths (no image I/O).
     t0 = time.perf_counter()
-    raw_files: list[Path] = []
+    raw_files: list[tuple[Path, object]] = []
     entries_discovered = 0
     files_discovered = 0
     unsupported_files = 0
@@ -44,7 +46,10 @@ def find_photos(folder_path):
         if not is_supported_media_path(file):
             unsupported_files += 1
             continue
-        raw_files.append(file)
+        try:
+            raw_files.append((file, file.stat()))
+        except OSError:
+            unsupported_files += 1
     stats.record("folder_scan [BG]", (time.perf_counter() - t0) * 1000)
     stats.inc("filesystem_entries_discovered", entries_discovered)
     stats.inc("files_discovered", files_discovered)
@@ -55,20 +60,74 @@ def find_photos(folder_path):
         entries_discovered, files_discovered, len(raw_files), unsupported_files,
     )
 
-    # Phase 2: metadata extraction — opens each image file via PIL for EXIF.
+    sync_plan = None
+    if synchronization_service is not None:
+        observations = []
+        root = folder.resolve(strict=False)
+        for file, stat in raw_files:
+            relative = str(file.resolve(strict=False).relative_to(root))
+            observations.append(FileObservation(
+                file.resolve(strict=False), relative, normalise_relative_path(relative),
+                file.name, int(stat.st_size), int(stat.st_mtime_ns)))
+        sync_plan = synchronization_service.plan_changes(observations)
+        sync_items_by_path = {
+            item.observation.path: item for item in sync_plan.items
+        }
+    else:
+        sync_items_by_path = {}
+
+    # Phase 2: expensive extraction/classification runs only for new or updated
+    # files. Unchanged and relocated files reuse sidecar/domain metadata.
     photos: list[Photo] = []
+    expensive_photos: list[Photo] = []
     t1 = time.perf_counter()
-    for file in raw_files:
-        photo = Photo.from_path(file)
-        photo.metadata = extract_basic_metadata(file)
-        photo.sync_intelligence_from_metadata()
+    for file, stat in raw_files:
+        photo = Photo.from_path(file, stat_result=stat)
+        sync_item = sync_items_by_path.get(file.resolve(strict=False))
+        photo.sync_state = sync_item.state if sync_item else "added"
+        photo.id = sync_item.photo_id if sync_item else None
+        if sync_item and sync_item.previous_location and sync_item.state in {"moved", "renamed"}:
+            photo.previous_path = Path(sync_item.previous_location.source_path)
+        needs_classification_snapshot = bool(sync_item and sync_item.classification is None)
+        if photo.sync_state in {"added", "updated"} or needs_classification_snapshot:
+            photo.metadata = extract_basic_metadata(file)
+            photo.sync_intelligence_from_metadata()
+            expensive_photos.append(photo)
+        elif sync_item and sync_item.captured_at:
+            # Rehydrate the durable capture date without reopening the image.
+            # Memory Review groups by this domain date after restart as well as
+            # during a same-session incremental import.
+            photo.metadata = {"date_taken": sync_item.captured_at}
+            photo.sync_intelligence_from_metadata()
+        if sync_item and sync_item.classification:
+            (photo.automatic_media_category, photo.effective_media_category,
+             photo.relevance_category, relevant, photo.classification_confidence,
+             photo.classification_reason) = sync_item.classification
+            photo.is_album_relevant_candidate = bool(relevant)
+            photo.media_category = photo.effective_media_category or photo.media_category
+            photo.metadata.update({
+                "automatic_media_category": photo.automatic_media_category,
+                "effective_media_category": photo.effective_media_category,
+                "media_category": photo.media_category,
+                "relevance_category": photo.relevance_category,
+                "is_album_relevant_candidate": photo.is_album_relevant_candidate,
+                "classification_confidence": photo.classification_confidence,
+                "classification_reason": photo.classification_reason,
+            })
+            photo.sync_intelligence_from_metadata()
         photos.append(photo)
     stats.record("metadata_extraction [BG]", (time.perf_counter() - t1) * 1000)
 
-    _media_classifier.classify_photos(photos)
+    _media_classifier.classify_photos(expensive_photos)
 
     for photo in photos:
+        if photo.previous_path:
+            loaded = _user_metadata_service.apply_for_photo(
+                photo, sidecar_source_path=photo.previous_path, trusted_relocation=True)
+            if loaded.loaded:
+                continue
         _user_metadata_service.apply_for_photo(photo)
 
     stats.inc("files_scanned", len(photos))
+    stats.inc("photos_expensively_processed", len(expensive_photos))
     return photos

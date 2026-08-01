@@ -44,7 +44,7 @@ from workers.embedding_worker import EmbeddingWorker
 from vision.batch_embedding_service import embedding_failure_diagnostic_lines
 from vision.batch_embedding_service import BatchEmbeddingService
 from vision.managed_mobileclip_provider import ManagedMobileCLIPEmbeddingProvider
-from workers.scan_worker import ScanWorker
+from workers.scan_worker import ScanCompletion, ScanWorker
 from workers.thumbnail_worker import ThumbnailWorker
 
 logger = logging.getLogger(__name__)
@@ -163,6 +163,7 @@ class MainWindow(QMainWindow):
             self._mobileclip_selected_photos,
         )
         self.settings_page.mobileclip_evaluation_requested.connect(self._handle_mobileclip_evaluation_requested)
+        self.settings_page.runtime_operation_finished.connect(self._on_runtime_operation_finished)
 
         browser_page = QWidget()
         browser_layout = QVBoxLayout(browser_page)
@@ -368,8 +369,8 @@ class MainWindow(QMainWindow):
         self._import_generation += 1
         self._import_phase = "Preparing"
         logger.info("Import lifecycle generation=%s phase=Scanning", self._import_generation)
-        self._set_embedding_status("Preparing import: scanning folder…")
-        self.status_label.setText("Scanning folder…")
+        self._set_embedding_status("Scanning changes…")
+        self.status_label.setText("Scanning changes…")
         self._start_scan(folder_path)
 
     def _start_scan(self, folder_path: str) -> None:
@@ -385,7 +386,7 @@ class MainWindow(QMainWindow):
 
         thread = QThread()
         thread._family_memory_run_id = run_id
-        worker = ScanWorker(folder_path)
+        worker = ScanWorker(folder_path, self.application_services, run_id)
         self.scan_thread = thread
         self.scan_worker = worker
         worker.moveToThread(thread)
@@ -416,6 +417,12 @@ class MainWindow(QMainWindow):
             return bool(thread.isRunning())
         except RuntimeError:
             if self.scan_thread is thread:
+                # A deleted Qt wrapper is still evidence that its run identity
+                # was issued.  Preserve that high-water mark before clearing
+                # the active references so the next worker cannot reuse it.
+                self._scan_run_id = max(
+                    self._scan_run_id, self._active_scan_run_id
+                )
                 self.scan_thread = None
                 self.scan_worker = None
                 self._active_scan_run_id = 0
@@ -431,11 +438,16 @@ class MainWindow(QMainWindow):
             folder = self._pending_import_folder_path
             self._begin_import_scan(folder)
 
-    def _on_scan_complete(self, photos: list) -> None:
+    def _on_scan_complete(self, completion) -> None:
+        photos = self._apply_scan_completion(completion)
+        if photos is None:
+            return
+
         # A newer folder request owns the next transition.  Let this scan's
         # thread-finished cleanup start it; do not create workers for stale data.
         if self._pending_import_folder_path is not None:
             return
+        photos = self._reconcile_incremental_photos(photos)
         stats = get_session_stats()
         n = len(photos or [])
 
@@ -453,13 +465,20 @@ class MainWindow(QMainWindow):
             f"Scan complete — showing {n} photos. Loading thumbnails…"
         )
 
-        self._current_import_photos = list(photos or [])
+        self._current_import_photos = [
+            photo for photo in (photos or [])
+            if getattr(photo, "sync_state", "added") in {"added", "updated"}
+        ]
         self._import_phase = "Thumbnail generation"
         logger.info(
             "Import lifecycle generation=%s phase=ScanCompleted submitted=%s next=ThumbnailGeneration",
             self._import_generation, len(self._current_import_photos),
         )
-        self._set_embedding_status("Preparing import: generating thumbnails…")
+        added = sum(getattr(photo, "sync_state", "added") == "added" for photo in photos or [])
+        renamed = sum(getattr(photo, "sync_state", "added") == "renamed" for photo in photos or [])
+        self._set_embedding_status(
+            f"Reusing existing metadata… Found {added} new photos and {renamed} renamed photos."
+        )
         self.start_thumbnail_loading(photos)
 
         # ── Phase 2 & 3 (deferred) ────────────────────────────────────────────
@@ -468,15 +487,72 @@ class MainWindow(QMainWindow):
         # remains responsive throughout.
         QTimer.singleShot(0, self._deferred_setup_cleanup_review)
 
+    def _apply_scan_completion(self, completion):
+        """Publish a matching worker result on the UI thread exactly once."""
+        if isinstance(completion, ScanCompletion):
+            # Compare with the latest issued run rather than only the active
+            # QThread reference: Qt may deliver thread.finished before the
+            # queued completion payload. A genuinely newer run increments
+            # _scan_run_id and still rejects the stale payload deterministically.
+            if (completion.run_id != self._scan_run_id
+                    or self._pending_import_folder_path is not None):
+                if completion.library is not None:
+                    self.application_services.discard_prepared_library(completion.library)
+                return None
+            if completion.library is not None:
+                self.application_services.publish_active_library(completion.library)
+                self.settings_page.refresh_developer_diagnostics()
+            self._last_import_result = completion.import_result
+            return completion.photos
+        # Direct domain-list calls remain supported by load/lifecycle tests.
+        return completion
+
+    def _reconcile_incremental_photos(self, photos: list) -> list:
+        """Reuse rich domain objects for unchanged files in the active session."""
+        previous_by_id = {
+            getattr(photo, "id", None): photo for photo in getattr(self, "_all_photos", [])
+            if getattr(photo, "id", None)
+        }
+        reconciled = []
+        for incoming in photos or []:
+            state = getattr(incoming, "sync_state", "added")
+            existing = previous_by_id.get(getattr(incoming, "id", None))
+            if existing is None or state in {"added", "updated"}:
+                reconciled.append(incoming)
+                continue
+            for attribute in (
+                "path", "filename", "extension", "file_size", "created_at",
+                "modified_at", "modified_time_ns", "sync_state", "previous_path",
+            ):
+                setattr(existing, attribute, getattr(incoming, attribute))
+            reconciled.append(existing)
+        return reconciled
+
     def _start_embedding_indexing(self, photos: list) -> None:
         """Launch import/index embedding generation without blocking the UI."""
         requested_photos = list(photos or [])
+        settings_page = getattr(self, "settings_page", None)
+        if requested_photos and getattr(settings_page, "_active_runtime_thread", None) is not None:
+            # Incremental scans can finish before startup verification. Keep the
+            # same shared-manager lifecycle as before and resume only after the
+            # authoritative runtime operation reaches a terminal state.
+            self._pending_embedding_photos = requested_photos
+            self._set_embedding_status("Waiting for MobileCLIP verification to finish…")
+            return
         if self._embedding_thread_is_running():
             self._pending_embedding_photos = requested_photos
             self._request_embedding_worker_cancel()
             return
 
         self._launch_embedding_worker(requested_photos)
+
+    @Slot(str)
+    def _on_runtime_operation_finished(self, _operation: str) -> None:
+        pending = self._pending_embedding_photos
+        if pending is None or self._embedding_thread_is_running():
+            return
+        self._pending_embedding_photos = None
+        self._launch_embedding_worker(pending)
 
     def _embedding_thread_is_running(self) -> bool:
         """Return thread state while discarding a deleted Qt wrapper safely."""
@@ -929,7 +1005,9 @@ class MainWindow(QMainWindow):
 
         self.status_label.setText(
             (
-                f"Found {len(review_input)} review photos (imported={imported_count}, relevant={relevant_count}). "
+                f"Found {len(review_input)} review input photos "
+                f"(imported={imported_count}, relevant={relevant_count}, "
+                f"fallback_to_imported={fallback_to_imported}). "
                 f"Review loaded with "
                 f"{scoring_result.scored_count} scored selected candidates for year {chosen_year}; "
                 f"selected={len(album.selected_photos)}, rejected={len(album.rejected_photos)}."

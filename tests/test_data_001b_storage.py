@@ -28,7 +28,10 @@ def test_complete_schema_indexes_and_history(opened):
         row=c.execute('select library_id,schema_version from libraries').fetchone()
     assert REQUIRED_TABLES <= tables
     assert {'uq_photo_categories_current','uq_reviews_current','idx_photo_locations_fingerprint'} <= indexes
-    assert history == [(1,'data_001a_foundation',64),(2,'data_001b_full_schema',64)]
+    assert history == [(1,'data_001a_foundation',64),(2,'data_001b_full_schema',64),
+                       (3,'data_001c_import_registration',64),
+                       (4,'data_001d_incremental_photo_sync',64),
+                       (5,'data_001d_classification_snapshot',64)]
     assert row == (record.library_id,SCHEMA_VERSION)
 
 def add_photo(c, library_id, photo_id='photo'):
@@ -67,7 +70,7 @@ def test_backup_validate_restore(opened,tmp_path):
     with store.work_unit() as c:
         add_photo(c,record.library_id)
     backup=tmp_path/'backup'/'family.db'
-    result=store.backup(backup); assert result.schema_version == 2
+    result=store.backup(backup); assert result.schema_version == SCHEMA_VERSION
     assert store.validate_backup(backup).integrity == 'ok'
     with pytest.raises(BackupDestinationConflictError): store.backup(backup)
     with store.work_unit() as c: c.execute("delete from photos")
@@ -78,6 +81,6 @@ def test_backup_validate_restore(opened,tmp_path):
 
 def test_health_report_shape(opened):
     report=opened[0].health_check()
-    assert report['healthy'] and report['schema_version']==report['expected_schema_version']==2
+    assert report['healthy'] and report['schema_version']==report['expected_schema_version']==SCHEMA_VERSION
     assert report['integrity_check']=='ok' and report['foreign_key_check']=='ok'
     assert report['missing_required_tables']==[] and report['migration_history_consistent']

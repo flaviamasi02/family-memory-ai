@@ -264,6 +264,29 @@ class EmbeddingStore:
                 cur = con.execute("UPDATE embeddings SET status='invalidated', updated_at=? WHERE photo_key=? AND model_key=?", (now_iso(), key, metadata.model_key))
             return int(cur.rowcount)
 
+    def preserve_for_relocation(self, old_path: Path, new_path: Path) -> int:
+        """Re-key valid cached vectors after content-confirmed relocation."""
+        old_key = str(Path(old_path).resolve(strict=False))
+        try:
+            new_key, mtime_ns, size, fingerprint = source_identity(Path(new_path))
+        except OSError:
+            return 0
+        with self._lock, closing(sqlite3.connect(self.db_path)) as con, con:
+            rows = con.execute(
+                "SELECT provider_id,checkpoint_id,model_revision,model_key,embedding_dimension,"
+                "embedding_blob,embedding_json,generated_at,status,error,schema_version "
+                "FROM embeddings WHERE photo_key=? AND status='ok'", (old_key,)).fetchall()
+            for row in rows:
+                con.execute(
+                    "REPLACE INTO embeddings(photo_key,source_fingerprint,source_mtime_ns,source_size,"
+                    "provider_id,checkpoint_id,model_revision,model_key,embedding_dimension,embedding_blob,"
+                    "embedding_json,generated_at,updated_at,status,error,schema_version) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (new_key, fingerprint, mtime_ns, size, *row[:8], now_iso(), *row[8:]))
+            if rows:
+                con.execute("DELETE FROM embeddings WHERE photo_key=?", (old_key,))
+            return len(rows)
+
     def invalidate_model_embeddings(self, model_key: str) -> int:
         with self._lock, closing(sqlite3.connect(self.db_path)) as con, con:
             cur = con.execute("UPDATE embeddings SET status='invalidated', updated_at=? WHERE model_key=?", (now_iso(), model_key))

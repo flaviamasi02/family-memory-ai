@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### DATA-001D — Incremental photo synchronization
+
+- Added single-traversal change planning for unchanged, added, removed, moved, renamed, and updated photos with stable PhotoID and retained location history.
+- Unchanged imports now bypass image metadata/classification, thumbnail regeneration, semantic embedding submission, fingerprint reads after initial capture, and unnecessary location updates. Content-confirmed relocations preserve database metadata and re-key existing thumbnail/semantic caches without inference.
+- Added schema-version-4 synchronization counters, missing-photo lifecycle, bounded Developer Diagnostics summaries, lightweight status text, and automated synchronization/restart/performance/duplicate-preservation coverage. DATA-001E–H remain planned.
+- Added schema-version-5 classifier snapshots so unchanged and restart imports repopulate Cleanup Review without image reclassification; category/review history migration remains future scope.
+
+### DATA-001C — Photo repository and import registration
+
+- Added automatic idempotent library registration to the existing background folder import, with stable persisted PhotoIDs and indexed `photo_locations`; original folders remain untouched.
+- Added `PhotoRepository` CRUD and PhotoID, relative-path, fingerprint/hash, and library-list lookups through `MetadataStore`.
+- Added durable import-run lifecycle, counters, elapsed time, per-file outcomes, batch transactions, rollback handling, restart/reimport stability, and regression coverage proving the scanner is invoked only once. Existing JSON/sidecars and all review, album, MobileCLIP, and semantic workflows remain unchanged; DATA-001D–H remain planned.
+
 ### DEV-007 — Developer Diagnostics UI
 
 - Corrected the pre-existing mixed-folder scanner boundary: one shared supported-media extension contract now rejects databases, WAL/SHM files, sidecars, JSON, project/configuration, hidden non-media, and extensionless files before metadata, model, review, album, semantic, or thumbnail work. Added deterministic discovered/supported/skipped/job-count coverage; DATA-001B services remain isolated from normal import.

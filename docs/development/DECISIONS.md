@@ -795,3 +795,13 @@ Schema version 2 is the complete DATA-001 foundation: all domain tables share th
 ### DEV-007 developer validation surface — 2026-08-01
 
 DATA-001B manual validation is available through a collapsed Settings section using the existing application-composed storage services. It is read-only by default and exposes only explicit registration/open, health/schema inspection, online backup/validation, safe managed-folder opening, and a minimized clipboard report. There is no restore/delete/SQL console, scanning, import integration, or legacy migration. The CLI remains supported, while DATA-001C remains next.
+
+### DATA-001C implementation record — 2026-08-01
+
+Normal folder import now idempotently registers or reopens its library and records one durable import run. Stable UUIDv4 PhotoIDs, current file observations, and per-run outcomes are written through `PhotoRepository` and `MetadataStore` in a constant number of transactions using the scanner's existing result list; no second scan or eager hashing is introduced. Relative-path matches preserve identity across repeated imports and changed observations, while fingerprint/hash lookup and location history establish the conservative foundation for later rename/move policy. Schema version 3 records measured elapsed time. Existing JSON/sidecar, MobileCLIP, review, album, and embedding behavior remains unchanged; DATA-001D–H remain planned and Product Owner validation is required.
+
+### DATA-001D implementation record — 2026-08-01
+
+Incremental imports use the existing scanner traversal and a repository-backed change plan; no second walk is permitted. Relative path, size, and nanosecond mtime are the unchanged fast path. A path-independent SHA-256 fingerprint over size plus the first MiB is stored once and used only for conservative unique relocation matching. Unchanged files bypass image metadata extraction, classification, thumbnail generation, semantic embedding submission, and location updates. Moves/renames retain PhotoID and historical locations and re-key existing disposable caches without inference. Schema version 4 records explicit synchronization counters, missing files are soft state, and diagnostics expose bounded aggregates. DATA-001E–H remain planned.
+
+The unchanged fast path must still reconstruct the existing UI domain projections. Schema version 5 stores only the current classifier snapshot needed by Photo Browser and Cleanup Review (automatic/effective and relevance categories, album eligibility, confidence, and reason). This is not the future category/review history migration: it prevents a skipped classifier from erasing cleanup datasource state on restart while keeping classification work change-only.
