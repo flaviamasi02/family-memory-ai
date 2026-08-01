@@ -59,18 +59,20 @@ def test_import_performance_title_has_valid_point_size(page):
 def test_import_efficiency_no_session_is_clear_and_explained(page):
     widget, _, _, _ = page
     report = widget.import_performance_report.toPlainText()
-    assert "Import Efficiency" in report
-    assert "Status: No completed import available" in report
+    assert widget.import_efficiency_title.text().endswith("Import Efficiency")
+    assert "No completed import" in widget.import_efficiency_status_banner.text()
+    assert "No technical details" in report
+    assert not widget.import_performance_report.isVisible()
     tooltip = widget.import_performance_report.toolTip()
     for label in (
-        "Photos reused", "Thumbnails reused", "Embeddings reused",
+        "Already known photos", "New photos", "Thumbnails reused", "Embeddings reused",
         "File checks avoided", "Path processing avoided", "Database queries avoided",
     ):
         assert f"{label}:" in tooltip
 
 
 def test_import_efficiency_uses_friendly_labels_and_keeps_timing_detail(page):
-    widget, _, _, _ = page
+    widget, _, app, _ = page
     from core.perf_stats import begin_import_performance_session, finish_import_performance_session
     session = begin_import_performance_session("/test")
     for key, value in {
@@ -83,18 +85,49 @@ def test_import_efficiency_uses_friendly_labels_and_keeps_timing_detail(page):
     finish_import_performance_session()
     widget.refresh_developer_diagnostics()
     report = widget.import_performance_report.toPlainText()
-    assert "Status: Efficient reuse detected" in report
+    assert "Good reuse" in widget.import_efficiency_status_banner.text()
+    assert widget.import_efficiency_values["Photos processed"].text() == "10"
+    assert widget.import_efficiency_values["Already known photos"].text() == "9"
+    assert widget.import_efficiency_values["New photos"].text() == "1"
+    assert widget.import_efficiency_values["Embeddings reused"].text() == "10"
+    assert "seconds" in widget.import_performance_summary.text()
     for text in (
-        "Photos processed: 10", "Photos reused: 9", "Thumbnails reused: 10",
+        "Photos processed: 10", "Already known photos: 9", "Thumbnails reused: 10",
         "Embeddings reused: 10", "File checks avoided: 10",
         "Path processing avoided: 20", "Database queries avoided: 4",
-        "Slowest stage:", "Total import time:", "Per-stage timings:",
+        "Per-stage timings:", "Developer counters:",
         "SQLite reads:",
     ):
         assert text in report
     assert "filesystem_stat_calls_avoided" not in report
     assert "path_resolutions_avoided" not in report
     assert "sqlite_queries_avoided" not in report
+    # QWidget.isVisible() includes ancestor visibility. Exercise the actual UI
+    # lifecycle rather than inspecting a child of the intentionally collapsed
+    # Developer Diagnostics panel.
+    assert not widget.technical_details_toggle.isChecked()
+    assert widget.import_performance_report.isHidden()
+    assert widget.technical_details_toggle.text() == "▸ Technical Details"
+    widget.show()
+    widget.developer_diagnostics_toggle.click()
+    app.processEvents()
+    widget.technical_details_toggle.click()
+    app.processEvents()
+    assert widget.import_performance_report.isVisible()
+    assert widget.technical_details_toggle.text() == "▾ Technical Details"
+    widget.technical_details_toggle.click()
+    app.processEvents()
+    assert widget.import_performance_report.isHidden()
+    assert widget.technical_details_toggle.text() == "▸ Technical Details"
+
+
+def test_import_efficiency_status_levels_are_deterministic(page):
+    widget, _, _, _ = page
+    assert widget._reuse_status(None) == ("No completed import", 0)
+    assert widget._reuse_status({"processed_photos": 10}) == ("Full processing required", 1)
+    assert widget._reuse_status({"processed_photos": 10, "reused_photos": 2}) == ("Partial reuse", 3)
+    assert widget._reuse_status({"processed_photos": 10, "reused_photos": 8}) == ("Good reuse", 4)
+    assert widget._reuse_status({"processed_photos": 10, "reused_photos": 10}) == ("Excellent reuse", 5)
 
 
 def test_refresh_register_reuse_health_schema_and_source_unchanged(page):

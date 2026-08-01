@@ -2,9 +2,9 @@
 
 ## Unreleased
 
-### Import Efficiency diagnostics clarification
+### UX-004 — Product Owner Performance Dashboard
 
-- Developer Diagnostics now explains import reuse in Product Owner language, shows a deterministic descriptive status, and retains full per-stage timings plus backward-compatible technical JSON export.
+- Developer Diagnostics now leads with a card-based Import Efficiency dashboard, plain-English status, metric explanations, completion time, and slowest activity. Full stage/thread/per-item diagnostics remain available in collapsed Technical Details and JSON export remains backward compatible.
 - Added the cached-embedding aggregate to the existing PERF session so the UI can report embeddings reused without changing embedding scheduling, cache behavior, or import results.
 - Recorded PERF-002 — Cleanup Review bulk interaction performance as planned follow-up work only. No baseline comparison exists, so this does not attribute the observation to PR #50.
 

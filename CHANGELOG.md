@@ -2,9 +2,10 @@
 
 ## Unreleased
 
-### Import Efficiency diagnostics clarification
+### UX-004 — Product Owner Performance Dashboard
 
-- Added a plain-English Import Efficiency summary with deterministic reuse status, processed/reused photo counts, thumbnail and embedding reuse, avoided-work explanations, slowest stage, and total import time while retaining the complete technical timing table and unchanged JSON metric keys.
+- Added a compact, plain-English Import Efficiency dashboard with readable reuse cards, metric help, outcome levels, completion time, and slowest activity.
+- Moved all stage timings, thread names, per-item values, and developer counters into collapsed Technical Details while retaining the unchanged JSON metric keys and measurements.
 - Recorded PERF-002 as a planned investigation into Cleanup Review multi-selection and bulk-category responsiveness; no optimization or regression attribution is included in this change.
 
 ### FIX — Invalid Qt font size warning
