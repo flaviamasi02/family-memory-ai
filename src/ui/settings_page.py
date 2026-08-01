@@ -42,7 +42,6 @@ from workers.ai_runtime_worker import AIRuntimeOperationWorker
 from core.application_services import ApplicationServices, build_application_services
 from core.perf_stats import (
     export_performance_report,
-    import_efficiency_status,
     performance_history,
 )
 from storage.errors import StorageError
@@ -316,7 +315,54 @@ class SettingsPage(QWidget):
         self.diagnostics_report.setMaximumHeight(160)
         panel.addWidget(self.diagnostics_report)
 
-        self.import_performance_title = QLabel("Import Performance")
+        self.import_efficiency_title = QLabel("⚡ Import Efficiency")
+        efficiency_font = QFont(self.import_efficiency_title.font())
+        efficiency_font.setPointSizeF(max(14, efficiency_font.pointSizeF() + 3))
+        efficiency_font.setWeight(QFont.Weight.Bold)
+        self.import_efficiency_title.setFont(efficiency_font)
+        panel.addWidget(self.import_efficiency_title)
+
+        self.import_efficiency_status_banner = QLabel("— No completed import")
+        self.import_efficiency_status_banner.setObjectName("importEfficiencyStatus")
+        self.import_efficiency_status_banner.setStyleSheet(
+            "#importEfficiencyStatus { background: #eef1f4; border-radius: 7px; "
+            "padding: 9px; font-size: 14px; font-weight: 700; }"
+        )
+        panel.addWidget(self.import_efficiency_status_banner)
+
+        self.import_efficiency_completion = QLabel("Complete an import to see how much work was reused.")
+        self.import_efficiency_completion.setWordWrap(True)
+        panel.addWidget(self.import_efficiency_completion)
+
+        self.import_efficiency_values: dict[str, QLabel] = {}
+        efficiency_grid = QGridLayout()
+        efficiency_cards = (
+            ("Photos processed", "📁", "Photos included in the completed import."),
+            ("Already known photos", "✓", "Photos already stored in the library."),
+            ("New photos", "+", "Photos that were not already known to the library."),
+            ("Embeddings reused", "✨", "The previous AI analysis was reused."),
+            ("Thumbnails reused", "✓", "Existing thumbnails were reused."),
+            ("Database work avoided", "🗃", "Database queries avoided by reusing information already available."),
+        )
+        for index, (label, icon, help_text) in enumerate(efficiency_cards):
+            card = QFrame(); card.setFrameShape(QFrame.Shape.StyledPanel)
+            card.setStyleSheet("QFrame { background: white; border: 1px solid #dfe4e8; border-radius: 6px; padding: 5px; }")
+            card.setToolTip(help_text)
+            card_layout = QVBoxLayout(card)
+            heading = QLabel(f"{icon}  {label}"); heading.setStyleSheet("font-weight: 600; border: none;")
+            heading.setToolTip(help_text)
+            value = QLabel("0"); value.setStyleSheet("font-size: 24px; font-weight: 700; color: #243447; border: none;")
+            value.setToolTip(help_text)
+            card_layout.addWidget(heading); card_layout.addWidget(value)
+            self.import_efficiency_values[label] = value
+            efficiency_grid.addWidget(card, index // 3, index % 3)
+        panel.addLayout(efficiency_grid)
+
+        self.import_efficiency_result = QLabel("☆☆☆☆☆  No completed import")
+        self.import_efficiency_result.setStyleSheet("font-size: 16px; font-weight: 700; color: #39734d;")
+        panel.addWidget(self.import_efficiency_result)
+
+        self.import_performance_title = QLabel("⚡ Import Performance")
         # A pixel-sized QSS font has pointSizeF() == -1. Qt's stylesheet/font
         # resolution later copies that font through setPointSize(), producing
         # ``QFont::setPointSize: Point size <= 0 (-1)`` when this diagnostics
@@ -332,18 +378,36 @@ class SettingsPage(QWidget):
         self.performance_history_selector = QComboBox()
         self.performance_history_selector.currentIndexChanged.connect(self._show_performance_session)
         panel.addWidget(self.performance_history_selector)
+        self.import_performance_summary = QLabel("Import completed in\n—\n\nSlowest activity\n—")
+        self.import_performance_summary.setWordWrap(True)
+        self.import_performance_summary.setStyleSheet("font-size: 15px; padding: 6px;")
+        panel.addWidget(self.import_performance_summary)
+        self.technical_details_toggle = QPushButton("▸ Technical Details")
+        self.technical_details_toggle.setCheckable(True)
+        self.technical_details_toggle.setChecked(False)
+        self.technical_details_toggle.setToolTip(
+            "Show all timings, stages, thread names, per-item measurements, and developer counters."
+        )
+        panel.addWidget(self.technical_details_toggle)
         self.import_performance_report = QTextEdit()
         self.import_performance_report.setReadOnly(True)
         self.import_performance_report.setMaximumHeight(240)
         self.import_performance_report.setToolTip(
-            "Photos reused: Photos already known to the library were reused instead of being fully processed again.\n"
+            "Photos processed: Photos included in this import.\n"
+            "Already known photos: Photos already stored in the library.\n"
+            "New photos: Photos not previously stored in the library.\n"
             "Thumbnails reused: Existing thumbnail files were reused.\n"
-            "Embeddings reused: Existing AI image analysis was reused instead of recalculated.\n"
-            "File checks avoided: The application reused file information already collected during the folder scan.\n"
-            "Path processing avoided: The application reused normalized file locations instead of processing the same paths again.\n"
-            "Database queries avoided: The application reused results or batch operations instead of performing additional database lookups."
+            "Embeddings reused: The previous AI analysis was reused.\n"
+            "File checks avoided: The application avoided checking the same files multiple times.\n"
+            "Path processing avoided: The application avoided processing the same paths multiple times.\n"
+            "Database queries avoided: The application reused information instead of reading it again.\n"
+            "Timing averages: Average elapsed milliseconds for each processed item.\n"
+            "Per-stage timings: Elapsed time, item count, per-item average, and thread for each activity.\n"
+            "Developer counters: Original internal measurements retained for diagnosis."
         )
         panel.addWidget(self.import_performance_report)
+        self.import_performance_report.setVisible(False)
+        self.technical_details_toggle.toggled.connect(self._toggle_performance_details)
         self.export_performance_button = QPushButton("Export Performance Report")
         self.export_performance_button.clicked.connect(self._export_performance_report)
         panel.addWidget(self.export_performance_button)
@@ -438,14 +502,36 @@ class SettingsPage(QWidget):
         session_id = self.performance_history_selector.currentData()
         return next((item for item in performance_history() if item.session_id == session_id), None)
 
+    def _toggle_performance_details(self, expanded: bool) -> None:
+        self.technical_details_toggle.setText(
+            "▾ Technical Details" if expanded else "▸ Technical Details")
+        self.import_performance_report.setVisible(expanded)
+
+    @staticmethod
+    def _reuse_status(counters: dict[str, int] | None) -> tuple[str, int]:
+        """Translate existing counters into a Product Owner-facing reuse result."""
+        if counters is None:
+            return "No completed import", 0
+        processed = max(0, int(counters.get("processed_photos", 0)))
+        reused = min(processed, max(0, int(counters.get("reused_photos", 0))))
+        if processed and reused == processed:
+            return "Excellent reuse", 5
+        if processed and reused * 4 >= processed * 3:
+            return "Good reuse", 4
+        if reused:
+            return "Partial reuse", 3
+        return "Full processing required", 1
+
     def _show_performance_session(self, _index: int = -1) -> None:
         session = self._selected_performance_session()
         if session is None:
-            self.import_performance_report.setPlainText(
-                "Import Efficiency\n"
-                f"Status: {import_efficiency_status(None)}\n\n"
-                "Complete an import to see reuse and detailed timing information."
-            )
+            self.import_efficiency_status_banner.setText("— No completed import")
+            self.import_efficiency_completion.setText("Complete an import to see how much work was reused.")
+            for value in self.import_efficiency_values.values():
+                value.setText("0")
+            self.import_efficiency_result.setText("☆☆☆☆☆  No completed import")
+            self.import_performance_summary.setText("Import completed in\n—\n\nSlowest activity\n—")
+            self.import_performance_report.setPlainText("No technical details are available until an import completes.")
             self.export_performance_button.setEnabled(False)
             return
         counters = session.counters
@@ -453,26 +539,49 @@ class SettingsPage(QWidget):
             values = [stage.average_ms_per_item for stage in session.stages
                       if stage.name == stage_name and stage.average_ms_per_item is not None]
             return sum(values) / len(values) if values else 0.0
+        processed = max(0, counters.get("processed_photos", 0))
+        reused = min(processed, max(0, counters.get("reused_photos", 0)))
+        status, stars = self._reuse_status(counters)
+        dashboard_values = {
+            "Photos processed": processed,
+            "Already known photos": reused,
+            "New photos": max(0, processed - reused),
+            "Embeddings reused": counters.get("embedding_cache_hits", 0),
+            "Thumbnails reused": counters.get("thumbnail_cache_hits", 0),
+            "Database work avoided": counters.get("sqlite_queries_avoided", 0),
+        }
+        for label, value in dashboard_values.items():
+            self.import_efficiency_values[label].setText(f"{value:,}")
+        self.import_efficiency_status_banner.setText(f"✓  {status}")
+        self.import_efficiency_completion.setText("Import completed successfully")
+        self.import_efficiency_result.setText(f"{'★' * stars}{'☆' * (5 - stars)}  {status}")
+        self.import_performance_summary.setText(
+            f"Import completed in\n<b>{session.total_ms / 1000:.2f} seconds</b>\n\n"
+            f"Slowest activity\n<b>{session.identify_bottleneck() or 'Not available'}</b>"
+        )
         lines = [
-            "Import Efficiency",
-            f"Status: {import_efficiency_status(counters)}",
-            f"Photos processed: {counters.get('processed_photos', 0)}",
-            f"Photos reused: {counters.get('reused_photos', 0)}",
-            "  Photos already known to the library were reused instead of being fully processed again.",
+            "All timings and developer counters",
+            f"Photos processed: {processed}",
+            f"Already known photos: {reused}",
+            f"New photos: {max(0, processed - reused)}",
             f"Thumbnails reused: {counters.get('thumbnail_cache_hits', 0)}",
-            "  Existing thumbnail files were reused.",
             f"Embeddings reused: {counters.get('embedding_cache_hits', 0)}",
-            "  Existing AI image analysis was reused instead of recalculated.",
             f"File checks avoided: {counters.get('filesystem_stat_calls_avoided', 0)}",
-            "  The application reused file information already collected during the folder scan.",
             f"Path processing avoided: {counters.get('path_resolutions_avoided', 0)}",
-            "  The application reused normalized file locations instead of processing the same paths again.",
             f"Database queries avoided: {counters.get('sqlite_queries_avoided', 0)}",
-            "  The application reused results or batch operations instead of performing additional database lookups.",
-            f"Slowest stage: {session.identify_bottleneck() or 'Not available'}",
-            f"Total import time: {session.total_ms:.1f} ms",
             "",
-            "Technical timing details",
+            "Developer counters:",
+        ]
+        friendly_counter_keys = {
+            "filesystem_stat_calls_avoided", "path_resolutions_avoided", "sqlite_queries_avoided"
+        }
+        lines.extend(
+            f"{key}: {value}" for key, value in sorted(counters.items())
+            if key not in friendly_counter_keys
+        )
+        lines.extend([
+            "",
+            "Timing averages",
             f"Photos newly embedded: {counters.get('embedded_photos', 0)}",
             f"Thumbnails generated: {counters.get('thumbnails_generated', 0)}",
             f"Average embedding time: {average('Embedding execution'):.2f} ms/item",
@@ -480,7 +589,7 @@ class SettingsPage(QWidget):
             f"Average DB write: {average('SQLite writes'):.2f} ms/item",
             f"Average DB read: {average('SQLite reads'):.2f} ms/item",
             "", "Per-stage timings:",
-        ]
+        ])
         lines.extend(
             f"{stage.name}: {stage.elapsed_ms:.1f} ms "
             f"({stage.elapsed_ms * 100 / session.total_ms if session.total_ms else 0:.1f}%) · "

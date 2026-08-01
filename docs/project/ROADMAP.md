@@ -5,6 +5,7 @@
 ### Completed
 
 - UX-001
+- UX-004 — Product Owner Performance Dashboard
 - MODEL-004A — Face Recognition Foundation
 - BUG-001 — MobileCLIP Verification Lifecycle (PR #41)
 - BUG-001B — MobileCLIP Recovery and Repeated Import Stability (PR #42)
@@ -37,8 +38,8 @@ The Product Owner measured approximately 190.643 seconds for a CPU-based first s
 
 The Product Owner observed that selecting multiple Cleanup Review images and
 assigning a category feels a little slow. PERF-002 will investigate
-multi-selection responsiveness, bulk category assignment, repeated
-sidecar/database writes, unnecessary full-grid rebuilds, repaint frequency,
+multi-selection and selection latency, bulk category assignment, repeated
+sidecar/database writes, grid refresh and unnecessary full-grid rebuilds, repaint frequency,
 preservation of scroll position and selection, and asynchronous or batched
 persistence where safe. PERF-002 is not implemented. Because no baseline
 comparison was performed, the observation is not attributed to PR #50.

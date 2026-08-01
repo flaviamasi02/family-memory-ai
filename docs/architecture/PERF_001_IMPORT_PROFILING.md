@@ -33,17 +33,17 @@ rerun here, so no MobileCLIP performance gain is claimed.
 
 ## Product Owner presentation
 
-Developer Diagnostics presents the same counters under an **Import Efficiency**
-summary using plain-English labels: Photos processed/reused, Thumbnails reused,
-Embeddings reused, File checks avoided, Path processing avoided, and Database
-queries avoided. Each reuse/avoided-work value includes an in-app explanation.
-The summary status is descriptive rather than a performance score: a completed
-import with a strict majority of photos reused and no newly generated thumbnails
-or embeddings reports **Efficient reuse detected**; any other import with reused
-photos reports **Some work reused**; a completed import without reuse reports
-**Full processing required**; and an empty history reports **No completed import
-available**.
+UX-004 makes Developer Diagnostics lead with an **Import Efficiency** card
+dashboard using plain-English labels: Photos processed, Already known photos,
+New photos, Thumbnails reused, Embeddings reused, and Database work avoided.
+Every card and technical metric has tooltip help. Existing avoided-work counters
+are presented as File checks avoided, Path processing avoided, and Database
+queries avoided without renaming their internal keys. Status is derived only
+from collected counters and reads **Excellent reuse**, **Good reuse**, **Partial
+reuse**, **Full processing required**, or **No completed import**.
 
-The per-stage table remains visible. JSON export continues to use the original
+Import Performance first shows completion time and the slowest activity. The
+complete per-stage table, thread attribution, ms/item values, and developer
+counters remain available in collapsed **Technical Details**. JSON export continues to use the original
 internal counter keys and retains exact timings, thread attribution, environment,
 and hardware information.
