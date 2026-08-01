@@ -39,6 +39,7 @@ class Photo:
     user_decision: str = "pending"
     classification_reason: str = ""
     classification_confidence: float = 0.0
+    modified_time_ns: int = 0
 
     def __post_init__(self) -> None:
         if self.intelligence is None:
@@ -70,6 +71,7 @@ class Photo:
             ai_tags=[],
             intelligence=PhotoIntelligence(),
             visual_features=VisualFeatureProfile(),
+            modified_time_ns=stat.st_mtime_ns,
         )
 
     def display_name(self) -> str:

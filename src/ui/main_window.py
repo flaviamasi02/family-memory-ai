@@ -385,7 +385,7 @@ class MainWindow(QMainWindow):
 
         thread = QThread()
         thread._family_memory_run_id = run_id
-        worker = ScanWorker(folder_path)
+        worker = ScanWorker(folder_path, self.application_services)
         self.scan_thread = thread
         self.scan_worker = worker
         worker.moveToThread(thread)

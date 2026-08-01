@@ -111,6 +111,16 @@ class MetadataStore:
         return self._configure(sqlite3.connect(self._require_path(), timeout=5.0))
 
     @contextlib.contextmanager
+    def read_connection(self) -> Iterator[sqlite3.Connection]:
+        """Yield a short-lived reader under the same lifecycle lock as writes."""
+        with self._operation_lock:
+            connection = self._connect()
+            try:
+                yield connection
+            finally:
+                connection.close()
+
+    @contextlib.contextmanager
     def work_unit(self) -> Iterator[sqlite3.Connection]:
         """Yield a fresh transaction-owned connection; never share it across threads."""
         with self._operation_lock:

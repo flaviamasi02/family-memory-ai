@@ -209,7 +209,14 @@ CREATE INDEX idx_metadata_migration_status ON metadata_migration_history(library
 """
 
 V2_STATEMENTS = tuple(part.strip() for part in V2_SQL.split(";") if part.strip())
-MIGRATIONS = (Migration(1, "data_001a_foundation", V1_STATEMENTS), Migration(2, "data_001b_full_schema", V2_STATEMENTS))
+V3_STATEMENTS = (
+    "ALTER TABLE import_runs ADD COLUMN elapsed_time_ms REAL CHECK(elapsed_time_ms IS NULL OR elapsed_time_ms>=0)",
+)
+MIGRATIONS = (
+    Migration(1, "data_001a_foundation", V1_STATEMENTS),
+    Migration(2, "data_001b_full_schema", V2_STATEMENTS),
+    Migration(3, "data_001c_import_registration", V3_STATEMENTS),
+)
 SCHEMA_VERSION = MIGRATIONS[-1].version
 
 REQUIRED_TABLES = frozenset({

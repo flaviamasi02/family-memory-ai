@@ -1,0 +1,226 @@
+"""Repository boundary for stable photos and their observed file locations."""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+from uuid import uuid4
+
+from storage.metadata_store import MetadataStore
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def normalise_relative_path(value: str | Path) -> str:
+    """Return a portable, case-aware key for a path relative to a library."""
+    key = os.path.normpath(str(value)).replace("\\", "/")
+    return key.casefold() if os.name == "nt" else key
+
+
+@dataclass(frozen=True)
+class PhotoRecord:
+    photo_id: str
+    library_id: str
+    media_type: str
+    width: int | None
+    height: int | None
+    captured_at: str | None
+    content_hash: str | None
+    hash_algorithm: str | None
+    hash_version: int | None
+    status: str
+    metadata_revision: int
+
+
+@dataclass(frozen=True)
+class PhotoLocationRecord:
+    location_id: str
+    photo_id: str
+    library_id: str
+    source_path: str
+    root_relative_path: str
+    normalised_path_key: str
+    filename: str
+    file_size: int
+    modified_time_ns: int
+    partial_fingerprint: str | None
+    fingerprint_algorithm: str | None
+    fingerprint_version: int | None
+    availability: str
+
+
+class PhotoRepository:
+    """CRUD/query operations using MetadataStore-owned work units.
+
+    A caller performing a bulk import can pass its transaction connection to
+    every method, avoiding one transaction and connection per photo.
+    """
+
+    def __init__(self, store: MetadataStore):
+        self.store = store
+
+    @staticmethod
+    def _photo(row: Any | None) -> PhotoRecord | None:
+        return PhotoRecord(*row) if row else None
+
+    @staticmethod
+    def _location(row: Any | None) -> PhotoLocationRecord | None:
+        return PhotoLocationRecord(*row) if row else None
+
+    @staticmethod
+    def _photo_columns() -> str:
+        return ("photo_id,library_id,media_type,width,height,captured_at,content_hash,"
+                "hash_algorithm,hash_version,status,metadata_revision")
+
+    @staticmethod
+    def _location_columns() -> str:
+        return ("location_id,photo_id,library_id,source_path,root_relative_path,"
+                "normalised_path_key,filename,file_size,modified_time_ns,partial_fingerprint,"
+                "fingerprint_algorithm,fingerprint_version,availability")
+
+    def create_photo(self, *, media_type: str = "image", width: int | None = None,
+                     height: int | None = None, captured_at: str | None = None,
+                     content_hash: str | None = None, hash_algorithm: str | None = None,
+                     hash_version: int | None = None, connection=None) -> PhotoRecord:
+        if connection is None:
+            with self.store.work_unit() as transaction:
+                return self.create_photo(media_type=media_type, width=width, height=height,
+                    captured_at=captured_at, content_hash=content_hash,
+                    hash_algorithm=hash_algorithm, hash_version=hash_version,
+                    connection=transaction)
+        photo_id = str(uuid4())
+        connection.execute(
+            "INSERT INTO photos(photo_id,library_id,media_type,width,height,captured_at,"
+            "content_hash,hash_algorithm,hash_version) VALUES (?,?,?,?,?,?,?,?,?)",
+            (photo_id, self.store.library_id, media_type, width, height, captured_at,
+             content_hash, hash_algorithm, hash_version),
+        )
+        return self.get_by_id(photo_id, connection=connection)
+
+    def update_photo(self, photo_id: str, *, connection=None, **changes) -> PhotoRecord:
+        allowed = {"media_type", "width", "height", "captured_at", "camera_make",
+                   "camera_model", "content_hash", "hash_algorithm", "hash_version", "status"}
+        invalid = set(changes) - allowed
+        if invalid:
+            raise ValueError(f"Unsupported photo fields: {', '.join(sorted(invalid))}")
+        if not changes:
+            record = self.get_by_id(photo_id, connection=connection)
+            if record is None:
+                raise KeyError(photo_id)
+            return record
+        if connection is None:
+            with self.store.work_unit() as transaction:
+                return self.update_photo(photo_id, connection=transaction, **changes)
+        assignments = ",".join(f"{name}=?" for name in changes)
+        cursor = connection.execute(
+            f"UPDATE photos SET {assignments},metadata_revision=metadata_revision+1,updated_at=? "
+            "WHERE photo_id=? AND library_id=?",
+            (*changes.values(), utc_now(), photo_id, self.store.library_id),
+        )
+        if not cursor.rowcount:
+            raise KeyError(photo_id)
+        return self.get_by_id(photo_id, connection=connection)
+
+    def get_by_id(self, photo_id: str, *, connection=None) -> PhotoRecord | None:
+        if connection is None:
+            with self.store.read_connection() as reader:
+                return self.get_by_id(photo_id, connection=reader)
+        row = connection.execute(
+            f"SELECT {self._photo_columns()} FROM photos WHERE photo_id=? AND library_id=?",
+            (photo_id, self.store.library_id),
+        ).fetchone()
+        return self._photo(row)
+
+    def get_by_relative_path(self, relative_path: str | Path, *, connection=None) -> PhotoRecord | None:
+        key = normalise_relative_path(relative_path)
+        if connection is None:
+            with self.store.read_connection() as reader:
+                return self.get_by_relative_path(key, connection=reader)
+        row = connection.execute(
+            f"SELECT {','.join('p.' + c for c in self._photo_columns().split(','))} "
+            "FROM photos p JOIN photo_locations l ON l.photo_id=p.photo_id "
+            "WHERE l.library_id=? AND l.normalised_path_key=? AND l.availability!='deleted'",
+            (self.store.library_id, key),
+        ).fetchone()
+        return self._photo(row)
+
+    def get_by_fingerprint(self, fingerprint: str, *, file_size: int | None = None,
+                           connection=None) -> list[PhotoRecord]:
+        if connection is None:
+            with self.store.read_connection() as reader:
+                return self.get_by_fingerprint(fingerprint, file_size=file_size, connection=reader)
+        size_sql, parameters = (" AND l.file_size=?", [self.store.library_id, fingerprint, file_size]) \
+            if file_size is not None else ("", [self.store.library_id, fingerprint])
+        rows = connection.execute(
+            f"SELECT DISTINCT {','.join('p.' + c for c in self._photo_columns().split(','))} "
+            "FROM photos p JOIN photo_locations l ON l.photo_id=p.photo_id "
+            "WHERE l.library_id=? AND (l.partial_fingerprint=? OR p.content_hash=?)" + size_sql,
+            ([parameters[0], fingerprint, fingerprint] + parameters[2:]),
+        ).fetchall()
+        return [self._photo(row) for row in rows]
+
+    def list_library_photos(self, *, connection=None) -> list[PhotoRecord]:
+        if connection is None:
+            with self.store.read_connection() as reader:
+                return self.list_library_photos(connection=reader)
+        rows = connection.execute(
+            f"SELECT {self._photo_columns()} FROM photos WHERE library_id=? ORDER BY created_at,photo_id",
+            (self.store.library_id,),
+        ).fetchall()
+        return [self._photo(row) for row in rows]
+
+    def get_location(self, relative_path: str | Path, *, connection=None) -> PhotoLocationRecord | None:
+        key = normalise_relative_path(relative_path)
+        if connection is None:
+            with self.store.read_connection() as reader:
+                return self.get_location(key, connection=reader)
+        return self._location(connection.execute(
+            f"SELECT {self._location_columns()} FROM photo_locations "
+            "WHERE library_id=? AND normalised_path_key=?",
+            (self.store.library_id, key),
+        ).fetchone())
+
+    def create_location(self, photo_id: str, *, source_path: str, relative_path: str,
+                        filename: str, file_size: int, modified_time_ns: int,
+                        import_run_id: str, partial_fingerprint: str | None = None,
+                        fingerprint_algorithm: str | None = None,
+                        fingerprint_version: int | None = None, connection=None) -> PhotoLocationRecord:
+        if connection is None:
+            with self.store.work_unit() as transaction:
+                return self.create_location(photo_id, source_path=source_path,
+                    relative_path=relative_path, filename=filename, file_size=file_size,
+                    modified_time_ns=modified_time_ns, import_run_id=import_run_id,
+                    partial_fingerprint=partial_fingerprint,
+                    fingerprint_algorithm=fingerprint_algorithm,
+                    fingerprint_version=fingerprint_version, connection=transaction)
+        location_id, now = str(uuid4()), utc_now()
+        key = normalise_relative_path(relative_path)
+        connection.execute(
+            "INSERT INTO photo_locations(location_id,photo_id,library_id,source_path,"
+            "root_relative_path,normalised_path_key,filename,extension,file_size,modified_time_ns,"
+            "partial_fingerprint,fingerprint_algorithm,fingerprint_version,first_seen_run_id,"
+            "last_seen_run_id,first_seen_at,last_seen_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (location_id, photo_id, self.store.library_id, source_path, relative_path, key,
+             filename, Path(filename).suffix.lower(), file_size, modified_time_ns,
+             partial_fingerprint, fingerprint_algorithm, fingerprint_version,
+             import_run_id, import_run_id, now, now),
+        )
+        connection.execute("UPDATE photos SET preferred_location_id=? WHERE photo_id=?",
+                           (location_id, photo_id))
+        return self.get_location(key, connection=connection)
+
+    def refresh_location(self, location_id: str, *, source_path: str, filename: str,
+                         file_size: int, modified_time_ns: int, import_run_id: str,
+                         connection) -> None:
+        connection.execute(
+            "UPDATE photo_locations SET source_path=?,filename=?,extension=?,file_size=?,"
+            "modified_time_ns=?,availability='available',last_seen_run_id=?,last_seen_at=?,"
+            "removed_at=NULL,updated_at=? WHERE location_id=? AND library_id=?",
+            (source_path, filename, Path(filename).suffix.lower(), file_size, modified_time_ns,
+             import_run_id, utc_now(), utc_now(), location_id, self.store.library_id),
+        )

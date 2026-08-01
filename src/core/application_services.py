@@ -13,6 +13,14 @@ class ApplicationServices:
     library_registry: LibraryRegistry
     metadata_store: MetadataStore
 
+    def open_or_register_library(self, source_root):
+        """Idempotently select the managed library for an imported root."""
+        record = self.library_registry.register(source_root)
+        if self.metadata_store.library_id != record.library_id:
+            self.metadata_store.close_library()
+            self.metadata_store.open_library(record.library_id)
+        return record
+
     def close(self) -> None:
         self.metadata_store.close()
 

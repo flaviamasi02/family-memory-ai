@@ -1,11 +1,11 @@
 # DATA-001 — Central Metadata Storage Architecture Specification
 
-Status: **DATA-001A–B implemented; automated validation complete; Product Owner validation pending**
+Status: **DATA-001A–C implemented; automated validation complete; Product Owner validation pending**
 
 Owner: Architecture
 Last updated: 2026-07-28
 
-This document is the authoritative technical contract for DATA-001. The durable decisions are recorded in `docs/development/DECISIONS.md`; this specification defines how later implementation increments must realize them. DATA-001A implements the application-data, registry, and minimal database/store foundation; DATA-001B implements schema version 2 and database operations described below. DATA-001C–H, PERF-001, and MODEL-004B remain planned.
+This document is the authoritative technical contract for DATA-001. The durable decisions are recorded in `docs/development/DECISIONS.md`; this specification defines how later implementation increments must realize them. DATA-001A implements the application-data, registry, and minimal database/store foundation; DATA-001B implements schema version 2 and database operations; DATA-001C implements photo/import repositories and normal-import registration. DATA-001D–H, PERF-001, and MODEL-004B remain planned.
 
 ## 1. Executive Summary
 
@@ -456,3 +456,9 @@ Normal import still never registers or opens a managed library, performs a healt
 ### CI lifecycle boundary correction (2026-08-01)
 
 The first mixed-folder correction redundantly filtered already trusted collections in `MainWindow._on_scan_complete()`, `load_photos()`, `start_thumbnail_loading()`, and `ThumbnailWorker.__init__()`. That broke lifecycle type compatibility: mocked/prevalidated values such as `"photo"`, `"second"`, and `"second-photo"` were removed because they were not filesystem paths with extensions. Filtering now occurs only during filesystem discovery in `PhotoScanner`; downstream orchestration preserves trusted domain inputs unchanged. Real databases, WAL/SHM files, JSON/sidecars, project files, and all other unsupported filesystem entries remain excluded before Photo construction, metadata extraction, or thumbnail work.
+
+## DATA-001C implementation note (2026-08-01)
+
+DATA-001C connects the existing single-pass background import to managed metadata without changing the scanner, classification, sidecar, MobileCLIP, Cleanup Review, Memory Review, Album Draft, or semantic-embedding behavior. Import idempotently registers the selected root, opens its existing LibraryID when known, creates a durable `ImportRun` before scanning, and transactionally registers the scanner's existing `Photo` results afterward. Schema version 3 adds the measured elapsed-time field to import history; start/completion timestamps, terminal state, discovered/created/reused/changed/skipped/failed counters, and per-file outcomes are retained.
+
+`PhotoRepository` allocates UUIDv4 PhotoIDs and provides create, update, PhotoID, relative-path, fingerprint/hash, and library-list operations behind `MetadataStore`. The registrar first matches the indexed normalized relative path, reuses stable PhotoIDs on repeated import and changed observations, refreshes `photo_locations`, and assigns the PhotoID to the existing domain object. It performs one durable run-start transaction and one batch transaction rather than per-photo connections or a duplicate filesystem walk. A failed batch rolls back all photo/location/items together and marks the independently durable run failed. Original folders and legacy JSON/sidecars remain unchanged and authoritative for their existing workflows; no legacy metadata is migrated. DATA-001D–H remain planned, and Product Owner manual validation is required before merge.
