@@ -86,6 +86,14 @@ class ImportRunResult:
     def reused(self) -> int:
         return self.unchanged + self.moved + self.renamed
 
+    @property
+    def observed_count(self) -> int:
+        return self.added + self.unchanged + self.moved + self.renamed + self.updated
+
+    @property
+    def counts_consistent(self) -> bool:
+        return self.observed_count + self.skipped == self.discovered
+
 
 class ImportRegistrationService:
     """Plan filesystem deltas once and commit their metadata as one batch."""

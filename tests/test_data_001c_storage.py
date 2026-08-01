@@ -159,7 +159,7 @@ def test_automatic_registration_reuses_library_and_worker_has_one_scan(tmp_path)
     assert first.library_id == second.library_id and len(registry.list_libraries()) == 1
     source = (Path(__file__).parents[1] / "src/workers/scan_worker.py").read_text()
     assert source.count("find_photos(self._folder_path, registration)") == 1
-    assert "open_or_register_library(self._folder_path)" in source
+    assert "prepare_import_library(self._folder_path)" in source
 
 
 def test_failed_library_switch_preserves_active_diagnostics_context(tmp_path, monkeypatch):
@@ -183,3 +183,19 @@ def test_failed_library_switch_preserves_active_diagnostics_context(tmp_path, mo
     assert services.metadata_store is active_store
     assert services.metadata_store.library_id == first.library_id
     assert services.diagnostics()["database_health"] is True
+
+
+def test_switching_registered_folders_publishes_one_authoritative_store(tmp_path):
+    first_root = tmp_path / "first"; first_root.mkdir()
+    second_root = tmp_path / "second"; second_root.mkdir()
+    paths = ApplicationDataPathService(tmp_path / "app")
+    registry = LibraryRegistry(paths)
+    services = ApplicationServices(paths, registry, MetadataStore(paths, registry))
+    first = services.open_or_register_library(first_root)
+    assert services.metadata_store.library_id == first.library_id
+    second = services.open_or_register_library(second_root)
+    assert services.metadata_store.library_id == second.library_id
+    repeated = services.open_or_register_library(first_root)
+    assert repeated.library_id == first.library_id
+    assert services.metadata_store.library_id == first.library_id
+    assert len(services.library_registry.list_libraries()) == 2

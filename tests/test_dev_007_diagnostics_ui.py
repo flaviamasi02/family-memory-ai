@@ -100,6 +100,26 @@ def test_unavailable_registered_library_is_reported_without_traceback(page):
     assert widget.diagnostics_labels["Active LibraryID"].text() == "No active library"
 
 
+def test_settings_reopen_and_refresh_preserve_imported_active_context(page):
+    widget, services, _, tmp_path = page
+    source = tmp_path / "imported"; source.mkdir()
+    record = services.open_or_register_library(source)
+    widget.refresh_developer_diagnostics()
+    assert widget.diagnostics_labels["Active LibraryID"].text() == record.library_id
+    assert widget.diagnostics_labels["Schema version"].text() == str(SCHEMA_VERSION)
+    assert widget.diagnostics_labels["Database health status"].text() == "Healthy"
+
+    from ui.settings_page import SettingsPage
+    reopened = SettingsPage(application_services=services)
+    try:
+        reopened.refresh_developer_diagnostics()
+        assert reopened.diagnostics_labels["Active LibraryID"].text() == record.library_id
+        assert reopened.diagnostics_labels["Active database path"].text() != "No active database"
+        assert reopened.diagnostics_labels["Schema version"].text() == "5"
+    finally:
+        reopened.close(); reopened.deleteLater()
+
+
 def test_ui_uses_storage_services_not_sqlite_directly():
     source = Path("src/ui/settings_page.py").read_text(encoding="utf-8")
     assert "sqlite3" not in source

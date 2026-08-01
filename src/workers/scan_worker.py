@@ -3,11 +3,13 @@ Background worker that runs folder scanning and metadata extraction
 off the UI thread so the main window stays responsive during import.
 
 Emits:
-  scan_complete(list)  — when find_photos() finishes; payload is list[Photo].
+  scan_complete(object) — structured photos/library/import result on success.
   scan_error(str)      — when an unhandled exception occurs during scanning.
   finished()           — always emitted last, regardless of outcome.
 """
 from __future__ import annotations
+
+from dataclasses import dataclass
 
 from PySide6.QtCore import QObject, Signal
 
@@ -19,26 +21,38 @@ from storage.import_registration import ImportRegistrationService
 from vision.embedding_provider import EmbeddingStore
 
 
+@dataclass(frozen=True)
+class ScanCompletion:
+    run_id: int
+    photos: list
+    library: object | None
+    import_result: object | None
+
+
 class ScanWorker(QObject):
-    scan_complete = Signal(list)
+    scan_complete = Signal(object)
     scan_error = Signal(str)
     finished = Signal()
 
-    def __init__(self, folder_path: str, application_services: ApplicationServices | None = None) -> None:
+    def __init__(self, folder_path: str, application_services: ApplicationServices | None = None,
+                 run_id: int = 0) -> None:
         super().__init__()
         self._folder_path = folder_path
         self._application_services = application_services
+        self._run_id = run_id
 
     def run(self) -> None:
         registration = None
+        prepared_library = None
         try:
             if self._application_services is not None:
-                self._application_services.open_or_register_library(self._folder_path)
-                store = self._application_services.metadata_store
+                prepared_library = self._application_services.prepare_import_library(self._folder_path)
+                store = prepared_library.store
                 registration = ImportRegistrationService(store, self._folder_path)
             photos = find_photos(self._folder_path, registration)
+            import_result = None
             if registration is not None:
-                registration.register(
+                import_result = registration.register(
                     photos,
                     skipped=get_session_stats().get_counter("unsupported_files_skipped"),
                 )
@@ -57,13 +71,16 @@ class ScanWorker(QObject):
                         previous.source_path, previous.modified_time_ns,
                         previous.file_size, str(photo.path))
                     embedding_store.preserve_for_relocation(photo.previous_path, photo.path)
-            self.scan_complete.emit(photos)
+            self.scan_complete.emit(ScanCompletion(
+                self._run_id, photos, prepared_library, import_result))
         except Exception as exc:  # noqa: BLE001
             if registration is not None:
                 try:
                     registration.fail(str(exc))
                 except Exception:  # noqa: BLE001
                     pass
+            if prepared_library is not None and self._application_services is not None:
+                self._application_services.discard_prepared_library(prepared_library)
             self.scan_error.emit(str(exc))
         finally:
             self.finished.emit()

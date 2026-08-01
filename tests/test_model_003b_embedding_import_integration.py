@@ -11,6 +11,7 @@ from ui.main_window import MainWindow
 from vision.batch_embedding_service import BatchEmbeddingService
 from vision.embedding_provider import EmbeddingStore, FakeEmbeddingProvider
 from workers.embedding_worker import EmbeddingWorker
+from workers.scan_worker import ScanCompletion
 
 JPEG_BYTES = bytes.fromhex("ffd8ffe000104a46494600010101006000600000ffdb0043000302020302020303030304030304050805050404050a070706080c0a0c0c0b0a0b0b0d0e12100d0e110e0b0b1016101113141515150c0f171816141812141514ffdb00430103040405040509050509140d0b0d141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414141414ffc00011080001000103012200021101031101ffc4001400010000000000000000000000000000000000000008ffc40014100100000000000000000000000000000000000000ffda000c03010002110311003f00b2c001ffd9")
 
@@ -479,6 +480,49 @@ def test_incremental_reconciliation_preserves_rich_review_domain_object():
     assert existing.path == Path("new/photo.jpg")
     assert existing.intelligence.year == 2024
     assert existing.user_decision == "keep"
+
+
+def test_matching_scan_completion_publishes_even_when_thread_finished_arrives_first():
+    window = _embedding_window_for_lifecycle_tests()
+    published = []
+    discarded = []
+    refreshed = []
+    window._active_scan_run_id = 0
+    window._scan_run_id = 4
+    window.application_services = type("Services", (), {
+        "publish_active_library": lambda self, value: published.append(value),
+        "discard_prepared_library": lambda self, value: discarded.append(value),
+    })()
+    window.settings_page = type("Settings", (), {
+        "refresh_developer_diagnostics": lambda self: refreshed.append(True),
+    })()
+    library = object()
+    summary = object()
+    completion = ScanCompletion(4, ["photo"], library, summary)
+
+    assert window._apply_scan_completion(completion) == ["photo"]
+    assert published == [library] and refreshed == [True] and discarded == []
+    assert window._last_import_result is summary
+
+
+def test_stale_scan_completion_cannot_replace_newer_active_library():
+    window = _embedding_window_for_lifecycle_tests()
+    published = []
+    discarded = []
+    window._active_scan_run_id = 5
+    window._scan_run_id = 5
+    window.application_services = type("Services", (), {
+        "publish_active_library": lambda self, value: published.append(value),
+        "discard_prepared_library": lambda self, value: discarded.append(value),
+    })()
+    window.settings_page = type("Settings", (), {
+        "refresh_developer_diagnostics": lambda self: None,
+    })()
+    stale_library = object()
+
+    assert window._apply_scan_completion(
+        ScanCompletion(4, ["stale"], stale_library, object())) is None
+    assert published == [] and discarded == [stale_library]
 
 
 def test_mixed_new_and_cached_embedding_completion_is_success():
@@ -973,9 +1017,10 @@ def test_scan_thread_references_clear_after_matching_thread_finishes(monkeypatch
             self.deleted = True
 
     class FakeScanWorker:
-        def __init__(self, folder_path, application_services):
+        def __init__(self, folder_path, application_services, run_id):
             self.folder_path = folder_path
             self.application_services = application_services
+            self.run_id = run_id
             self.scan_complete = _Signal()
             self.scan_error = _Signal()
             self.finished = _Signal()
@@ -997,6 +1042,7 @@ def test_scan_thread_references_clear_after_matching_thread_finishes(monkeypatch
     first_thread = window.scan_thread
     assert window.scan_worker is workers[0]
     assert workers[0].application_services is window.application_services
+    assert workers[0].run_id == 1
 
     first_thread.finished.emit()
 
@@ -1068,9 +1114,10 @@ def test_deleted_scan_thread_wrapper_is_not_reused_for_second_scan(monkeypatch):
             pass
 
     class FakeScanWorker:
-        def __init__(self, folder_path, application_services):
+        def __init__(self, folder_path, application_services, run_id):
             self.folder_path = folder_path
             self.application_services = application_services
+            self.run_id = run_id
             self.scan_complete = _Signal()
             self.scan_error = _Signal()
             self.finished = _Signal()
@@ -1097,6 +1144,7 @@ def test_deleted_scan_thread_wrapper_is_not_reused_for_second_scan(monkeypatch):
     assert len(workers) == 1
     assert workers[0].folder_path == "/second"
     assert workers[0].application_services is window.application_services
+    assert workers[0].run_id == 2
     assert window.scan_thread is not deleted_thread
     assert isinstance(window.scan_thread, FakeThread)
     assert window.scan_thread.started_called is True

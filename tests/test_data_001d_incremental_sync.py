@@ -212,6 +212,8 @@ def test_no_duplicate_rows_and_import_statistics_are_durable(opened):
             "SELECT unchanged_count,added_count,removed_count,moved_count,renamed_count,updated_count "
             "FROM import_runs WHERE import_run_id=?", (result.import_run_id,)).fetchone()
     assert row == (20, 0, 0, 0, 0, 0)
+    assert result.counts_consistent
+    assert result.observed_count == 20
 
 
 def test_pipeline_keeps_one_walk_and_submits_only_changed_photos_to_embeddings():
