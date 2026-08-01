@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### PERF-001A — Import Performance Profiling & Diagnostics
+
+- Added aggregate import-stage, worker, database, and thread measurements to Developer Diagnostics.
+- Added a process-local 20-import history and JSON report export. PERF-001B is next; no algorithms were optimized.
+
 ### MODEL-004A — Face Recognition Foundation
 
 - Added platform-neutral Face, Person, FaceCluster, geometry, landmark, quality, and versioned FaceEmbedding domain records with stable IDs and JSON-safe serialization.

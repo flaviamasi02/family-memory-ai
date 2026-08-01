@@ -10,6 +10,7 @@ Emits:
 from __future__ import annotations
 
 from dataclasses import dataclass
+import time
 
 from PySide6.QtCore import QObject, Signal
 
@@ -42,6 +43,7 @@ class ScanWorker(QObject):
         self._run_id = run_id
 
     def run(self) -> None:
+        worker_started = time.perf_counter()
         registration = None
         prepared_library = None
         try:
@@ -83,4 +85,6 @@ class ScanWorker(QObject):
                 self._application_services.discard_prepared_library(prepared_library)
             self.scan_error.emit(str(exc))
         finally:
+            get_session_stats().record("ScanWorker", (time.perf_counter() - worker_started) * 1000,
+                                       thread_kind="Background thread")
             self.finished.emit()

@@ -440,6 +440,10 @@ Product Owner manual validation is mandatory: use a temporary app-data root and 
 
 ## DEV-007 — Developer Diagnostics UI (2026-08-01)
 
+PERF-001A extends this section with an **Import Performance** history selector,
+stage breakdown and JSON report export. History is limited to 20 process-local
+imports and profiling never initiates storage queries or scans.
+
 Settings now includes a collapsed-by-default **Developer Diagnostics** section backed by the application-composed `ApplicationServices`, `LibraryRegistry`, and `MetadataStore`. It displays the application-data root, registry count, active library/database identity, actual and expected schema versions, integrity and foreign-key results, migration consistency, missing tables, and read/write availability. It can refresh, explicitly register an operator-chosen test folder, open a selected registered library, run health and schema summaries, create or validate a backup, safely open managed folders, and copy a minimized plain-text report. The UI never opens SQLite directly and provides no SQL console, Restore, Delete, scan, or migration action.
 
 The command-line diagnostic remains available, but it is no longer required for normal Product Owner validation. In Settings, expand Developer Diagnostics; select **Register Test Library** and choose an empty disposable folder; confirm one stable LibraryID and the application-managed `family_memory.db`; confirm schema version 2; run Health Check; create and validate a backup with the standard dialogs; confirm the selected folder stayed empty; then exercise normal import, MobileCLIP, Photo Browser, Cleanup Review, Memory Review, and album behavior. That was the DATA-001B validation boundary: registration was explicit, normal import was disconnected from SQLite, legacy content remained authoritative and unmigrated, and DATA-001C was next. DATA-001C/D have since superseded the import and diagnostics portions of that statement.

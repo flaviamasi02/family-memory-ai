@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from core.application_data import ApplicationDataPathService, get_app_data_service
 from storage.library_registry import LibraryRecord, LibraryRegistry
 from storage.metadata_store import MetadataStore
+from core.perf_stats import get_session_stats
 
 
 @dataclass(frozen=True)
@@ -29,7 +30,10 @@ class ApplicationServices:
 
     def prepare_import_library(self, source_root) -> PreparedLibraryContext:
         """Open a worker-ready context without changing the published active library."""
+        stats = get_session_stats()
+        stats.start("Library registration", thread_kind="Background thread")
         record = self.library_registry.register(source_root)
+        stats.stop("Library registration", 1)
         if self.metadata_store.library_id == record.library_id:
             return PreparedLibraryContext(record, self.metadata_store)
         store = MetadataStore(self.paths, self.library_registry)

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### PERF-001A — Import Performance Profiling & Diagnostics
+
+- Added thread-safe `perf_counter()` import sessions, aggregate `[PERF]` logging,
+  bounded history, Developer Diagnostics display, and JSON export.
+- The pipeline and UI workflow are unchanged; PERF-001B optimization is next.
+
 ### PR #47 — DATA-001C/D repository registration and incremental synchronization
 
 - Implemented DATA-001C: normal folder import now registers or reuses one application-managed library, persists stable LibraryID/PhotoID identities, locations, import runs/items, elapsed time, counters, and per-file outcomes through `PhotoRepository` and transactional `MetadataStore` work units. The central `family_memory.db` remains outside source folders.

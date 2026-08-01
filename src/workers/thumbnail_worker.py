@@ -37,6 +37,7 @@ class ThumbnailWorker(QObject):
 
     def run(self):
         stats = get_session_stats()
+        worker_started = time.perf_counter()
         _cache_hits = 0
         _cache_misses = 0
         _generated = 0
@@ -116,11 +117,13 @@ class ThumbnailWorker(QObject):
             stats.inc("thumbnails_generated", _generated)
             stats.inc("corrupt_unsupported_skipped", _corrupt_skipped)
             if _gen_ms > 0:
-                stats.record("thumbnail_generation [BG]", _gen_ms)
+                stats.record("Thumbnail generation", _gen_ms, _generated, "Background thread")
 
         except Exception as exc:  # noqa: BLE001
             print(f"[ThumbnailWorker] Fatal error in run(): {exc}")
         finally:
+            stats.record("ThumbnailWorker", (time.perf_counter() - worker_started) * 1000,
+                         len(self.photos), "Background thread")
             self.finished.emit()
 
     def _load_thumbnail_image(self, image_path):
