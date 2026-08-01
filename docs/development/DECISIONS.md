@@ -784,24 +784,46 @@ GitHub `@codex` comments are not a reliable same-task continuation mechanism. Co
 
 Canonical workflow detail: `docs/development/AI_PROJECT_PLAYBOOK.md`.
 
-### DATA-001A implementation record — 2026-07-28
+### Historical checkpoint — DATA-001A implementation record — 2026-07-28
 
 The approved bootstrap registry is the architecture-specified, atomically replaced `metadata/library_registry.json`, not a per-library sidecar. Library identity is canonical lowercase UUIDv4; database paths derive only from that ID. The minimal version-1 per-library SQLite foundation contains `schema_migrations` and `libraries`, and all access is behind a connection-per-work-unit `MetadataStore`. This implements DATA-001A infrastructure only: legacy JSON/sidecars and current caches remain authoritative, and DATA-001B–H remain planned. Product Owner manual validation is still required.
 
-### DATA-001B implementation record — 2026-07-28
+### Historical checkpoint — DATA-001B implementation record — 2026-07-28
 
-Schema version 2 is the complete DATA-001 foundation: all domain tables share the one managed `family_memory.db`; semantic and face vectors are constrained float32 little-endian BLOBs. Ordered migrations are checksum-verified, forward-only, individually transactional, and serialized with work units. Online backup, validated safety-copy restore, structured health reporting, and explicit non-destructive diagnostics are service responsibilities. DATA-001B does not connect import or migrate/cut over legacy content; DATA-001C–H remain planned and Product Owner validation is required.
+Schema version 2 is the complete DATA-001 foundation: all domain tables share the one managed `family_memory.db`; semantic and face vectors are constrained float32 little-endian BLOBs. Ordered migrations are checksum-verified, forward-only, individually transactional, and serialized with work units. Online backup, validated safety-copy restore, structured health reporting, and explicit non-destructive diagnostics are service responsibilities. DATA-001B does not connect import or migrate/cut over legacy content; at that DATA-001B checkpoint, DATA-001C–H remained planned and Product Owner validation was required.
 
-### DEV-007 developer validation surface — 2026-08-01
+### Historical checkpoint — DEV-007 developer validation surface — 2026-08-01
 
-DATA-001B manual validation is available through a collapsed Settings section using the existing application-composed storage services. It is read-only by default and exposes only explicit registration/open, health/schema inspection, online backup/validation, safe managed-folder opening, and a minimized clipboard report. There is no restore/delete/SQL console, scanning, import integration, or legacy migration. The CLI remains supported, while DATA-001C remains next.
+DATA-001B manual validation is available through a collapsed Settings section using the existing application-composed storage services. It is read-only by default and exposes only explicit registration/open, health/schema inspection, online backup/validation, safe managed-folder opening, and a minimized clipboard report. There is no restore/delete/SQL console, scanning, import integration, or legacy migration. The CLI remains supported. This records the DATA-001B checkpoint; DATA-001C/D are now implemented.
 
-### DATA-001C implementation record — 2026-08-01
+### Historical checkpoint — DATA-001C implementation record — 2026-08-01
 
-Normal folder import now idempotently registers or reopens its library and records one durable import run. Stable UUIDv4 PhotoIDs, current file observations, and per-run outcomes are written through `PhotoRepository` and `MetadataStore` in a constant number of transactions using the scanner's existing result list; no second scan or eager hashing is introduced. Relative-path matches preserve identity across repeated imports and changed observations, while fingerprint/hash lookup and location history establish the conservative foundation for later rename/move policy. Schema version 3 records measured elapsed time. Existing JSON/sidecar, MobileCLIP, review, album, and embedding behavior remains unchanged; DATA-001D–H remain planned and Product Owner validation is required.
+Normal folder import now idempotently registers or reopens its library and records one durable import run. Stable UUIDv4 PhotoIDs, current file observations, and per-run outcomes are written through `PhotoRepository` and `MetadataStore` in a constant number of transactions using the scanner's existing result list; no second scan or eager hashing is introduced. Relative-path matches preserve identity across repeated imports and changed observations, while fingerprint/hash lookup and location history establish the conservative foundation for later rename/move policy. Schema version 3 records measured elapsed time. Existing JSON/sidecar, MobileCLIP, review, album, and embedding behavior remained unchanged at that checkpoint; DATA-001D is now implemented and DATA-001E–H remain planned.
 
-### DATA-001D implementation record — 2026-08-01
+### Historical checkpoint — DATA-001D implementation record — 2026-08-01
 
 Incremental imports use the existing scanner traversal and a repository-backed change plan; no second walk is permitted. Relative path, size, and nanosecond mtime are the unchanged fast path. A path-independent SHA-256 fingerprint over size plus the first MiB is stored once and used only for conservative unique relocation matching. Unchanged files bypass image metadata extraction, classification, thumbnail generation, semantic embedding submission, and location updates. Moves/renames retain PhotoID and historical locations and re-key existing disposable caches without inference. Schema version 4 records explicit synchronization counters, missing files are soft state, and diagnostics expose bounded aggregates. DATA-001E–H remain planned.
 
 The unchanged fast path must still reconstruct the existing UI domain projections. Schema version 5 stores only the current classifier snapshot needed by Photo Browser and Cleanup Review (automatic/effective and relevance categories, album eligibility, confidence, and reason). This is not the future category/review history migration: it prevents a skipped classifier from erasing cleanup datasource state on restart while keeping classification work change-only.
+
+## DEC-0054 — Incremental rehydration preserves rich domain state
+
+Status: Accepted and implemented by DATA-001D (PR #47).
+
+An unchanged or relocated database record must be rehydrated into the rich `Photo` projection consumed by Photo Browser, Cleanup Review, and Memory Review. Reconciliation must preserve capture dates, cleanup/effective/relevance categories, album eligibility, review state, and other already-known domain metadata; skipping extraction/classification must never replace that state with an empty thin object. Schema version 5 persists the minimum current classifier snapshot needed across restart, while same-session reconciliation retains richer in-memory state. This is compatibility protection, not completion of category/review-history migration.
+
+This decision follows regressions in which the first incremental implementation emptied Cleanup Review and temporarily emptied Memory Review on repeat import. UI regression coverage and Product Owner workflow validation are required in addition to green storage/CI tests.
+
+## DEC-0055 — Only the current scan may publish active-library state
+
+Status: Accepted and implemented by DATA-001C/D (PR #47).
+
+`ApplicationServices`, not a worker or Settings, owns the authoritative active LibraryID and `MetadataStore`. Workers may prepare isolated contexts, but completion publishes on the UI thread only when its monotonic, unique scan run ID is the latest issued run and no newer folder request is pending. Stale results are discarded and their stores closed. A scan run ID high-water mark is never reused after Qt wrapper cleanup. This makes folder switching deterministic and prevents stale completion from replacing a newer active library or photo collection.
+
+The decision resolves the worker-owned context that Settings could not see and the stale-completion race discovered during PR #47 validation. SQLite connections remain connection-per-work-unit and are never shared across worker/UI threads; matching thread-finished handlers own deterministic cleanup.
+
+## DEC-0056 — Expensive work follows incremental eligibility and runtime readiness
+
+Status: Accepted and implemented by DATA-001D (PR #47).
+
+Unchanged photos bypass metadata extraction, classification, thumbnail generation, and embedding submission. Added and updated photos are eligible for new expensive work; conservatively identified moves/renames preserve and re-key disposable thumbnail and embedding artifacts. Embedding work waits while the shared MobileCLIP runtime operation is active and starts only from a truthful Ready lifecycle rather than racing verification. This preserves reuse without claiming that the legacy semantic cache has migrated into `family_memory.db`.

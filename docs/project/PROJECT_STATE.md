@@ -1,11 +1,17 @@
 # Family Memory AI - Project State
 
-## Current status — 2026-07-27
+## Current status — 2026-08-01
 
 Family Memory AI remains a Windows-desktop-first, mobile-ready product. The completed baseline is **UX-001**, **MODEL-004A — Face Recognition Foundation**, **BUG-001 — MobileCLIP Verification Lifecycle** (PR #41), and **BUG-001B — MobileCLIP Recovery and Repeated Import Stability** (PR #42). PR #42 is merged in the repository at merge commit `d981a7e`; CI passed before merge and Product Owner manual validation passed.
 
-The next approved architectural initiative is **DATA-001 — Central Metadata Storage**. Its authoritative specification is `docs/architecture/DATA_001_CENTRAL_METADATA_STORAGE.md`, covering current-state evidence, schema, identity, migration, concurrency, recovery, and DATA-001A–H delivery increments. DATA-001A–D are implemented with automated validation complete and Product Owner validation pending; DATA-001E–H remain planned. **PERF-001 — Semantic Embedding Performance** is planned and not started, and must follow DATA-001. MODEL-004B through MODEL-004F remain planned and not started.
-DEV-007 adds the non-destructive Settings-based Product Owner diagnostics surface for DATA-001B; command-line use is optional. DATA-001C now connects normal import to SQLite; DATA-001D implements incremental photo synchronization; DATA-001E remains the next metadata implementation increment.
+The next approved architectural initiative is **DATA-001 — Central Metadata Storage**. Its authoritative specification is `docs/architecture/DATA_001_CENTRAL_METADATA_STORAGE.md`, covering current-state evidence, schema, identity, migration, concurrency, recovery, and DATA-001A–H delivery increments. DATA-001A–D are implemented and Product Owner validated; DATA-001E–H remain planned. **PERF-001 — Semantic Embedding Performance** is planned and not started, and must follow DATA-001. MODEL-004B through MODEL-004F remain planned and not started.
+DEV-007 Developer Diagnostics UI, DATA-001C, and DATA-001D are implemented and Product Owner validated. The expected managed-library SQLite schema is **version 5**. DATA-001C connects normal import to SQLite with stable LibraryID/PhotoID registration, `PhotoRepository`, durable locations, and import history. DATA-001D performs one-walk incremental detection and preserves identities, historical metadata, thumbnails, and embeddings while scheduling expensive work only for eligible added/updated photos. Repeated imports and restarts reuse durable state without duplicate libraries or photos. DATA-001E remains the next approved metadata increment.
+
+`ApplicationServices` owns the authoritative active-library context. `ScanWorker` prepares a store, and only the latest current completion publishes its LibraryID/`MetadataStore` on the UI thread; monotonic run IDs and stale-completion rejection make folder switching deterministic. Settings diagnostics reads the same shared context. “No active library” is valid before import; a successful import exposes the active LibraryID and database path. Connections are per work unit, never shared across threads.
+
+Product Owner validation before PR #47 merge passed initial/repeated/added-photo import, reuse, Photo Browser, Memory Review, Cleanup Review, MobileCLIP and embedding reuse, active-library and healthy schema diagnostics, duplicate prevention, non-media filtering, and diagnostics-UI backup creation/validation. Automated tests separately cover unchanged/added/updated/missing/moved/renamed reconciliation, restart persistence, lifecycle guards, and UI regressions. No PR #47 blocking bug remained after final validation. This does not claim every filesystem scenario was manually exercised.
+
+Known persistence limitation: `family_memory.db` is in application-managed storage, never the source folder, but legacy sidecars, JSON learning/category profiles, the semantic embedding cache, and face-foundation database remain in use where applicable. Category/review history and other legacy metadata migration are incomplete; SQLite is not yet authoritative for all metadata. No mobile synchronization is implemented.
 
 
 ### Validated MobileCLIP outcomes
@@ -16,7 +22,7 @@ The measured Product Owner baseline for a 422-photo first semantic indexing run 
 
 ### Active sequence
 
-1. **DATA-001 — Central Metadata Storage** — DATA-001A–D implemented; Product Owner validation pending; DATA-001E–H planned.
+1. **DATA-001 — Central Metadata Storage** — DATA-001A–D implemented and Product Owner validated; DATA-001E–H planned.
 2. **PERF-001 — Semantic Embedding Performance** — planned, not started.
 3. **MODEL-004B — Face Detection** — planned, not started.
 4. **MODEL-004C — Face Embeddings** — planned, not started.

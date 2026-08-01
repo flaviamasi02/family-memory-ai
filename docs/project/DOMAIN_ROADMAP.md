@@ -1,10 +1,10 @@
 # Family Memory AI - Domain Roadmap
 
-## Current approved sequence — 2026-07-27
+## Current approved sequence — 2026-08-01
 
-Completed: UX-001; MODEL-004A — Face Recognition Foundation; BUG-001 — MobileCLIP Verification Lifecycle; BUG-001B — MobileCLIP Recovery and Repeated Import Stability.
+Completed: UX-001; MODEL-004A — Face Recognition Foundation; BUG-001 — MobileCLIP Verification Lifecycle; BUG-001B — MobileCLIP Recovery and Repeated Import Stability; DATA-001A; DATA-001B; DATA-001C; DATA-001D; DEV-007 Developer Diagnostics UI.
 
-Next: (1) DATA-001 — Central Metadata Storage; (2) PERF-001 — Semantic Embedding Performance; (3) MODEL-004B — Face Detection; (4) MODEL-004C — Face Embeddings; (5) MODEL-004D — Face Clustering; (6) MODEL-004E — Person Management; (7) MODEL-004F — Memory Review Integration. DATA-001A–D are implemented with Product Owner validation pending; DATA-001E–H remain planned; every later item is planned and not started. DATA-001 must finish before PERF-001.
+Next: (1) DATA-001 — Central Metadata Storage; (2) PERF-001 — Semantic Embedding Performance; (3) MODEL-004B — Face Detection; (4) MODEL-004C — Face Embeddings; (5) MODEL-004D — Face Clustering; (6) MODEL-004E — Person Management; (7) MODEL-004F — Memory Review Integration. DATA-001A–D are implemented and Product Owner validated; DATA-001E–H remain planned; every later item is planned and not started. DATA-001 must finish before PERF-001.
 
 This sequence supersedes stale “current” or “next recommended” labels retained below as historical domain context.
 
