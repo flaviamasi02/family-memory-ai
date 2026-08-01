@@ -464,8 +464,9 @@ class MainWindow(QMainWindow):
         self.photo_model.set_photos(photos)
         self._apply_browser_filter()
         stats.record("UI refresh", (time.perf_counter() - t0) * 1000, n, "UI thread")
-        if self._last_import_result is not None:
-            stats.inc("reused_photos", int(getattr(self._last_import_result, "reused", 0)))
+        import_result = getattr(self, "_last_import_result", None)
+        if import_result is not None:
+            stats.inc("reused_photos", int(getattr(import_result, "reused", 0)))
 
         self.status_label.setText(
             f"Scan complete — showing {n} photos. Loading thumbnails…"
@@ -507,7 +508,7 @@ class MainWindow(QMainWindow):
                 return None
             if completion.library is not None:
                 self.application_services.publish_active_library(completion.library)
-                self.settings_page.refresh_developer_diagnostics()
+                self._refresh_performance_diagnostics_if_available()
             self._last_import_result = completion.import_result
             return completion.photos
         # Direct domain-list calls remain supported by load/lifecycle tests.
@@ -708,7 +709,23 @@ class MainWindow(QMainWindow):
         logger.info("Import lifecycle generation=%s phase=%s", self._import_generation, self._import_phase)
         session = finish_import_performance_session()
         session.print_summary()
-        self.settings_page.refresh_developer_diagnostics()
+        self._refresh_performance_diagnostics_if_available()
+
+    def _refresh_performance_diagnostics_if_available(self) -> None:
+        """Refresh optional diagnostics without making it a lifecycle dependency.
+
+        Lightweight lifecycle harnesses and shutdown paths may not own Settings.
+        A refresh failure is reported, but cannot invalidate an otherwise
+        completed import or recreate any UI/storage objects.
+        """
+        settings_page = getattr(self, "settings_page", None)
+        refresh = getattr(settings_page, "refresh_developer_diagnostics", None)
+        if not callable(refresh):
+            return
+        try:
+            refresh()
+        except Exception:  # noqa: BLE001
+            logger.exception("Optional performance diagnostics refresh failed")
 
     def _on_embedding_progress(self, run_id: int, progress) -> None:
         if run_id != self._active_embedding_run_id:
