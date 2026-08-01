@@ -76,8 +76,9 @@ def test_mixed_folder_scan_filters_before_photo_and_metadata_work(tmp_path, monk
     class FakePhoto:
         def __init__(self, path):
             self.path = Path(path); self.metadata = {}; self.extension = self.path.suffix.lower()
+            self.previous_path = None
         @classmethod
-        def from_path(cls, path):
+        def from_path(cls, path, stat_result=None):
             constructed.append(Path(path)); return cls(path)
         def sync_intelligence_from_metadata(self): pass
 

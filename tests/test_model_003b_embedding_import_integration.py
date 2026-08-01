@@ -500,8 +500,7 @@ def test_starting_new_import_replaces_ready_status(monkeypatch):
     window._queue_or_start_scan("/new-import")
 
     assert window._import_phase == "Preparing"
-    assert window.ai_status_label.text.startswith("Preparing import:")
-    assert "scanning" in window.ai_status_label.text.lower()
+    assert window.ai_status_label.text == "Scanning changes…"
     assert not window.ai_status_label.text.startswith("✓ Semantic embeddings ready:")
 
 
@@ -646,7 +645,7 @@ def test_second_import_during_embedding_waits_for_cancellation_before_scanning()
     window._on_embedding_thread_finished(7)
 
     assert scans_started == ["/second-folder"]
-    assert window.status_label.text == "Scanning folder…"
+    assert window.status_label.text == "Scanning changes…"
     assert window.embedding_thread is None
     assert window.embedding_worker is None
 
@@ -687,7 +686,7 @@ def test_third_import_also_resumes_exactly_once_after_embedding_cleanup():
         assert window._pending_import_folder_path is None
         assert window.embedding_thread is None
         assert window.embedding_worker is None
-        assert window.status_label.text == "Scanning folder…"
+        assert window.status_label.text == "Scanning changes…"
         assert window._embedding_close_requested is False
 
 
