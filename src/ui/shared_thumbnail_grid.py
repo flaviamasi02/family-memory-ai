@@ -47,6 +47,7 @@ class SharedThumbnailCard(QFrame):
         super().__init__(parent)
         self.item = None
         self.key = item.key
+        self.thumbnail_rescale_count = 0
 
         self.setObjectName("sharedReviewCard")
         self.setFrameShape(QFrame.Shape.StyledPanel)
@@ -96,9 +97,27 @@ class SharedThumbnailCard(QFrame):
 
         pixmap = item.thumbnail
         # Category/decision changes reuse the same thumbnail object.  Avoid the
-        # relatively expensive smooth rescale and cache churn in that case.
-        if pixmap is not previous_thumbnail:
-            if isinstance(pixmap, QPixmap) and not pixmap.isNull():
+        # relatively expensive smooth rescale and cache churn in that case. A
+        # null pixmap is never reusable: it must deterministically restore the
+        # shared non-null placeholder, including on a card's first refresh.
+        incoming_valid = isinstance(pixmap, QPixmap) and not pixmap.isNull()
+        previous_valid = (
+            isinstance(previous_thumbnail, QPixmap)
+            and not previous_thumbnail.isNull()
+        )
+        displayed_pixmap = self.thumbnail_label.pixmap()
+        displayed_valid = (
+            isinstance(displayed_pixmap, QPixmap)
+            and not displayed_pixmap.isNull()
+        )
+        can_reuse = (
+            incoming_valid
+            and previous_valid
+            and pixmap is previous_thumbnail
+            and displayed_valid
+        )
+        if not can_reuse:
+            if incoming_valid:
                 scaled = pixmap.scaled(
                     140,
                     140,
@@ -107,6 +126,7 @@ class SharedThumbnailCard(QFrame):
                 )
                 self.thumbnail_label.setPixmap(scaled)
                 self.thumbnail_label.setText("")
+                self.thumbnail_rescale_count += 1
             else:
                 self.thumbnail_label.setPixmap(_get_shared_placeholder_pixmap())
                 self.thumbnail_label.setText("")

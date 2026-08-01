@@ -33,6 +33,10 @@ a claim about a particular user's disk or complete UI latency.
   change membership, it refreshes affected rendered cards only. An unchanged
   thumbnail object is not rescaled. Filter membership is recomputed once and, if
   it changes, the grid is rebuilt once with existing thumbnail objects.
+- Missing and null thumbnails always display the deterministic shared placeholder.
+  Reuse is allowed only when the incoming and previous thumbnail objects and the
+  currently displayed pixmap are all valid, so a later real thumbnail replaces
+  the placeholder normally and an accidentally cleared label is repaired.
 - A duplicate category submission is ignored while the action is active, and a
   concise busy/result label is shown. Widgets and the final refresh stay on the
   Qt UI thread. Sidecars remain synchronous because the current mutable Photo and

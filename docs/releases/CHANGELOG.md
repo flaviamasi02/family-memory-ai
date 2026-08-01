@@ -751,3 +751,5 @@
   updates only affected cards when filter membership is stable, avoids rescaling
   unchanged thumbnails, reports partial success, and blocks duplicate submission.
 - See `docs/architecture/PERF_002_CLEANUP_BULK.md` for benchmark results and scope.
+- CI follow-up: null or missing thumbnails now always install the shared non-null
+  placeholder; only the same valid pixmap with a valid displayed image is reused.

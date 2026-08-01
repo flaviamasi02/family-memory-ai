@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 from models.photo import Photo
 from core.category_registry import get_category_registry, reset_category_registry
 from ui.irrelevant_media_page import IrrelevantMediaPage
+from ui.shared_thumbnail_grid import SharedGridItem, SharedThumbnailCard
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -119,6 +120,77 @@ class IrrelevantMediaPageTests(unittest.TestCase):
                 card.thumbnail_label.pixmap().isNull(),
                 "Card must display a non-null placeholder pixmap when no cached thumbnail exists",
             )
+
+    def _grid_item(self, thumbnail, badge_one="Unknown"):
+        return SharedGridItem(
+            key="photo", filename="photo.jpg", thumbnail=thumbnail,
+            badge_one=badge_one, badge_two="50%", badge_three="Review",
+        )
+
+    def test_null_pixmap_refresh_keeps_non_null_placeholder(self):
+        card = SharedThumbnailCard(self._grid_item(QPixmap()))
+        self.assertFalse(card.thumbnail_label.pixmap().isNull())
+
+        card.refresh(self._grid_item(QPixmap(), badge_one="Document"))
+        self.assertFalse(card.thumbnail_label.pixmap().isNull())
+        self.assertEqual(card.thumbnail_rescale_count, 0)
+
+    def test_valid_cached_thumbnail_is_displayed(self):
+        thumbnail = QPixmap(32, 32)
+        thumbnail.fill(Qt.GlobalColor.blue)
+        card = SharedThumbnailCard(self._grid_item(thumbnail))
+
+        displayed = card.thumbnail_label.pixmap()
+        self.assertFalse(displayed.isNull())
+        self.assertEqual(card.thumbnail_rescale_count, 1)
+
+    def test_same_valid_pixmap_reuse_skips_rescale(self):
+        thumbnail = QPixmap(32, 32)
+        thumbnail.fill(Qt.GlobalColor.green)
+        card = SharedThumbnailCard(self._grid_item(thumbnail))
+        rescale_count = card.thumbnail_rescale_count
+
+        card.refresh(self._grid_item(thumbnail, badge_one="Meme"))
+
+        self.assertEqual(card.thumbnail_rescale_count, rescale_count)
+        self.assertFalse(card.thumbnail_label.pixmap().isNull())
+
+    def test_same_valid_pixmap_restores_accidentally_cleared_label(self):
+        thumbnail = QPixmap(32, 32)
+        thumbnail.fill(Qt.GlobalColor.green)
+        card = SharedThumbnailCard(self._grid_item(thumbnail))
+        rescale_count = card.thumbnail_rescale_count
+        card.thumbnail_label.setPixmap(QPixmap())
+
+        card.refresh(self._grid_item(thumbnail))
+
+        self.assertFalse(card.thumbnail_label.pixmap().isNull())
+        self.assertEqual(card.thumbnail_rescale_count, rescale_count + 1)
+
+    def test_placeholder_is_replaced_by_real_thumbnail(self):
+        card = SharedThumbnailCard(self._grid_item(None))
+        placeholder = card.thumbnail_label.pixmap()
+        thumbnail = QPixmap(32, 32)
+        thumbnail.fill(Qt.GlobalColor.red)
+
+        card.refresh(self._grid_item(thumbnail))
+
+        self.assertFalse(card.thumbnail_label.pixmap().isNull())
+        self.assertEqual(card.thumbnail_rescale_count, 1)
+        self.assertNotEqual(card.thumbnail_label.pixmap().cacheKey(), placeholder.cacheKey())
+
+    def test_incremental_category_refresh_preserves_valid_thumbnail(self):
+        thumbnail = QPixmap(32, 32)
+        thumbnail.fill(Qt.GlobalColor.yellow)
+        card = SharedThumbnailCard(self._grid_item(thumbnail))
+        displayed_key = card.thumbnail_label.pixmap().cacheKey()
+        rescale_count = card.thumbnail_rescale_count
+
+        card.refresh(self._grid_item(thumbnail, badge_one="Family Photo"))
+
+        self.assertEqual(card.badge_one.text(), "Family Photo")
+        self.assertEqual(card.thumbnail_label.pixmap().cacheKey(), displayed_key)
+        self.assertEqual(card.thumbnail_rescale_count, rescale_count)
 
     def test_details_panel_updates_with_structured_explanations(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -331,3 +331,5 @@ After optimization, the UI is responsive immediately after clicking Import (scan
 - Added aggregate `[PERF]` timings, partial-failure feedback, duplicate-action
   protection, incremental affected-card updates, and unchanged-thumbnail reuse.
 - Added reproducible 10/100/1,000-photo synthetic regression benchmarks.
+- Restored deterministic non-null Cleanup Review placeholders while retaining
+  the unchanged-valid-thumbnail rescale optimization.
