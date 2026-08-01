@@ -1163,9 +1163,12 @@ def test_deleted_scan_thread_wrapper_is_not_reused_for_second_scan(monkeypatch):
     assert third_thread is not second_thread
     assert len(workers) == 2
     assert workers[1].folder_path == "/third"
+    assert workers[1].run_id == 3
+    assert window._scan_run_id == 3
+    assert window._active_scan_run_id == 3
 
     # A stale/duplicate completion from the second run cannot clear the third.
-    window._on_scan_thread_finished(1, second_thread)
+    window._on_scan_thread_finished(2, second_thread)
     assert window.scan_thread is third_thread
     assert window.scan_worker is third_worker
 

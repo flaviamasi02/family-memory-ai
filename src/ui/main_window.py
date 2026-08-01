@@ -417,6 +417,12 @@ class MainWindow(QMainWindow):
             return bool(thread.isRunning())
         except RuntimeError:
             if self.scan_thread is thread:
+                # A deleted Qt wrapper is still evidence that its run identity
+                # was issued.  Preserve that high-water mark before clearing
+                # the active references so the next worker cannot reuse it.
+                self._scan_run_id = max(
+                    self._scan_run_id, self._active_scan_run_id
+                )
                 self.scan_thread = None
                 self.scan_worker = None
                 self._active_scan_run_id = 0
