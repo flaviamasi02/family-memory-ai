@@ -2,11 +2,18 @@
 
 ## Current status — 2026-08-01
 
+**PERF-002 — Cleanup Review Bulk Interaction Performance is implemented.** Bulk
+category changes now coalesce learning-profile persistence, preserve compatible
+sidecars, update unchanged-filter cards incrementally without thumbnail reloads,
+report partial failures, prevent duplicate submission, and emit aggregate
+performance diagnostics. Synthetic 10/100/1,000-photo measurements and scope are
+recorded in `docs/architecture/PERF_002_CLEANUP_BULK.md`. **MODEL-004B — Face
+Detection is the recommended next feature milestone and remains planned, not
+implemented.**
+
 **UX-004 — Product Owner Performance Dashboard is complete.** Import diagnostics
 now explains reuse and avoided work before progressively disclosing unchanged
-technical measurements. **PERF-002** is planned to investigate Cleanup Review
-multi-selection, bulk category assignment, grid refresh, and selection latency;
-no PERF-002 behavior has been implemented.
+technical measurements.
 
 Family Memory AI remains a Windows-desktop-first, mobile-ready product. The completed baseline is **UX-001**, **MODEL-004A — Face Recognition Foundation**, **BUG-001 — MobileCLIP Verification Lifecycle** (PR #41), and **BUG-001B — MobileCLIP Recovery and Repeated Import Stability** (PR #42). PR #42 is merged in the repository at merge commit `d981a7e`; CI passed before merge and Product Owner manual validation passed.
 

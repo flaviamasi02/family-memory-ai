@@ -14,7 +14,7 @@
 
 1. DATA-001 — Central Metadata Storage (**DATA-001A–D implemented and Product Owner validated; DATA-001E–H planned**)
 2. PERF-001 — Semantic Embedding Performance (**PERF-001A and PERF-001B implemented**)
-3. PERF-002 — Cleanup Review bulk interaction performance (**planned; not started**)
+3. PERF-002 — Cleanup Review bulk interaction performance (**implemented**)
 4. MODEL-004B — Face Detection (**planned; not started**)
 5. MODEL-004C — Face Embeddings (**planned; not started**)
 6. MODEL-004D — Face Clustering (**planned; not started**)
@@ -34,15 +34,18 @@ MobileCLIP improvement is inferred from that database-path measurement.
 
 The Product Owner measured approximately 190.643 seconds for a CPU-based first semantic indexing pass over 422 photos (approximately 0.45 seconds per photo). That remains the latest production profiler baseline; PERF-001B did not rerun MobileCLIP and therefore does not claim a semantic-inference gain. Existing cache validation continues to avoid recomputing unchanged embeddings.
 
-### PERF-002 planned follow-up
+### PERF-002 implementation
 
 The Product Owner observed that selecting multiple Cleanup Review images and
-assigning a category feels a little slow. PERF-002 will investigate
+assigning a category feels a little slow. PERF-002 measured and optimized
 multi-selection and selection latency, bulk category assignment, repeated
 sidecar/database writes, grid refresh and unnecessary full-grid rebuilds, repaint frequency,
 preservation of scroll position and selection, and asynchronous or batched
-persistence where safe. PERF-002 is not implemented. Because no baseline
-comparison was performed, the observation is not attributed to PR #50.
+persistence where safe. Learning profile derivation/persistence is now coalesced
+once per bulk action, affected cards update incrementally, and aggregate timings
+are logged. The synthetic 10/100/1,000-photo results are recorded in
+`docs/architecture/PERF_002_CLEANUP_BULK.md`. The observation is not attributed
+to PR #50. **MODEL-004B — Face Detection is the recommended next feature milestone.**
 
 ---
 
