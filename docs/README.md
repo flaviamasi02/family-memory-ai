@@ -139,6 +139,8 @@ Start from the document that matches your goal:
 | [development/DECISIONS.md](development/DECISIONS.md) | Architecture Decision (DEC) ledger | Developers, architects, AI assistants | Architecture governance |
 | [development/DOCUMENTATION_ARCHITECTURE.md](development/DOCUMENTATION_ARCHITECTURE.md) | Documentation structure, ownership, and rules | Developers, AI assistants | Documentation governance |
 | [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md) | High-level architecture and module boundaries | Developers, architects | Architecture governance |
+| [architecture/DATA_MODEL.md](architecture/DATA_MODEL.md) | Implemented managed-library schema and synchronization model | Developers, architects | Architecture governance |
+| [architecture/DATA_001_CENTRAL_METADATA_STORAGE.md](architecture/DATA_001_CENTRAL_METADATA_STORAGE.md) | Canonical DATA-001 contract, increments, and migration boundaries | Developers, architects | Architecture governance |
 | [releases/CHANGELOG.md](releases/CHANGELOG.md) | Versioned implementation history | Developers, stakeholders | Release management |
 
 ---

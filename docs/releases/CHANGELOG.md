@@ -2,32 +2,25 @@
 
 ## Unreleased
 
-### DATA-001D — Incremental photo synchronization
+### PR #47 — DATA-001C/D repository registration and incremental synchronization
 
-- Added single-traversal change planning for unchanged, added, removed, moved, renamed, and updated photos with stable PhotoID and retained location history.
-- Unchanged imports now bypass image metadata/classification, thumbnail regeneration, semantic embedding submission, fingerprint reads after initial capture, and unnecessary location updates. Content-confirmed relocations preserve database metadata and re-key existing thumbnail/semantic caches without inference.
-- Added schema-version-4 synchronization counters, missing-photo lifecycle, bounded Developer Diagnostics summaries, lightweight status text, and automated synchronization/restart/performance/duplicate-preservation coverage. DATA-001E–H remain planned.
-- Added schema-version-5 classifier snapshots so unchanged and restart imports repopulate Cleanup Review without image reclassification; category/review history migration remains future scope.
+- Implemented DATA-001C: normal folder import now registers or reuses one application-managed library, persists stable LibraryID/PhotoID identities, locations, import runs/items, elapsed time, counters, and per-file outcomes through `PhotoRepository` and transactional `MetadataStore` work units. The central `family_memory.db` remains outside source folders.
+- Implemented DATA-001D: a single supported-media walk plans unchanged, added, updated, missing, moved, and renamed outcomes. Repeats and restarts avoid duplicate rows, retain historical locations and PhotoIDs, rehydrate preserved capture/classifier metadata, reuse thumbnails/embeddings, and submit only eligible added/updated photos to expensive work.
+- Advanced the expected schema to version 5: migration 3 adds import elapsed time; migration 4 adds incremental counters; migration 5 adds the current classification/relevance snapshot required for restart-safe Cleanup Review rehydration. This is not full legacy category/review migration.
+- Extended DEV-007 Developer Diagnostics to show the shared active LibraryID/database, actual/expected schema, health/integrity/foreign-key/migration checks, registered/active/removed photo counts, last incremental sync, and last import summary. CLI diagnostics remain supported but optional for normal validation.
+- Fixed validation regressions that could lose Cleanup/Memory Review state, start embedding work while MobileCLIP verification was active, hide worker-owned library state from Settings, or allow stale scan completion to publish. Scan IDs are monotonic and unique; only the current completion publishes through `ApplicationServices`; thread cleanup is deterministic.
+- Product Owner validation passed initial/repeated/added-photo imports, incremental reuse, Photo Browser, Memory Review, Cleanup Review, MobileCLIP and embedding reuse, active-library diagnostics, healthy version-5 schema, duplicate prevention, non-media filtering, and diagnostics-UI backup/validation. Automated coverage additionally exercises update/missing/move/rename and restart/lifecycle paths; this entry does not claim every such path was manually tested.
+- Compatibility: existing sidecars, JSON profiles, semantic cache, and face database remain where applicable; legacy migration, mobile synchronization, PERF-001, and MODEL-004B are not implemented by this change. DATA-001E–H remain planned.
 
-### DATA-001C — Photo repository and import registration
+### DEV-007 — Developer Diagnostics UI (earlier DATA-001B checkpoint)
 
-- Added automatic idempotent library registration to the existing background folder import, with stable persisted PhotoIDs and indexed `photo_locations`; original folders remain untouched.
-- Added `PhotoRepository` CRUD and PhotoID, relative-path, fingerprint/hash, and library-list lookups through `MetadataStore`.
-- Added durable import-run lifecycle, counters, elapsed time, per-file outcomes, batch transactions, rollback handling, restart/reimport stability, and regression coverage proving the scanner is invoked only once. Existing JSON/sidecars and all review, album, MobileCLIP, and semantic workflows remain unchanged; DATA-001D–H remain planned.
-
-### DEV-007 — Developer Diagnostics UI
-
-- Corrected the pre-existing mixed-folder scanner boundary: one shared supported-media extension contract now rejects databases, WAL/SHM files, sidecars, JSON, project/configuration, hidden non-media, and extensionless files before metadata, model, review, album, semantic, or thumbnail work. Added deterministic discovered/supported/skipped/job-count coverage; DATA-001B services remain isolated from normal import.
-- Restored lifecycle compatibility by removing redundant extension filtering from already validated scanner output, downstream queues, and thumbnail-worker construction; the strict filesystem boundary remains authoritative and CI test doubles/domain values pass through unchanged.
-
-- Added a collapsed Settings diagnostics section for non-terminal DATA-001B validation, using the composed registry and metadata store for explicit test-library registration/open, structured health/schema display, backup creation/validation, safe managed-folder opening, and a minimized clipboard report.
-- The surface has no Restore, Delete, SQL console, scan, import integration, or legacy migration action. CLI diagnostics remain supported; normal import remains disconnected from SQLite and DATA-001C remains next.
+- Added the collapsed, non-destructive Settings diagnostics surface and shared supported-media filtering. Its earlier “normal import disconnected” boundary was superseded by DATA-001C/D above; backup creation/validation and CLI commands remain available.
 
 ### DATA-001B — Full SQLite schema and migration operations
 
 - Added immutable schema migration version 2 with the full photo, location, embedding, category, review, album, preference, import-history, reserved face/person, and legacy-migration-ledger foundation, including domain constraints and lookup indexes.
 - Added checksum-verified transactional migrations, unsupported-schema handling, structured health reporting, validated SQLite online backup, safety-copy atomic restore, and explicit diagnostic commands.
-- Existing imports, sidecars, JSON profiles, semantic/face caches, UI workflows, and original photo folders remain unchanged and authoritative. No legacy content migration or SQLite cutover occurred; DATA-001C–H remain planned and Product Owner validation is pending.
+- Existing imports, sidecars, JSON profiles, semantic/face caches, UI workflows, and original photo folders remain unchanged and authoritative. At the historical DATA-001B checkpoint, no legacy content migration or SQLite cutover had occurred; DATA-001C/D are now implemented and validated, while DATA-001E–H remain planned.
 
 ### DATA-001A — Application data paths and library registry
 

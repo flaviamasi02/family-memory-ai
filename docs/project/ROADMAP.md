@@ -11,7 +11,7 @@
 
 ### Next
 
-1. DATA-001 — Central Metadata Storage (**DATA-001A–D implemented; Product Owner validation pending; DATA-001E–H planned**)
+1. DATA-001 — Central Metadata Storage (**DATA-001A–D implemented and Product Owner validated; DATA-001E–H planned**)
 2. PERF-001 — Semantic Embedding Performance (**planned; not started**)
 3. MODEL-004B — Face Detection (**planned; not started**)
 4. MODEL-004C — Face Embeddings (**planned; not started**)
@@ -19,7 +19,7 @@
 6. MODEL-004E — Person Management (**planned; not started**)
 7. MODEL-004F — Memory Review Integration (**planned; not started**)
 
-DATA-001 must be completed before PERF-001. Stabilizing central metadata architecture first allows PERF-001 to use centralized indexed storage and avoids optimizing a storage design that will immediately change. This approved sequence supersedes older “next recommended” statements retained below as historical context.
+DATA-001A, DATA-001B, DATA-001C, DATA-001D, and DEV-007 Developer Diagnostics UI are implemented. DATA-001E and the later approved DATA-001 increments remain planned; no additional DATA-001E scope is introduced here. DATA-001 must be completed before PERF-001. Stabilizing central metadata architecture first allows PERF-001 to use centralized indexed storage and avoids optimizing a storage design that will immediately change. This approved sequence supersedes older “next recommended” statements retained below as historical context.
 
 ### PERF-001 scope baseline
 

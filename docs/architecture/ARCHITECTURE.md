@@ -1,6 +1,6 @@
 # Family Memory AI Architecture
 
-## DATA-001 — Central Metadata Storage (DATA-001A–D implemented; Product Owner validation pending)
+## DATA-001 — Central Metadata Storage (DATA-001A–D implemented and Product Owner validated)
 
 DATA-001 establishes one central, application-owned SQLite database named `family_memory.db` for each managed photo library. Multiple databases split by photos, embeddings, people, review, or albums are not approved. The logical database includes Libraries, Photos, Embeddings, Categories, Review, Albums, Preferences, ImportHistory, Faces, and People; exact tables and physical schema may evolve during design without reopening the durable one-database decision.
 
@@ -23,6 +23,17 @@ AppData/
 Application data must not be written beside originals, and original images must never be modified to carry app metadata. Original folders remain clean. Export or portable-project support must be explicit and user-controlled. The architecture supports multiple libraries and future backup/export and mobile synchronization while the Windows desktop remains the only active implementation target and Android comes later.
 
 The authoritative technical contract is [DATA-001 — Central Metadata Storage Architecture Specification](DATA_001_CENTRAL_METADATA_STORAGE.md). It defines the current persistence inventory, stable library/photo identities, explicit schema, SQLite-BLOB embedding decision, service and concurrency boundaries, idempotent migration, backup/recovery, testing, and DATA-001A–H increments. The DATA-001A–D infrastructure is implemented; DATA-001 as a whole and DATA-001E–H remain incomplete.
+
+### Current folder-import and active-library flow
+
+1. The user selects a folder. `ScanWorker` performs the single supported-media filesystem walk while `ImportRegistrationService` compares each observation with repository state.
+2. `ApplicationServices` registers or reuses the folder’s stable LibraryID and prepares its application-managed `MetadataStore`; the source folder never owns `family_memory.db`.
+3. The synchronization plan classifies supported observations as unchanged, added, updated, moved, or renamed and identifies previously available locations that are now missing. Stat evidence (normalized relative path, size, and nanosecond mtime) is the unchanged fast path; a conservative partial fingerprint supports unique relocation matching.
+4. Unchanged and relocated items are rehydrated with the same PhotoID and persisted classifier/capture snapshot. Only added or updated photos undergo expensive extraction/classification, thumbnail generation, and embedding submission. Relocations re-key reusable thumbnail and semantic caches.
+5. Photo/location mutations, import history, per-item outcomes, and summary counters commit in a repository transaction. Current UI pages receive rich `Photo` domain objects; same-session reconciliation preserves review-domain state rather than replacing it with a thin persistence projection.
+6. The current completion is handled on the UI thread and publishes its prepared LibraryID/`MetadataStore` to the shared `ApplicationServices`; Settings diagnostics reads that exact context. Before a successful import, “No active library” is valid. Folder switches deterministically publish the successfully completed current folder.
+
+Each scan receives a monotonic, unique run ID. Completion is accepted only when it matches the latest issued scan and no newer folder request is pending, so stale workers cannot replace photos or active-library state. SQLite connections are never shared across threads: `MetadataStore` opens a connection per work unit. Worker terminal signals request thread shutdown directly, while matching thread-finished handlers own deterministic cleanup and queued-import continuation.
 
 ## Purpose
 
