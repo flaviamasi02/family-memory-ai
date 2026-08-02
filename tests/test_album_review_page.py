@@ -38,6 +38,7 @@ from vision.embedding_provider import (
     source_identity,
 )
 from vision.semantic_similarity_service import canonical_photo_key
+from core.selection_diagnostics import clear_selection_diagnostics
 
 
 class AlbumReviewPageTests(unittest.TestCase):
@@ -45,9 +46,13 @@ class AlbumReviewPageTests(unittest.TestCase):
     def setUpClass(cls):
         cls._app = QApplication.instance() or QApplication([])
 
+    def setUp(self):
+        clear_selection_diagnostics()
+
     def tearDown(self):
         os.environ.pop("FAMILY_MEMORY_CATEGORIES_ROOT", None)
         reset_category_registry()
+        clear_selection_diagnostics()
 
     def _make_breakdown(
         self,
@@ -1054,6 +1059,119 @@ class AlbumReviewPageTests(unittest.TestCase):
 
         self.assertEqual(page._grid_rebuild_count, rebuild_before)
         self.assertEqual(page.filename_value.text(), "photo_5.jpg")
+
+    def test_perf_003_selection_updates_only_delta_and_finalizes_details(self):
+        breakdowns = [self._make_virtual_breakdown(index) for index in range(423)]
+        page = AlbumReviewPage()
+        page.set_scored_photos(breakdowns)
+        self._flush_ui(wait_ms=80)
+        cards = list(page._cards_by_key.values())
+        for card in cards:
+            card.set_selected = Mock(wraps=card.set_selected)
+        rebuilds_before = page.grid_rebuild_count()
+        scroll_before = page.grid_scroll.verticalScrollBar().value()
+
+        target_key = page._photo_key(breakdowns[9].photo)
+        page._select_key(target_key, additive=True)
+
+        changed_calls = sum(card.set_selected.call_count for card in cards)
+        self.assertEqual(changed_calls, 1)
+        self.assertEqual(page.grid_rebuild_count(), rebuilds_before)
+        self.assertEqual(page.grid_scroll.verticalScrollBar().value(), scroll_before)
+        self.assertEqual(page._details_key, target_key)
+        self.assertEqual(page.filename_value.text(), "photo_9.jpg")
+
+        # With 423 rows, score sorting does not preserve numeric fixture order.
+        # Select the intended photo by its authoritative key, not visible index.
+        second_key = page._photo_key(breakdowns[12].photo)
+        page._select_key(second_key, additive=False)
+        self.assertEqual(page._details_key, second_key)
+        self.assertEqual(page.filename_value.text(), "photo_12.jpg")
+        self.assertIs(page._current_details_row.breakdown.photo, breakdowns[12].photo)
+
+        stale_row = page._rows_by_key[target_key]
+        stale_generation = page._details_generation - 1
+        page._pending_preview_row = stale_row
+        page._preview_timer.setProperty("generation", page._preview_generation)
+        page._preview_timer.setProperty("details_generation", stale_generation)
+        page._complete_deferred_preview()
+        self.assertEqual(page.filename_value.text(), "photo_12.jpg")
+        self.assertIs(page._current_details_row.breakdown.photo, breakdowns[12].photo)
+
+    def test_perf_003_twenty_ctrl_clicks_have_constant_card_work(self):
+        breakdowns = [self._make_virtual_breakdown(index) for index in range(423)]
+        page = AlbumReviewPage()
+        page.set_scored_photos(breakdowns)
+        self._flush_ui(wait_ms=100)
+        page.clear_selection()
+        cards = list(page._cards_by_key.values())
+        for card in cards:
+            card.set_selected = Mock(wraps=card.set_selected)
+        page._update_selection_count = Mock(wraps=page._update_selection_count)
+        rebuilds_before = page.grid_rebuild_count()
+        thumbnails_before = page.retained_thumbnail_count()
+
+        for index in range(20):
+            page._select_key(page._row_key(page._visible_rows[index]), additive=True)
+
+        self.assertEqual(page.selected_count(), 20)
+        self.assertEqual(
+            sum(card.set_selected.call_count for card in cards), 20
+        )
+        self.assertEqual(page._update_selection_count.call_count, 20)
+        self.assertTrue(page._preview_timer.isActive())
+        self.assertTrue(page._suggestion_timer.isActive())
+        self.assertEqual(
+            page._suggestion_timer.timerType(), Qt.TimerType.PreciseTimer
+        )
+        self.assertEqual(page.grid_rebuild_count(), rebuilds_before)
+        self.assertEqual(page.retained_thumbnail_count(), thumbnails_before)
+        page._select_key(page._row_key(page._visible_rows[10]), additive=True)
+        self.assertEqual(page.selected_count(), 19)
+        self.assertEqual(sum(card.set_selected.call_count for card in cards), 21)
+
+    def test_perf_003_bulk_selection_defers_one_final_suggestion(self):
+        breakdowns = [self._make_virtual_breakdown(index) for index in range(100)]
+        page = AlbumReviewPage()
+        page.set_scored_photos(breakdowns)
+        self._flush_ui(wait_ms=140)
+        page._category_suggestion_service.suggest = Mock(
+            return_value=CategorySuggestionResult(
+                source_photo_key="photo_20.jpg", status="insufficient_evidence"
+            )
+        )
+        page._category_suggestion_service.suggest.reset_mock()
+        rebuilds_before = page.grid_rebuild_count()
+        thumbnails_before = page.retained_thumbnail_count()
+
+        page._select_key(page._row_key(page._visible_rows[10]), additive=False)
+        page._select_key(page._row_key(page._visible_rows[20]), range_select=True)
+        self.assertEqual(page._category_suggestion_service.suggest.call_count, 0)
+        self.assertEqual(page._details_key, page._row_key(page._visible_rows[20]))
+        self.assertEqual(page.filename_value.text(), "photo_20.jpg")
+        self.assertEqual(page.selected_count(), 11)
+        self.assertEqual(page.grid_rebuild_count(), rebuilds_before)
+        self.assertEqual(page.retained_thumbnail_count(), thumbnails_before)
+        self.assertEqual(page._category_suggestion_service.suggest.call_count, 0)
+
+        self._flush_ui(wait_ms=780)
+        self.assertEqual(page._category_suggestion_service.suggest.call_count, 1)
+
+    def test_perf_003_clear_selection_skips_filter_sort_and_updates_count_once(self):
+        breakdowns = [self._make_virtual_breakdown(index) for index in range(20)]
+        page = AlbumReviewPage()
+        page.set_scored_photos(breakdowns)
+        self._flush_ui(wait_ms=80)
+        page.select_all_visible()
+        page._filtered_sorted_rows = Mock(wraps=page._filtered_sorted_rows)
+        page._update_selection_count = Mock(wraps=page._update_selection_count)
+
+        page.clear_selection()
+        page._filtered_sorted_rows.assert_not_called()
+        page._update_selection_count.assert_called_once()
+        self.assertEqual(page.selected_count(), 0)
+        self.assertEqual(page.filename_value.text(), "-")
+        self.assertIsNone(page._details_key)
 
     def test_cached_thumbnails_are_reused(self):
         with tempfile.TemporaryDirectory() as tmpdir:

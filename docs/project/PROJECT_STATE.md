@@ -1,6 +1,18 @@
 # Family Memory AI - Project State
 
-## Current status — 2026-08-01
+## Current status — 2026-08-02
+
+**PERF-003 — Memory Review Performance is not complete; Product Owner acceptance
+remains pending.** Earlier optimizations produced no perceived improvement on the
+Product Owner's Windows library. Developer Diagnostics now provides an opt-in
+real-device Memory Review/Cleanup Review selection comparison and temporary,
+non-persistent isolation controls. Aggregate measurements
+identified full rendered-card recreation on every sort as the main avoidable UI
+work. Sort-only updates now relayout retained cards, normalized-path row lookup
+is indexed, refreshes preserve compatible controls/selection/scroll, and Memory
+Review timings and avoided-rebuild counters are available in Developer
+Diagnostics. Details and evidence are recorded in
+`docs/architecture/PERF_003_MEMORY_REVIEW.md`. Face recognition has not started.
 
 **PERF-002 — Cleanup Review Bulk Interaction Performance is implemented.** Bulk
 category changes now coalesce learning-profile persistence, preserve compatible

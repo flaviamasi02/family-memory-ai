@@ -19,9 +19,11 @@ def page(tmp_path, monkeypatch):
     QApplication = widgets.QApplication
     from ui.settings_page import SettingsPage
     from core.perf_stats import clear_performance_history
+    from core.selection_diagnostics import clear_selection_diagnostics
 
     monkeypatch.setenv("FAMILY_MEMORY_APP_DATA_ROOT", str(tmp_path / "runtime"))
     clear_performance_history()
+    clear_selection_diagnostics()
     paths = ApplicationDataPathService(tmp_path / "app")
     registry = LibraryRegistry(paths)
     services = ApplicationServices(paths, registry, MetadataStore(paths, registry))
@@ -32,6 +34,7 @@ def page(tmp_path, monkeypatch):
     services.close()
     result.deleteLater()
     clear_performance_history()
+    clear_selection_diagnostics()
 
 
 def test_section_present_collapsed_and_safe_without_active_library(page):
@@ -54,6 +57,22 @@ def test_import_performance_title_has_valid_point_size(page):
     # Pixel-sized QSS fonts report pointSizeF() == -1 and caused Qt's warning
     # when its stylesheet-resolved title font was copied internally.
     assert "font-size" not in widget.import_performance_title.styleSheet()
+
+
+def test_memory_review_selection_measurement_controls_default_off(page):
+    widget, _, _, _ = page
+    assert widget.measure_memory_review_selection_button.text() == "Measure Memory Review selection"
+    assert "Open Memory Review" in widget.memory_review_measurement_instructions.text()
+    assert all(not checkbox.isChecked() for checkbox in widget.selection_diagnostic_bypasses.values())
+    widget.measure_memory_review_selection_button.click()
+    assert "measurement armed" in widget.diagnostics_status_label.text().lower()
+    widget.refresh_developer_diagnostics()
+    assert "Waiting for Memory Review selection..." in widget.memory_review_performance_report.toPlainText()
+
+
+def test_import_performance_summary_does_not_show_raw_html(page):
+    widget, _, _, _ = page
+    assert "<b>" not in widget.import_performance_summary.text()
 
 
 def test_import_efficiency_no_session_is_clear_and_explained(page):

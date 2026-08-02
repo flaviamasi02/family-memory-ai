@@ -12,6 +12,7 @@ from PySide6.QtGui import QDesktopServices, QFont, QGuiApplication
 from PySide6.QtWidgets import (
     QFileDialog,
     QButtonGroup,
+    QCheckBox,
     QComboBox,
     QGridLayout,
     QHBoxLayout,
@@ -43,6 +44,12 @@ from core.application_services import ApplicationServices, build_application_ser
 from core.perf_stats import (
     export_performance_report,
     performance_history,
+)
+from core.memory_review_perf import memory_review_performance_snapshot
+from core.selection_diagnostics import (
+    arm_selection_measurement,
+    selection_diagnostic_report,
+    set_selection_bypass,
 )
 from storage.errors import StorageError
 from storage.schema import SCHEMA_VERSION
@@ -416,6 +423,56 @@ class SettingsPage(QWidget):
         self.export_performance_button.clicked.connect(self._export_performance_report)
         panel.addWidget(self.export_performance_button)
 
+        self.memory_review_performance_title = QLabel("Memory Review Performance")
+        self.memory_review_performance_title.setStyleSheet("font-weight: 700; margin-top: 8px;")
+        panel.addWidget(self.memory_review_performance_title)
+        self.memory_review_performance_report = QTextEdit()
+        self.memory_review_performance_report.setReadOnly(True)
+        self.memory_review_performance_report.setMaximumHeight(180)
+        self.memory_review_performance_report.setToolTip(
+            "Aggregate Memory Review UI timings. Values are process-local and contain no per-photo logs."
+        )
+        panel.addWidget(self.memory_review_performance_report)
+        self.measure_memory_review_selection_button = QPushButton(
+            "Measure Memory Review selection"
+        )
+        self.measure_memory_review_selection_button.clicked.connect(
+            lambda _checked=False: self._arm_selection_measurement("memory")
+        )
+        panel.addWidget(self.measure_memory_review_selection_button)
+        self.measure_cleanup_review_selection_button = QPushButton(
+            "Measure Cleanup Review selection"
+        )
+        self.measure_cleanup_review_selection_button.clicked.connect(
+            lambda _checked=False: self._arm_selection_measurement("cleanup")
+        )
+        panel.addWidget(self.measure_cleanup_review_selection_button)
+        self.memory_review_measurement_instructions = QLabel(
+            "Open Memory Review, then select several photos. Return here to view the measured result."
+        )
+        self.memory_review_measurement_instructions.setWordWrap(True)
+        panel.addWidget(self.memory_review_measurement_instructions)
+        self.selection_diagnostic_warning = QLabel(
+            "Temporary diagnostic controls: displayed information may be incomplete while a bypass is enabled."
+        )
+        self.selection_diagnostic_warning.setWordWrap(True)
+        panel.addWidget(self.selection_diagnostic_warning)
+        self.selection_diagnostic_bypasses = {}
+        for key, label in (
+            ("preview", "Memory Review diagnostic: skip preview loading"),
+            ("details", "Memory Review diagnostic: skip detail-panel refresh"),
+            ("suggestions", "Memory Review diagnostic: skip AI suggestions"),
+            ("styling", "Memory Review diagnostic: skip selection styling"),
+        ):
+            set_selection_bypass(key, False)
+            checkbox = QCheckBox(label)
+            checkbox.setChecked(False)
+            checkbox.toggled.connect(
+                lambda checked, bypass_key=key: set_selection_bypass(bypass_key, checked)
+            )
+            self.selection_diagnostic_bypasses[key] = checkbox
+            panel.addWidget(checkbox)
+
         actions = QGridLayout()
         action_specs = (
             ("diagnostics_refresh_button", "Refresh", self.refresh_developer_diagnostics),
@@ -441,6 +498,12 @@ class SettingsPage(QWidget):
     def _set_diagnostics_status(self, text: str) -> None:
         self.diagnostics_status_label.setText(text)
 
+    def _arm_selection_measurement(self, workspace: str = "memory") -> None:
+        arm_selection_measurement(workspace)
+        self._set_diagnostics_status(
+            f"{workspace.title()} Review selection measurement armed. Select photos, then Refresh."
+        )
+
     def refresh_developer_diagnostics(self) -> None:
         services = self.application_services
         records = services.library_registry.list_libraries()
@@ -454,6 +517,31 @@ class SettingsPage(QWidget):
             if index >= 0:
                 self.diagnostics_library_selector.setCurrentIndex(index)
         self.diagnostics_library_selector.blockSignals(False)
+        snapshot = memory_review_performance_snapshot()
+        timings = snapshot["timings"]
+        counters = snapshot["counters"]
+        readable_order = (
+            "Memory Review load", "Score retrieval", "Database reads",
+            "Grid creation", "Filter update", "Sort update", "Selection update",
+            "Ctrl-click selection", "Deselection", "Shift range selection",
+            "Select all visible", "Clear selection", "Selection highlight update",
+            "Selection highlight visible", "Selected-count label update",
+            "Preview refresh", "Suggestion refresh", "Thumbnail refresh",
+        )
+        memory_lines = [selection_diagnostic_report(), "", "Recent aggregate timings (last / average / maximum)"]
+        for name in readable_order:
+            values = timings.get(name)
+            if values is None:
+                memory_lines.append(f"{name}: —")
+            else:
+                memory_lines.append(
+                    f"{name}: {values['last_ms']:.1f} / {values['average_ms']:.1f} / "
+                    f"{values['max_ms']:.1f} ms ({values['count']} samples)"
+                )
+        if counters:
+            memory_lines.extend(("", "Update counters"))
+            memory_lines.extend(f"{key}: {value}" for key, value in sorted(counters.items()))
+        self.memory_review_performance_report.setPlainText("\n".join(memory_lines))
         store = services.metadata_store
         health = store.health_check() if store.library_id else None
         sync = store.incremental_sync_summary() if store.library_id else None
@@ -560,8 +648,8 @@ class SettingsPage(QWidget):
         self.import_efficiency_completion.setText("Import completed successfully")
         self.import_efficiency_result.setText(f"{'★' * stars}{'☆' * (5 - stars)}  {status}")
         self.import_performance_summary.setText(
-            f"Import completed in\n<b>{session.total_ms / 1000:.2f} seconds</b>\n\n"
-            f"Slowest activity\n<b>{session.identify_bottleneck() or 'Not available'}</b>"
+            f"Import completed in\n{session.total_ms / 1000:.2f} seconds\n\n"
+            f"Slowest activity\n{session.identify_bottleneck() or 'Not available'}"
         )
         lines = [
             "All timings and developer counters",

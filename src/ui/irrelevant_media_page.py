@@ -36,6 +36,12 @@ from ui.components.workspace_info_content import WORKSPACE_INFO_CONTENT
 from ui.components.workspace_info_panel import WorkspaceInfoPanel
 from ui.image_preview_dialog import ImagePreviewDialog
 from ui.shared_thumbnail_grid import SharedGridItem, SharedThumbnailGrid
+from core.selection_diagnostics import (
+    add_selection_count,
+    add_selection_time,
+    begin_selection_measurement,
+    finish_selection_measurement,
+)
 from ui.help.workspace_help_content import CLEANUP_REVIEW_WORKSPACE
 from workers.face_detection_worker import FaceDetectionWorker
 
@@ -486,16 +492,32 @@ class IrrelevantMediaPage(QWidget):
             self.moved_photos.emit(moved_photos)
 
     def _on_grid_selection_changed(self, selected_keys: set[str], selected_key: Optional[str]) -> None:
-        _ = selected_keys
+        started = time.perf_counter()
+        measurement = begin_selection_measurement("cleanup")
+        if measurement is not None:
+            add_selection_count("Selected photos", len(selected_keys))
+            add_selection_count("Visible cards", self.thumbnail_grid.rendered_card_count())
         self.selection_count_label.setText(f"Selected: {self.thumbnail_grid.selected_count()}")
+        add_selection_time("Selected-count update", (time.perf_counter() - started) * 1000.0)
         if not selected_key:
             self._clear_details()
+            finish_selection_measurement(deferred=True)
             return
         row = self._row_for_key(selected_key)
         if row is None:
             self._clear_details()
+            finish_selection_measurement(deferred=True)
             return
+        details_started = time.perf_counter()
         self._show_details(row)
+        add_selection_time("Detail text update", (time.perf_counter() - details_started) * 1000.0)
+        add_selection_count("Detail refreshes")
+        add_selection_count("Grid rebuilds", 0)
+        add_selection_count("Filter operations", 0)
+        add_selection_count("Sort operations", 0)
+        add_selection_count("Layout activation calls", 0)
+        add_selection_time("Total synchronous UI-thread time", (time.perf_counter() - started) * 1000.0)
+        finish_selection_measurement(deferred=True)
 
     def _on_card_double_clicked(self, key: str) -> None:
         self.open_preview_for_key(key)

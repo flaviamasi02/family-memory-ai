@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
+from core.selection_diagnostics import clear_selection_diagnostics
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QMessageBox
 
@@ -22,7 +23,11 @@ class IrrelevantMediaPageTests(unittest.TestCase):
     def setUpClass(cls):
         cls._app = QApplication.instance() or QApplication([])
 
+    def setUp(self):
+        clear_selection_diagnostics()
+
     def tearDown(self):
+        clear_selection_diagnostics()
         os.environ.pop("FAMILY_MEMORY_CATEGORIES_ROOT", None)
         reset_category_registry()
 

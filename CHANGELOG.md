@@ -1,5 +1,20 @@
 # Changelog
 
+### PERF-003 — Memory Review Performance
+
+- Added an opt-in, non-persistent real-device selection measurement and isolation panel for side-by-side Memory Review/Cleanup Review diagnosis; Product Owner acceptance remains pending and no new bottleneck fix is claimed.
+- Fixed diagnostic arming so the Memory Review button targets only Memory Review, cannot be consumed by Cleanup Review events, clears incomplete prior runs, and visibly reports its waiting state until selection completes.
+- Completed event-loop-aware measurement through first selected-card paint and deferred settling, moved the requested report above legacy aggregates, deferred/coalesced preview scaling/loading until after selection handling, and removed literal `<b>` tags from Import Performance text.
+- Fixed the second-click path by making normal Ctrl-click delta calculation strictly one-key/O(1) and moving semantic suggestion execution to a 750 ms idle debounce; one preview timer and one suggestion timer are restarted rather than accumulated across rapid clicks.
+- Bound detail text, preview, and AI work to one authoritative row snapshot plus generation token, invalidated pending work on data/view reset, and corrected the 423-row regression to select photo 9/12 by stable key rather than score-sorted visible index.
+- Made duplicate push/pull-request CI deterministic by batching the selection microbenchmark under controlled GC and clearing process-local selection diagnostics before and after every affected UI test.
+- Made the single final 750 ms suggestion debounce deterministic with Qt `PreciseTimer`; the previous coarse timer could legally fire beyond the regression window and falsely appear cancelled while selection performance remained correct.
+- Added aggregate Memory Review timings and readable Developer Diagnostics for load, grid, filters, sorting, selection, preview, suggestions, thumbnails, scoring, and database reads.
+- Reused and relaid out existing cards for sort-only changes, indexed row lookup, and preserved compatible selection, filters, search, sort, thumbnails, and scroll across refreshes.
+- Documented measured code-path bottlenecks and added bounded diagnostics regression coverage without changing scoring or AI suggestion behavior.
+- Follow-up Product Owner feedback removed the remaining all-card stylesheet pass during selection, batches changed highlights, debounces AI suggestion refreshes, and adds reproducible 1/10/100/1,000-item selection measurements.
+- Simplified selection finalization after CI and Product Owner feedback: one authoritative call now replaces all final-row detail fields synchronously, including missing-value defaults, while only suggestion computation remains debounced.
+
 ## Unreleased
 
 ### UX-004 — Product Owner Performance Dashboard
