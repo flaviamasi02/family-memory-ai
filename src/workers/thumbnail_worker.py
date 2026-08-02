@@ -70,12 +70,17 @@ class ThumbnailWorker(QObject):
                         if cached_image is not None:
                             _cache_hits += 1
                             self._mark_thumbnail_ready(photo, cache_path)
+                            photo.metadata.pop("thumbnail_history_requested", None)
                             self.thumbnail_status_updated.emit(photo)
                             self.thumbnail_ready.emit(photo, cached_image)
                             continue
 
                         _cache_misses += 1
-                        if getattr(photo, "sync_state", "added") not in {"added", "updated"}:
+                        history_requested = bool(
+                            (getattr(photo, "metadata", {}) or {}).get("thumbnail_history_requested", False)
+                        )
+                        if (getattr(photo, "sync_state", "added") not in {"added", "updated"}
+                                and not history_requested):
                             # Incremental sync never decodes unchanged content.
                             # A missing disposable cache can be regenerated only
                             # after the file itself changes or is newly added.
@@ -100,6 +105,7 @@ class ThumbnailWorker(QObject):
                             print(f"Failed to cache thumbnail for {photo.path}: {exc}")
 
                         self._mark_thumbnail_ready(photo, cache_path)
+                        photo.metadata.pop("thumbnail_history_requested", None)
 
                         self.thumbnail_status_updated.emit(photo)
                         self.thumbnail_ready.emit(photo, image)

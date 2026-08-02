@@ -186,25 +186,28 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                 _purpose_section(
                     why_this_workspace_exists="Cleanup Review protects memory quality by isolating files that are likely non-memory content before album building.",
                     problem_it_solves="Screenshots, ads, duplicates, documents, and low-value media can pollute review quality if mixed with family memories.",
-                    ai_automation="The classifier proposes categories, confidence, and safe actions; exact duplicate candidates are grouped deterministically.",
-                    user_interaction="Confirm keep or move decisions and correct categories when the recommendation does not match your intent.",
-                    expected_outcome="A safer, cleaner working set with non-memory media moved to cleanup review instead of permanent deletion.",
+                    ai_automation="The classifier conservatively proposes To Trash with confidence and an explanation; it never moves a proposal automatically.",
+                    user_interaction="Review and explicitly confirm To Trash proposals before moving, reject incorrect proposals, or restore moved photos.",
+                    expected_outcome="To review shows only active work. Moved files disappear from normal workflows, are never permanently deleted, and remain available in Trash History for restore.",
                 ),
                 _workflow_section(
                     [
                         "Inspect Cleanup Candidates",
                         "Check AI Reasons and Confidence",
-                        "Apply Keep or Move Decisions",
+                        "Confirm Selected To Trash Proposals",
                         "Correct Category Where Needed",
                         "Run Face Analysis for Ambiguous Items",
-                        "Complete Safe Cleanup Separation",
+                        "Move Confirmed Photos to Family Memory Trash",
+                        "Restore From Trash When Needed",
+                        "Switch to Trash History for Move and Restore Audit",
                     ]
                 ),
                 _best_practices_section(
                     [
                         "Use category grouping to process one media type at a time.",
                         "Prioritize low-confidence items first; they need your judgment most.",
-                        "Move files to cleanup review rather than deleting anything immediately.",
+                        "Only explicitly confirmed files can move to Trash; proposals alone are never moved.",
+                        "Check the shown destination before moving. Files are never permanently deleted.",
                         "Use face analysis on uncertain candidates before final decisions.",
                         "Reclassify unknown items after enough corrections are available.",
                     ]
@@ -217,7 +220,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                         ),
                         WorkspaceHelpTip(
                             title="Safety Tip",
-                            body="Cleanup moves are reversible when reviewed in the dedicated cleanup folder. The compact workspace introduction panel at the top can be collapsed whenever you need more grid space.",
+                            body="Trash moves are reversible, history is retained, and moved photos are excluded from normal active review. The compact workspace introduction panel can be collapsed for more grid space.",
                         ),
                     ]
                 ),

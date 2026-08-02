@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 import logging
+import hashlib
+import os
 import time
 from contextlib import ExitStack, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import Qt, QTimer, QThread, Signal
+from PySide6.QtCore import QSettings, Qt, QTimer, QThread, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
+    QButtonGroup,
     QFormLayout,
+    QFileDialog,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -27,6 +32,8 @@ from core.category_registry import get_category_registry
 from core.image_display_loader import load_display_thumbnail
 from core.media_classifier import MediaCategory, MediaClassifier
 from core.safe_file_move_service import CLEANUP_REVIEW_FOLDER_NAME, move_files_to_cleanup_review
+from core.trash_workflow_service import TrashRecord, TrashWorkflowService
+from cache.thumbnail_cache import get_thumbnail_cache_path, preserve_thumbnail_for_relocation
 from core.user_metadata_service import UserMetadataService
 from learning.category_learning_engine import get_category_learning_engine
 from learning.preference_learning_engine import get_preference_learning_engine
@@ -56,6 +63,15 @@ RECOMMENDED_ACTION_LABELS = {
 }
 
 
+def cleanup_photo_identity(photo) -> str:
+    """One identity for rows, cards, selections, caches, and worker results."""
+    photo_id = str(getattr(photo, "id", "") or "").strip()
+    if photo_id:
+        return f"photo:{photo_id}"
+    current_path = Path(getattr(photo, "path", "")).resolve(strict=False)
+    return os.path.normcase(os.path.normpath(str(current_path)))
+
+
 @dataclass
 class CleanupReviewRow:
     photo: object
@@ -73,6 +89,8 @@ class IrrelevantMediaPage(QWidget):
     categories_changed = Signal()
     faces_analyzed = Signal(object)
     help_requested = Signal(str)
+    active_state_changed = Signal(object)
+    history_thumbnails_requested = Signal(object)
 
     WORKSPACE_ID = CLEANUP_REVIEW_WORKSPACE
 
@@ -97,6 +115,13 @@ class IrrelevantMediaPage(QWidget):
         self._face_detection_thread: Optional[QThread] = None
         self._face_detection_worker: Optional[FaceDetectionWorker] = None
         self._bulk_category_in_progress = False
+        self._view_scroll_positions = {"review": 0, "history": 0}
+        self._trash_destination: Optional[Path] = None
+        self._trash_destination_error = "Import a library to choose a Trash destination."
+        self._trash_settings = QSettings(
+            QSettings.Format.IniFormat, QSettings.Scope.UserScope,
+            "FamilyMemoryAI", "CleanupReview",
+        )
         self.last_bulk_performance: dict[str, int | float] = {}
 
         self.header = WorkspaceHeader("Cleanup Review")
@@ -117,6 +142,39 @@ class IrrelevantMediaPage(QWidget):
 
         self.category_filter_combo = QComboBox()
         self.category_filter_combo.currentTextChanged.connect(self._trigger_refresh)
+        self.view_combo = QComboBox()
+        self.view_combo.addItem("To review", "review")
+        self.view_combo.addItem("Trash History", "history")
+        self.view_combo.currentIndexChanged.connect(self._on_view_combo_changed)
+        self.view_combo.setVisible(False)  # compatibility state; visible switch uses both labeled buttons
+        self.view_to_review_button = QPushButton("To review")
+        self.view_history_button = QPushButton("Trash History")
+        for button in (self.view_to_review_button, self.view_history_button):
+            button.setCheckable(True)
+            button.setMinimumSize(150, 38)
+            button.setStyleSheet(
+                "QPushButton { font-weight: 600; padding: 7px 18px; } "
+                "QPushButton:checked { background: #1f6feb; color: white; border: 2px solid #174ea6; }"
+            )
+        self.view_to_review_button.setChecked(True)
+        self.view_button_group = QButtonGroup(self)
+        self.view_button_group.setExclusive(True)
+        self.view_button_group.addButton(self.view_to_review_button)
+        self.view_button_group.addButton(self.view_history_button)
+        self.view_to_review_button.clicked.connect(lambda: self._select_cleanup_view("review"))
+        self.view_history_button.clicked.connect(lambda: self._select_cleanup_view("history"))
+        self.view_explanation_label = QLabel("Photos still requiring cleanup decisions.")
+        self.view_explanation_label.setWordWrap(True)
+
+        self.view_switch = QGroupBox("View")
+        self.view_switch.setObjectName("cleanupViewSwitch")
+        view_switch_layout = QVBoxLayout(self.view_switch)
+        view_buttons = QHBoxLayout()
+        view_buttons.addWidget(self.view_to_review_button)
+        view_buttons.addWidget(self.view_history_button)
+        view_buttons.addStretch(1)
+        view_switch_layout.addLayout(view_buttons)
+        view_switch_layout.addWidget(self.view_explanation_label)
 
         self.confidence_filter_combo = QComboBox()
         self.confidence_filter_combo.addItems([
@@ -201,6 +259,12 @@ class IrrelevantMediaPage(QWidget):
         self.user_category_value = QLabel("-")
         self.effective_category_value = QLabel("-")
         self.decision_value = QLabel("-")
+        self.trash_status_value = QLabel("-")
+        self.original_path_value = QLabel("-")
+        self.original_path_value.setWordWrap(True)
+        self.current_trash_path_value = QLabel("-")
+        self.current_trash_path_value.setWordWrap(True)
+        self.trash_moved_at_value = QLabel("-")
         self.metadata_summary_value = QLabel("-")
         self.metadata_summary_value.setWordWrap(True)
 
@@ -211,6 +275,10 @@ class IrrelevantMediaPage(QWidget):
         details_form.addRow("Recommended action:", self.recommended_action_value)
         details_form.addRow("Current user category:", self.user_category_value)
         details_form.addRow("Effective category:", self.effective_category_value)
+        details_form.addRow("Status:", self.trash_status_value)
+        details_form.addRow("Original path:", self.original_path_value)
+        details_form.addRow("Current Trash path:", self.current_trash_path_value)
+        details_form.addRow("Moved date:", self.trash_moved_at_value)
         details_form.addRow("Current decision:", self.decision_value)
         details_form.addRow("Metadata summary:", self.metadata_summary_value)
 
@@ -226,6 +294,39 @@ class IrrelevantMediaPage(QWidget):
         self.keep_button.clicked.connect(lambda: self._set_decision_for_selected("keep"))
         self.move_button = QPushButton("Move to Cleanup Folder")
         self.move_button.clicked.connect(self.move_selected_to_quarantine)
+        self.confirm_trash_button = QPushButton("Confirm selected for Trash")
+        self.confirm_trash_button.clicked.connect(self.confirm_selected_for_trash)
+        self.move_trash_button = QPushButton("Move confirmed photos to Trash")
+        self.move_trash_button.clicked.connect(self.move_confirmed_to_trash)
+        self.move_trash_button.setMinimumSize(340, 48)
+        self.move_trash_button.setStyleSheet(
+            "QPushButton { background: #b42318; color: white; font-size: 14px; "
+            "font-weight: 700; border-radius: 5px; padding: 10px 16px; } "
+            "QPushButton:disabled { background: #aaa; color: #eee; }"
+        )
+        self.trash_counts_label = QLabel()
+        self.trash_counts_label.setObjectName("trashWorkflowCounts")
+        self.trash_counts_label.setWordWrap(True)
+        self.trash_destination_label = QLabel("No valid Trash destination")
+        self.trash_destination_label.setObjectName("trashDestinationPath")
+        self.trash_destination_label.setWordWrap(True)
+        self.trash_destination_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.trash_explanation_label = QLabel(
+            "Only photos explicitly confirmed for Trash will move. Files are never permanently deleted."
+        )
+        self.trash_explanation_label.setWordWrap(True)
+        self.change_trash_folder_button = QPushButton("Change Trash folder…")
+        self.change_trash_folder_button.clicked.connect(self.change_trash_folder)
+        self.restore_trash_button = QPushButton("Restore selected photos")
+        self.restore_trash_button.clicked.connect(self.restore_selected_photos)
+        self.restore_trash_button.setMinimumSize(300, 44)
+        self.restore_trash_button.setStyleSheet(
+            "QPushButton { background: #1f6feb; color: white; font-size: 14px; "
+            "font-weight: 700; border-radius: 5px; padding: 9px 16px; }"
+        )
+        self.trash_action_status_label = QLabel("")
+        self.trash_action_status_label.setObjectName("trashActionStatus")
+        self.trash_action_status_label.setWordWrap(True)
         self.category_selector = QComboBox()
         self.apply_category_button = QPushButton("Apply Category to Selected")
         self.apply_category_button.clicked.connect(lambda: self._apply_category_to_selected(str(self.category_selector.currentData() or "unknown")))
@@ -245,11 +346,24 @@ class IrrelevantMediaPage(QWidget):
         actions_row_one = QHBoxLayout()
         actions_row_one.addWidget(self.keep_button)
         actions_row_one.addWidget(self.move_button)
+        actions_row_one.addWidget(self.confirm_trash_button)
 
         actions_row_two = QHBoxLayout()
         actions_row_two.addWidget(QLabel("Category:"))
         actions_row_two.addWidget(self.category_selector, 1)
         actions_row_two.addWidget(self.apply_category_button)
+
+        trash_actions = QGroupBox("Trash actions")
+        trash_actions.setObjectName("trashActionsSection")
+        trash_layout = QVBoxLayout(trash_actions)
+        trash_layout.addWidget(self.trash_counts_label)
+        trash_layout.addWidget(QLabel("Trash destination:"))
+        trash_layout.addWidget(self.trash_destination_label)
+        trash_layout.addWidget(self.change_trash_folder_button)
+        trash_layout.addWidget(self.trash_explanation_label)
+        trash_layout.addWidget(self.move_trash_button)
+        trash_layout.addWidget(self.restore_trash_button)
+        trash_layout.addWidget(self.trash_action_status_label)
 
         details_layout = QVBoxLayout()
         details_layout.addWidget(QLabel("Preview"))
@@ -271,6 +385,7 @@ class IrrelevantMediaPage(QWidget):
         grid_panel = QWidget()
         grid_layout = QVBoxLayout(grid_panel)
         grid_layout.setContentsMargins(0, 0, 0, 0)
+        grid_layout.addWidget(trash_actions)
         grid_layout.addWidget(self.results_label)
         grid_layout.addWidget(self.thumbnail_grid, 1)
 
@@ -285,6 +400,7 @@ class IrrelevantMediaPage(QWidget):
         root.addWidget(self.header)
         root.addWidget(self.info_panel)
         root.addWidget(self.stats_label)
+        root.addWidget(self.view_switch)
         root.addLayout(toolbar)
         root.addWidget(splitter, 1)
 
@@ -302,8 +418,60 @@ class IrrelevantMediaPage(QWidget):
         self._refresh_group_options()
         self._trigger_refresh(force=True)
 
+    def _select_cleanup_view(self, view: str) -> None:
+        current = str(self.view_combo.currentData() or "review")
+        self._view_scroll_positions[current] = self.thumbnail_grid.scroll_value()
+        index = self.view_combo.findData(view)
+        if index < 0 or view == current:
+            return
+        self.view_combo.blockSignals(True)
+        self.view_combo.setCurrentIndex(index)
+        self.view_combo.blockSignals(False)
+        self._sync_visible_view_switch(view)
+        self._trigger_refresh(force=True)
+        if view == "history":
+            self._request_missing_history_thumbnails()
+        target = self._view_scroll_positions.get(view, 0)
+        self.thumbnail_grid.restore_scroll_value(target)
+        QTimer.singleShot(50, lambda value=target: self.thumbnail_grid.restore_scroll_value(value))
+
+    def _on_view_combo_changed(self) -> None:
+        view = str(self.view_combo.currentData() or "review")
+        self._sync_visible_view_switch(view)
+        self._trigger_refresh(force=True)
+        if view == "history":
+            self._request_missing_history_thumbnails()
+
+    def _request_missing_history_thumbnails(self) -> None:
+        missing = []
+        for row in self._visible_rows:
+            metadata = getattr(row.photo, "metadata", {}) or {}
+            if (self._thumbnail_for_photo(row.photo, (140, 140)) is None
+                    and not metadata.get("thumbnail_history_requested", False)):
+                row.photo.metadata["thumbnail_history_requested"] = True
+                missing.append(row.photo)
+        if missing:
+            self.history_thumbnails_requested.emit(missing)
+
+    def _sync_visible_view_switch(self, view: str) -> None:
+        self.view_to_review_button.setChecked(view == "review")
+        self.view_history_button.setChecked(view == "history")
+        self.view_explanation_label.setText(
+            "Photos already moved to Trash. You can review or restore them here."
+            if view == "history" else "Photos still requiring cleanup decisions."
+        )
+
     def set_photos(self, photos, imported_root: Optional[str | Path], total_imported_count: Optional[int] = None) -> None:
         self._imported_root = Path(imported_root) if imported_root else None
+        if self._imported_root is not None:
+            saved = self._trash_settings.value(self._trash_destination_setting_key(), "", type=str)
+            chosen = Path(saved) if saved else TrashWorkflowService(self._imported_root).default_destination
+            if not self._set_trash_destination(chosen):
+                self._set_trash_destination(TrashWorkflowService(self._imported_root).default_destination)
+        else:
+            self._trash_destination = None
+            self._trash_destination_error = "Import a library before moving photos to Trash."
+            self._update_trash_actions()
         self._imported_total_count = int(total_imported_count) if isinstance(total_imported_count, int) else len(photos or [])
 
         self._rows = [self._build_row(photo) for photo in list(photos or [])]
@@ -491,6 +659,235 @@ class IrrelevantMediaPage(QWidget):
             self._trigger_refresh(force=True)
             self.moved_photos.emit(moved_photos)
 
+    def confirm_selected_for_trash(self) -> None:
+        selected = [row for row in self._selected_rows() if row.effective_category == "to_trash"]
+        for row in selected:
+            row.photo.metadata["trash_workflow_state"] = "confirmed_to_trash"
+            row.user_decision = "confirmed_to_trash"
+            self._save_photo_user_metadata(row.photo)
+        if selected:
+            noun = "photo" if len(selected) == 1 else "photos"
+            message = f"{len(selected)} {noun} confirmed for Trash."
+            self._show_user_saved_indicator(message)
+            self._show_trash_status(message, "success")
+            self._trigger_refresh(force=True)
+
+    def change_trash_folder(self) -> None:
+        start = str(self._trash_destination or (self._imported_root.parent if self._imported_root else Path.home()))
+        selected = QFileDialog.getExistingDirectory(self, "Choose Trash folder", start)
+        if selected:
+            self._set_trash_destination(Path(selected), remember=True)
+
+    def _trash_destination_setting_key(self) -> str:
+        root = str(self._imported_root.resolve()) if self._imported_root else "no-library"
+        return "trash_destination/" + hashlib.sha256(root.encode("utf-8")).hexdigest()
+
+    def _set_trash_destination(self, destination: Path, *, remember: bool = False) -> bool:
+        if self._imported_root is None:
+            self._trash_destination = None
+            self._trash_destination_error = "Import a library before choosing a Trash destination."
+            self._update_trash_actions()
+            return False
+        try:
+            self._trash_destination = TrashWorkflowService(self._imported_root).validate_destination(destination)
+            self._trash_destination_error = ""
+            if remember:
+                self._trash_settings.setValue(self._trash_destination_setting_key(), str(self._trash_destination))
+        except ValueError as exc:
+            self._trash_destination = None
+            self._trash_destination_error = str(exc)
+            LOGGER.warning("Invalid Trash destination %s: %s", destination, exc)
+        self._update_trash_actions()
+        return self._trash_destination is not None
+
+    def _show_trash_status(self, message: str, state: str = "info") -> None:
+        colors = {"success": "#137333", "warning": "#8a4b08", "error": "#b42318", "info": "#1f6feb"}
+        self.trash_action_status_label.setStyleSheet(f"font-weight: 600; color: {colors.get(state, colors['info'])};")
+        self.trash_action_status_label.setText(message)
+        self.trash_action_status_label.setVisible(True)
+
+    def _update_trash_actions(self) -> None:
+        if not hasattr(self, "trash_counts_label"):
+            return
+        states = [str((getattr(row.photo, "metadata", {}) or {}).get("trash_workflow_state", "")) for row in self._rows]
+        failed = states.count("move_failed")
+        active_states = [str(row.photo.metadata.get("trash_workflow_state", "")) for row in self._rows
+                         if bool(row.photo.metadata.get("is_active", True))]
+        if self.view_combo.currentData() == "history":
+            self.trash_counts_label.setText(
+                f"Moved to Trash: {states.count('moved_to_trash')} | "
+                f"Restored: {states.count('restored')} | Failed moves: {failed}"
+            )
+        else:
+            self.trash_counts_label.setText(
+                f"To review: {len(active_states)} | Proposed for Trash: {active_states.count('proposed_to_trash')} | "
+                f"Ready to move: {active_states.count('confirmed_to_trash')} | "
+                f"Failed moves: {active_states.count('move_failed')}"
+            )
+        if self._trash_destination is not None:
+            self.trash_destination_label.setText(str(self._trash_destination))
+            self.trash_destination_label.setToolTip(str(self._trash_destination))
+        else:
+            self.trash_destination_label.setText(self._trash_destination_error or "No valid Trash destination")
+        self.move_trash_button.setEnabled(self._trash_destination is not None and not self._bulk_category_in_progress)
+        self.restore_trash_button.setVisible(self.view_combo.currentData() == "history")
+        self.move_trash_button.setVisible(self.view_combo.currentData() != "history")
+        self.confirm_trash_button.setVisible(self.view_combo.currentData() != "history")
+
+    def _create_trash_confirmation_dialog(self, count: int, destination: Path):
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle("Move photos to Trash")
+        dialog.setIcon(QMessageBox.Icon.Warning)
+        dialog.setText(f"Move {count} confirmed photo(s) to Trash?")
+        dialog.setInformativeText(
+            f"Destination:\n{destination}\n\n"
+            "The files will be moved, not permanently deleted.\n\n"
+            "Other programs may no longer find these files in their current folders."
+        )
+        cancel_button = dialog.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+        move_button = dialog.addButton("Move to Trash", QMessageBox.ButtonRole.AcceptRole)
+        dialog.setDefaultButton(cancel_button)
+        return dialog, move_button
+
+    def restore_selected_photos(self) -> None:
+        rows = [row for row in self._selected_rows()
+                if row.photo.metadata.get("trash_workflow_state") == "moved_to_trash"]
+        if not rows:
+            message = "Select one or more moved photos in Trash History to restore."
+            self._show_trash_status(message, "warning")
+            QMessageBox.information(self, "No moved photos selected", message)
+            return
+        original_folders = [Path(row.photo.metadata.get("trash_original_path", "")).parent for row in rows]
+        alternate_destination = None
+        if any(not folder.is_dir() for folder in original_folders):
+            selected = QFileDialog.getExistingDirectory(
+                self, "Choose restore folder", str(self._imported_root or Path.home())
+            )
+            if not selected:
+                self._show_trash_status("Restore cancelled because an original folder is unavailable.", "warning")
+                return
+            alternate_destination = Path(selected)
+        destinations = {str(folder) for folder in original_folders}
+        destination_text = next(iter(destinations)) if len(destinations) == 1 else "their original folders"
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle("Restore photos")
+        dialog.setText(f"Restore {len(rows)} photo(s) to {destination_text}?")
+        dialog.setInformativeText("The files will return to the active photo workflow.")
+        cancel_button = dialog.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+        restore_button = dialog.addButton("Restore", QMessageBox.ButtonRole.AcceptRole)
+        dialog.setDefaultButton(cancel_button)
+        dialog.exec()
+        if dialog.clickedButton() is not restore_button:
+            return
+        service = TrashWorkflowService(self._imported_root)
+        records = []
+        for row in rows:
+            metadata = row.photo.metadata
+            records.append(TrashRecord(
+                str(getattr(row.photo, "id", "") or self._photo_key(row.photo)),
+                str(metadata.get("trash_original_path", "")), state="moved_to_trash",
+                destination_path=str(metadata.get("trash_destination_path", row.photo.path)),
+                history=list(metadata.get("trash_history", [])),
+            ))
+        result = service.restore(records, alternate_destination)
+        restored = []
+        for row, record in zip(rows, records):
+            row.photo.metadata["trash_history"] = record.history
+            row.photo.metadata["trash_move_error"] = record.error
+            if record.state == "restored":
+                row.photo.metadata["trash_workflow_state"] = "restored"
+                row.photo.metadata["is_active"] = True
+                row.photo.path = Path(record.destination_path)
+                restored.append(row.photo)
+            self._save_photo_user_metadata(row.photo)
+        if result.failed_count:
+            message = f"{result.restored_count} of {result.requested_count} photos restored. {result.failed_count} could not be restored."
+            state = "warning"
+        else:
+            noun = "photo" if result.restored_count == 1 else "photos"
+            message, state = f"{result.restored_count} {noun} restored to the active workflow.", "success"
+        self._show_trash_status(message, state)
+        self._trigger_refresh(force=True)
+        if restored:
+            self.active_state_changed.emit(restored)
+
+    def move_confirmed_to_trash(self) -> None:
+        if self._bulk_category_in_progress:
+            self._show_trash_status("A Trash operation is already in progress.", "warning")
+            return
+        rows = [row for row in self._rows
+                if row.photo.metadata.get("trash_workflow_state") in {"confirmed_to_trash", "move_failed"}]
+        if not rows:
+            message = "No photos are confirmed for Trash. Confirm proposed photos before moving them."
+            LOGGER.info("Trash move blocked: no confirmed photos")
+            self._show_trash_status(message, "warning")
+            QMessageBox.information(self, "No confirmed photos", message)
+            return
+        if self._imported_root is None or self._trash_destination is None:
+            message = self._trash_destination_error or "No valid Trash destination is available."
+            LOGGER.warning("Trash move blocked: %s", message)
+            self._show_trash_status(message, "error")
+            QMessageBox.warning(self, "Trash destination unavailable", message)
+            return
+        service = TrashWorkflowService(self._imported_root)
+        destination = self._trash_destination
+        dialog, move_button = self._create_trash_confirmation_dialog(len(rows), destination)
+        dialog.exec()
+        if dialog.clickedButton() is not move_button:
+            self._show_trash_status("Trash move cancelled. No files were moved.", "info")
+            return
+        self._bulk_category_in_progress = True
+        try:
+            records = [TrashRecord(str(getattr(row.photo, "id", "") or self._photo_key(row.photo)),
+                                   str(row.photo.path), state=row.photo.metadata["trash_workflow_state"])
+                       for row in rows]
+            result = service.move_confirmed(records, destination)
+            by_id = {record.photo_id: record for record in records}
+            for row in rows:
+                key = str(getattr(row.photo, "id", "") or self._photo_key(row.photo))
+                record = by_id[key]
+                old_path = Path(row.photo.path)
+                old_card_key = self._photo_key(row.photo)
+                retained_card_thumbnail = self._thumbnail_cache.get(old_card_key)
+                row.photo.metadata["trash_workflow_state"] = record.state
+                row.photo.metadata["is_active"] = record.state != "moved_to_trash"
+                row.photo.metadata.setdefault("trash_original_path", record.source_path)
+                row.photo.metadata["trash_destination_path"] = record.destination_path
+                row.photo.metadata["trash_move_error"] = record.error
+                row.photo.metadata["trash_history"] = record.history
+                if record.state == "moved_to_trash" and record.history:
+                    row.photo.metadata["trash_moved_at"] = record.history[-1].get("timestamp", "")
+                if record.state == "moved_to_trash":
+                    row.photo.path = Path(record.destination_path)
+                    preserve_thumbnail_for_relocation(
+                        str(old_path), int(getattr(row.photo, "modified_time_ns", 0) or 0),
+                        int(getattr(row.photo, "file_size", 0) or 0), str(row.photo.path),
+                    )
+                    moved_cache = get_thumbnail_cache_path(str(row.photo.path))
+                    if moved_cache.is_file():
+                        row.photo.thumbnail_path = str(moved_cache)
+                        row.photo.metadata["thumbnail_path"] = str(moved_cache)
+                    if retained_card_thumbnail is not None:
+                        self._thumbnail_cache[self._photo_key(row.photo)] = retained_card_thumbnail
+                self._save_photo_user_metadata(row.photo)
+            if result.moved_count == 0 and result.failed_count:
+                message, state = "No photos were moved. Review the error details.", "error"
+            elif result.failed_count:
+                message = (f"{result.moved_count} of {result.requested_count} photos moved to Trash and were "
+                           f"removed from the active workflow. {result.failed_count} could not be moved.")
+                state = "warning"
+            else:
+                noun = "photo" if result.moved_count == 1 else "photos"
+                message, state = (f"{result.moved_count} {noun} moved to Trash and removed from the active workflow.",
+                                  "success")
+            self._show_user_saved_indicator(message)
+            self._show_trash_status(message, state)
+            self._trigger_refresh(force=True)
+            self.active_state_changed.emit([row.photo for row in rows if not row.photo.metadata.get("is_active", True)])
+        finally:
+            self._bulk_category_in_progress = False
+            self._update_trash_actions()
+
     def _on_grid_selection_changed(self, selected_keys: set[str], selected_key: Optional[str]) -> None:
         started = time.perf_counter()
         measurement = begin_selection_measurement("cleanup")
@@ -538,6 +935,11 @@ class IrrelevantMediaPage(QWidget):
     def _build_row(self, photo) -> CleanupReviewRow:
         metadata = dict(getattr(photo, "metadata", {}) or {})
 
+        trash_proposal = (
+            metadata.get("trash_proposal_category") == "to_trash"
+            and metadata.get("trash_workflow_state") in {"proposed_to_trash", "confirmed_to_trash", "moved_to_trash", "move_failed"}
+        )
+
         automatic_category = str(
             metadata.get("cleanup_automatic_category", "")
             or metadata.get("automatic_media_category", "")
@@ -556,7 +958,8 @@ class IrrelevantMediaPage(QWidget):
         ).strip().lower()
 
         effective_category = str(
-            metadata.get("cleanup_effective_category", "")
+            ("to_trash" if trash_proposal else "")
+            or metadata.get("cleanup_effective_category", "")
             or metadata.get("effective_media_category", "")
             or metadata.get("relevance_category", "")
             or getattr(photo, "effective_media_category", "")
@@ -564,6 +967,16 @@ class IrrelevantMediaPage(QWidget):
             or automatic_category
             or MediaCategory.Unknown.value
         ).strip().lower()
+
+        # Stable category and workflow state are distinct. Existing manual or
+        # reimported To Trash assignments are proposals until explicitly confirmed.
+        if (effective_category == "to_trash" and metadata.get("is_active", True)
+                and metadata.get("trash_workflow_state") not in {
+                    "confirmed_to_trash", "moved_to_trash", "move_failed", "restored",
+                }):
+            metadata["trash_workflow_state"] = "proposed_to_trash"
+            metadata.setdefault("trash_proposal_category", "to_trash")
+            photo.metadata = metadata
 
         confidence = float(
             metadata.get("cleanup_confidence", metadata.get("classification_confidence", getattr(photo, "classification_confidence", 0.0) or 0.0))
@@ -682,7 +1095,12 @@ class IrrelevantMediaPage(QWidget):
         previous_scroll = self.thumbnail_grid.scroll_value()
         selected_key_before = self.thumbnail_grid.selected_key()
         self._visible_rows = self._filtered_rows()
-        self.results_label.setText(f"Showing {len(self._visible_rows)} of {len(self._rows)} cleanup review items")
+        if self._visible_rows:
+            self.results_label.setText(f"Showing {len(self._visible_rows)} photos")
+        elif self.view_combo.currentData() == "history":
+            self.results_label.setText("No photos have been moved to Trash yet.")
+        else:
+            self.results_label.setText("No remaining photos in this view.")
         self._update_stats()
 
         items = [self._to_grid_item(row) for row in self._visible_rows]
@@ -710,7 +1128,13 @@ class IrrelevantMediaPage(QWidget):
         )
 
     def _filtered_rows(self) -> list[CleanupReviewRow]:
-        rows = list(self._rows)
+        history = self.view_combo.currentData() == "history"
+        if history:
+            rows = [row for row in self._rows
+                    if row.photo.metadata.get("trash_workflow_state") == "moved_to_trash"]
+        else:
+            rows = [row for row in self._rows if bool(row.photo.metadata.get("is_active", True))
+                    and row.photo.metadata.get("trash_workflow_state") != "moved_to_trash"]
 
         category = self.category_filter_combo.currentData()
         if category and category != self.CATEGORY_FILTER_ALL:
@@ -775,8 +1199,17 @@ class IrrelevantMediaPage(QWidget):
             else "-"
         )
         self.effective_category_value.setText(self._category_registry.label_for(row.effective_category))
+        state = str((getattr(photo, "metadata", {}) or {}).get("trash_workflow_state", ""))
+        self.trash_status_value.setText({
+            "proposed_to_trash": "Proposed", "confirmed_to_trash": "Confirmed",
+            "moved_to_trash": "Moved", "move_failed": "Failed", "restored": "Restored",
+        }.get(state, "Not in Trash workflow"))
         self.decision_value.setText(row.user_decision.replace("_", " ").title())
         self.metadata_summary_value.setText(self._metadata_summary(photo))
+        metadata = getattr(photo, "metadata", {}) or {}
+        self.original_path_value.setText(str(metadata.get("trash_original_path", "") or "-"))
+        self.current_trash_path_value.setText(str(metadata.get("trash_destination_path", "") or "-"))
+        self.trash_moved_at_value.setText(str(metadata.get("trash_moved_at", "") or "-"))
 
         self.reasons_list.clear()
         for reason in row.reasons:
@@ -787,7 +1220,15 @@ class IrrelevantMediaPage(QWidget):
             self.alternatives_list.addItem(f"{label} ({score}%)")
         self._refresh_alternatives_visibility(row.confidence < 0.80)
 
-        pixmap = self._thumbnail_for_photo(photo, (320, 220), allow_original_decode=True)
+        # Trash History auto-selects its first card during a view switch.  A
+        # history cache miss must keep both card and detail preview on their
+        # placeholders until the existing background thumbnail worker replies;
+        # otherwise automatic selection decodes the moved original on the UI
+        # thread (and can do so more than once during selection reconciliation).
+        allow_original_decode = self.view_combo.currentData() != "history"
+        pixmap = self._thumbnail_for_photo(
+            photo, (320, 220), allow_original_decode=allow_original_decode
+        )
         if isinstance(pixmap, QPixmap) and not pixmap.isNull():
             self.preview_label.setPixmap(pixmap)
             self.preview_label.setText("")
@@ -809,6 +1250,10 @@ class IrrelevantMediaPage(QWidget):
         self.recommended_action_value.setText("-")
         self.user_category_value.setText("-")
         self.effective_category_value.setText("-")
+        self.trash_status_value.setText("-")
+        self.original_path_value.setText("-")
+        self.current_trash_path_value.setText("-")
+        self.trash_moved_at_value.setText("-")
         self.decision_value.setText("-")
         self.metadata_summary_value.setText("-")
         self.reasons_list.clear()
@@ -1155,7 +1600,7 @@ class IrrelevantMediaPage(QWidget):
         return None
 
     def _photo_key(self, photo) -> str:
-        return str(getattr(photo, "path", ""))
+        return cleanup_photo_identity(photo)
 
     def _thumbnail_for_photo(self, photo, target_size, *, allow_original_decode: bool = False) -> Optional[QPixmap]:
         thumbnail = getattr(photo, "thumbnail", None)
@@ -1196,6 +1641,7 @@ class IrrelevantMediaPage(QWidget):
         return None
 
     def _update_stats(self) -> None:
+        self._update_trash_actions()
         imported = self._imported_total_count
         cleanup_candidates = len([
             row for row in self._rows

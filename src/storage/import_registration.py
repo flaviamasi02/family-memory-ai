@@ -51,6 +51,8 @@ class SyncItem:
     fingerprint: str | None = None
     captured_at: str | None = None
     classification: tuple[str | None, str | None, str | None, int | None, float | None, str | None] | None = None
+    trash_workflow_state: str | None = None
+    is_active: bool = True
 
 
 @dataclass(frozen=True)
@@ -154,7 +156,9 @@ class ImportRegistrationService:
                 planned.append(SyncItem(observation, "unchanged" if unchanged else "updated",
                                         existing.photo_id, existing, fingerprint,
                                         photos_by_id[existing.photo_id].captured_at,
-                                        _classification_snapshot(photos_by_id[existing.photo_id])))
+                                        _classification_snapshot(photos_by_id[existing.photo_id]),
+                                        photos_by_id[existing.photo_id].trash_workflow_state,
+                                        bool(photos_by_id[existing.photo_id].is_active)))
                 matched_location_ids.add(existing.location_id)
                 continue
 
@@ -172,7 +176,9 @@ class ImportRegistrationService:
                 planned.append(SyncItem(observation, state, previous.photo_id,
                                         previous, fingerprint,
                                         photos_by_id[previous.photo_id].captured_at,
-                                        _classification_snapshot(photos_by_id[previous.photo_id])))
+                                        _classification_snapshot(photos_by_id[previous.photo_id]),
+                                        photos_by_id[previous.photo_id].trash_workflow_state,
+                                        bool(photos_by_id[previous.photo_id].is_active)))
                 matched_location_ids.add(previous.location_id)
             else:
                 planned.append(SyncItem(observation, "added", fingerprint=fingerprint))

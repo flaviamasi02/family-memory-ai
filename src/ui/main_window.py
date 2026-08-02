@@ -30,6 +30,7 @@ from core.perf_stats import (begin_import_performance_session,
 from core.memory_review_perf import measure_memory_review, record_memory_review
 from core.safe_file_move_service import CLEANUP_REVIEW_FOLDER_NAME
 from models.photo_model import PhotoModel
+from models.photo import Photo
 from ui.album_draft_page import AlbumDraftPage
 from ui.album_review_page import AlbumReviewPage
 from ui.components.workspace_header import WorkspaceHeader
@@ -43,6 +44,9 @@ from ui.photo_details_panel import PhotoDetailsPanel
 from ui.photo_grid_widget import PhotoGridWidget
 from ui.settings_page import SettingsPage
 from workers.embedding_worker import EmbeddingWorker
+from storage.photo_repository import PhotoRepository
+from core.trash_workflow_service import TrashRecord
+from cache.thumbnail_cache import get_thumbnail_cache_path_for_identity
 from vision.batch_embedding_service import embedding_failure_diagnostic_lines
 from vision.batch_embedding_service import BatchEmbeddingService
 from vision.managed_mobileclip_provider import ManagedMobileCLIPEmbeddingProvider
@@ -154,6 +158,8 @@ class MainWindow(QMainWindow):
         self.irrelevant_media_page.help_requested.connect(self._on_workspace_help_requested)
         self.irrelevant_media_page.categories_changed.connect(self._sync_cleanup_category_options)
         self.irrelevant_media_page.moved_photos.connect(self._handle_irrelevant_media_moved)
+        self.irrelevant_media_page.active_state_changed.connect(self._handle_trash_active_state_changed)
+        self.irrelevant_media_page.history_thumbnails_requested.connect(self.start_thumbnail_loading)
         self.irrelevant_media_page.faces_analyzed.connect(self._handle_faces_analyzed)
         self.settings_page = SettingsPage(
             runtime_manager=self.ai_runtime_manager,
@@ -462,7 +468,8 @@ class MainWindow(QMainWindow):
         # regardless of library size.
         t0 = time.perf_counter()
         self._all_photos = list(photos or [])
-        self.photo_model.set_photos(photos)
+        active_photos = [photo for photo in self._all_photos if self._is_active_photo(photo)]
+        self.photo_model.set_photos(active_photos)
         self._apply_browser_filter()
         stats.record("UI refresh", (time.perf_counter() - t0) * 1000, n, "UI thread")
         import_result = getattr(self, "_last_import_result", None)
@@ -474,7 +481,7 @@ class MainWindow(QMainWindow):
         )
 
         self._current_import_photos = [
-            photo for photo in (photos or [])
+            photo for photo in active_photos
             if getattr(photo, "sync_state", "added") in {"added", "updated"}
         ]
         self._import_phase = "Thumbnail generation"
@@ -487,7 +494,7 @@ class MainWindow(QMainWindow):
         self._set_embedding_status(
             f"Reusing existing metadata… Found {added} new photos and {renamed} renamed photos."
         )
-        self.start_thumbnail_loading(photos)
+        self.start_thumbnail_loading(active_photos)
 
         # ── Phase 2 & 3 (deferred) ────────────────────────────────────────────
         # Let Qt process the browser repaint first, then set up the secondary
@@ -848,10 +855,11 @@ class MainWindow(QMainWindow):
     def _deferred_setup_memory_review(self) -> None:
         """Populate Memory Review and Album Draft — deferred from _deferred_setup_cleanup_review."""
         self.status_label.setText("Preparing Memory Review…")
-        relevant = [p for p in self._all_photos if self._is_album_relevant(p)]
+        active = [p for p in self._all_photos if self._is_active_photo(p)]
+        relevant = [p for p in active if self._is_album_relevant(p)]
         t0 = time.perf_counter()
         try:
-            self._load_album_review_data(relevant_photos=relevant, imported_photos=self._all_photos)
+            self._load_album_review_data(relevant_photos=relevant, imported_photos=active)
         except Exception as exc:  # noqa: BLE001
             print(f"[MainWindow] Memory Review setup error: {exc}", file=sys.stderr, flush=True)
             self.status_label.setText("Memory Review preparation encountered an error.")
@@ -871,15 +879,43 @@ class MainWindow(QMainWindow):
 
     def load_photos(self, photos):
         self._all_photos = list(photos or [])
-        self.photo_model.set_photos(photos)
+        active = [photo for photo in self._all_photos if self._is_active_photo(photo)]
+        self.photo_model.set_photos(active)
         self._apply_browser_filter()
-        self._start_embedding_indexing(self._all_photos)
+        self._start_embedding_indexing(active)
         self._load_irrelevant_media_data(self._all_photos)
-        relevant_photos = [photo for photo in self._all_photos if self._is_album_relevant(photo)]
-        self._load_album_review_data(relevant_photos=relevant_photos, imported_photos=self._all_photos)
+        relevant_photos = [photo for photo in active if self._is_album_relevant(photo)]
+        self._load_album_review_data(relevant_photos=relevant_photos, imported_photos=active)
 
     def _load_irrelevant_media_data(self, photos):
-        irrelevant = [photo for photo in photos or [] if not self._is_album_relevant(photo)]
+        irrelevant = [photo for photo in photos or []
+                      if (not self._is_album_relevant(photo)
+                          or bool((getattr(photo, "metadata", {}) or {}).get("trash_workflow_state"))
+                          or (getattr(photo, "metadata", {}) or {}).get("effective_media_category") == "to_trash")]
+        known_ids = {str(getattr(photo, "id", "")) for photo in irrelevant}
+        store = self.application_services.metadata_store
+        if store.library_id:
+            for item in PhotoRepository(store).list_trash_history():
+                if str(item["photo_id"]) in known_ids:
+                    continue
+                path = Path(str(item.get("destination_path") or ""))
+                if not path.is_file():
+                    continue
+                photo = Photo.from_path(path)
+                photo.id = str(item["photo_id"])
+                photo.metadata.update(item)
+                photo.metadata["trash_original_path"] = str(item.get("source_path") or "")
+                photo.metadata["trash_destination_path"] = str(item.get("destination_path") or "")
+                photo.metadata["trash_moved_at"] = str(item.get("created_at") or "")
+                photo.metadata["trash_move_error"] = str(item.get("error") or "")
+                cached = get_thumbnail_cache_path_for_identity(
+                    str(item.get("source_path") or ""), int(item.get("modified_time_ns") or 0),
+                    int(item.get("file_size") or 0),
+                )
+                if cached.is_file():
+                    photo.thumbnail_path = str(cached)
+                    photo.metadata["thumbnail_path"] = str(cached)
+                irrelevant.append(photo)
         self.irrelevant_media_page.set_photos(
             irrelevant,
             self._imported_folder,
@@ -892,9 +928,15 @@ class MainWindow(QMainWindow):
             return bool(getattr(intelligence, "is_album_relevant_candidate", True))
         return bool(getattr(photo, "is_album_relevant_candidate", True))
 
+    @staticmethod
+    def _is_active_photo(photo) -> bool:
+        metadata = getattr(photo, "metadata", {}) or {}
+        return bool(metadata.get("is_active", True)) and metadata.get("trash_workflow_state") != "moved_to_trash"
+
     def _apply_browser_filter(self):
         filter_name = self.browser_filter_combo.currentText()
-        filtered = [photo for photo in self._all_photos if self._matches_browser_filter(photo, filter_name)]
+        filtered = [photo for photo in self._all_photos
+                    if self._is_active_photo(photo) and self._matches_browser_filter(photo, filter_name)]
         self.photo_view.set_photos(filtered)
 
         if self.selected_photo is not None and all(
@@ -1132,6 +1174,32 @@ class MainWindow(QMainWindow):
         self.status_label.setText(
             f"Cleanup files moved to {Path(self._imported_folder) / CLEANUP_REVIEW_FOLDER_NAME}. Library updated in memory."
         )
+
+    def _handle_trash_active_state_changed(self, _photos):
+        """Refresh active consumers once; Cleanup Review retains its history rows."""
+        changed = list(_photos or [])
+        store = self.application_services.metadata_store
+        if store.library_id:
+            records = []
+            for photo in changed:
+                metadata = getattr(photo, "metadata", {}) or {}
+                if getattr(photo, "id", None):
+                    records.append(TrashRecord(
+                        str(photo.id), str(metadata.get("trash_original_path", photo.path)),
+                        state=str(metadata.get("trash_workflow_state", "restored")),
+                        destination_path=str(metadata.get("trash_destination_path", photo.path)),
+                        error=str(metadata.get("trash_move_error", "")),
+                        history=list(metadata.get("trash_history", [])),
+                    ))
+            if records:
+                PhotoRepository(store).apply_trash_results(records)
+        active = [photo for photo in self._all_photos if self._is_active_photo(photo)]
+        self.photo_model.set_photos(active)
+        self._apply_browser_filter()
+        self._review_cache_signature = None
+        self._review_cache_payload = None
+        relevant = [photo for photo in active if self._is_album_relevant(photo)]
+        self._load_album_review_data(relevant_photos=relevant, imported_photos=active)
 
     def _handle_faces_analyzed(self, analyzed_photos):
         updated_photos = list(analyzed_photos or [])

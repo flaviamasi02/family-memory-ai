@@ -756,3 +756,11 @@
 - Product Owner follow-up: bulk-category completion is now shown for eight seconds
   in a dedicated inline status area directly below the category action controls,
   with singular/plural and failure wording and duplicate-notification coalescing.
+# Unreleased
+
+- **CLEAN-004:** Added the stable To Trash category, conservative proposal
+  evidence, confirmation-only collision-safe moves, partial-failure reporting,
+  active-workflow exclusion, durable audit state, and restore. No permanent
+  deletion or face recognition was added.
+- Moved Trash records are now inactive across browsing, memory, AI/indexing and
+  album pipelines, with a distinct Cleanup Review Trash History/restore mode.

@@ -8,11 +8,11 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 from core.selection_diagnostics import clear_selection_diagnostics
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from models.photo import Photo
 from core.category_registry import get_category_registry, reset_category_registry
-from ui.irrelevant_media_page import IrrelevantMediaPage
+from ui.irrelevant_media_page import IrrelevantMediaPage, cleanup_photo_identity
 from ui.shared_thumbnail_grid import SharedGridItem, SharedThumbnailCard
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -551,6 +551,198 @@ class IrrelevantMediaPageTests(unittest.TestCase):
         self.assertFalse(hasattr(page, "mark_screenshot_button"))
         self.assertFalse(hasattr(page, "mark_duplicate_button"))
         self.assertFalse(hasattr(page, "mark_unknown_button"))
+
+    def test_trash_action_area_shows_destination_counts_and_distinct_status(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "library"; root.mkdir()
+            proposed = self._make_photo(root, "proposed.jpg", {
+                "trash_proposal_category": "to_trash", "trash_workflow_state": "proposed_to_trash",
+            })
+            confirmed = self._make_photo(root, "confirmed.jpg", {
+                "trash_proposal_category": "to_trash", "trash_workflow_state": "confirmed_to_trash",
+            })
+            page = IrrelevantMediaPage(); page.set_photos([proposed, confirmed], root)
+            self.assertEqual(page.trash_destination_label.text(), str(root.parent / "Family Memory Trash"))
+            self.assertIn("Proposed for Trash: 1", page.trash_counts_label.text())
+            self.assertIn("Ready to move: 1", page.trash_counts_label.text())
+            self.assertEqual(page.move_trash_button.parentWidget().objectName(), "trashActionsSection")
+            self.assertGreaterEqual(page.move_trash_button.minimumHeight(), 48)
+            page.select_photo_by_filename("proposed.jpg")
+            self.assertEqual(page.trash_status_value.text(), "Proposed")
+            page.select_photo_by_filename("confirmed.jpg")
+            self.assertEqual(page.trash_status_value.text(), "Confirmed")
+
+    def test_trash_confirmation_contains_exact_count_destination_and_required_warning(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "library"; root.mkdir()
+            page = IrrelevantMediaPage(); page.set_photos([], root)
+            dialog, move_button = page._create_trash_confirmation_dialog(3, page._trash_destination)
+            self.assertEqual(dialog.windowTitle(), "Move photos to Trash")
+            self.assertIn("3 confirmed", dialog.text())
+            self.assertIn(str(page._trash_destination), dialog.informativeText())
+            self.assertIn("moved, not permanently deleted", dialog.informativeText())
+            self.assertIn("Other programs may no longer find", dialog.informativeText())
+            self.assertEqual(move_button.text(), "Move to Trash")
+
+    def test_zero_confirmed_and_cancel_move_nothing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "library"; root.mkdir()
+            proposed = self._make_photo(root, "proposed.jpg", {
+                "trash_proposal_category": "to_trash", "trash_workflow_state": "proposed_to_trash",
+            })
+            page = IrrelevantMediaPage(); page.set_photos([proposed], root)
+            with patch.object(QMessageBox, "information") as information:
+                page.move_confirmed_to_trash()
+            information.assert_called_once()
+            self.assertTrue(proposed.path.exists())
+
+            proposed.metadata["trash_workflow_state"] = "confirmed_to_trash"
+            page._rows = [page._build_row(proposed)]
+            fake_dialog = unittest.mock.Mock()
+            move_button = object()
+            fake_dialog.clickedButton.return_value = object()
+            with patch.object(page, "_create_trash_confirmation_dialog", return_value=(fake_dialog, move_button)), \
+                    patch("ui.irrelevant_media_page.TrashWorkflowService.move_confirmed") as move:
+                page.move_confirmed_to_trash()
+            fake_dialog.exec.assert_called_once()
+            move.assert_not_called()
+            self.assertTrue(proposed.path.exists())
+
+    def test_change_and_invalid_trash_destination_are_explicit(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "library"; root.mkdir()
+            alternate = Path(tmpdir) / "alternate"; alternate.mkdir()
+            page = IrrelevantMediaPage(); page.set_photos([], root)
+            with patch.object(QFileDialog, "getExistingDirectory", return_value=str(alternate)):
+                page.change_trash_folder()
+            self.assertEqual(page.trash_destination_label.text(), str(alternate))
+            self.assertTrue(page.move_trash_button.isEnabled())
+            self.assertFalse(page._set_trash_destination(root / "inside"))
+            self.assertFalse(page.move_trash_button.isEnabled())
+            self.assertIn("actively scanned library", page.trash_destination_label.text())
+
+    def test_move_to_trash_button_confirmation_performs_confirmed_move(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "library"; root.mkdir()
+            photo = self._make_photo(root, "confirmed.jpg", {
+                "trash_proposal_category": "to_trash", "trash_workflow_state": "confirmed_to_trash",
+            })
+            page = IrrelevantMediaPage(); page.set_photos([photo], root)
+            fake_dialog = unittest.mock.Mock()
+            move_button = object()
+            fake_dialog.clickedButton.return_value = move_button
+            with patch.object(page, "_create_trash_confirmation_dialog", return_value=(fake_dialog, move_button)):
+                page.move_confirmed_to_trash()
+            fake_dialog.exec.assert_called_once()
+            self.assertFalse((root / "confirmed.jpg").exists())
+            self.assertTrue((root.parent / "Family Memory Trash" / "confirmed.jpg").exists())
+            self.assertEqual(photo.metadata["trash_workflow_state"], "moved_to_trash")
+            self.assertEqual(
+                page.trash_action_status_label.text(),
+                "1 photo moved to Trash and removed from the active workflow.",
+            )
+
+            self.assertNotIn("confirmed.jpg", page.visible_filenames())
+            self.assertIn("removed from the active workflow", page.trash_action_status_label.text())
+            page.view_combo.setCurrentIndex(page.view_combo.findData("history"))
+            self._flush_ui()
+            self.assertIn("confirmed.jpg", page.visible_filenames())
+            card = page.thumbnail_grid._cards_by_key.get(str(photo.path))
+            self.assertIsNotNone(card)
+            self.assertFalse(card.thumbnail_label.pixmap().isNull())
+            self.assertIn("Moved to Trash: 1", page.trash_counts_label.text())
+            self.assertEqual(photo.metadata["is_active"], False)
+
+    def test_manual_to_trash_category_maps_to_proposed_not_confirmed(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            photo = self._make_photo(root, "manual.jpg", {
+                "cleanup_effective_category": "to_trash", "is_active": True,
+            })
+            page = IrrelevantMediaPage(); page.set_photos([photo], root)
+            self.assertEqual(photo.metadata["trash_workflow_state"], "proposed_to_trash")
+            self.assertIn("Proposed for Trash: 1", page.trash_counts_label.text())
+            self.assertIn("Ready to move: 0", page.trash_counts_label.text())
+
+    def test_visible_view_switch_has_exact_labels_explanations_and_empty_history(self):
+        page = IrrelevantMediaPage(); page.show(); self._flush_ui()
+        self.assertTrue(page.view_switch.isVisible())
+        self.assertEqual(page.view_to_review_button.text(), "To review")
+        self.assertEqual(page.view_history_button.text(), "Trash History")
+        self.assertTrue(page.view_to_review_button.isChecked())
+        self.assertEqual(page.view_explanation_label.text(), "Photos still requiring cleanup decisions.")
+        page.view_history_button.click(); self._flush_ui()
+        self.assertTrue(page.view_history_button.isChecked())
+        self.assertEqual(
+            page.view_explanation_label.text(),
+            "Photos already moved to Trash. You can review or restore them here.",
+        )
+        self.assertEqual(page.results_label.text(), "No photos have been moved to Trash yet.")
+        self.assertTrue(page.restore_trash_button.isVisible())
+        self.assertFalse(page.move_trash_button.isVisible())
+        self.assertFalse(page.confirm_trash_button.isVisible())
+
+    def test_view_switch_never_mixes_active_and_moved_rows(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            active = self._make_photo(root, "active.jpg", {"is_active": True})
+            moved = self._make_photo(root, "moved.jpg", {
+                "is_active": False, "trash_workflow_state": "moved_to_trash",
+                "trash_original_path": str(root / "old" / "moved.jpg"),
+                "trash_destination_path": str(root / "moved.jpg"),
+                "trash_moved_at": "2026-08-02T10:00:00+00:00",
+            })
+            page = IrrelevantMediaPage(); page.set_photos([active, moved], root)
+            self.assertEqual(page.visible_filenames(), ["active.jpg"])
+            page.view_history_button.click(); self._flush_ui()
+            self.assertEqual(page.visible_filenames(), ["moved.jpg"])
+            self.assertEqual(page.trash_moved_at_value.text(), "2026-08-02T10:00:00+00:00")
+            page.view_to_review_button.click(); self._flush_ui()
+            self.assertEqual(page.visible_filenames(), ["active.jpg"])
+
+    def test_history_cache_miss_requests_background_thumbnail_from_current_trash_path(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            moved = self._make_photo(root, "current-trash.jpg", {
+                "is_active": False, "trash_workflow_state": "moved_to_trash",
+                "trash_original_path": str(root / "missing-original.jpg"),
+                "trash_destination_path": str(root / "current-trash.jpg"),
+            })
+            moved.thumbnail = None
+            moved.thumbnail_path = ""
+            requested = []
+            page = IrrelevantMediaPage(); page.set_photos([moved], root)
+            page.history_thumbnails_requested.connect(lambda photos: requested.extend(photos))
+            with patch("ui.irrelevant_media_page.load_display_thumbnail") as synchronous_decode:
+                page.view_history_button.click(); self._flush_ui()
+            self.assertEqual(requested, [moved])
+            self.assertEqual(requested[0].path, root / "current-trash.jpg")
+            synchronous_decode.assert_not_called()
+            card = page.thumbnail_grid._cards_by_key.get(str(moved.path))
+            self.assertIsNotNone(card)
+            self.assertFalse(card.thumbnail_label.pixmap().isNull())
+            placeholder_key = card.thumbnail_label.pixmap().cacheKey()
+            page._trigger_refresh(force=True); self._flush_ui()
+            self.assertEqual(requested, [moved], "refresh must not queue a duplicate history request")
+            background_thumbnail = QPixmap(40, 40)
+            background_thumbnail.fill(Qt.GlobalColor.cyan)
+            page.update_thumbnail(moved, background_thumbnail); self._flush_ui()
+            self.assertNotEqual(card.thumbnail_label.pixmap().cacheKey(), placeholder_key)
+            self.assertEqual(page.preview_label.pixmap().cacheKey(), background_thumbnail.cacheKey())
+
+    def test_logical_thumbnail_identity_survives_move_and_restore_paths(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            photo = self._make_photo(root, "identity.jpg")
+            photo.id = "stable-photo-id"
+            before = cleanup_photo_identity(photo)
+            photo.metadata["trash_original_path"] = str(photo.path)
+            photo.metadata["trash_workflow_state"] = "moved_to_trash"
+            photo.path = root / "Family Memory Trash" / "identity.jpg"
+            self.assertEqual(cleanup_photo_identity(photo), before)
+            photo.metadata["trash_workflow_state"] = "restored"
+            photo.path = root / "restored" / "identity.jpg"
+            self.assertEqual(cleanup_photo_identity(photo), before)
 
     def test_cleanup_review_grid_renders_multiple_columns_when_wide(self):
         with tempfile.TemporaryDirectory() as tmpdir:

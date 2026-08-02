@@ -1,5 +1,14 @@
 # DATA-001 — Central Metadata Storage Architecture Specification
 
+## CLEAN-004 lifecycle extension
+
+Schema version 6 stores Trash workflow state independently from category text.
+`is_active=0` is authoritative for a successfully moved photo, so active queries
+exclude it without deleting its PhotoID, locations, categories, embeddings, or
+audit rows. `trash_history` retains move/restore provenance. Incremental import
+rehydrates active and workflow state and must not reactivate an app-managed move;
+restore changes the same logical record back to active.
+
 Status: **DATA-001A–D implemented; automated and Product Owner validation complete; DATA-001E–H planned**
 
 Owner: Architecture

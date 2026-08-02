@@ -66,6 +66,7 @@ _SYSTEM_CATEGORIES: list[tuple[str, str, str, bool, bool]] = [
     ("video", "Video", "Video media.", True, False),
     ("duplicate_candidate", "Duplicate Candidate", "Likely duplicate media.", True, False),
     ("low_quality", "Low Quality", "Low-quality image candidate.", True, False),
+    ("to_trash", "To Trash", "Conservative removal proposals awaiting explicit confirmation.", True, False),
     ("unknown", "Unknown", "Unclassified media.", True, False),
     # Compatibility IDs currently produced/used in cleanup flows.
     ("document_or_scan", "Documents", "Cleanup document/scan category.", True, False),

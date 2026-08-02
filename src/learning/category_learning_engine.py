@@ -24,7 +24,7 @@ CONTENT_CATEGORY_IDS = {
     "family_photo", "personal_photo", "screenshot", "document", "receipt", "invoice",
     "advertisement", "meme", "graphic", "document_or_scan", "meme_or_graphic",
 }
-WORKFLOW_CATEGORY_IDS = {"duplicate_candidate", "low_quality", "low_quality_photo", "unknown", "video"}
+WORKFLOW_CATEGORY_IDS = {"duplicate_candidate", "low_quality", "low_quality_photo", "unknown", "video", "to_trash"}
 
 
 @dataclass

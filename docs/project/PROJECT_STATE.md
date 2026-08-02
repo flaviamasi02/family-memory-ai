@@ -2,6 +2,15 @@
 
 ## Current status — 2026-08-02
 
+**CLEAN-004 — Smart Cleanup and Trash Workflow is implemented for review.** A
+stable To Trash state supports conservative explainable proposals, mandatory
+confirmation, safe reversible moves, retained logical identity/history, active
+review exclusion, failure retry, and restore. It never permanently deletes
+photos. Face recognition remains unimplemented. Tab-switch latency is deferred.
+Cleanup Review's default queue now represents remaining active work only;
+inactive moved records are isolated in Trash History and restore reactivates
+their stable logical identity.
+
 **PERF-003 — Memory Review Performance is not complete; Product Owner acceptance
 remains pending.** Earlier optimizations produced no perceived improvement on the
 Product Owner's Windows library. Developer Diagnostics now provides an opt-in

@@ -22,6 +22,11 @@ class CandidateSelectionEngine:
         result = CandidateSelectionResult()
 
         for candidate in album.candidate_photos or []:
+            metadata = getattr(candidate, "metadata", {}) or {}
+            if not bool(metadata.get("is_active", True)) or metadata.get("trash_workflow_state") == "moved_to_trash":
+                album.rejected_photos.append(candidate)
+                result.rejection_reasons["inactive_trashed_photo"] = result.rejection_reasons.get("inactive_trashed_photo", 0) + 1
+                continue
             reason = self._rejection_reason(candidate, album.year)
             if reason is None:
                 self._mark_selected(candidate)

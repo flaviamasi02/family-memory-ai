@@ -38,6 +38,9 @@ class PhotoCleanupEngine:
         classifications = [self._classify_single_photo(photo) for photo in photos or []]
         self._mark_exact_duplicates(classifications)
 
+        for classification in classifications:
+            self._propose_to_trash(classification)
+
         category_counts: dict[str, int] = {}
         for classification in classifications:
             self._apply_classification_to_photo(classification)
@@ -49,6 +52,47 @@ class PhotoCleanupEngine:
             total_count=len(classifications),
             category_counts=category_counts,
         )
+
+    def _propose_to_trash(self, classification: PhotoCleanupClassification) -> None:
+        """Turn only exceptionally strong, non-memory evidence into a proposal.
+
+        A category correction is an authoritative decision, so automatic cleanup
+        never replaces it.  Faces and positive memory evidence deliberately make
+        the threshold unreachable for ordinary classifier signals.
+        """
+        photo = classification.photo
+        metadata = getattr(photo, "metadata", {}) or {}
+        if metadata.get("cleanup_user_corrected_category") or metadata.get("user_corrected_media_category"):
+            return
+        if metadata.get("trash_workflow_state") in {"confirmed_to_trash", "moved_to_trash", "restored"}:
+            return
+        intelligence = getattr(photo, "intelligence", None)
+        has_people = bool(getattr(intelligence, "has_faces", False) or getattr(intelligence, "face_count", 0))
+        memory_score = float(getattr(photo, "memory_score", 0) or 0)
+        rarity_score = float(getattr(photo, "rarity_score", 0) or 0)
+        if has_people or memory_score >= 0.6 or rarity_score >= 0.6:
+            return
+        strong_categories = {"duplicate_candidate", "screenshot", "document_or_scan", "advertisement", "meme_or_graphic"}
+        if classification.category not in strong_categories or classification.confidence < 0.95:
+            return
+        original = classification.category
+        if original == "duplicate_candidate":
+            explanation = "Proposed for Trash because it is an exact duplicate and a preferred copy exists."
+            source = "exact_duplicate"
+        else:
+            label = original.replace("_", " ")
+            explanation = f"Proposed for Trash because strong cleanup evidence identifies it as {label}."
+            source = "deterministic_classifier"
+        # Preserve the classifier's useful content category.  ``to_trash`` is
+        # stored as a proposal and workflow state, not overloaded as content.
+        metadata.update({
+            "trash_proposal_category": "to_trash",
+            "trash_workflow_state": "proposed_to_trash",
+            "trash_proposal_confidence": classification.confidence,
+            "trash_proposal_source": source,
+            "trash_proposal_explanation": explanation,
+            "trash_previous_category": original,
+        })
 
     def _classify_single_photo(self, photo: Photo) -> PhotoCleanupClassification:
         registry = get_category_registry()

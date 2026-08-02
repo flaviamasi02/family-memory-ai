@@ -137,6 +137,10 @@ def find_photos(folder_path, synchronization_service=None):
                 "classification_reason": photo.classification_reason,
             })
             photo.sync_intelligence_from_metadata()
+        if sync_item:
+            photo.metadata["is_active"] = bool(sync_item.is_active)
+            if sync_item.trash_workflow_state:
+                photo.metadata["trash_workflow_state"] = sync_item.trash_workflow_state
         photos.append(photo)
     creation_ms = (time.perf_counter() - t1) * 1000
     stats.record("Photo object creation", creation_ms, len(photos), "Background thread")
