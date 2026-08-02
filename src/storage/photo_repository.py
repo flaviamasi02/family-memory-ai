@@ -41,6 +41,11 @@ class PhotoRecord:
     is_album_relevant_candidate: int | None
     classification_confidence: float | None
     classification_reason: str | None
+    trash_workflow_state: str | None
+    trash_proposal_confidence: float | None
+    trash_proposal_source: str | None
+    trash_proposal_explanation: str | None
+    is_active: int
 
 
 @dataclass(frozen=True)
@@ -83,7 +88,8 @@ class PhotoRepository:
         return ("photo_id,library_id,media_type,width,height,captured_at,content_hash,"
                 "hash_algorithm,hash_version,status,metadata_revision,automatic_media_category,"
                 "effective_media_category,relevance_category,is_album_relevant_candidate,"
-                "classification_confidence,classification_reason")
+                "classification_confidence,classification_reason,trash_workflow_state,"
+                "trash_proposal_confidence,trash_proposal_source,trash_proposal_explanation,is_active")
 
     @staticmethod
     def _location_columns() -> str:
@@ -132,6 +138,7 @@ class PhotoRepository:
             automatic_media_category, effective_media_category, relevance_category,
             None if is_album_relevant_candidate is None else int(is_album_relevant_candidate),
             classification_confidence, classification_reason,
+            None, None, None, None, 1,
         )
 
     def update_photo(self, photo_id: str, *, connection=None, **changes) -> PhotoRecord:
@@ -140,6 +147,8 @@ class PhotoRepository:
         allowed.update({"automatic_media_category", "effective_media_category",
                         "relevance_category", "is_album_relevant_candidate",
                         "classification_confidence", "classification_reason"})
+        allowed.update({"trash_workflow_state", "trash_proposal_confidence", "trash_proposal_source",
+                        "trash_proposal_explanation", "is_active"})
         invalid = set(changes) - allowed
         if invalid:
             raise ValueError(f"Unsupported photo fields: {', '.join(sorted(invalid))}")
@@ -208,6 +217,36 @@ class PhotoRepository:
             (self.store.library_id,),
         ).fetchall()
         return [self._photo(row) for row in rows]
+
+    def list_active_photos(self, *, connection=None) -> list[PhotoRecord]:
+        if connection is None:
+            with self.store.read_connection() as reader:
+                return self.list_active_photos(connection=reader)
+        rows = connection.execute(
+            f"SELECT {self._photo_columns()} FROM photos WHERE library_id=? AND is_active=1 ORDER BY created_at,photo_id",
+            (self.store.library_id,),
+        ).fetchall()
+        return [self._photo(row) for row in rows]
+
+    def apply_trash_results(self, results, *, connection=None) -> None:
+        """Persist a batch of service records and immutable audit rows."""
+        if connection is None:
+            with self.store.work_unit() as transaction:
+                self.apply_trash_results(results, connection=transaction)
+                return
+        for record in results:
+            active = int(record.state not in {"moved_to_trash"})
+            connection.execute(
+                "UPDATE photos SET trash_workflow_state=?,is_active=?,updated_at=? WHERE photo_id=? AND library_id=?",
+                (record.state, active, utc_now(), record.photo_id, self.store.library_id),
+            )
+            event = record.history[-1] if record.history else {"action": record.state}
+            connection.execute(
+                "INSERT INTO trash_history(trash_history_id,photo_id,library_id,action,source_path,destination_path,error,created_at) VALUES (?,?,?,?,?,?,?,?)",
+                (str(uuid4()), record.photo_id, self.store.library_id, event.get("action", record.state),
+                 event.get("source", record.source_path), event.get("destination", record.destination_path),
+                 event.get("error", record.error), event.get("timestamp", utc_now())),
+            )
 
     def get_location(self, relative_path: str | Path, *, connection=None) -> PhotoLocationRecord | None:
         key = normalise_relative_path(relative_path)

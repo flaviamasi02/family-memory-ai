@@ -1,5 +1,15 @@
 # Family Memory AI - Roadmap
 
+## CLEAN-004 — Smart Cleanup and Trash Workflow
+
+- [x] Stable To Trash category and explicit workflow states
+- [x] Conservative explainable proposal safeguards
+- [x] Confirmation-only move to Family Memory Trash with restore and audit
+- [x] Active-review exclusion with logical identity retained
+- [ ] Deferred: tab-switch latency investigation
+
+Face recognition is not part of CLEAN-004 and remains a later milestone.
+
 ## Approved delivery sequence — 2026-07-27
 
 ### Completed

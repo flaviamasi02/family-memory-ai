@@ -351,3 +351,10 @@ After optimization, the UI is responsive immediately after clicking Import (scan
 - Added a dedicated non-modal category-action status area directly below Cleanup
   Review's category selector and Apply button, with readable success,
   partial-failure, and complete-failure text.
+# Unreleased
+
+- CLEAN-004 adds conservative, explainable **To Trash** proposals and an
+  explicit-confirmation, reversible move workflow. Files are moved to **Family
+  Memory Trash**, never permanently deleted; active review excludes moved files
+  while logical identity and audit history are retained, and safe restore is
+  supported.

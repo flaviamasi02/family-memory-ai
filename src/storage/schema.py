@@ -228,12 +228,22 @@ V5_STATEMENTS = (
     "ALTER TABLE photos ADD COLUMN classification_confidence REAL CHECK(classification_confidence IS NULL OR (classification_confidence>=0 AND classification_confidence<=1))",
     "ALTER TABLE photos ADD COLUMN classification_reason TEXT",
 )
+V6_STATEMENTS = (
+    "ALTER TABLE photos ADD COLUMN trash_workflow_state TEXT CHECK(trash_workflow_state IS NULL OR trash_workflow_state IN ('proposed_to_trash','confirmed_to_trash','moved_to_trash','move_failed','restored'))",
+    "ALTER TABLE photos ADD COLUMN trash_proposal_confidence REAL CHECK(trash_proposal_confidence IS NULL OR (trash_proposal_confidence>=0 AND trash_proposal_confidence<=1))",
+    "ALTER TABLE photos ADD COLUMN trash_proposal_source TEXT",
+    "ALTER TABLE photos ADD COLUMN trash_proposal_explanation TEXT",
+    "ALTER TABLE photos ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1))",
+    "CREATE TABLE trash_history (trash_history_id TEXT PRIMARY KEY, photo_id TEXT NOT NULL REFERENCES photos(photo_id) ON DELETE RESTRICT, library_id TEXT NOT NULL REFERENCES libraries(library_id) ON DELETE RESTRICT, action TEXT NOT NULL, source_path TEXT, destination_path TEXT, error TEXT, created_at TEXT NOT NULL)",
+    "CREATE INDEX idx_trash_history_photo ON trash_history(photo_id,created_at)",
+)
 MIGRATIONS = (
     Migration(1, "data_001a_foundation", V1_STATEMENTS),
     Migration(2, "data_001b_full_schema", V2_STATEMENTS),
     Migration(3, "data_001c_import_registration", V3_STATEMENTS),
     Migration(4, "data_001d_incremental_photo_sync", V4_STATEMENTS),
     Migration(5, "data_001d_classification_snapshot", V5_STATEMENTS),
+    Migration(6, "clean_004_trash_workflow", V6_STATEMENTS),
 )
 SCHEMA_VERSION = MIGRATIONS[-1].version
 
@@ -241,4 +251,5 @@ REQUIRED_TABLES = frozenset({
     "schema_migrations", "libraries", "photos", "photo_locations", "embeddings", "categories",
     "photo_categories", "reviews", "albums", "album_items", "preferences", "import_runs",
     "import_run_items", "people", "faces", "face_embeddings", "metadata_migration_history",
+    "trash_history",
 })

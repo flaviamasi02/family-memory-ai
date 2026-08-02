@@ -6,6 +6,7 @@ from pathlib import Path
 
 
 CLEANUP_REVIEW_FOLDER_NAME = "_family_memory_cleanup_review"
+TRASH_FOLDER_NAME = "Family Memory Trash"
 
 
 @dataclass
@@ -58,3 +59,17 @@ def _build_unique_destination(destination_folder: Path, filename: str) -> Path:
         if not next_candidate.exists():
             return next_candidate
         counter += 1
+
+
+def move_file_safely(source: str | Path, destination_folder: str | Path) -> Path:
+    """Move one file without overwriting; return only after destination exists."""
+    source_path = Path(source)
+    if not source_path.is_file():
+        raise FileNotFoundError(source_path)
+    folder = Path(destination_folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    destination = _build_unique_destination(folder, source_path.name)
+    shutil.move(str(source_path), str(destination))
+    if not destination.is_file():
+        raise OSError(f"Move did not create destination: {destination}")
+    return destination
