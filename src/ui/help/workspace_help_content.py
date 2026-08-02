@@ -12,6 +12,7 @@ MEMORY_REVIEW_WORKSPACE = "memory_review"
 CLEANUP_REVIEW_WORKSPACE = "cleanup_review"
 ALBUM_DRAFT_WORKSPACE = "album_draft"
 SETTINGS_WORKSPACE = "settings"
+PEOPLE_REVIEW_WORKSPACE = "people_review"
 
 
 def _purpose_section(
@@ -78,6 +79,23 @@ def _ai_status_section(items: list[WorkspaceAIStatusMetric]) -> WorkspaceHelpSec
 
 def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
     return [
+        WorkspaceHelpDefinition(
+            workspace_id=PEOPLE_REVIEW_WORKSPACE,
+            title="People Review",
+            sections=(
+                _purpose_section(
+                    "People Review privately groups locally detected faces for your review.",
+                    "It helps organize recurring people without making public or automatic identity claims.",
+                    "Local models detect, describe, and conservatively cluster faces; photos are never uploaded.",
+                    "Start a scan explicitly, inspect candidates, and confirm or reject every name.",
+                    "Only Product Owner-confirmed names appear elsewhere in the application.",
+                ),
+                _workflow_section(["Start a local scan", "Review unnamed clusters", "Create or select a person", "Confirm an assignment", "Correct false detections"]),
+                _best_practices_section(["Treat faces as sensitive data.", "Use several varied examples before trusting a suggestion.", "Exclude non-photo sources and delete analysis data from Settings when no longer wanted."]),
+                _tips_section([WorkspaceHelpTip(title="Privacy tip", body="Face processing stays local and every identity requires your confirmation.")]),
+                _ai_status_section([WorkspaceAIStatusMetric("People Recognition", 45, "Owner-confirmed local face review")]),
+            ),
+        ),
         WorkspaceHelpDefinition(
             workspace_id=PHOTO_BROWSER_WORKSPACE,
             title="Photo Browser",

@@ -103,3 +103,7 @@ Canonical record: DEC-0050 in `docs/development/DECISIONS.md`.
 Decision: future face intelligence uses stable, portable Face, Person, and FaceCluster identities behind platform-neutral service/repository contracts. Embeddings are versioned cache evidence rather than identity, enabling future reprocessing and profile learning without discarding manual decisions. MODEL-004A contains no detection or recognition algorithm and makes no UI change.
 
 Canonical record: DEC-0051 in `docs/development/DECISIONS.md`; architecture detail in `docs/architecture/FACE_RECOGNITION.md`.
+
+## DEC-0050 — Face identity remains local and owner-confirmed
+
+Face detections and descriptors are biometric-like sensitive application data. Processing is local, original photos are immutable, automatic clusters are advisory, and only explicit Product Owner actions can confirm a person's identity. Inactive Trash and stable excluded category IDs are ineligible. Face-analysis reset does not delete photos or unrelated decisions.

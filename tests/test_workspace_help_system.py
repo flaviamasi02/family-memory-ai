@@ -18,6 +18,7 @@ class WorkspaceHelpRegistryTests(unittest.TestCase):
             "photo_browser",
             "memory_review",
             "cleanup_review",
+            "people_review",
             "album_draft",
             "settings",
         }
@@ -45,7 +46,7 @@ class WorkspaceHelpUiTests(unittest.TestCase):
 
         tab_labels = [window.tabs.tabText(index) for index in range(window.tabs.count())]
         self.assertIn("Settings", tab_labels)
-        self.assertEqual(window.tabs.count(), 5)
+        self.assertEqual(window.tabs.count(), 6)
         self.assertFalse(window.workspace_help_dock.isVisible())
 
     def test_each_required_workspace_contains_workspace_info_panel(self):
@@ -55,15 +56,16 @@ class WorkspaceHelpUiTests(unittest.TestCase):
             "Photo Browser",
             "Memory Review",
             "Cleanup Review",
+            "People Review",
             "Album Draft",
             "Settings",
         }
         tab_labels = [window.tabs.tabText(index) for index in range(window.tabs.count())]
-        self.assertEqual(tab_labels, ["Photo Browser", "Memory Review", "Cleanup Review", "Album Draft", "Settings"])
+        self.assertEqual(tab_labels, ["Photo Browser", "Cleanup Review", "People Review", "Memory Review", "Album Draft", "Settings"])
         self.assertEqual(set(tab_labels), required_tabs)
 
         panel_instances = window.findChildren(WorkspaceInfoPanel)
-        self.assertEqual(len(panel_instances), 5)
+        self.assertEqual(len(panel_instances), 6)
 
         browser_panel = window.tabs.widget(0).findChild(WorkspaceInfoPanel)
         self.assertIsNotNone(browser_panel)
@@ -71,6 +73,7 @@ class WorkspaceHelpUiTests(unittest.TestCase):
 
         self.assertEqual(window.review_page.info_panel.workspace_id, "memory_review")
         self.assertEqual(window.irrelevant_media_page.info_panel.workspace_id, "cleanup_review")
+        self.assertEqual(window.people_review_page.info_panel.workspace_id, "people_review")
         self.assertEqual(window.draft_page.info_panel.workspace_id, "album_draft")
         self.assertEqual(window.settings_page.info_panel.workspace_id, "settings")
 

@@ -8,6 +8,7 @@ from ui.help.workspace_help_content import (
     MEMORY_REVIEW_WORKSPACE,
     PHOTO_BROWSER_WORKSPACE,
     SETTINGS_WORKSPACE,
+    PEOPLE_REVIEW_WORKSPACE,
 )
 
 
@@ -22,6 +23,13 @@ class WorkspaceInfoContent:
 
 
 WORKSPACE_INFO_CONTENT: dict[str, WorkspaceInfoContent] = {
+    PEOPLE_REVIEW_WORKSPACE: WorkspaceInfoContent(
+        title="People Review",
+        purpose="Review locally detected face groups and confirm who appears in family photos.",
+        purpose_details="Processing stays on this computer. Suggested groups and matches are advisory until you confirm them.",
+        typical_actions=("Start an eligible-photo scan", "Review face clusters", "Create or select a person", "Confirm or reject suggestions"),
+        tip="No identity is automatically named or exposed outside People Review.",
+    ),
     PHOTO_BROWSER_WORKSPACE: WorkspaceInfoContent(
         title="Photo Browser",
         purpose="Browse all imported photos and inspect the complete photo library.",

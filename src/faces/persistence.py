@@ -84,6 +84,22 @@ class SQLiteFaceRepository:
                 CREATE INDEX IF NOT EXISTS idx_faces_person ON faces(person_id);
                 CREATE INDEX IF NOT EXISTS idx_faces_cluster ON faces(cluster_id);
                 CREATE INDEX IF NOT EXISTS idx_embeddings_model ON face_embeddings(model_key, status);
+                CREATE TABLE IF NOT EXISTS face_assignment_audit (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, face_id TEXT NOT NULL,
+                    person_id TEXT, action TEXT NOT NULL, created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS rejected_face_suggestions (
+                    face_id TEXT NOT NULL, person_id TEXT NOT NULL, created_at TEXT NOT NULL,
+                    PRIMARY KEY(face_id, person_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_face_audit_face ON face_assignment_audit(face_id);
+                CREATE TABLE IF NOT EXISTS face_processing_results (
+                    image_id TEXT PRIMARY KEY, source_fingerprint TEXT NOT NULL,
+                    detector_key TEXT NOT NULL, processing_version TEXT NOT NULL,
+                    status TEXT NOT NULL, face_count INTEGER NOT NULL DEFAULT 0,
+                    failure_code TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_face_processing_status ON face_processing_results(status,detector_key);
                 """
             )
             row = connection.execute("SELECT version FROM face_schema LIMIT 1").fetchone()
@@ -126,6 +142,61 @@ class SQLiteFaceRepository:
         with self._lock, self._connect() as connection:
             cursor = connection.execute("DELETE FROM faces WHERE image_id=?", (image_id,))
             return cursor.rowcount
+
+    def list_faces(self) -> list[Face]:
+        return self._faces("SELECT payload,person_id,cluster_id FROM faces ORDER BY image_id,id")
+
+    def get_processing_result(self, image_id: str) -> dict[str, Any] | None:
+        with self._lock, self._connect() as connection:
+            row = connection.execute("SELECT * FROM face_processing_results WHERE image_id=?", (image_id,)).fetchone()
+        return dict(row) if row else None
+
+    def save_processing_result(self, image_id: str, fingerprint: str, detector_key: str,
+                               status: str, face_count: int = 0, failure_code: str = "",
+                               processing_version: str = "face-worker-v1") -> None:
+        with self._lock, self._connect() as connection:
+            connection.execute(
+                """INSERT INTO face_processing_results VALUES(?,?,?,?,?,?,?,?)
+                   ON CONFLICT(image_id) DO UPDATE SET source_fingerprint=excluded.source_fingerprint,
+                   detector_key=excluded.detector_key,processing_version=excluded.processing_version,
+                   status=excluded.status,face_count=excluded.face_count,
+                   failure_code=excluded.failure_code,updated_at=excluded.updated_at""",
+                (image_id, fingerprint, detector_key, processing_version, status,
+                 int(face_count), failure_code, utc_now()))
+
+    def assign_cluster(self, cluster_id: str, person_id: str) -> int:
+        """Confirm all non-false-positive members in one transaction and audit them."""
+        now = utc_now()
+        with self._lock, self._connect() as connection:
+            rows = connection.execute("SELECT id,payload FROM faces WHERE cluster_id=?", (cluster_id,)).fetchall()
+            count = 0
+            for row in rows:
+                payload = json.loads(row["payload"])
+                if payload.get("false_positive"): continue
+                payload.update(person_id=person_id, assignment_source="manual_cluster",
+                               assignment_confidence=1.0, assignment_confirmed=True,
+                               updated_at=now, revision=int(payload.get("revision", 1)) + 1)
+                connection.execute("UPDATE faces SET person_id=?,payload=?,updated_at=? WHERE id=?",
+                                   (person_id, json.dumps(payload, sort_keys=True), now, row["id"]))
+                connection.execute("INSERT INTO face_assignment_audit(face_id,person_id,action,created_at) VALUES(?,?,?,?)",
+                                   (row["id"], person_id, "manual_confirm", now))
+                count += 1
+            connection.execute("UPDATE clusters SET person_id=?,updated_at=? WHERE id=?", (person_id, now, cluster_id))
+            return count
+
+    def reject_suggestion(self, face_id: str, person_id: str) -> None:
+        with self._lock, self._connect() as connection:
+            connection.execute("INSERT OR REPLACE INTO rejected_face_suggestions VALUES(?,?,?)", (face_id, person_id, utc_now()))
+
+    def clear_face_analysis(self) -> None:
+        """Delete biometric-like analysis while preserving original photos and categories."""
+        with self._lock, self._connect() as connection:
+            connection.execute("DELETE FROM rejected_face_suggestions")
+            connection.execute("DELETE FROM face_assignment_audit")
+            connection.execute("DELETE FROM face_embeddings")
+            connection.execute("DELETE FROM faces")
+            connection.execute("DELETE FROM clusters")
+            connection.execute("DELETE FROM face_processing_results")
 
     def save_person(self, person: Person) -> Person:
         person.updated_at = utc_now()
@@ -191,6 +262,17 @@ class SQLiteFaceRepository:
     def get_embedding(self, face_id: str, model_key: str) -> FaceEmbedding | None:
         rows = self._embedding_rows("SELECT * FROM face_embeddings WHERE face_id=? AND model_key=?", (face_id, model_key))
         return rows[0] if rows else None
+
+    def embedding_face_ids(self, model_key: str, face_ids) -> set[str]:
+        """Return cached IDs in one bounded query instead of one query per face."""
+        values = tuple(str(value) for value in face_ids)
+        if not values: return set()
+        placeholders = ",".join("?" for _ in values)
+        with self._lock, self._connect() as connection:
+            rows = connection.execute(
+                f"SELECT face_id FROM face_embeddings WHERE model_key=? AND face_id IN ({placeholders})",
+                (model_key, *values)).fetchall()
+        return {str(row[0]) for row in rows}
 
     def embeddings_for_model(self, model_key: str, only_current: bool = True) -> list[FaceEmbedding]:
         query = "SELECT e.* FROM face_embeddings e"

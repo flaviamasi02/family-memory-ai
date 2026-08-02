@@ -679,6 +679,44 @@ def test_close_event_waits_for_running_embedding_thread_before_destroying(monkey
     assert FakeBase.closed is True
 
 
+def test_close_event_cancels_and_waits_for_face_processing_when_present(monkeypatch):
+    window = _embedding_window_for_lifecycle_tests()
+    window.embedding_thread = None
+    window.embedding_worker = None
+    waited = []
+
+    class FakeApp:
+        def processEvents(self):
+            pass
+
+    class FakeThread:
+        running = True
+
+        def isRunning(self):
+            return self.running
+
+        def wait(self, milliseconds):
+            waited.append(milliseconds)
+            self.running = False
+
+    class FakeWorker:
+        cancelled = False
+
+        def cancel(self):
+            self.cancelled = True
+
+    worker = FakeWorker()
+    window.face_processing_thread = FakeThread()
+    window.face_processing_worker = worker
+    monkeypatch.setattr("ui.main_window.QCoreApplication.instance", lambda: FakeApp())
+    monkeypatch.setattr("ui.main_window.QMainWindow.closeEvent", lambda self, event: None)
+
+    window.closeEvent(object())
+
+    assert worker.cancelled is True
+    assert waited == [250]
+
+
 def test_thread_and_worker_references_clear_only_after_thread_completion():
     window = _embedding_window_for_lifecycle_tests()
     thread = object()
@@ -829,9 +867,13 @@ def test_terminal_callback_exception_becomes_explicit_failure(monkeypatch):
 def test_import_state_machine_reaches_embedding_after_thumbnail_completion(monkeypatch):
     window = _embedding_window_for_lifecycle_tests()
     displayed = []
+    people_review_inputs = []
     thumbnail_inputs = []
     embedding_inputs = []
     window.photo_model = type("PhotoModel", (), {"set_photos": lambda self, photos: displayed.append(list(photos))})()
+    window.people_review_page = type(
+        "PeopleReviewPage", (), {"set_photos": lambda self, photos: people_review_inputs.append(list(photos))}
+    )()
     window._apply_browser_filter = lambda: None
     window._deferred_setup_cleanup_review = lambda: None
     window.start_thumbnail_loading = thumbnail_inputs.append
@@ -842,6 +884,7 @@ def test_import_state_machine_reaches_embedding_after_thumbnail_completion(monke
 
     assert window._import_phase == "Thumbnail generation"
     assert displayed == [["photo"]]
+    assert people_review_inputs == [["photo"]]
     assert thumbnail_inputs == [["photo"]]
     assert embedding_inputs == []
 

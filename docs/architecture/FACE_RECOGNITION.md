@@ -44,3 +44,78 @@ Foreign keys clear obsolete Person/Cluster links and cascade face-embedding dele
 ## Future integration rules
 
 Memory Review may later consume Person and Face query services, but it must not access SQLite tables or AI providers directly. Manual names and assignments remain durable product decisions. Automatic clusters remain independent evidence and must not overwrite a manual Person assignment. Profile learning may select profile faces or build versioned embeddings while preserving source Face IDs and history.
+
+## FACE-001 processing and lifecycle
+
+`faces.eligibility.face_processing_eligibility` is the shared policy boundary. It uses stable category IDs and excludes manual opt-outs, inactive/Trash records, unsupported media, and non-photographic categories. Restoring a valid unchanged photo makes it eligible again.
+
+The OpenCV detector is lazy and reads EXIF-oriented pixels locally. Pixel bounding boxes refer to that authoritative orientation. Padded crops live only in the application cache. The separate local face-crop descriptor is not MobileCLIP. Embeddings are finite, dimension-checked, source-fingerprinted and model-versioned. Conservative deterministic clustering is advisory and never supplies a name. Confirmed assignments are manual and audited.
+
+Face data is sensitive. Settings can delete detections, crops, embeddings, clusters, proposals and confirmed assignments without modifying originals, categories, cleanup history or album decisions. No cloud inference, relationship inference, automatic naming, or album-score adjustment is part of FACE-001. Work is incremental and bounded; UI rendering and model initialization must remain off the synchronous full-library path.
+
+### Managed Windows face runtime
+
+Face detection runs in the application-owned `.venv-face-runtime`, never the
+MobileCLIP environment or an arbitrary `cv2` import from the application
+interpreter. The reproducible Windows/Python 3.10–3.12 set is
+`opencv-python-headless==4.10.0.84`, `numpy==1.26.4`, and `Pillow==10.4.0`;
+Python 3.13 uses `opencv-python-headless==4.11.0.86`, `numpy==2.1.3`, and
+`Pillow==11.1.0`. Other interpreter versions stop with an actionable unsupported
+version state before package installation. Repair recreates the environment,
+then upgrades `pip`, `setuptools`, and `wheel` before installing runtime wheels.
+Install and Repair diagnose the interpreter and installed distributions, remove
+all conflicting OpenCV wheels, reinstall the pinned set, and verify module
+location, version, `cv2.data.haarcascades`, the frontal-face XML, and a non-empty
+`CascadeClassifier`. Detailed interpreter and module paths remain in the runtime
+log; normal UI messages distinguish downloads, permissions, environments,
+conflicts, shadowing/model/API verification, and corruption.
+
+The application interpreter and Face Runtime interpreter are independent. An
+application launched from Python 3.14 first discovers an existing managed or
+64-bit Python 3.12/3.11/3.10 interpreter; if none is available on Windows, the
+Settings worker downloads the pinned Python 3.12.10 64-bit installer over HTTPS
+from the allowlisted official `www.python.org` host. Before execution Windows
+Authenticode must report a valid Python Software Foundation signature (the
+integrity equivalent to a pinned file hash). The installer runs silently with a
+target under `runtimes/face-python`, without PATH, launcher, shortcut, or file
+association changes. It then creates `runtimes/.venv-face-runtime`. Downloads
+are atomic `.partial` files and are removed on cancellation or failure. This
+installer approach does not extract archives, so archive path traversal is not
+part of the boundary. Remove invokes the retained official installer uninstall
+mode and deletes both application-managed runtime directories.
+
+Detection and descriptor operations cross a bounded persistent subprocess
+boundary. One managed worker is started per scan, loads Pillow, NumPy, OpenCV,
+and the Haar classifier once, then accepts bounded newline-delimited JSON work
+items until completion or cancellation. Queue control, persistence, progress,
+pause, resume, and cancellation remain in the main application. No photo is uploaded. The Python
+3.14 application environment, system PATH, system Python, and MobileCLIP runtime
+remain unchanged.
+
+The managed boundary is the application-owned `faces/managed_worker.py` entry
+point. Requests and responses carry matching IDs and a protocol version; normal
+logs stay off stdout. Every response identifies success, an image-scoped
+failure, or a runtime-scoped failure and reports processing duration. JPEG, PNG,
+and WebP are decoded with Pillow and corrected
+with `ImageOps.exif_transpose`; HEIC/HEIF is excluded by eligibility until the
+managed decoder has explicit support. Corrupt, missing, undecodable, or timed-out
+individual images increment the batch failure count and do not change runtime
+Ready state. Missing interpreters, process-start failures, invalid protocol,
+OpenCV import failures, and cascade failures mark the runtime Needs repair.
+Detection evidence is persisted before optional crop and descriptor work. A crop
+or descriptor failure is reported separately and does not discard a usable face
+box or count the entire photo as a hard image failure. Completion and cancellation
+summaries group hard failures by worker error code and report crop, embedding, and
+persistence failures independently.
+Crop generation decodes each EXIF-oriented source once per photo, not once per
+face. Managed detections are bounds-checked, suppress boxes with at least 35%
+intersection-over-union, enforce a minimum side of 24 pixels or 1.5% of the shorter image
+dimension, and accept at most 50 candidates per image. Images reaching that cap
+are flagged as unusually face-heavy rather than allowed to create unbounded
+downstream work. Full clustering is deferred and runs once after scanning, not
+once per photo. Cached embedding lookup is one bounded query per photo.
+Technical invocation logs include executable, worker, return code, stdout,
+stderr, timeout, suffix, size, error type, startup duration, per-item duration,
+and process launch count, but omit source-photo paths. Successful results are
+reused only while source fingerprint, detector identity, and protocol version
+remain compatible; zero-face results are cached too.

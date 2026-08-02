@@ -43,6 +43,7 @@ from ui.irrelevant_media_page import IrrelevantMediaPage
 from ui.photo_details_panel import PhotoDetailsPanel
 from ui.photo_grid_widget import PhotoGridWidget
 from ui.settings_page import SettingsPage
+from ui.people_review_page import PeopleReviewPage
 from workers.embedding_worker import EmbeddingWorker
 from storage.photo_repository import PhotoRepository
 from core.trash_workflow_service import TrashRecord
@@ -52,6 +53,8 @@ from vision.batch_embedding_service import BatchEmbeddingService
 from vision.managed_mobileclip_provider import ManagedMobileCLIPEmbeddingProvider
 from workers.scan_worker import ScanCompletion, ScanWorker
 from workers.thumbnail_worker import ThumbnailWorker
+from workers.face_processing_worker import FaceProcessingWorker
+from faces.processing import LocalFaceEmbeddingProvider, LocalOpenCVFaceDetector, ManagedFaceRuntimeClient
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +98,8 @@ class MainWindow(QMainWindow):
         self._pending_embedding_photos = None
         self._embedding_run_lifecycle: dict[int, dict[str, bool]] = {}
         self._pending_import_folder_path = None
+        self.face_processing_thread = None
+        self.face_processing_worker = None
         self._import_phase = "Idle"
         self._import_generation = 0
         self._current_import_photos = []
@@ -172,6 +177,16 @@ class MainWindow(QMainWindow):
         )
         self.settings_page.mobileclip_evaluation_requested.connect(self._handle_mobileclip_evaluation_requested)
         self.settings_page.runtime_operation_finished.connect(self._on_runtime_operation_finished)
+        self.people_review_page = PeopleReviewPage()
+        self.people_review_page.help_requested.connect(self._on_workspace_help_requested)
+        self.people_review_page.scan_requested.connect(self._start_face_processing)
+        self.people_review_page.pause_requested.connect(self._pause_face_processing)
+        self.people_review_page.resume_requested.connect(self._resume_face_processing)
+        self.people_review_page.cancel_requested.connect(self._cancel_face_processing)
+        self.people_review_page.skip_requested.connect(self._skip_face_processing)
+        self.people_review_page.runtime_settings_requested.connect(self._open_face_runtime_settings)
+        self.settings_page.face_runtime_ready_changed.connect(self.people_review_page.set_runtime_ready)
+        self.people_review_page.set_runtime_ready(self.settings_page.face_runtime_manager.status().ready)
 
         browser_page = QWidget()
         browser_layout = QVBoxLayout(browser_page)
@@ -201,14 +216,16 @@ class MainWindow(QMainWindow):
 
         self.tabs = QTabWidget()
         self.tabs.addTab(browser_page, "Photo Browser")
-        self.tabs.addTab(self.review_page, "Memory Review")
         self.tabs.addTab(self.irrelevant_media_page, "Cleanup Review")
+        self.tabs.addTab(self.people_review_page, "People Review")
+        self.tabs.addTab(self.review_page, "Memory Review")
         self.tabs.addTab(self.draft_page, "Album Draft")
         self.tabs.addTab(self.settings_page, "Settings")
         self._tab_workspace_ids = [
             PHOTO_BROWSER_WORKSPACE,
-            self.review_page.WORKSPACE_ID,
             self.irrelevant_media_page.WORKSPACE_ID,
+            self.people_review_page.WORKSPACE_ID,
+            self.review_page.WORKSPACE_ID,
             self.draft_page.WORKSPACE_ID,
             self.settings_page.WORKSPACE_ID,
         ]
@@ -247,6 +264,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         self._embedding_close_requested = True
+        self._cancel_face_processing()
         self._request_embedding_worker_cancel()
         if self.thumbnail_worker is not None:
             self.thumbnail_worker.cancel()
@@ -259,9 +277,96 @@ class MainWindow(QMainWindow):
             self.thumbnail_thread.wait(250)
             if app is not None:
                 app.processEvents()
+        while True:
+            face_thread = getattr(self, "face_processing_thread", None)
+            if face_thread is None or not face_thread.isRunning():
+                break
+            face_thread.wait(250)
+            if app is not None:
+                app.processEvents()
+        while True:
+            runtime_thread = getattr(getattr(self, "settings_page", None), "_face_runtime_thread", None)
+            if runtime_thread is None or not runtime_thread.isRunning():
+                break
+            runtime_thread.wait(250)
+            if app is not None:
+                app.processEvents()
         if app is not None:
             app.processEvents()
         super().closeEvent(event)
+
+    def _start_face_processing(self, photos) -> None:
+        if self.face_processing_thread is not None:
+            return
+        self.people_review_page.progress_label.setText(
+            f"Preparing local face scan for {len(photos)} eligible photos…"
+        )
+        thread = QThread(self)
+        runtime_status = self.settings_page.face_runtime_manager.status()
+        client = ManagedFaceRuntimeClient(runtime_status.interpreter_path,
+                                          self.settings_page.face_runtime_manager.log_path)
+        detector = LocalOpenCVFaceDetector(runtime_status.interpreter_path, client)
+        embedder = LocalFaceEmbeddingProvider(interpreter_path=runtime_status.interpreter_path,
+                                              runtime_client=client)
+        worker = FaceProcessingWorker(photos, self.people_review_page.repository,
+                                      detector=detector, embedder=embedder)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.progress.connect(self.people_review_page.show_scan_progress)
+        worker.stage_changed.connect(self.people_review_page.show_scan_stage)
+        worker.completed.connect(self.people_review_page.show_scan_completed)
+        worker.unavailable.connect(self._on_face_runtime_unavailable)
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(self._on_face_processing_thread_finished)
+        thread.finished.connect(thread.deleteLater)
+        self.face_processing_thread, self.face_processing_worker = thread, worker
+        thread.start()
+
+    def _on_face_runtime_unavailable(self, message: str) -> None:
+        self.settings_page.face_runtime_manager.mark_runtime_failure(message)
+        self.settings_page.refresh_face_runtime_status()
+        self.people_review_page.show_scan_unavailable(message)
+
+    def _open_face_runtime_settings(self) -> None:
+        settings_index = self.tabs.indexOf(self.settings_page)
+        if settings_index >= 0:
+            self.tabs.setCurrentIndex(settings_index)
+            QTimer.singleShot(0, self.settings_page.open_face_runtime_section)
+
+    def _pause_face_processing(self) -> None:
+        if self.face_processing_worker is not None:
+            self.face_processing_worker.pause()
+            self.people_review_page.set_scan_state("paused")
+            self.people_review_page.progress_label.setText("Local face scan paused safely between photos.")
+
+    def _resume_face_processing(self) -> None:
+        if self.face_processing_worker is not None:
+            self.face_processing_worker.resume()
+            self.people_review_page.set_scan_state("running")
+            self.people_review_page.progress_label.setText("Resuming local face scan…")
+
+    def _cancel_face_processing(self) -> None:
+        worker = getattr(self, "face_processing_worker", None)
+        if worker is not None:
+            worker.cancel()
+            page = getattr(self, "people_review_page", None)
+            if page is not None:
+                page.progress_label.setText("Cancelling local face scan safely…")
+
+    def _skip_face_processing(self) -> None:
+        worker = getattr(self, "face_processing_worker", None)
+        if worker is not None:
+            worker.skip_current()
+            page = getattr(self, "people_review_page", None)
+            if page is not None:
+                page.progress_label.setText("Skipping the current photo safely…")
+
+    def _on_face_processing_thread_finished(self) -> None:
+        self.face_processing_worker = None
+        self.face_processing_thread = None
+        if hasattr(self, "people_review_page"):
+            self.people_review_page.set_scan_state("idle")
 
     def _mobileclip_library_photos(self) -> list:
         return list(self._all_photos or [])
@@ -468,6 +573,9 @@ class MainWindow(QMainWindow):
         # regardless of library size.
         t0 = time.perf_counter()
         self._all_photos = list(photos or [])
+        people_review_page = getattr(self, "people_review_page", None)
+        if people_review_page is not None:
+            people_review_page.set_photos(self._all_photos)
         active_photos = [photo for photo in self._all_photos if self._is_active_photo(photo)]
         self.photo_model.set_photos(active_photos)
         self._apply_browser_filter()
@@ -879,6 +987,9 @@ class MainWindow(QMainWindow):
 
     def load_photos(self, photos):
         self._all_photos = list(photos or [])
+        people_review_page = getattr(self, "people_review_page", None)
+        if people_review_page is not None:
+            people_review_page.set_photos(self._all_photos)
         active = [photo for photo in self._all_photos if self._is_active_photo(photo)]
         self.photo_model.set_photos(active)
         self._apply_browser_filter()
