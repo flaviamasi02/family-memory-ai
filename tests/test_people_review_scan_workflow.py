@@ -7,7 +7,7 @@ import queue
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 
 from faces.models import BoundingBox, FaceEmbedding
 from faces.persistence import SQLiteFaceRepository
@@ -245,3 +245,58 @@ def test_one_persistent_process_handles_one_hundred_requests(tmp_path):
         assert result["faces"] == []
     assert factory.launch_count == 1 and client.launch_count == 1
     client.close()
+
+
+def test_embedding_failure_preserves_successful_detection(tmp_path):
+    class FailingEmbedder(FakeEmbedder):
+        def embed(self, path, faces, cancel_event=None):
+            raise ValueError("descriptor fixture failure")
+
+    path = tmp_path / "face.jpg"; path.write_bytes(b"fixture")
+    repository = SQLiteFaceRepository(tmp_path / "faces.sqlite3")
+    worker = FaceProcessingWorker([photo(path, "one")], repository, FakeDetector(),
+                                  FailingEmbedder(), crop_cache=FakeCropCache())
+    completed = []; worker.completed.connect(completed.append); worker.run()
+    result = completed[0]
+    assert result.faces_found == 1
+    assert result.failures == 0
+    assert result.embedding_failures == 1
+    assert repository.faces_for_image("one")[0].processing_error == "embedding_failed"
+
+
+def test_crop_failure_preserves_detection_and_is_not_a_hard_image_failure(tmp_path):
+    class FailingCrop:
+        def create(self, path, face): raise OSError("crop fixture failure")
+
+    path = tmp_path / "face.jpg"; path.write_bytes(b"fixture")
+    repository = SQLiteFaceRepository(tmp_path / "faces.sqlite3")
+    worker = FaceProcessingWorker([photo(path, "one")], repository, FakeDetector(),
+                                  FakeEmbedder(), crop_cache=FailingCrop())
+    completed = []; worker.completed.connect(completed.append); worker.run()
+    result = completed[0]
+    assert (result.faces_found, result.failures, result.crop_failures) == (1, 0, 1)
+    assert len(repository.faces_for_image("one")) == 1
+
+
+def test_grouped_hard_failure_reasons_are_counted_and_ranked(tmp_path):
+    paths = [tmp_path / f"corrupt-{index}.jpg" for index in range(3)]
+    for path in paths: path.write_bytes(b"bad")
+    worker = FaceProcessingWorker([photo(path, str(index)) for index, path in enumerate(paths)],
+                                  SQLiteFaceRepository(tmp_path / "faces.sqlite3"), FakeDetector(),
+                                  FakeEmbedder(), crop_cache=FakeCropCache())
+    completed = []; worker.completed.connect(completed.append); worker.run()
+    assert completed[0].failure_reasons == (("image_processing_failed", 3),)
+
+
+def test_high_failure_warning_shows_top_reason_and_can_cancel(tmp_path, monkeypatch):
+    from ui.people_review_page import PeopleReviewPage
+    from workers.face_processing_worker import FaceScanProgress
+    app = QApplication.instance() or QApplication([])
+    page = PeopleReviewPage(SQLiteFaceRepository(tmp_path / "faces.sqlite3"))
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: QMessageBox.StandardButton.No)
+    cancelled = []; page.cancel_requested.connect(lambda: cancelled.append(True))
+    page.show_scan_progress(FaceScanProgress(100, processed=20, failures=15, remaining=80,
+                                             failure_reasons=(("crop_failed", 15),)))
+    assert "top reason: crop_failed" in page.progress_label.text()
+    assert cancelled == [True]
+    app.processEvents()

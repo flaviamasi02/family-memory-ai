@@ -102,6 +102,11 @@ managed decoder has explicit support. Corrupt, missing, undecodable, or timed-ou
 individual images increment the batch failure count and do not change runtime
 Ready state. Missing interpreters, process-start failures, invalid protocol,
 OpenCV import failures, and cascade failures mark the runtime Needs repair.
+Detection evidence is persisted before optional crop and descriptor work. A crop
+or descriptor failure is reported separately and does not discard a usable face
+box or count the entire photo as a hard image failure. Completion and cancellation
+summaries group hard failures by worker error code and report crop, embedding, and
+persistence failures independently.
 Technical invocation logs include executable, worker, return code, stdout,
 stderr, timeout, suffix, size, error type, startup duration, per-item duration,
 and process launch count, but omit source-photo paths. Successful results are

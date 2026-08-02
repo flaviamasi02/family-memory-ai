@@ -167,6 +167,8 @@ class ManagedFaceRuntimeClient:
                   "worker": str(self.worker_path), "command": command, "return_code": returncode,
                   "stdout": stdout, "stderr": stderr, "timeout_seconds": 120,
                   "image_suffix": suffix.casefold(), "image_size": int(size or 0), "result_type": error_type,
+                  "processing_stage": "detect" if command == "detect" else "embed",
+                  "worker_error_code": error_type.split(":", 1)[-1],
                   "request_id": request_id, "processing_ms": processing_ms, "worker_startup_ms": self.startup_ms,
                   "process_launch_count": self.launch_count}
         with self.log_path.open("a", encoding="utf-8") as stream:

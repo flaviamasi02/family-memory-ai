@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import statistics
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from threading import Condition, Event
 
@@ -13,7 +15,7 @@ from PySide6.QtCore import QObject, Signal
 
 from faces.models import Face
 from faces.processing import (ConservativeFaceClusterer, FaceCropCache,
-                              FaceModelUnavailable, LocalFaceEmbeddingProvider,
+                              FaceImageProcessingError, FaceModelUnavailable, LocalFaceEmbeddingProvider,
                               LocalOpenCVFaceDetector)
 
 
@@ -35,6 +37,20 @@ class FaceScanProgress:
     average_processing_ms: float = 0.0
     median_processing_ms: float = 0.0
     slowest_processing_ms: float = 0.0
+    photos_decoded: int = 0
+    photos_with_faces: int = 0
+    crop_failures: int = 0
+    embedding_failures: int = 0
+    persistence_failures: int = 0
+
+
+@dataclass(frozen=True)
+class PhotoProcessingOutcome:
+    face_count: int = 0
+    reused: bool = False
+    crop_failures: int = 0
+    embedding_failures: int = 0
+    persistence_failures: int = 0
 
 
 class FaceProcessingWorker(QObject):
@@ -77,6 +93,7 @@ class FaceProcessingWorker(QObject):
             if hasattr(self.detector, "available") and not self.detector.available:
                 raise FaceModelUnavailable("Local face processing is unavailable. Install the optional face runtime from Settings, then try again.")
             processed = faces_found = no_faces = failures = cache_hits = 0
+            decoded = photos_with_faces = crop_failures = embedding_failures = persistence_failures = 0
             failure_reasons = {}; run_started = time.perf_counter()
             for photo in self.photos:
                 with self._pause:
@@ -86,12 +103,17 @@ class FaceProcessingWorker(QObject):
                     break
                 current = str(getattr(photo, "filename", "") or getattr(photo, "path", ""))
                 try:
-                    reused = self._process_photo(photo)
-                    cache_hits += int(reused)
+                    outcome = self._process_photo(photo)
+                    cache_hits += int(outcome.reused)
+                    decoded += 1
+                    crop_failures += outcome.crop_failures
+                    embedding_failures += outcome.embedding_failures
+                    persistence_failures += outcome.persistence_failures
                     metadata = dict(getattr(photo, "metadata", {}) or {})
                     metadata.pop("face_processing_failure", None); photo.metadata = metadata
-                    count = len(self.repository.faces_for_image(self._image_id(photo)))
+                    count = outcome.face_count
                     faces_found += count
+                    photos_with_faces += int(count > 0)
                     no_faces += int(count == 0)
                 except FaceModelUnavailable:
                     if self._cancel.is_set():
@@ -112,16 +134,18 @@ class FaceProcessingWorker(QObject):
                 progress = FaceScanProgress(total, processed, current, faces_found, no_faces,
                                             failures, total - processed, self._cancel.is_set(), rate,
                                             (total - processed) / rate if rate else 0,
-                                            tuple(sorted(failure_reasons.items())), cache_hits,
-                                            *self._runtime_timings())
+                                            tuple(sorted(failure_reasons.items(), key=lambda item: (-item[1], item[0]))), cache_hits,
+                                            *self._runtime_timings(), decoded, photos_with_faces,
+                                            crop_failures, embedding_failures, persistence_failures)
                 self.progress.emit(progress)
             if not self._cancel.is_set():
                 self._rebuild_clusters()
             progress = FaceScanProgress(total, processed, "", faces_found, no_faces, failures,
                                         total - processed, self._cancel.is_set(),
                                         processed / max(time.perf_counter()-run_started,.001), 0,
-                                        tuple(sorted(failure_reasons.items())), cache_hits,
-                                        *self._runtime_timings())
+                                        tuple(sorted(failure_reasons.items(), key=lambda item: (-item[1], item[0]))), cache_hits,
+                                        *self._runtime_timings(), decoded, photos_with_faces,
+                                        crop_failures, embedding_failures, persistence_failures)
             self.completed.emit(progress)
         except FaceModelUnavailable as exc:
             self.unavailable.emit(str(exc))
@@ -148,30 +172,78 @@ class FaceProcessingWorker(QObject):
         if (result and result["status"] == "success" and result["source_fingerprint"] == fingerprint
                 and result["detector_key"] == detector_key
                 and result["processing_version"] == "face-worker-v1"):
-            return True
+            return PhotoProcessingOutcome(int(result["face_count"]), reused=True)
         if existing and all(f.source_fingerprint == fingerprint and f.detector_key == detector_key for f in existing):
             self.repository.save_processing_result(image_id, fingerprint, detector_key, "success", len(existing))
-            return True
+            return PhotoProcessingOutcome(len(existing), reused=True)
         self.repository.delete_faces_for_image(image_id)
         candidates = self.detector.detect(path, self._cancel)
-        faces = []
+        faces = []; crop_failures = persistence_failures = 0
         for candidate in candidates:
             stable = hashlib.sha256(f"{image_id}|{fingerprint}|{candidate.bounding_box.to_dict()}|{detector_key}".encode()).hexdigest()
             face = Face(image_id=image_id, id=stable, source_fingerprint=fingerprint,
                         bounding_box=candidate.bounding_box, detection_confidence=candidate.confidence,
                         detector_key=detector_key, landmarks=candidate.landmarks,
                         quality_metrics=candidate.quality_metrics or {})
-            self.crop_cache.create(path, face)
-            self.repository.save_face(face)
+            # Detection evidence is useful independently of crops/embeddings.
+            # Persist it first so a downstream optional step cannot erase it.
+            try:
+                self.repository.save_face(face)
+            except Exception as exc:
+                persistence_failures += 1
+                self._log_stage(photo, "persist", "persistence_failed", exc)
+                continue
             faces.append(face)
+            try:
+                self.crop_cache.create(path, face)
+                self.repository.save_face(face)
+            except Exception as exc:
+                crop_failures += 1
+                face.processing_error = "crop_failed"
+                self._log_stage(photo, "crop", "crop_failed", exc)
+                try: self.repository.save_face(face)
+                except Exception: persistence_failures += 1
+        if candidates and not faces:
+            raise FaceImageProcessingError(
+                "persistence_failed", "Detected faces could not be saved for this image.")
         if faces:
             model_key = (f"{self.embedder.provider_id}|{self.embedder.model_id}|"
                          f"{self.embedder.model_revision}|dim={self.embedder.embedding_dimension}")
-            missing = [face for face in faces if self.repository.get_embedding(face.id, model_key) is None]
-            for embedding in self.embedder.embed(path, missing, self._cancel):
-                self.repository.save_embedding(embedding)
-        self.repository.save_processing_result(image_id, fingerprint, detector_key, "success", len(faces))
-        return False
+            missing = [face for face in faces if face.crop_cache_path and
+                       self.repository.get_embedding(face.id, model_key) is None]
+            embedding_failures = 0
+            for face in missing:
+                try:
+                    embeddings = self.embedder.embed(path, (face,), self._cancel)
+                    for embedding in embeddings: self.repository.save_embedding(embedding)
+                    if not embeddings: raise ValueError("No descriptor was produced.")
+                except Exception as exc:
+                    embedding_failures += 1
+                    face.processing_error = "embedding_failed"
+                    self._log_stage(photo, "embed", "embedding_failed", exc)
+                    try: self.repository.save_face(face)
+                    except Exception: persistence_failures += 1
+        try:
+            self.repository.save_processing_result(image_id, fingerprint, detector_key, "success", len(faces))
+        except Exception as exc:
+            persistence_failures += 1
+            self._log_stage(photo, "persist", "persistence_failed", exc)
+        return PhotoProcessingOutcome(len(faces), False, crop_failures,
+                                      embedding_failures if faces else 0, persistence_failures)
+
+    def _log_stage(self, photo, stage: str, code: str, exc: Exception) -> None:
+        """Record downstream diagnostics without exposing a personal path."""
+        client = getattr(self.detector, "runtime_client", None)
+        log_path = getattr(client, "log_path", None)
+        if log_path is None: return
+        path = Path(getattr(photo, "path", ""))
+        record = {"time": datetime.now(timezone.utc).isoformat(), "operation": "scan",
+                  "processing_stage": stage, "error_code": code,
+                  "image_suffix": path.suffix.casefold(),
+                  "image_size": path.stat().st_size if path.is_file() else 0,
+                  "technical_detail": f"{type(exc).__name__}: {exc}"}
+        with Path(log_path).open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(record, ensure_ascii=True) + "\n")
 
     def _close_runtime(self):
         clients = {getattr(self.detector, "runtime_client", None), getattr(self.embedder, "runtime_client", None)}

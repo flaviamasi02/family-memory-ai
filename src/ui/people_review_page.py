@@ -31,6 +31,7 @@ class PeopleReviewPage(QWidget):
         super().__init__(parent)
         self.repository = repository or SQLiteFaceRepository()
         self._photos = []
+        self._failure_warning_shown = False
         layout = QVBoxLayout(self)
         self.header = WorkspaceHeader("People Review")
         self.header.help_clicked.connect(lambda: self.help_requested.emit(self.WORKSPACE_ID))
@@ -79,6 +80,7 @@ class PeopleReviewPage(QWidget):
 
     def _scan(self) -> None:
         eligible = [p for p in self._photos if face_processing_eligibility(p).eligible]
+        self._failure_warning_shown = False
         self.progress_label.setText(f"Preparing local face scan for {len(eligible)} eligible photos…")
         self.set_scan_state("running")
         self.scan_requested.emit(eligible)
@@ -101,7 +103,8 @@ class PeopleReviewPage(QWidget):
 
     def show_scan_progress(self, progress) -> None:
         eta = f"{progress.estimated_remaining_seconds / 60:.1f} min remaining" if progress.remaining else "finishing"
-        warning = (" Warning: many images are failing; review logs or Cancel." if
+        top_reason = progress.failure_reasons[0][0] if progress.failure_reasons else "unknown"
+        warning = (f" Warning: many images are failing (top reason: {top_reason}); Cancel is available." if
                    progress.processed >= 20 and progress.failures / progress.processed > .2 else "")
         self.progress_label.setText(
             f"Eligible: {progress.eligible} | Processed: {progress.processed} | "
@@ -109,6 +112,16 @@ class PeopleReviewPage(QWidget):
             f"No faces: {progress.no_faces} | Failures: {progress.failures} | Remaining: {progress.remaining} | "
             f"{progress.images_per_second:.2f} images/sec | {eta}.{warning}"
         )
+        if warning and not self._failure_warning_shown:
+            self._failure_warning_shown = True
+            answer = QMessageBox.warning(
+                self, "Many images could not be processed",
+                f"More than 20% of processed photos failed. The most common reason is {top_reason}.\n\n"
+                "Completed results are safe. Continue scanning?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)
+            if answer != QMessageBox.StandardButton.Yes:
+                self.cancel_requested.emit()
 
     def show_scan_completed(self, progress) -> None:
         self.refresh(); self.set_scan_state("idle")
@@ -117,7 +130,9 @@ class PeopleReviewPage(QWidget):
         self.progress_label.setText(
             f"Local face scan {outcome}. Processed {progress.processed} of {progress.eligible} photos; "
             f"found {progress.faces_found} faces; {progress.no_faces} had no faces; {progress.failures} failed. "
-            f"Reused: {progress.cache_hits}. Failure reasons: {reasons}."
+            f"Crop failures: {progress.crop_failures}; embedding failures: {progress.embedding_failures}; "
+            f"persistence failures: {progress.persistence_failures}. Reused: {progress.cache_hits}. "
+            f"Failure reasons: {reasons}."
         )
 
     def show_scan_unavailable(self, message: str) -> None:
