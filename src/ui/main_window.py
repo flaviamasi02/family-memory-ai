@@ -43,6 +43,7 @@ from ui.irrelevant_media_page import IrrelevantMediaPage
 from ui.photo_details_panel import PhotoDetailsPanel
 from ui.photo_grid_widget import PhotoGridWidget
 from ui.settings_page import SettingsPage
+from ui.people_review_page import PeopleReviewPage
 from workers.embedding_worker import EmbeddingWorker
 from storage.photo_repository import PhotoRepository
 from core.trash_workflow_service import TrashRecord
@@ -172,6 +173,8 @@ class MainWindow(QMainWindow):
         )
         self.settings_page.mobileclip_evaluation_requested.connect(self._handle_mobileclip_evaluation_requested)
         self.settings_page.runtime_operation_finished.connect(self._on_runtime_operation_finished)
+        self.people_review_page = PeopleReviewPage()
+        self.people_review_page.help_requested.connect(self._on_workspace_help_requested)
 
         browser_page = QWidget()
         browser_layout = QVBoxLayout(browser_page)
@@ -201,14 +204,16 @@ class MainWindow(QMainWindow):
 
         self.tabs = QTabWidget()
         self.tabs.addTab(browser_page, "Photo Browser")
-        self.tabs.addTab(self.review_page, "Memory Review")
         self.tabs.addTab(self.irrelevant_media_page, "Cleanup Review")
+        self.tabs.addTab(self.people_review_page, "People Review")
+        self.tabs.addTab(self.review_page, "Memory Review")
         self.tabs.addTab(self.draft_page, "Album Draft")
         self.tabs.addTab(self.settings_page, "Settings")
         self._tab_workspace_ids = [
             PHOTO_BROWSER_WORKSPACE,
-            self.review_page.WORKSPACE_ID,
             self.irrelevant_media_page.WORKSPACE_ID,
+            self.people_review_page.WORKSPACE_ID,
+            self.review_page.WORKSPACE_ID,
             self.draft_page.WORKSPACE_ID,
             self.settings_page.WORKSPACE_ID,
         ]
@@ -468,6 +473,7 @@ class MainWindow(QMainWindow):
         # regardless of library size.
         t0 = time.perf_counter()
         self._all_photos = list(photos or [])
+        self.people_review_page.set_photos(self._all_photos)
         active_photos = [photo for photo in self._all_photos if self._is_active_photo(photo)]
         self.photo_model.set_photos(active_photos)
         self._apply_browser_filter()
@@ -879,6 +885,7 @@ class MainWindow(QMainWindow):
 
     def load_photos(self, photos):
         self._all_photos = list(photos or [])
+        self.people_review_page.set_photos(self._all_photos)
         active = [photo for photo in self._all_photos if self._is_active_photo(photo)]
         self.photo_model.set_photos(active)
         self._apply_browser_filter()

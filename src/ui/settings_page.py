@@ -128,6 +128,9 @@ class SettingsPage(QWidget):
         root.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         root.addWidget(self.info_panel)
         root.addWidget(self.description_label)
+        self.delete_face_analysis_button = QPushButton("Delete all face analysis data…")
+        self.delete_face_analysis_button.clicked.connect(self._delete_face_analysis)
+        root.addWidget(self.delete_face_analysis_button)
         self._build_developer_diagnostics(root)
         page_layout.addWidget(self.settings_scroll_area, 1)
         self.settings_scroll_area.setWidget(self.settings_scroll_content)
@@ -1151,6 +1154,20 @@ class SettingsPage(QWidget):
         if self.folder_radio.isChecked():
             return another_folder_source(self._selected_folder, limit)
         return current_library_source(self._library_provider(), limit)
+
+    def _delete_face_analysis(self) -> None:
+        message = ("This removes face detections, crops, embeddings, clusters, suggestions, and "
+                   "confirmed person assignments. Original photos, categories, cleanup history, "
+                   "and album decisions remain untouched.")
+        if QMessageBox.warning(self, "Delete all face analysis data?", message,
+                               QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                               QMessageBox.StandardButton.Cancel) != QMessageBox.StandardButton.Yes:
+            return
+        from faces.persistence import SQLiteFaceRepository
+        from faces.processing import FaceCropCache
+        SQLiteFaceRepository().clear_face_analysis()
+        FaceCropCache().clear()
+        QMessageBox.information(self, "Face analysis deleted", "Face analysis data was deleted. Original photos were not changed.")
 
     def _refresh_source_summary(self) -> None:
         required_widgets = ("run_button", "select_folder_button", "source_summary")

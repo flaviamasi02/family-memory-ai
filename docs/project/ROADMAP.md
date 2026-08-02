@@ -250,3 +250,7 @@ Following planned milestone:
 - [ ] MODEL-003 — First real MobileCLIP classification integration, only after MODEL-002F succeeds.
 
 MODEL-002F must keep the production classifier unchanged while validating installation, verification, benchmark, and persistence behavior. MODEL-003 should define safe classification integration only after MobileCLIP is operationally validated.
+
+## FACE-001 delivery note
+
+FACE-001 delivers MODEL-004B–F as one reviewable vertical slice over MODEL-004A: local detection, face descriptors, advisory clustering, person management, and confirmed metadata exposure foundations. Relationship inference and album scoring are deferred.

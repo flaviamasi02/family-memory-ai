@@ -361,3 +361,8 @@ After optimization, the UI is responsive immediately after clicking Import (scan
 - Cleanup Review now defaults to active work only; successfully moved photos
   disappear immediately from normal workflows and remain accessible through a
   separate Trash History view with safe restore.
+
+### FACE-001 — Local Face Detection and People Review
+
+- Added explicit, local-only eligible-photo face scanning foundations, EXIF-oriented detections and crops, face-specific descriptors, conservative advisory clustering, manual profiles and People Review.
+- Added privacy reset controls. Names remain unconfirmed until Product Owner action; Trash and non-photo categories are excluded.

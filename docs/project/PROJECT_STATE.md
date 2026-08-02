@@ -1195,3 +1195,7 @@ Historical status at implementation time: implemented in the PR branch and await
 
 - MODEL-003D follow-up: suggestion evidence now normalizes category IDs/display labels such as `Family Photo`, `family photo`, and `family_photo` before eligibility checks, and opt-in developer diagnostics can explain evidence counts when suggestions are unavailable.
 - MODEL-003D follow-up: deterministic and legacy learned rules no longer assign Family Photo. Ordinary supported images remain Unknown even with camera/EXIF/GPS/filename/geometry or face evidence, with a truthful semantic-evidence waiting explanation. Only MODEL-003D may propose Family Photo; explicit manual categories and accepted suggestions remain authoritative, and reliable non-family rules are unchanged.
+
+## FACE-001 — local People Review (2026-08-02)
+
+FACE-001 extends the repository-authoritative MODEL-004A foundation rather than creating another face store. Eligible active still photos can be scanned only after explicit action; detections, oriented crops, face-specific embeddings and conservative unnamed clusters remain local. Product Owner confirmation is required for identity. Trash, inactive photos, documents, screenshots, memes/graphics, advertisements and explicit non-family decisions are excluded. Relationship inference and album-score changes are not implemented. Tab-switch latency remains deferred.

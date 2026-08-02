@@ -44,3 +44,11 @@ Foreign keys clear obsolete Person/Cluster links and cascade face-embedding dele
 ## Future integration rules
 
 Memory Review may later consume Person and Face query services, but it must not access SQLite tables or AI providers directly. Manual names and assignments remain durable product decisions. Automatic clusters remain independent evidence and must not overwrite a manual Person assignment. Profile learning may select profile faces or build versioned embeddings while preserving source Face IDs and history.
+
+## FACE-001 processing and lifecycle
+
+`faces.eligibility.face_processing_eligibility` is the shared policy boundary. It uses stable category IDs and excludes manual opt-outs, inactive/Trash records, unsupported media, and non-photographic categories. Restoring a valid unchanged photo makes it eligible again.
+
+The OpenCV detector is lazy and reads EXIF-oriented pixels locally. Pixel bounding boxes refer to that authoritative orientation. Padded crops live only in the application cache. The separate local face-crop descriptor is not MobileCLIP. Embeddings are finite, dimension-checked, source-fingerprinted and model-versioned. Conservative deterministic clustering is advisory and never supplies a name. Confirmed assignments are manual and audited.
+
+Face data is sensitive. Settings can delete detections, crops, embeddings, clusters, proposals and confirmed assignments without modifying originals, categories, cleanup history or album decisions. No cloud inference, relationship inference, automatic naming, or album-score adjustment is part of FACE-001. Work is incremental and bounded; UI rendering and model initialization must remain off the synchronous full-library path.

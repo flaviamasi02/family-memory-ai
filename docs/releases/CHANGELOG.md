@@ -764,3 +764,7 @@
   deletion or face recognition was added.
 - Moved Trash records are now inactive across browsing, memory, AI/indexing and
   album pipelines, with a distinct Cleanup Review Trash History/restore mode.
+
+### FACE-001 — Local Face Detection and People Review
+
+People Review provides explicit local scanning, advisory clusters and owner-confirmed naming. Source photos are never uploaded or modified, and face-analysis data can be deleted independently.

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Mapping
+import math
 from uuid import uuid4
 
 
@@ -82,11 +83,20 @@ class Face:
     created_at: str = field(default_factory=utc_now)
     updated_at: str = field(default_factory=utc_now)
     revision: int = 1
+    crop_cache_key: str = ""
+    crop_cache_path: str = ""
+    detection_status: str = "detected"
+    false_positive: bool = False
+    assignment_source: str = ""
+    assignment_confidence: float | None = None
+    assignment_confirmed: bool = False
+    processing_error: str = ""
 
     def __post_init__(self) -> None:
         if not self.id or not self.image_id:
             raise ValueError("Face and image IDs cannot be empty.")
         self.detection_confidence = _confidence(self.detection_confidence, "detection confidence")
+        self.assignment_confidence = _confidence(self.assignment_confidence, "assignment confidence")
         self.landmarks = tuple(self.landmarks)
         self.quality_metrics = {str(key): float(value) for key, value in self.quality_metrics.items()}
         if self.revision < 1:
@@ -107,6 +117,14 @@ class Face:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "revision": self.revision,
+            "crop_cache_key": self.crop_cache_key,
+            "crop_cache_path": self.crop_cache_path,
+            "detection_status": self.detection_status,
+            "false_positive": self.false_positive,
+            "assignment_source": self.assignment_source,
+            "assignment_confidence": self.assignment_confidence,
+            "assignment_confirmed": self.assignment_confirmed,
+            "processing_error": self.processing_error,
         }
 
     @classmethod
@@ -129,6 +147,7 @@ class Person:
     created_at: str = field(default_factory=utc_now)
     updated_at: str = field(default_factory=utc_now)
     revision: int = 1
+    relationship_label: str = ""
 
     def __post_init__(self) -> None:
         if not self.id:
@@ -140,7 +159,7 @@ class Person:
 
     def to_dict(self) -> dict[str, Any]:
         return {key: getattr(self, key) for key in (
-            "id", "name", "aliases", "profile_face_id", "notes", "created_at", "updated_at", "revision"
+            "id", "name", "aliases", "profile_face_id", "notes", "created_at", "updated_at", "revision", "relationship_label"
         )} | {"aliases": list(self.aliases)}
 
     @classmethod
@@ -160,6 +179,7 @@ class FaceCluster:
     created_at: str = field(default_factory=utc_now)
     updated_at: str = field(default_factory=utc_now)
     revision: int = 1
+    face_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.id:
@@ -167,6 +187,7 @@ class FaceCluster:
         self.confidence = _confidence(self.confidence, "cluster confidence")
         if self.revision < 1:
             raise ValueError("Cluster revision must be positive.")
+        self.face_ids = tuple(self.face_ids)
 
     def to_dict(self) -> dict[str, Any]:
         return dict(vars(self))
@@ -197,6 +218,8 @@ class FaceEmbedding:
             raise ValueError("Embedding identity fields cannot be empty.")
         if self.dimension < 0 or (self.status == "ok" and self.dimension != len(self.vector)):
             raise ValueError("Embedding dimension must match a successful vector.")
+        if self.status == "ok" and not all(math.isfinite(item) for item in self.vector):
+            raise ValueError("Embedding vectors must contain only finite values.")
 
     @property
     def model_key(self) -> str:
