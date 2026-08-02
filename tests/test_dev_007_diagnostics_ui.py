@@ -9,7 +9,7 @@ from core.application_data import ApplicationDataPathService
 from core.application_services import ApplicationServices
 from storage.library_registry import LibraryRegistry
 from storage.metadata_store import MetadataStore
-from storage.schema import SCHEMA_VERSION
+from storage.schema import REQUIRED_TABLES, SCHEMA_VERSION
 
 
 @pytest.fixture
@@ -166,7 +166,7 @@ def test_refresh_register_reuse_health_schema_and_source_unchanged(page):
     widget._show_schema_summary()
     summary = widget.diagnostics_report.toPlainText()
     assert f"Schema version: {SCHEMA_VERSION}" in summary
-    assert "Required tables: 17" in summary
+    assert f"Required tables: {len(REQUIRED_TABLES)}" in summary
     assert "1: data_001a_foundation" in summary
     assert "2: data_001b_full_schema" in summary
     assert "3: data_001c_import_registration" in summary
@@ -221,7 +221,7 @@ def test_settings_reopen_and_refresh_preserve_imported_active_context(page):
         reopened.refresh_developer_diagnostics()
         assert reopened.diagnostics_labels["Active LibraryID"].text() == record.library_id
         assert reopened.diagnostics_labels["Active database path"].text() != "No active database"
-        assert reopened.diagnostics_labels["Schema version"].text() == "5"
+        assert reopened.diagnostics_labels["Schema version"].text() == str(SCHEMA_VERSION)
     finally:
         reopened.close(); reopened.deleteLater()
 
