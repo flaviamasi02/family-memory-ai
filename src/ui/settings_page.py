@@ -305,10 +305,12 @@ class SettingsPage(QWidget):
         self.face_runtime_repair_button = QPushButton("Repair")
         self.face_runtime_remove_button = QPushButton("Remove")
         self.face_runtime_logs_button = QPushButton("View Logs")
+        self.face_runtime_copy_details_button = QPushButton("Copy technical details")
         self.face_runtime_folder_button = QPushButton("Open Runtime Folder")
         for button in (self.face_runtime_install_button, self.face_runtime_verify_button,
                        self.face_runtime_repair_button, self.face_runtime_remove_button,
-                       self.face_runtime_logs_button, self.face_runtime_folder_button):
+                       self.face_runtime_logs_button, self.face_runtime_copy_details_button,
+                       self.face_runtime_folder_button):
             actions.addWidget(button)
         layout.addLayout(actions)
         self.face_runtime_progress = QProgressBar(); self.face_runtime_progress.setRange(0, 100)
@@ -324,6 +326,9 @@ class SettingsPage(QWidget):
         self.face_runtime_repair_button.clicked.connect(lambda: self._confirm_face_runtime_operation("repair"))
         self.face_runtime_remove_button.clicked.connect(lambda: self._confirm_face_runtime_operation("remove"))
         self.face_runtime_logs_button.clicked.connect(self._show_face_runtime_logs)
+        self.face_runtime_copy_details_button.clicked.connect(
+            lambda: QGuiApplication.clipboard().setText(self.face_runtime_technical_details.toPlainText())
+        )
         self.face_runtime_folder_button.clicked.connect(lambda: self._open_folder(self.face_runtime_manager.root))
         self.refresh_face_runtime_status()
 
@@ -374,7 +379,12 @@ class SettingsPage(QWidget):
         self.refresh_face_runtime_status()
 
     def _on_face_runtime_failed(self, message: str) -> None:
-        self.face_runtime_message.setText(f"Operation failed. Recommended action: choose Repair. Reason: {message}")
+        self.face_runtime_progress.setValue(0)
+        if "not supported" in message or "No compatible" in message:
+            recommendation = "Install a supported Family Memory AI Windows build; retrying the same packages will not help."
+        else:
+            recommendation = "Choose Repair to recreate the managed runtime."
+        self.face_runtime_message.setText(f"Operation failed. Recommended action: {recommendation} Reason: {message}")
         self.face_runtime_technical_details.setPlainText(message); self.face_runtime_technical_details.show()
         self.refresh_face_runtime_status()
 

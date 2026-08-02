@@ -2,11 +2,12 @@ import json, sys
 from pathlib import Path
 from types import SimpleNamespace
 import pytest
-from faces.runtime import FaceRuntimeManager, OPENCV_PACKAGE, NUMPY_PACKAGE
+from faces.runtime import (COMPATIBILITY, FaceRuntimeManager, classify_pip_failure,
+                           compatible_packages, meaningful_pip_error)
 
 class FakeRunner:
-    def __init__(self, diagnostic=None, install_error="", repair_after_uninstall=False):
-        self.calls=[]; self.diagnostic=diagnostic or self.valid(); self.install_error=install_error; self.repair_after_uninstall=repair_after_uninstall
+    def __init__(self, diagnostic=None, install_error="", repair_after_uninstall=False, python=(3, 12), tooling_error=""):
+        self.calls=[]; self.diagnostic=diagnostic or self.valid(); self.install_error=install_error; self.repair_after_uninstall=repair_after_uninstall; self.python=python; self.tooling_error=tooling_error
     @staticmethod
     def valid(**updates):
         value={'executable':'managed-python','prefix':'managed','python_version':'3.12','cv2_file':'managed/site-packages/cv2/__init__.py','cv2_version':'4.10.0','has_data':True,'has_cascade':True,'in_site_packages':True,'distributions':{'opencv-python-headless':'4.10.0.84','numpy':'1.26.4'},'ok':True,'cascade_path':'managed/haarcascade_frontalface_default.xml'}
@@ -15,18 +16,26 @@ class FakeRunner:
         self.calls.append(list(args))
         if '-m' in args and 'venv' in args:
             root=Path(args[-1]); executable=root/('Scripts/python.exe' if sys.platform=='win32' else 'bin/python'); executable.parent.mkdir(parents=True,exist_ok=True); executable.write_text('fake')
-        if 'install' in args and self.install_error: return SimpleNamespace(returncode=1,stdout='',stderr=self.install_error)
+        if 'install' in args and self.install_error and 'opencv-python-headless' in ' '.join(args): return SimpleNamespace(returncode=1,stdout='',stderr=self.install_error)
+        if args[-3:]==['pip','setuptools','wheel'] and self.tooling_error: return SimpleNamespace(returncode=1,stdout='',stderr=self.tooling_error)
         if 'uninstall' in args and self.repair_after_uninstall:
             self.diagnostic = self.valid()
-        if '-c' in args: return SimpleNamespace(returncode=0,stdout=json.dumps(self.diagnostic)+'\n',stderr='')
+        if '-c' in args:
+            script=args[args.index('-c')+1]
+            if 'platform.python_version' in script:
+                executable=Path(args[0]); data={'executable':str(executable.resolve()),'prefix':str(executable.parent.parent.resolve()),'python_version':f'{self.python[0]}.{self.python[1]}.0','python_major':self.python[0],'python_minor':self.python[1],'architecture':'64-bit','platform':'Windows','pip_version':'pip 24.0'}
+            else: data=self.diagnostic
+            return SimpleNamespace(returncode=0,stdout=json.dumps(data)+'\n',stderr='')
         return SimpleNamespace(returncode=0,stdout='ok',stderr='')
 
 def test_install_uses_dedicated_environment_pins_versions_and_becomes_ready(tmp_path):
     runner=FakeRunner(); manager=FaceRuntimeManager(tmp_path/'.venv-face-runtime',runner)
     assert manager.status().state=='Not installed'; status=manager.install()
     assert status.ready and status.interpreter_path != sys.executable
-    install=next(c for c in runner.calls if 'install' in c)
-    assert OPENCV_PACKAGE in install and NUMPY_PACKAGE in install
+    installs=[c for c in runner.calls if 'install' in c]
+    install=installs[-1]
+    assert set(COMPATIBILITY[(3,12)]).issubset(install)
+    assert installs[0][-3:] == ['pip','setuptools','wheel']
     assert all('.venv-mobileclip' not in ' '.join(c) for c in runner.calls)
 
 def test_missing_cascade_api_is_verification_not_network_error(tmp_path):
@@ -46,7 +55,7 @@ def test_repair_uninstalls_all_conflicting_opencv_distributions_first(tmp_path):
     distributions={'cv2':'1.0','opencv-python':'4','opencv-contrib-python':'4','opencv-python-headless':'4.10.0.84','numpy':'1.26.4'}
     runner=FakeRunner(FakeRunner.valid(distributions=distributions),repair_after_uninstall=True); manager=FaceRuntimeManager(tmp_path/'.venv-face-runtime',runner)
     assert manager.repair().ready
-    uninstall=next(c for c in runner.calls if 'uninstall' in c); install=next(c for c in runner.calls if 'install' in c)
+    uninstall=next(c for c in runner.calls if 'uninstall' in c); install=next(c for c in runner.calls if 'install' in c and 'opencv-python-headless' in ' '.join(c))
     assert uninstall.index('uninstall') < len(uninstall) and runner.calls.index(uninstall) < runner.calls.index(install)
     assert {'cv2','opencv-python','opencv-contrib-python','opencv-python-headless'}.issubset(uninstall)
 
@@ -58,5 +67,53 @@ def test_multiple_active_distributions_fail_as_conflict(tmp_path):
 
 def test_download_error_is_distinct_from_verification_error(tmp_path):
     manager=FaceRuntimeManager(tmp_path/'.venv-face-runtime',FakeRunner(install_error='Could not fetch URL'))
-    with pytest.raises(RuntimeError,match='download or installation'): manager.install()
-    assert 'connection' in manager.status().last_error.lower()
+    with pytest.raises(RuntimeError,match='could not be reached'): manager.install()
+    assert 'could not fetch' in manager.status().last_error.lower()
+
+
+def test_error_extraction_uses_specific_error_before_trailing_hint():
+    output='notice: A new release of pip is available.\nERROR: No matching distribution found for numpy==1.26.4\nhint: See above for details.'
+    assert meaningful_pip_error(output) == 'ERROR: No matching distribution found for numpy==1.26.4'
+    assert classify_pip_failure(output) == 'no_wheel'
+
+
+@pytest.mark.parametrize(('output','kind'), [
+    ('ERROR: package Requires-Python >=3.12', 'unsupported_python'),
+    ('SSL: CERTIFICATE_VERIFY_FAILED', 'network'),
+    ('ERROR: [WinError 5] Access is denied', 'permission'),
+    ('ERROR: ResolutionImpossible dependency conflict', 'dependency'),
+])
+def test_pip_failure_classification(output, kind):
+    assert classify_pip_failure(output) == kind
+
+
+def test_compatible_package_policy_and_unsupported_python(tmp_path):
+    assert compatible_packages(3,10) and compatible_packages(3,12) and compatible_packages(3,13)
+    assert compatible_packages(3,14) is None
+    runner=FakeRunner(python=(3,14)); manager=FaceRuntimeManager(tmp_path/'.venv-face-runtime',runner)
+    with pytest.raises(RuntimeError,match='Python 3.14.0 is not supported'): manager.install()
+    runtime_installs=[c for c in runner.calls if 'install' in c and 'opencv-python-headless' in ' '.join(c)]
+    assert runtime_installs == []
+
+
+def test_repair_recreates_partial_environment_before_tooling(tmp_path):
+    root=tmp_path/'.venv-face-runtime'; stale=root/'stale.txt'; stale.parent.mkdir(); stale.write_text('broken')
+    runner=FakeRunner(); manager=FaceRuntimeManager(root,runner); assert manager.repair().ready
+    assert not stale.exists()
+    venv_index=next(i for i,c in enumerate(runner.calls) if 'venv' in c)
+    tooling_index=next(i for i,c in enumerate(runner.calls) if c[-3:]==['pip','setuptools','wheel'])
+    runtime_index=next(i for i,c in enumerate(runner.calls) if 'install' in c and 'opencv-python-headless' in ' '.join(c))
+    assert venv_index < tooling_index < runtime_index
+
+
+def test_stdout_and_stderr_are_combined_for_analysis():
+    from faces.runtime import combined_output
+    result=SimpleNamespace(stdout='ERROR: ResolutionImpossible',stderr='hint: See above for details.')
+    assert classify_pip_failure(combined_output(result)) == 'dependency'
+
+
+def test_installer_tooling_failure_is_separate_from_runtime_packages(tmp_path):
+    runner=FakeRunner(tooling_error='ERROR: failed building wheel for installer tooling')
+    manager=FaceRuntimeManager(tmp_path/'.venv-face-runtime',runner)
+    with pytest.raises(RuntimeError,match='installer could not be prepared'): manager.install()
+    assert not any('opencv-python-headless' in ' '.join(c) and 'install' in c for c in runner.calls)

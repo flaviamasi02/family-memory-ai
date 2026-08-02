@@ -58,7 +58,11 @@ Face data is sensitive. Settings can delete detections, crops, embeddings, clust
 Face detection runs in the application-owned `.venv-face-runtime`, never the
 MobileCLIP environment or an arbitrary `cv2` import from the application
 interpreter. The reproducible Windows/Python 3.10–3.12 set is
-`opencv-python-headless==4.10.0.84`, `numpy==1.26.4`, and `Pillow==10.4.0`.
+`opencv-python-headless==4.10.0.84`, `numpy==1.26.4`, and `Pillow==10.4.0`;
+Python 3.13 uses `opencv-python-headless==4.11.0.86`, `numpy==2.1.3`, and
+`Pillow==11.1.0`. Other interpreter versions stop with an actionable unsupported
+version state before package installation. Repair recreates the environment,
+then upgrades `pip`, `setuptools`, and `wheel` before installing runtime wheels.
 Install and Repair diagnose the interpreter and installed distributions, remove
 all conflicting OpenCV wheels, reinstall the pinned set, and verify module
 location, version, `cv2.data.haarcascades`, the frontal-face XML, and a non-empty

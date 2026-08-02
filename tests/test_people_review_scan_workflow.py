@@ -153,4 +153,6 @@ def test_verification_failure_recommends_repair_not_internet(tmp_path):
     message = window.settings_page.face_runtime_message.text().lower()
     assert "repair" in message
     assert "internet" not in message
+    assert window.settings_page.face_runtime_progress.value() == 0
+    assert window.settings_page.face_runtime_repair_button.isEnabled()
     window.close(); app.processEvents()
