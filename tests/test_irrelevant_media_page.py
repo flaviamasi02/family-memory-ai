@@ -637,7 +637,10 @@ class IrrelevantMediaPageTests(unittest.TestCase):
             self.assertFalse((root / "confirmed.jpg").exists())
             self.assertTrue((root.parent / "Family Memory Trash" / "confirmed.jpg").exists())
             self.assertEqual(photo.metadata["trash_workflow_state"], "moved_to_trash")
-            self.assertEqual(page.trash_action_status_label.text(), "1 photo moved to Trash.")
+            self.assertEqual(
+                page.trash_action_status_label.text(),
+                "1 photo moved to Trash and removed from the active workflow.",
+            )
 
             self.assertNotIn("confirmed.jpg", page.visible_filenames())
             self.assertIn("removed from the active workflow", page.trash_action_status_label.text())
