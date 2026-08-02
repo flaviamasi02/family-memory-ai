@@ -12,6 +12,7 @@ from PySide6.QtCore import QSettings, Qt, QTimer, QThread, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
+    QButtonGroup,
     QFormLayout,
     QFileDialog,
     QGroupBox,
@@ -102,6 +103,7 @@ class IrrelevantMediaPage(QWidget):
         self._face_detection_thread: Optional[QThread] = None
         self._face_detection_worker: Optional[FaceDetectionWorker] = None
         self._bulk_category_in_progress = False
+        self._view_scroll_positions = {"review": 0, "history": 0}
         self._trash_destination: Optional[Path] = None
         self._trash_destination_error = "Import a library to choose a Trash destination."
         self._trash_settings = QSettings(
@@ -131,7 +133,36 @@ class IrrelevantMediaPage(QWidget):
         self.view_combo = QComboBox()
         self.view_combo.addItem("To review", "review")
         self.view_combo.addItem("Trash History", "history")
-        self.view_combo.currentIndexChanged.connect(self._trigger_refresh)
+        self.view_combo.currentIndexChanged.connect(self._on_view_combo_changed)
+        self.view_combo.setVisible(False)  # compatibility state; visible switch uses both labeled buttons
+        self.view_to_review_button = QPushButton("To review")
+        self.view_history_button = QPushButton("Trash History")
+        for button in (self.view_to_review_button, self.view_history_button):
+            button.setCheckable(True)
+            button.setMinimumSize(150, 38)
+            button.setStyleSheet(
+                "QPushButton { font-weight: 600; padding: 7px 18px; } "
+                "QPushButton:checked { background: #1f6feb; color: white; border: 2px solid #174ea6; }"
+            )
+        self.view_to_review_button.setChecked(True)
+        self.view_button_group = QButtonGroup(self)
+        self.view_button_group.setExclusive(True)
+        self.view_button_group.addButton(self.view_to_review_button)
+        self.view_button_group.addButton(self.view_history_button)
+        self.view_to_review_button.clicked.connect(lambda: self._select_cleanup_view("review"))
+        self.view_history_button.clicked.connect(lambda: self._select_cleanup_view("history"))
+        self.view_explanation_label = QLabel("Photos still requiring cleanup decisions.")
+        self.view_explanation_label.setWordWrap(True)
+
+        self.view_switch = QGroupBox("View")
+        self.view_switch.setObjectName("cleanupViewSwitch")
+        view_switch_layout = QVBoxLayout(self.view_switch)
+        view_buttons = QHBoxLayout()
+        view_buttons.addWidget(self.view_to_review_button)
+        view_buttons.addWidget(self.view_history_button)
+        view_buttons.addStretch(1)
+        view_switch_layout.addLayout(view_buttons)
+        view_switch_layout.addWidget(self.view_explanation_label)
 
         self.confidence_filter_combo = QComboBox()
         self.confidence_filter_combo.addItems([
@@ -178,8 +209,6 @@ class IrrelevantMediaPage(QWidget):
         self.face_detection_status_label.setStyleSheet("font-size: 12px; color: #666;")
 
         toolbar = QHBoxLayout()
-        toolbar.addWidget(QLabel("View:"))
-        toolbar.addWidget(self.view_combo)
         toolbar.addWidget(QLabel("Category:"))
         toolbar.addWidget(self.category_filter_combo)
         toolbar.addWidget(QLabel("Confidence:"))
@@ -223,6 +252,7 @@ class IrrelevantMediaPage(QWidget):
         self.original_path_value.setWordWrap(True)
         self.current_trash_path_value = QLabel("-")
         self.current_trash_path_value.setWordWrap(True)
+        self.trash_moved_at_value = QLabel("-")
         self.metadata_summary_value = QLabel("-")
         self.metadata_summary_value.setWordWrap(True)
 
@@ -236,6 +266,7 @@ class IrrelevantMediaPage(QWidget):
         details_form.addRow("Status:", self.trash_status_value)
         details_form.addRow("Original path:", self.original_path_value)
         details_form.addRow("Current Trash path:", self.current_trash_path_value)
+        details_form.addRow("Moved date:", self.trash_moved_at_value)
         details_form.addRow("Current decision:", self.decision_value)
         details_form.addRow("Metadata summary:", self.metadata_summary_value)
 
@@ -276,6 +307,11 @@ class IrrelevantMediaPage(QWidget):
         self.change_trash_folder_button.clicked.connect(self.change_trash_folder)
         self.restore_trash_button = QPushButton("Restore selected photos")
         self.restore_trash_button.clicked.connect(self.restore_selected_photos)
+        self.restore_trash_button.setMinimumSize(300, 44)
+        self.restore_trash_button.setStyleSheet(
+            "QPushButton { background: #1f6feb; color: white; font-size: 14px; "
+            "font-weight: 700; border-radius: 5px; padding: 9px 16px; }"
+        )
         self.trash_action_status_label = QLabel("")
         self.trash_action_status_label.setObjectName("trashActionStatus")
         self.trash_action_status_label.setWordWrap(True)
@@ -352,6 +388,7 @@ class IrrelevantMediaPage(QWidget):
         root.addWidget(self.header)
         root.addWidget(self.info_panel)
         root.addWidget(self.stats_label)
+        root.addWidget(self.view_switch)
         root.addLayout(toolbar)
         root.addWidget(splitter, 1)
 
@@ -368,6 +405,34 @@ class IrrelevantMediaPage(QWidget):
         self._reload_category_selector_options()
         self._refresh_group_options()
         self._trigger_refresh(force=True)
+
+    def _select_cleanup_view(self, view: str) -> None:
+        current = str(self.view_combo.currentData() or "review")
+        self._view_scroll_positions[current] = self.thumbnail_grid.scroll_value()
+        index = self.view_combo.findData(view)
+        if index < 0 or view == current:
+            return
+        self.view_combo.blockSignals(True)
+        self.view_combo.setCurrentIndex(index)
+        self.view_combo.blockSignals(False)
+        self._sync_visible_view_switch(view)
+        self._trigger_refresh(force=True)
+        target = self._view_scroll_positions.get(view, 0)
+        self.thumbnail_grid.restore_scroll_value(target)
+        QTimer.singleShot(50, lambda value=target: self.thumbnail_grid.restore_scroll_value(value))
+
+    def _on_view_combo_changed(self) -> None:
+        view = str(self.view_combo.currentData() or "review")
+        self._sync_visible_view_switch(view)
+        self._trigger_refresh(force=True)
+
+    def _sync_visible_view_switch(self, view: str) -> None:
+        self.view_to_review_button.setChecked(view == "review")
+        self.view_history_button.setChecked(view == "history")
+        self.view_explanation_label.setText(
+            "Photos already moved to Trash. You can review or restore them here."
+            if view == "history" else "Photos still requiring cleanup decisions."
+        )
 
     def set_photos(self, photos, imported_root: Optional[str | Path], total_imported_count: Optional[int] = None) -> None:
         self._imported_root = Path(imported_root) if imported_root else None
@@ -640,6 +705,7 @@ class IrrelevantMediaPage(QWidget):
         self.move_trash_button.setEnabled(self._trash_destination is not None and not self._bulk_category_in_progress)
         self.restore_trash_button.setVisible(self.view_combo.currentData() == "history")
         self.move_trash_button.setVisible(self.view_combo.currentData() != "history")
+        self.confirm_trash_button.setVisible(self.view_combo.currentData() != "history")
 
     def _create_trash_confirmation_dialog(self, count: int, destination: Path):
         dialog = QMessageBox(self)
@@ -759,6 +825,8 @@ class IrrelevantMediaPage(QWidget):
                 row.photo.metadata["trash_destination_path"] = record.destination_path
                 row.photo.metadata["trash_move_error"] = record.error
                 row.photo.metadata["trash_history"] = record.history
+                if record.state == "moved_to_trash" and record.history:
+                    row.photo.metadata["trash_moved_at"] = record.history[-1].get("timestamp", "")
                 if record.state == "moved_to_trash":
                     row.photo.path = Path(record.destination_path)
                 self._save_photo_user_metadata(row.photo)
@@ -987,10 +1055,12 @@ class IrrelevantMediaPage(QWidget):
         previous_scroll = self.thumbnail_grid.scroll_value()
         selected_key_before = self.thumbnail_grid.selected_key()
         self._visible_rows = self._filtered_rows()
-        self.results_label.setText(
-            f"Showing {len(self._visible_rows)} photos" if self._visible_rows
-            else "No remaining photos in this view."
-        )
+        if self._visible_rows:
+            self.results_label.setText(f"Showing {len(self._visible_rows)} photos")
+        elif self.view_combo.currentData() == "history":
+            self.results_label.setText("No photos have been moved to Trash yet.")
+        else:
+            self.results_label.setText("No remaining photos in this view.")
         self._update_stats()
 
         items = [self._to_grid_item(row) for row in self._visible_rows]
@@ -1020,9 +1090,8 @@ class IrrelevantMediaPage(QWidget):
     def _filtered_rows(self) -> list[CleanupReviewRow]:
         history = self.view_combo.currentData() == "history"
         if history:
-            rows = [row for row in self._rows if row.photo.metadata.get("trash_workflow_state") in {
-                "moved_to_trash", "move_failed", "restored",
-            }]
+            rows = [row for row in self._rows
+                    if row.photo.metadata.get("trash_workflow_state") == "moved_to_trash"]
         else:
             rows = [row for row in self._rows if bool(row.photo.metadata.get("is_active", True))
                     and row.photo.metadata.get("trash_workflow_state") != "moved_to_trash"]
@@ -1100,6 +1169,7 @@ class IrrelevantMediaPage(QWidget):
         metadata = getattr(photo, "metadata", {}) or {}
         self.original_path_value.setText(str(metadata.get("trash_original_path", "") or "-"))
         self.current_trash_path_value.setText(str(metadata.get("trash_destination_path", "") or "-"))
+        self.trash_moved_at_value.setText(str(metadata.get("trash_moved_at", "") or "-"))
 
         self.reasons_list.clear()
         for reason in row.reasons:
@@ -1135,6 +1205,7 @@ class IrrelevantMediaPage(QWidget):
         self.trash_status_value.setText("-")
         self.original_path_value.setText("-")
         self.current_trash_path_value.setText("-")
+        self.trash_moved_at_value.setText("-")
         self.decision_value.setText("-")
         self.metadata_summary_value.setText("-")
         self.reasons_list.clear()

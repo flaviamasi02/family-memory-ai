@@ -661,6 +661,42 @@ class IrrelevantMediaPageTests(unittest.TestCase):
             self.assertIn("Proposed for Trash: 1", page.trash_counts_label.text())
             self.assertIn("Ready to move: 0", page.trash_counts_label.text())
 
+    def test_visible_view_switch_has_exact_labels_explanations_and_empty_history(self):
+        page = IrrelevantMediaPage(); page.show(); self._flush_ui()
+        self.assertTrue(page.view_switch.isVisible())
+        self.assertEqual(page.view_to_review_button.text(), "To review")
+        self.assertEqual(page.view_history_button.text(), "Trash History")
+        self.assertTrue(page.view_to_review_button.isChecked())
+        self.assertEqual(page.view_explanation_label.text(), "Photos still requiring cleanup decisions.")
+        page.view_history_button.click(); self._flush_ui()
+        self.assertTrue(page.view_history_button.isChecked())
+        self.assertEqual(
+            page.view_explanation_label.text(),
+            "Photos already moved to Trash. You can review or restore them here.",
+        )
+        self.assertEqual(page.results_label.text(), "No photos have been moved to Trash yet.")
+        self.assertTrue(page.restore_trash_button.isVisible())
+        self.assertFalse(page.move_trash_button.isVisible())
+        self.assertFalse(page.confirm_trash_button.isVisible())
+
+    def test_view_switch_never_mixes_active_and_moved_rows(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            active = self._make_photo(root, "active.jpg", {"is_active": True})
+            moved = self._make_photo(root, "moved.jpg", {
+                "is_active": False, "trash_workflow_state": "moved_to_trash",
+                "trash_original_path": str(root / "old" / "moved.jpg"),
+                "trash_destination_path": str(root / "moved.jpg"),
+                "trash_moved_at": "2026-08-02T10:00:00+00:00",
+            })
+            page = IrrelevantMediaPage(); page.set_photos([active, moved], root)
+            self.assertEqual(page.visible_filenames(), ["active.jpg"])
+            page.view_history_button.click(); self._flush_ui()
+            self.assertEqual(page.visible_filenames(), ["moved.jpg"])
+            self.assertEqual(page.trash_moved_at_value.text(), "2026-08-02T10:00:00+00:00")
+            page.view_to_review_button.click(); self._flush_ui()
+            self.assertEqual(page.visible_filenames(), ["active.jpg"])
+
     def test_cleanup_review_grid_renders_multiple_columns_when_wide(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
