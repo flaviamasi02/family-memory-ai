@@ -6,7 +6,7 @@
 - Reused and relaid out existing cards for sort-only changes, indexed row lookup, and preserved compatible selection, filters, search, sort, thumbnails, and scroll across refreshes.
 - Documented measured code-path bottlenecks and added bounded diagnostics regression coverage without changing scoring or AI suggestion behavior.
 - Follow-up Product Owner feedback removed the remaining all-card stylesheet pass during selection, batches changed highlights, debounces AI suggestion refreshes, and adds reproducible 1/10/100/1,000-item selection measurements.
-- Simplified selection finalization after CI feedback: active-row details now update synchronously in the same authoritative transaction, while only expensive AI suggestions remain debounced and generation-guarded.
+- Simplified selection finalization after CI and Product Owner feedback: the immediate path now updates only keys/cards/count, while one generation-guarded zero-delay callback owns final-row details and only suggestions retain the longer debounce.
 
 ## Unreleased
 

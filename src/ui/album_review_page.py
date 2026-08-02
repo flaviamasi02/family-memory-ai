@@ -266,6 +266,7 @@ class AlbumReviewPage(QWidget):
         self._empty_reason_text: str = ""
         self._last_view_signature: Optional[tuple[str, str, str]] = None
         self._last_visible_key_order: List[str] = []
+        self._visible_index_by_key: Dict[str, int] = {}
         self._rows_by_key: Dict[str, AlbumReviewRow] = {}
         self._grid_rebuild_count = 0
         self._decision_history = DecisionHistory()
@@ -283,6 +284,11 @@ class AlbumReviewPage(QWidget):
         )
         self._suggestion_request_id = 0
         self._current_suggestion = None
+        self._selection_generation = 0
+        self._pending_details_key: Optional[str] = None
+        self._details_timer = QTimer(self)
+        self._details_timer.setSingleShot(True)
+        self._details_timer.timeout.connect(self._complete_deferred_selection)
         self._suggestion_timer = QTimer(self)
         self._suggestion_timer.setSingleShot(True)
         self._suggestion_timer.setInterval(120)
@@ -944,6 +950,8 @@ class AlbumReviewPage(QWidget):
         operation = "Sort update" if previous_signature and previous_signature[:2] == view_signature[:2] and previous_signature[3] == view_signature[3] else "Filter update"
         with measure_memory_review(operation, items=len(self._all_rows)):
             self._visible_rows = self._filtered_sorted_rows()
+        self._index_visible_rows()
+
         self._selected_keys = {
             key
             for key in self._selected_keys
@@ -987,6 +995,14 @@ class AlbumReviewPage(QWidget):
             self._select_key(first_key, additive=False, range_select=False)
 
         self._update_selection_count()
+
+    def _index_visible_rows(self) -> None:
+        self._last_visible_key_order = [
+            self._row_key(row) for row in self._visible_rows
+        ]
+        self._visible_index_by_key = {
+            key: index for index, key in enumerate(self._last_visible_key_order)
+        }
 
     def _results_label_text(self) -> str:
         if not self._all_rows and self._empty_reason_text:
@@ -1187,18 +1203,17 @@ class AlbumReviewPage(QWidget):
         self, key: str, additive: bool = False, range_select: bool = False
     ) -> None:
         started = time.perf_counter()
-        visible_keys = [self._row_key(row) for row in self._visible_rows]
-        index_by_key = {visible_key: index for index, visible_key in enumerate(visible_keys)}
-        if key not in index_by_key:
+        visible_keys = self._last_visible_key_order
+        if key not in self._visible_index_by_key:
             return
 
         previous_keys = set(self._selected_keys)
         operation = "Single selection"
 
-        if range_select and self._selection_anchor_key in visible_keys:
+        if range_select and self._selection_anchor_key in self._visible_index_by_key:
             operation = "Shift range selection"
-            start = index_by_key[self._selection_anchor_key]
-            end = index_by_key[key]
+            start = self._visible_index_by_key[self._selection_anchor_key]
+            end = self._visible_index_by_key[key]
             if start > end:
                 start, end = end, start
             if not additive:
@@ -1274,20 +1289,19 @@ class AlbumReviewPage(QWidget):
         """Apply one selection transaction and touch changed cards only."""
         changed_keys = changed_selection_keys(previous_keys, self._selected_keys)
         highlight_started = time.perf_counter()
-        self.grid_content.setUpdatesEnabled(False)
-        try:
-            for changed_key in changed_keys:
-                card = self._cards_by_key.get(changed_key)
-                if card is not None:
-                    card.set_selected(changed_key in self._selected_keys)
-        finally:
-            self.grid_content.setUpdatesEnabled(True)
+        for changed_key in changed_keys:
+            card = self._cards_by_key.get(changed_key)
+            if card is not None:
+                card.set_selected(changed_key in self._selected_keys)
         record_memory_review(
             "Selection highlight update",
             (time.perf_counter() - highlight_started) * 1000.0,
             items=len(changed_keys),
         )
         increment_memory_review_counter("selection_cards_updated", len(changed_keys))
+        increment_memory_review_counter("selection_rows_scanned", 0)
+        increment_memory_review_counter("selection_viewport_updates", len(changed_keys))
+        increment_memory_review_counter("selection_layout_activations", 0)
 
         count_started = time.perf_counter()
         self._update_selection_count()
@@ -1298,19 +1312,42 @@ class AlbumReviewPage(QWidget):
         )
         increment_memory_review_counter("selected_count_updates")
 
-        # Details are correctness-critical selection state, not expensive
-        # background work. Finalize them synchronously after highlights/count;
-        # only the suggestion requested by _show_details is debounced.
-        if active_key is None:
+        # Match the responsive grid architecture: return after the minimal
+        # selection transaction so Qt can paint highlights. One replaceable
+        # zero-delay callback owns all secondary details for the final key.
+        self._selection_generation += 1
+        self._pending_details_key = active_key
+        self._details_timer.setProperty("generation", self._selection_generation)
+        self._details_timer.start(0)
+        record_memory_review(
+            "Selection highlight visible",
+            (time.perf_counter() - highlight_started) * 1000.0,
+            items=len(changed_keys),
+        )
+
+    def _complete_deferred_selection(self) -> None:
+        started = time.perf_counter()
+        generation = int(self._details_timer.property("generation") or 0)
+        key = self._pending_details_key
+        self._pending_details_key = None
+        if generation != self._selection_generation:
+            increment_memory_review_counter("stale_detail_refreshes_ignored")
+            return
+        if key is None:
             self._suggestion_request_id += 1
             self._suggestion_timer.stop()
             self._pending_suggestion_row = None
             self._clear_details()
-        else:
-            row = self._row_for_key(active_key)
-            if row is not None and active_key == self._selected_key:
+        elif key == self._selected_key:
+            row = self._row_for_key(key)
+            if row is not None:
                 self._show_details(row)
         increment_memory_review_counter("selection_details_refreshes")
+        record_memory_review(
+            "Selection deferred completion",
+            (time.perf_counter() - started) * 1000.0,
+            items=1 if key else 0,
+        )
 
     def _update_selection_count(self) -> None:
         count = len(self._selected_keys)
@@ -1940,6 +1977,7 @@ class AlbumReviewPage(QWidget):
 
         if new_visible_keys == previous_visible_keys:
             self._visible_rows = new_visible_rows
+            self._index_visible_rows()
             for key in affected_keys:
                 row = self._row_for_key(key)
                 card = self._cards_by_key.get(key)
@@ -1974,6 +2012,7 @@ class AlbumReviewPage(QWidget):
             self._selection_anchor_key = None
 
         self._visible_rows = new_visible_rows
+        self._index_visible_rows()
         self._rebuild_grid_preserving_scroll(previous_scroll, previous_render_count)
 
         if selected_key:
