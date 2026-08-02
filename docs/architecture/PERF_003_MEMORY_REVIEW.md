@@ -41,12 +41,20 @@ suggestion. Range, select-all, and clear therefore paid one expensive card-style
 update per rendered item even when most selection states were unchanged.
 
 The follow-up applies styles only to the symmetric selection delta, disables
-grid painting during that transaction, updates the count once, and coalesces
-details refreshes within one 16 ms frame. AI suggestions use a separate 120 ms
+grid painting during that transaction, and updates the count once. One
+authoritative finalization path then commits the active item and synchronously
+refreshes its correctness-critical details. AI suggestions use a separate 120 ms
 single-shot timer, so rapid changes produce one suggestion for the final primary
 photo. Request identity and primary-photo checks reject stale results. Selection
 does not call filtering, sorting, scoring, persistence, thumbnail loading, or
 grid rebuild code.
+
+CI exposed why details cannot share the suggestion debounce: selected keys and
+the active row could be committed while a replaceable timer still represented an
+older selection, leaving blank or stale filename, category, classification, and
+pipeline fields. The simplified path owns selected keys, active key, changed
+highlights, count, and details in that order. Only suggestion computation remains
+deferred and guarded by its request generation and final active key.
 
 A reproducible 10,000-iteration median CPU benchmark compared the former
 all-visible-card selection planning loop with the incremental delta calculation.

@@ -1055,7 +1055,7 @@ class AlbumReviewPageTests(unittest.TestCase):
         self.assertEqual(page._grid_rebuild_count, rebuild_before)
         self.assertEqual(page.filename_value.text(), "photo_5.jpg")
 
-    def test_perf_003_selection_updates_only_delta_and_coalesces_details(self):
+    def test_perf_003_selection_updates_only_delta_and_finalizes_details(self):
         breakdowns = [self._make_virtual_breakdown(index) for index in range(100)]
         page = AlbumReviewPage()
         page.set_scored_photos(breakdowns)
@@ -1063,7 +1063,6 @@ class AlbumReviewPageTests(unittest.TestCase):
         cards = list(page._cards_by_key.values())
         for card in cards:
             card.set_selected = Mock(wraps=card.set_selected)
-        details_before = page._details_key
         rebuilds_before = page.grid_rebuild_count()
         scroll_before = page.grid_scroll.verticalScrollBar().value()
 
@@ -1074,9 +1073,12 @@ class AlbumReviewPageTests(unittest.TestCase):
         self.assertEqual(changed_calls, 1)
         self.assertEqual(page.grid_rebuild_count(), rebuilds_before)
         self.assertEqual(page.grid_scroll.verticalScrollBar().value(), scroll_before)
-        self.assertEqual(page._details_key, details_before)
-        self._flush_ui(wait_ms=25)
         self.assertEqual(page._details_key, target_key)
+
+        second_key = page._row_key(page._visible_rows[12])
+        page._select_key(second_key, additive=False)
+        self.assertEqual(page._details_key, second_key)
+        self.assertEqual(page.filename_value.text(), "photo_12.jpg")
 
     def test_perf_003_bulk_selection_defers_one_final_suggestion(self):
         breakdowns = [self._make_virtual_breakdown(index) for index in range(100)]
@@ -1094,6 +1096,8 @@ class AlbumReviewPageTests(unittest.TestCase):
 
         page._select_key(page._row_key(page._visible_rows[10]), additive=False)
         page._select_key(page._row_key(page._visible_rows[20]), range_select=True)
+        self.assertEqual(page._details_key, page._row_key(page._visible_rows[20]))
+        self.assertEqual(page.filename_value.text(), "photo_20.jpg")
         self._flush_ui(wait_ms=25)
         self.assertEqual(page.selected_count(), 11)
         self.assertEqual(page.grid_rebuild_count(), rebuilds_before)
@@ -1117,6 +1121,8 @@ class AlbumReviewPageTests(unittest.TestCase):
         page._filtered_sorted_rows.assert_not_called()
         page._update_selection_count.assert_called_once()
         self.assertEqual(page.selected_count(), 0)
+        self.assertEqual(page.filename_value.text(), "-")
+        self.assertIsNone(page._details_key)
 
     def test_cached_thumbnails_are_reused(self):
         with tempfile.TemporaryDirectory() as tmpdir:

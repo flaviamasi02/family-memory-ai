@@ -283,10 +283,6 @@ class AlbumReviewPage(QWidget):
         )
         self._suggestion_request_id = 0
         self._current_suggestion = None
-        self._pending_details_key: Optional[str] = None
-        self._details_refresh_timer = QTimer(self)
-        self._details_refresh_timer.setSingleShot(True)
-        self._details_refresh_timer.timeout.connect(self._refresh_pending_selection_details)
         self._suggestion_timer = QTimer(self)
         self._suggestion_timer.setSingleShot(True)
         self._suggestion_timer.setInterval(120)
@@ -1302,21 +1298,17 @@ class AlbumReviewPage(QWidget):
         )
         increment_memory_review_counter("selected_count_updates")
 
-        self._pending_details_key = active_key
-        # One frame coalesces rapid Ctrl-clicks without delaying the immediate
-        # card highlight and selected-count update.
-        self._details_refresh_timer.start(16)
-
-    def _refresh_pending_selection_details(self) -> None:
-        key = self._pending_details_key
-        self._pending_details_key = None
-        if key is None:
+        # Details are correctness-critical selection state, not expensive
+        # background work. Finalize them synchronously after highlights/count;
+        # only the suggestion requested by _show_details is debounced.
+        if active_key is None:
+            self._suggestion_request_id += 1
             self._suggestion_timer.stop()
             self._pending_suggestion_row = None
             self._clear_details()
         else:
-            row = self._row_for_key(key)
-            if row is not None and key == self._selected_key:
+            row = self._row_for_key(active_key)
+            if row is not None and active_key == self._selected_key:
                 self._show_details(row)
         increment_memory_review_counter("selection_details_refreshes")
 
