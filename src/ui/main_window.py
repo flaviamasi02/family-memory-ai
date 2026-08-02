@@ -272,8 +272,11 @@ class MainWindow(QMainWindow):
             self.thumbnail_thread.wait(250)
             if app is not None:
                 app.processEvents()
-        while self.face_processing_thread is not None and self.face_processing_thread.isRunning():
-            self.face_processing_thread.wait(250)
+        while True:
+            face_thread = getattr(self, "face_processing_thread", None)
+            if face_thread is None or not face_thread.isRunning():
+                break
+            face_thread.wait(250)
             if app is not None:
                 app.processEvents()
         if app is not None:
