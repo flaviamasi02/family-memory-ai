@@ -54,6 +54,11 @@ class AlbumDraftBuilder:
                 self._inc(exclusion_reasons, "missing_photo")
                 continue
 
+            metadata = getattr(photo, "metadata", {}) or {}
+            if not bool(metadata.get("is_active", True)) or metadata.get("trash_workflow_state") == "moved_to_trash":
+                self._inc(exclusion_reasons, "inactive_trashed_photo")
+                continue
+
             path = getattr(photo, "path", None)
             if not path:
                 self._inc(exclusion_reasons, "missing_file_path")

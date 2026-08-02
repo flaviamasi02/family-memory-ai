@@ -24,6 +24,15 @@ Every confirmation, move, failure, rejection, and restore is retained in audit
 history. Failed moves retain the source and can be retried. Restore uses the
 original folder where possible or an alternate folder and never overwrites.
 
+Cleanup Review defaults to **To review**, which contains active work only. A
+separate **Trash History** view contains moved/audit records and their original
+and current paths; moved records are never mixed into the normal queue. The same
+active predicate gates Photo Browser, Memory Review, classification, thumbnail
+and embedding scheduling, candidate selection, scoring, and Album Draft input.
+Restore moves bytes safely back to the original folder, marks the logical photo
+active with state `restored`, retains both move and restore history, and prevents
+an immediate automatic re-proposal.
+
 Database and history writes are batch-capable. UI consumers must refresh once
 per completed batch rather than once per file. Tab-switch latency remains a
 deferred performance issue and is not addressed by CLEAN-004. Face recognition

@@ -6,6 +6,7 @@
 - [x] Conservative explainable proposal safeguards
 - [x] Confirmation-only move to Family Memory Trash with restore and audit
 - [x] Active-review exclusion with logical identity retained
+- [x] Separate Trash History view and safe reactivation through restore
 - [ ] Deferred: tab-switch latency investigation
 
 Face recognition is not part of CLEAN-004 and remains a later milestone.

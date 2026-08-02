@@ -188,7 +188,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                     problem_it_solves="Screenshots, ads, duplicates, documents, and low-value media can pollute review quality if mixed with family memories.",
                     ai_automation="The classifier conservatively proposes To Trash with confidence and an explanation; it never moves a proposal automatically.",
                     user_interaction="Review and explicitly confirm To Trash proposals before moving, reject incorrect proposals, or restore moved photos.",
-                    expected_outcome="A safer active working set with confirmed files moved—not permanently deleted—and complete Trash history retained.",
+                    expected_outcome="To review shows only active work. Moved files disappear from normal workflows, are never permanently deleted, and remain available in Trash History for restore.",
                 ),
                 _workflow_section(
                     [
@@ -199,6 +199,7 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                         "Run Face Analysis for Ambiguous Items",
                         "Move Confirmed Photos to Family Memory Trash",
                         "Restore From Trash When Needed",
+                        "Switch to Trash History for Move and Restore Audit",
                     ]
                 ),
                 _best_practices_section(

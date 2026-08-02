@@ -564,7 +564,7 @@ class IrrelevantMediaPageTests(unittest.TestCase):
             page = IrrelevantMediaPage(); page.set_photos([proposed, confirmed], root)
             self.assertEqual(page.trash_destination_label.text(), str(root.parent / "Family Memory Trash"))
             self.assertIn("Proposed for Trash: 1", page.trash_counts_label.text())
-            self.assertIn("Confirmed for Trash: 1", page.trash_counts_label.text())
+            self.assertIn("Ready to move: 1", page.trash_counts_label.text())
             self.assertEqual(page.move_trash_button.parentWidget().objectName(), "trashActionsSection")
             self.assertGreaterEqual(page.move_trash_button.minimumHeight(), 48)
             page.select_photo_by_filename("proposed.jpg")
@@ -638,6 +638,25 @@ class IrrelevantMediaPageTests(unittest.TestCase):
             self.assertTrue((root.parent / "Family Memory Trash" / "confirmed.jpg").exists())
             self.assertEqual(photo.metadata["trash_workflow_state"], "moved_to_trash")
             self.assertEqual(page.trash_action_status_label.text(), "1 photo moved to Trash.")
+
+            self.assertNotIn("confirmed.jpg", page.visible_filenames())
+            self.assertIn("removed from the active workflow", page.trash_action_status_label.text())
+            page.view_combo.setCurrentIndex(page.view_combo.findData("history"))
+            self._flush_ui()
+            self.assertIn("confirmed.jpg", page.visible_filenames())
+            self.assertIn("Moved to Trash: 1", page.trash_counts_label.text())
+            self.assertEqual(photo.metadata["is_active"], False)
+
+    def test_manual_to_trash_category_maps_to_proposed_not_confirmed(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            photo = self._make_photo(root, "manual.jpg", {
+                "cleanup_effective_category": "to_trash", "is_active": True,
+            })
+            page = IrrelevantMediaPage(); page.set_photos([photo], root)
+            self.assertEqual(photo.metadata["trash_workflow_state"], "proposed_to_trash")
+            self.assertIn("Proposed for Trash: 1", page.trash_counts_label.text())
+            self.assertIn("Ready to move: 0", page.trash_counts_label.text())
 
     def test_cleanup_review_grid_renders_multiple_columns_when_wide(self):
         with tempfile.TemporaryDirectory() as tmpdir:

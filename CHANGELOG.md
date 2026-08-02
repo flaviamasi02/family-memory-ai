@@ -358,3 +358,6 @@ After optimization, the UI is responsive immediately after clicking Import (scan
   Memory Trash**, never permanently deleted; active review excludes moved files
   while logical identity and audit history are retained, and safe restore is
   supported.
+- Cleanup Review now defaults to active work only; successfully moved photos
+  disappear immediately from normal workflows and remain accessible through a
+  separate Trash History view with safe restore.

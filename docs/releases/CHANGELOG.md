@@ -762,3 +762,5 @@
   evidence, confirmation-only collision-safe moves, partial-failure reporting,
   active-workflow exclusion, durable audit state, and restore. No permanent
   deletion or face recognition was added.
+- Moved Trash records are now inactive across browsing, memory, AI/indexing and
+  album pipelines, with a distinct Cleanup Review Trash History/restore mode.

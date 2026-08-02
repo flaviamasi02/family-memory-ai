@@ -26,6 +26,9 @@ class AlbumScoringEngine:
         scored: list[AlbumScoreBreakdown] = []
 
         for photo in album.selected_photos or []:
+            metadata = getattr(photo, "metadata", {}) or {}
+            if not bool(metadata.get("is_active", True)) or metadata.get("trash_workflow_state") == "moved_to_trash":
+                continue
             if photo.intelligence is None:
                 photo.intelligence = PhotoIntelligence()
 
