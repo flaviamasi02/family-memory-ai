@@ -3,18 +3,19 @@ from pathlib import Path
 from types import SimpleNamespace
 import pytest
 from faces.runtime import (COMPATIBILITY, FaceRuntimeManager, classify_pip_failure,
-                           compatible_packages, meaningful_pip_error)
+                           compatible_packages, meaningful_pip_error,
+                           MANAGED_PYTHON_HOSTS, MANAGED_PYTHON_URL)
 
 class FakeRunner:
-    def __init__(self, diagnostic=None, install_error="", repair_after_uninstall=False, python=(3, 12), tooling_error=""):
-        self.calls=[]; self.diagnostic=diagnostic or self.valid(); self.install_error=install_error; self.repair_after_uninstall=repair_after_uninstall; self.python=python; self.tooling_error=tooling_error
+    def __init__(self, diagnostic=None, install_error="", repair_after_uninstall=False, python=(3, 12), tooling_error="", architecture="64-bit"):
+        self.calls=[]; self.diagnostic=diagnostic or self.valid(); self.install_error=install_error; self.repair_after_uninstall=repair_after_uninstall; self.python=python; self.tooling_error=tooling_error; self.architecture=architecture
     @staticmethod
     def valid(**updates):
         value={'executable':'managed-python','prefix':'managed','python_version':'3.12','cv2_file':'managed/site-packages/cv2/__init__.py','cv2_version':'4.10.0','has_data':True,'has_cascade':True,'in_site_packages':True,'distributions':{'opencv-python-headless':'4.10.0.84','numpy':'1.26.4'},'ok':True,'cascade_path':'managed/haarcascade_frontalface_default.xml'}
         value.update(updates); return value
     def __call__(self,args,**kwargs):
         self.calls.append(list(args))
-        if '-m' in args and 'venv' in args:
+        if '-m' in args and 'venv' in args and args[-1] != '--help':
             root=Path(args[-1]); executable=root/('Scripts/python.exe' if sys.platform=='win32' else 'bin/python'); executable.parent.mkdir(parents=True,exist_ok=True); executable.write_text('fake')
         if 'install' in args and self.install_error and 'opencv-python-headless' in ' '.join(args): return SimpleNamespace(returncode=1,stdout='',stderr=self.install_error)
         if args[-3:]==['pip','setuptools','wheel'] and self.tooling_error: return SimpleNamespace(returncode=1,stdout='',stderr=self.tooling_error)
@@ -23,7 +24,7 @@ class FakeRunner:
         if '-c' in args:
             script=args[args.index('-c')+1]
             if 'platform.python_version' in script:
-                executable=Path(args[0]); data={'executable':str(executable.resolve()),'prefix':str(executable.parent.parent.resolve()),'python_version':f'{self.python[0]}.{self.python[1]}.0','python_major':self.python[0],'python_minor':self.python[1],'architecture':'64-bit','platform':'Windows','pip_version':'pip 24.0'}
+                executable=Path(args[0]); prefix=executable.parent if executable.parent.name=='face-python' else executable.parent.parent; data={'executable':str(executable.resolve()),'prefix':str(prefix.resolve()),'python_version':f'{self.python[0]}.{self.python[1]}.0','python_major':self.python[0],'python_minor':self.python[1],'architecture':self.architecture,'platform':'Windows','pip_version':'pip 24.0'}
             else: data=self.diagnostic
             return SimpleNamespace(returncode=0,stdout=json.dumps(data)+'\n',stderr='')
         return SimpleNamespace(returncode=0,stdout='ok',stderr='')
@@ -91,7 +92,7 @@ def test_compatible_package_policy_and_unsupported_python(tmp_path):
     assert compatible_packages(3,10) and compatible_packages(3,12) and compatible_packages(3,13)
     assert compatible_packages(3,14) is None
     runner=FakeRunner(python=(3,14)); manager=FaceRuntimeManager(tmp_path/'.venv-face-runtime',runner)
-    with pytest.raises(RuntimeError,match='Python 3.14.0 is not supported'): manager.install()
+    with pytest.raises(RuntimeError,match=r'Python 3\.14\..* is not supported'): manager.install()
     runtime_installs=[c for c in runner.calls if 'install' in c and 'opencv-python-headless' in ' '.join(c)]
     assert runtime_installs == []
 
@@ -117,3 +118,57 @@ def test_installer_tooling_failure_is_separate_from_runtime_packages(tmp_path):
     manager=FaceRuntimeManager(tmp_path/'.venv-face-runtime',runner)
     with pytest.raises(RuntimeError,match='installer could not be prepared'): manager.install()
     assert not any('opencv-python-headless' in ' '.join(c) and 'install' in c for c in runner.calls)
+
+
+class BootstrapRunner(FakeRunner):
+    def __init__(self, signature="Valid"):
+        super().__init__(); self.signature=signature
+    def __call__(self,args,**kwargs):
+        if args and args[0]=='powershell.exe':
+            self.calls.append(list(args)); return SimpleNamespace(returncode=0,stdout=json.dumps({'Status':self.signature,'Subject':'CN=Python Software Foundation'})+'\n',stderr='')
+        target=next((x.split('=',1)[1] for x in args if str(x).startswith('TargetDir=')),None)
+        if target:
+            self.calls.append(list(args)); path=Path(target)/'python.exe'; path.parent.mkdir(parents=True,exist_ok=True); path.write_text('managed'); return SimpleNamespace(returncode=0,stdout='installed',stderr='')
+        return super().__call__(args,**kwargs)
+
+
+def test_python314_can_bootstrap_private_python312_without_dead_end(tmp_path):
+    downloads=[]
+    def download(url,destination,cancel): downloads.append(url); Path(destination).write_bytes(b'signed-installer')
+    runner=BootstrapRunner(); manager=FaceRuntimeManager(tmp_path/'.venv-face-runtime',runner,download,platform_name='win32',discovery_candidates=[])
+    assert manager.install().ready
+    assert downloads == [MANAGED_PYTHON_URL]
+    venv=next(c for c in runner.calls if 'venv' in c)
+    assert Path(venv[0]) == manager.managed_python_executable
+    assert manager.status().bootstrap_interpreter == str(manager.managed_python_executable)
+    assert all('.venv-mobileclip' not in ' '.join(c) for c in runner.calls)
+
+
+def test_existing_supported_interpreter_discovery_requires_64_bit(tmp_path):
+    candidate=tmp_path/'Python312/python.exe'; candidate.parent.mkdir(); candidate.write_text('python')
+    supported=FaceRuntimeManager(tmp_path/'one/.venv-face-runtime',FakeRunner(),discovery_candidates=[candidate])
+    assert supported.find_supported_interpreter() == candidate
+    rejected=FaceRuntimeManager(tmp_path/'two/.venv-face-runtime',FakeRunner(architecture='32-bit'),discovery_candidates=[candidate])
+    assert rejected.find_supported_interpreter() is None
+
+
+def test_managed_python_source_is_https_and_allowlisted():
+    from urllib.parse import urlparse
+    parsed=urlparse(MANAGED_PYTHON_URL)
+    assert parsed.scheme == 'https' and parsed.hostname in MANAGED_PYTHON_HOSTS
+
+
+def test_integrity_failure_blocks_execution_and_cleans_partial(tmp_path):
+    def download(url,destination,cancel): Path(destination).write_bytes(b'untrusted')
+    runner=BootstrapRunner(signature='NotSigned'); manager=FaceRuntimeManager(tmp_path/'.venv-face-runtime',runner,download,platform_name='win32',discovery_candidates=[])
+    with pytest.raises(RuntimeError,match='integrity verification'): manager.install()
+    assert not list(tmp_path.glob('*.partial'))
+    assert not any(any(str(x).startswith('TargetDir=') for x in c) for c in runner.calls)
+
+
+def test_cancelled_download_removes_partial(tmp_path):
+    def download(url,destination,cancel):
+        Path(destination).write_bytes(b'partial'); raise RuntimeError('download cancelled')
+    manager=FaceRuntimeManager(tmp_path/'.venv-face-runtime',BootstrapRunner(),download,platform_name='win32',discovery_candidates=[])
+    with pytest.raises(RuntimeError,match='cancelled'): manager.install()
+    assert not list(tmp_path.glob('*.partial'))

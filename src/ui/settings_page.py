@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 import time
 from pathlib import Path
 from threading import Event
@@ -59,6 +60,7 @@ from ui.components.workspace_info_content import WORKSPACE_INFO_CONTENT
 from ui.components.workspace_info_panel import WorkspaceInfoPanel
 from ui.help.workspace_help_content import SETTINGS_WORKSPACE
 from faces.runtime import FaceRuntimeManager
+from faces.runtime import compatible_packages
 from workers.face_runtime_worker import FaceRuntimeWorker
 
 
@@ -300,15 +302,17 @@ class SettingsPage(QWidget):
             self.face_runtime_labels[key] = value
         layout.addLayout(grid)
         actions = QHBoxLayout()
-        self.face_runtime_install_button = QPushButton("Install")
+        self.face_runtime_install_button = QPushButton("Install supported Face Runtime")
         self.face_runtime_verify_button = QPushButton("Verify")
         self.face_runtime_repair_button = QPushButton("Repair")
         self.face_runtime_remove_button = QPushButton("Remove")
+        self.face_runtime_cancel_button = QPushButton("Cancel")
         self.face_runtime_logs_button = QPushButton("View Logs")
         self.face_runtime_copy_details_button = QPushButton("Copy technical details")
         self.face_runtime_folder_button = QPushButton("Open Runtime Folder")
         for button in (self.face_runtime_install_button, self.face_runtime_verify_button,
                        self.face_runtime_repair_button, self.face_runtime_remove_button,
+                       self.face_runtime_cancel_button,
                        self.face_runtime_logs_button, self.face_runtime_copy_details_button,
                        self.face_runtime_folder_button):
             actions.addWidget(button)
@@ -325,6 +329,7 @@ class SettingsPage(QWidget):
         self.face_runtime_verify_button.clicked.connect(lambda: self._start_face_runtime_operation("verify"))
         self.face_runtime_repair_button.clicked.connect(lambda: self._confirm_face_runtime_operation("repair"))
         self.face_runtime_remove_button.clicked.connect(lambda: self._confirm_face_runtime_operation("remove"))
+        self.face_runtime_cancel_button.clicked.connect(self._cancel_face_runtime_operation)
         self.face_runtime_logs_button.clicked.connect(self._show_face_runtime_logs)
         self.face_runtime_copy_details_button.clicked.connect(
             lambda: QGuiApplication.clipboard().setText(self.face_runtime_technical_details.toPlainText())
@@ -341,15 +346,24 @@ class SettingsPage(QWidget):
         for key, value in values.items(): self.face_runtime_labels[key].setText(value)
         busy = self._face_runtime_thread is not None
         self.face_runtime_install_button.setEnabled(not busy and not status.ready)
-        self.face_runtime_verify_button.setEnabled(not busy and status.state != "Not installed")
+        self.face_runtime_verify_button.setEnabled(not busy and self.face_runtime_manager.interpreter_path.is_file())
         self.face_runtime_repair_button.setEnabled(not busy)
-        self.face_runtime_remove_button.setEnabled(not busy and status.state != "Not installed")
+        assets_exist = self.face_runtime_manager.root.exists() or self.face_runtime_manager.managed_python_root.exists()
+        self.face_runtime_remove_button.setEnabled(not busy and assets_exist)
+        self.face_runtime_cancel_button.setEnabled(busy)
+        if (not busy and not status.ready and status.state in {"Not installed", "Unsupported Python failed"} and
+                compatible_packages(sys.version_info.major, sys.version_info.minor) is None):
+            self.face_runtime_message.setText(
+                f"The application uses Python {sys.version_info.major}.{sys.version_info.minor}, which is newer than the validated Face Runtime. "
+                "Family Memory AI can install a private 64-bit Python 3.12 runtime for face recognition. "
+                "Your main Python installation, PATH, and MobileCLIP will not be changed."
+            )
         self.face_runtime_ready_changed.emit(status.ready)
 
     def _confirm_face_runtime_operation(self, operation: str) -> None:
         descriptions = {
-            "install": "Install the local face recognition runtime into the application Python environment? No photos are uploaded.",
-            "repair": "Repair the local face recognition runtime by reinstalling its managed packages?",
+            "install": "Install a private 64-bit Python 3.12 runtime for face recognition (about 27 MB download and approximately 250 MB installed)? Your main Python, PATH, and MobileCLIP will not be changed.",
+            "repair": "Repair the local face recognition runtime? Family Memory AI may install a private signed 64-bit Python 3.12 runtime, recreate the face environment, and reinstall its packages. Your main Python and MobileCLIP will not be changed.",
             "remove": "Remove the managed face detector runtime? Existing face-analysis data is preserved until separately deleted.",
         }
         if QMessageBox.question(self, f"{operation.title()} Face Runtime", descriptions[operation]) != QMessageBox.StandardButton.Yes:
@@ -368,6 +382,11 @@ class SettingsPage(QWidget):
         self._face_runtime_thread, self._face_runtime_worker = thread, worker
         self.face_runtime_message.setText(f"{operation.title()} in progress…")
         self.face_runtime_progress.setValue(0); self.refresh_face_runtime_status(); thread.start()
+
+    def _cancel_face_runtime_operation(self) -> None:
+        if self._face_runtime_worker is not None:
+            self._face_runtime_worker.cancel()
+            self.face_runtime_message.setText("Cancelling Face Runtime installation and cleaning the partial download…")
 
     def _on_face_runtime_progress(self, value: int, message: str) -> None:
         self.face_runtime_progress.setValue(value); self.face_runtime_message.setText(message)

@@ -1199,3 +1199,8 @@ Historical status at implementation time: implemented in the PR branch and await
 ## FACE-001 — local People Review (2026-08-02)
 
 FACE-001 extends the repository-authoritative MODEL-004A foundation rather than creating another face store. Eligible active still photos can be scanned only after explicit action; detections, oriented crops, face-specific embeddings and conservative unnamed clusters remain local. Product Owner confirmation is required for identity. Trash, inactive photos, documents, screenshots, memes/graphics, advertisements and explicit non-family decisions are excluded. Relationship inference and album-score changes are not implemented. Tab-switch latency remains deferred.
+
+The optional Face Runtime is now independent of the application interpreter. A
+Python 3.14 development launch can discover or UI-install a private signed
+64-bit Python 3.12.10 bootstrap under application-managed storage; it does not
+modify the application or MobileCLIP environments.

@@ -69,3 +69,24 @@ location, version, `cv2.data.haarcascades`, the frontal-face XML, and a non-empt
 `CascadeClassifier`. Detailed interpreter and module paths remain in the runtime
 log; normal UI messages distinguish downloads, permissions, environments,
 conflicts, shadowing/model/API verification, and corruption.
+
+The application interpreter and Face Runtime interpreter are independent. An
+application launched from Python 3.14 first discovers an existing managed or
+64-bit Python 3.12/3.11/3.10 interpreter; if none is available on Windows, the
+Settings worker downloads the pinned Python 3.12.10 64-bit installer over HTTPS
+from the allowlisted official `www.python.org` host. Before execution Windows
+Authenticode must report a valid Python Software Foundation signature (the
+integrity equivalent to a pinned file hash). The installer runs silently with a
+target under `runtimes/face-python`, without PATH, launcher, shortcut, or file
+association changes. It then creates `runtimes/.venv-face-runtime`. Downloads
+are atomic `.partial` files and are removed on cancellation or failure. This
+installer approach does not extract archives, so archive path traversal is not
+part of the boundary. Remove invokes the retained official installer uninstall
+mode and deletes both application-managed runtime directories.
+
+Detection and descriptor operations cross a bounded JSON subprocess boundary:
+one source image or face crop is sent to the verified Face Runtime interpreter
+per work item, while queue control, persistence, progress, pause, resume, and
+cancellation remain in the main application. No photo is uploaded. The Python
+3.14 application environment, system PATH, system Python, and MobileCLIP runtime
+remain unchanged.
