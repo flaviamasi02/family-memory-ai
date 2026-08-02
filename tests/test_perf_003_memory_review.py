@@ -79,7 +79,9 @@ def test_incremental_highlight_work_is_measurably_lower_than_full_refresh():
 
 def test_real_selection_diagnostic_is_aggregate_and_path_free():
     clear_selection_diagnostics()
-    arm_selection_measurement()
+    arm_selection_measurement("memory")
+    assert "Waiting for Memory Review selection..." in selection_diagnostic_report()
+    assert begin_selection_measurement("cleanup") is None
     assert begin_selection_measurement("memory") is not None
     add_selection_time("Selection highlight update", 12.5)
     add_selection_count("Selected photos", 10)
@@ -90,6 +92,7 @@ def test_real_selection_diagnostic_is_aggregate_and_path_free():
     assert "Cleanup Review selection" in report
     assert "Selected photos: 10" in report
     assert "Cards restyled: 1" in report
+    assert "Selections measured: 1" in report
     assert "/" not in report and "\\" not in report
 
 
@@ -101,3 +104,14 @@ def test_diagnostic_bypasses_are_off_after_reset():
         assert selection_bypass(key)
     clear_selection_diagnostics()
     assert not any(selection_bypass(key) for key in ("preview", "details", "suggestions", "styling"))
+
+
+def test_memory_and_cleanup_measurements_are_not_cross_consumed():
+    clear_selection_diagnostics()
+    arm_selection_measurement("memory")
+    assert begin_selection_measurement("cleanup") is None
+    assert "Waiting for Memory Review selection..." in selection_diagnostic_report()
+    assert begin_selection_measurement("memory") is not None
+    add_selection_count("Selected photos", 3)
+    finish_selection_measurement(deferred=True)
+    assert "Selected photos: 3" in selection_diagnostic_report()

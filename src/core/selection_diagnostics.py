@@ -13,22 +13,24 @@ class SelectionMeasurement:
     started: float = field(default_factory=time.perf_counter)
 
 
-_armed = False
+_armed_workspace: str | None = None
 _active: SelectionMeasurement | None = None
 _reports: dict[str, SelectionMeasurement] = {}
 _bypasses = {"preview": False, "details": False, "suggestions": False, "styling": False}
 
 
-def arm_selection_measurement() -> None:
-    global _armed
-    _armed = True
+def arm_selection_measurement(workspace: str = "memory") -> None:
+    global _armed_workspace, _active
+    _armed_workspace = workspace
+    # A previous incomplete diagnostic must never capture the newly armed run.
+    _active = None
 
 
 def begin_selection_measurement(workspace: str) -> SelectionMeasurement | None:
-    global _armed, _active
-    if not _armed:
+    global _armed_workspace, _active
+    if _armed_workspace != workspace:
         return None
-    _armed = False
+    _armed_workspace = None
     _active = SelectionMeasurement(workspace=workspace)
     return _active
 
@@ -76,8 +78,12 @@ def selection_diagnostic_report() -> str:
         report = _reports.get(workspace)
         lines.extend(("", title))
         if report is None:
-            lines.append("No measured selection yet.")
+            if _armed_workspace == workspace:
+                lines.append("Waiting for Memory Review selection...")
+            else:
+                lines.append("No measured selection yet.")
             continue
+        lines.append("Selections measured: 1")
         for name, value in report.timings_ms.items():
             lines.append(f"{name}: {value:.1f} ms")
         lines.append("Counts:")
@@ -93,8 +99,8 @@ def selection_diagnostic_report() -> str:
 
 
 def clear_selection_diagnostics() -> None:
-    global _armed, _active
-    _armed = False
+    global _armed_workspace, _active
+    _armed_workspace = None
     _active = None
     _reports.clear()
     for key in _bypasses:

@@ -437,9 +437,16 @@ class SettingsPage(QWidget):
             "Measure Memory Review selection"
         )
         self.measure_memory_review_selection_button.clicked.connect(
-            self._arm_selection_measurement
+            lambda _checked=False: self._arm_selection_measurement("memory")
         )
         panel.addWidget(self.measure_memory_review_selection_button)
+        self.measure_cleanup_review_selection_button = QPushButton(
+            "Measure Cleanup Review selection"
+        )
+        self.measure_cleanup_review_selection_button.clicked.connect(
+            lambda _checked=False: self._arm_selection_measurement("cleanup")
+        )
+        panel.addWidget(self.measure_cleanup_review_selection_button)
         self.memory_review_measurement_instructions = QLabel(
             "Open Memory Review, then select several photos. Return here to view the measured result."
         )
@@ -491,10 +498,10 @@ class SettingsPage(QWidget):
     def _set_diagnostics_status(self, text: str) -> None:
         self.diagnostics_status_label.setText(text)
 
-    def _arm_selection_measurement(self) -> None:
-        arm_selection_measurement()
+    def _arm_selection_measurement(self, workspace: str = "memory") -> None:
+        arm_selection_measurement(workspace)
         self._set_diagnostics_status(
-            "Selection measurement armed. Select in Memory Review or Cleanup Review, then Refresh."
+            f"{workspace.title()} Review selection measurement armed. Select photos, then Refresh."
         )
 
     def refresh_developer_diagnostics(self) -> None:

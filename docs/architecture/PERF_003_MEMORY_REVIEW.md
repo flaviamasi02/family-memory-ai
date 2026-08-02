@@ -99,3 +99,12 @@ sort/row counts. Temporary process-local bypasses can independently skip preview
 details, suggestions, or selection styling; all default off and are reset when a
 new Settings page is constructed. No optimization conclusion is drawn until the
 Product Owner captures actual comparison results.
+
+The first Product Owner diagnostic attempt remained at “No measured selection
+yet.” The arming state was a single unscoped boolean and selection handlers
+checked for any active workspace, allowing an unrelated Cleanup Review event or
+incomplete run to consume or block the Memory Review measurement. Arming is now
+workspace-scoped, clears incomplete active state, ignores events from the other
+workspace, and displays “Waiting for Memory Review selection...” until the
+matching interaction begins. Separate Memory Review and Cleanup Review buttons
+populate their respective retained comparison reports.

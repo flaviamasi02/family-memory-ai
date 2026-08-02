@@ -1198,7 +1198,7 @@ class AlbumReviewPage(QWidget):
 
     def _on_card_clicked(self, key: str, modifiers_value: int) -> None:
         event_started = time.perf_counter()
-        if active_selection_measurement() is None:
+        if active_selection_measurement("memory") is None:
             begin_selection_measurement("memory")
         modifiers = Qt.KeyboardModifier(modifiers_value)
         additive = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
@@ -1212,7 +1212,7 @@ class AlbumReviewPage(QWidget):
         self, key: str, additive: bool = False, range_select: bool = False
     ) -> None:
         started = time.perf_counter()
-        if active_selection_measurement() is None:
+        if active_selection_measurement("memory") is None:
             begin_selection_measurement("memory")
         visible_keys = self._last_visible_key_order
         if key not in self._visible_index_by_key:
@@ -1276,7 +1276,7 @@ class AlbumReviewPage(QWidget):
 
     def select_all_visible(self) -> None:
         started = time.perf_counter()
-        if active_selection_measurement() is None:
+        if active_selection_measurement("memory") is None:
             begin_selection_measurement("memory")
         previous_keys = set(self._selected_keys)
         rendered_keys = set(self._rendered_keys)
@@ -1296,7 +1296,7 @@ class AlbumReviewPage(QWidget):
 
     def clear_selection(self) -> None:
         started = time.perf_counter()
-        if active_selection_measurement() is None:
+        if active_selection_measurement("memory") is None:
             begin_selection_measurement("memory")
         previous_keys = set(self._selected_keys)
         self._selected_keys.clear()

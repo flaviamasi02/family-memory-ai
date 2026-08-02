@@ -63,6 +63,8 @@ def test_memory_review_selection_measurement_controls_default_off(page):
     assert all(not checkbox.isChecked() for checkbox in widget.selection_diagnostic_bypasses.values())
     widget.measure_memory_review_selection_button.click()
     assert "measurement armed" in widget.diagnostics_status_label.text().lower()
+    widget.refresh_developer_diagnostics()
+    assert "Waiting for Memory Review selection..." in widget.memory_review_performance_report.toPlainText()
 
 
 def test_import_efficiency_no_session_is_clear_and_explained(page):
