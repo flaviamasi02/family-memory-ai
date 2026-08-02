@@ -52,3 +52,16 @@ Memory Review may later consume Person and Face query services, but it must not 
 The OpenCV detector is lazy and reads EXIF-oriented pixels locally. Pixel bounding boxes refer to that authoritative orientation. Padded crops live only in the application cache. The separate local face-crop descriptor is not MobileCLIP. Embeddings are finite, dimension-checked, source-fingerprinted and model-versioned. Conservative deterministic clustering is advisory and never supplies a name. Confirmed assignments are manual and audited.
 
 Face data is sensitive. Settings can delete detections, crops, embeddings, clusters, proposals and confirmed assignments without modifying originals, categories, cleanup history or album decisions. No cloud inference, relationship inference, automatic naming, or album-score adjustment is part of FACE-001. Work is incremental and bounded; UI rendering and model initialization must remain off the synchronous full-library path.
+
+### Managed Windows face runtime
+
+Face detection runs in the application-owned `.venv-face-runtime`, never the
+MobileCLIP environment or an arbitrary `cv2` import from the application
+interpreter. The reproducible Windows/Python 3.10–3.12 set is
+`opencv-python-headless==4.10.0.84`, `numpy==1.26.4`, and `Pillow==10.4.0`.
+Install and Repair diagnose the interpreter and installed distributions, remove
+all conflicting OpenCV wheels, reinstall the pinned set, and verify module
+location, version, `cv2.data.haarcascades`, the frontal-face XML, and a non-empty
+`CascadeClassifier`. Detailed interpreter and module paths remain in the runtime
+log; normal UI messages distinguish downloads, permissions, environments,
+conflicts, shadowing/model/API verification, and corruption.

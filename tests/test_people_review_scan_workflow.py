@@ -142,3 +142,15 @@ def test_missing_runtime_navigates_to_settings_and_ready_update_needs_no_restart
     assert page.scan_button.isEnabled()
     assert not page.open_runtime_settings_button.isVisible()
     window.close()
+
+
+def test_verification_failure_recommends_repair_not_internet(tmp_path):
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    window.settings_page._on_face_runtime_failed(
+        "The OpenCV installation is invalid or incomplete. Technical detail: CASCADE_API_MISSING"
+    )
+    message = window.settings_page.face_runtime_message.text().lower()
+    assert "repair" in message
+    assert "internet" not in message
+    window.close(); app.processEvents()

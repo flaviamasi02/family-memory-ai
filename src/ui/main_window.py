@@ -54,6 +54,7 @@ from vision.managed_mobileclip_provider import ManagedMobileCLIPEmbeddingProvide
 from workers.scan_worker import ScanCompletion, ScanWorker
 from workers.thumbnail_worker import ThumbnailWorker
 from workers.face_processing_worker import FaceProcessingWorker
+from faces.processing import LocalFaceEmbeddingProvider, LocalOpenCVFaceDetector
 
 logger = logging.getLogger(__name__)
 
@@ -300,7 +301,11 @@ class MainWindow(QMainWindow):
             f"Preparing local face scan for {len(photos)} eligible photos…"
         )
         thread = QThread(self)
-        worker = FaceProcessingWorker(photos, self.people_review_page.repository)
+        runtime_status = self.settings_page.face_runtime_manager.status()
+        detector = LocalOpenCVFaceDetector(runtime_status.interpreter_path)
+        embedder = LocalFaceEmbeddingProvider(interpreter_path=runtime_status.interpreter_path)
+        worker = FaceProcessingWorker(photos, self.people_review_page.repository,
+                                      detector=detector, embedder=embedder)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
         worker.progress.connect(self.people_review_page.show_scan_progress)

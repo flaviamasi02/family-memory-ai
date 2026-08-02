@@ -374,7 +374,7 @@ class SettingsPage(QWidget):
         self.refresh_face_runtime_status()
 
     def _on_face_runtime_failed(self, message: str) -> None:
-        self.face_runtime_message.setText(f"Operation failed. Recommended action: check your connection, then choose Repair. Reason: {message}")
+        self.face_runtime_message.setText(f"Operation failed. Recommended action: choose Repair. Reason: {message}")
         self.face_runtime_technical_details.setPlainText(message); self.face_runtime_technical_details.show()
         self.refresh_face_runtime_status()
 

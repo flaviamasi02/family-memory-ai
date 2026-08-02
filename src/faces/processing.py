@@ -5,6 +5,9 @@ from __future__ import annotations
 import hashlib
 import importlib
 import math
+import json
+import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Event
@@ -42,12 +45,15 @@ class LocalOpenCVFaceDetector:
     provider_id = "opencv-haar-frontal"
     model_revision = "1"
 
-    def __init__(self):
+    def __init__(self, interpreter_path: str | Path | None = None):
         self._cascade = None
         self.load_count = 0
+        self.interpreter_path = str(interpreter_path or sys.executable)
 
     @property
     def available(self) -> bool:
+        if Path(self.interpreter_path).resolve() != Path(sys.executable).resolve():
+            return Path(self.interpreter_path).is_file()
         try:
             _load_runtime()
             return True
@@ -68,6 +74,23 @@ class LocalOpenCVFaceDetector:
     def detect(self, image_path: Path, cancel_event: Event | None = None) -> Sequence[FaceDetectionCandidate]:
         if cancel_event and cancel_event.is_set():
             return ()
+        if Path(self.interpreter_path).resolve() != Path(sys.executable).resolve():
+            script = r'''import cv2,json,sys
+from PIL import Image,ImageOps
+import numpy as np
+image=np.asarray(ImageOps.exif_transpose(Image.open(sys.argv[1])).convert('RGB'))
+gray=cv2.cvtColor(image,cv2.COLOR_RGB2GRAY)
+p=cv2.data.haarcascades+'haarcascade_frontalface_default.xml'
+model=cv2.CascadeClassifier(p)
+assert not model.empty()
+print(json.dumps(model.detectMultiScale(gray,scaleFactor=1.1,minNeighbors=5,minSize=(24,24)).tolist()))'''
+            result = subprocess.run([self.interpreter_path, "-c", script, str(image_path)],
+                                    capture_output=True, text=True, timeout=120)
+            if result.returncode:
+                raise FaceModelUnavailable("The managed face runtime could not analyze this image.")
+            boxes = json.loads(result.stdout.strip().splitlines()[-1])
+            return tuple(FaceDetectionCandidate(BoundingBox(float(x), float(y), float(w), float(h)), .8)
+                         for x, y, w, h in boxes)
         cv, numpy = _load_runtime()
         reader = QImageReader(str(image_path))
         reader.setAutoTransform(True)
@@ -125,10 +148,30 @@ class LocalFaceEmbeddingProvider:
     model_revision = "1"
     embedding_dimension = 128
 
-    def __init__(self, crop_cache: FaceCropCache | None = None):
+    def __init__(self, crop_cache: FaceCropCache | None = None, interpreter_path: str | Path | None = None):
         self.crop_cache = crop_cache or FaceCropCache()
+        self.interpreter_path = str(interpreter_path or sys.executable)
 
     def embed(self, image_path: Path, faces: Sequence[Face], cancel_event: Event | None = None) -> Sequence[FaceEmbedding]:
+        if Path(self.interpreter_path).resolve() != Path(sys.executable).resolve():
+            output = []
+            script = r'''import cv2,json,sys,numpy as np
+x=cv2.imread(sys.argv[1],cv2.IMREAD_GRAYSCALE)
+assert x is not None
+d=cv2.dct(cv2.resize(x,(32,32)).astype(np.float32)/255.0).flatten()[:128]
+n=float(np.linalg.norm(d)); assert np.isfinite(n) and n>0
+print(json.dumps((d/n).tolist()))'''
+            for face in faces:
+                if cancel_event and cancel_event.is_set(): break
+                crop = self.crop_cache.create(image_path, face)
+                result = subprocess.run([self.interpreter_path, "-c", script, str(crop)],
+                                        capture_output=True, text=True, timeout=120)
+                if result.returncode: continue
+                vector = tuple(float(x) for x in json.loads(result.stdout.strip().splitlines()[-1]))
+                output.append(FaceEmbedding(face.id, self.provider_id, self.model_id,
+                                            self.model_revision, len(vector), vector,
+                                            face.source_fingerprint))
+            return tuple(output)
         cv, numpy = _load_runtime()
         output = []
         for face in faces:
