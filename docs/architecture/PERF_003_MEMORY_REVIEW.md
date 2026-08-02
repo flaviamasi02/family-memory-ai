@@ -173,3 +173,17 @@ explicitly cleared before and after every Album Review, Cleanup Review, and
 Developer Diagnostics UI test, preventing armed state, reports, bypasses, or
 deferred Qt timers from leaking into later tests under a different collection
 order. Assertions and product coverage are unchanged.
+
+## Final suggestion timer determinism
+
+The remaining CI failure was not a generation/key cancellation: after the normal
+selection and Shift range selection, the pending row, request ID, detail
+generation, current key, and authoritative row still matched. The timer itself
+used Qt's default `CoarseTimer`. At a 750 ms interval Qt may coalesce a coarse
+deadline by roughly 5%, which exceeds the regression's 30 ms observation margin
+under CI load; the final callback then appeared missing (`suggest.call_count ==
+0`) even though it remained pending. The timer now uses `Qt.PreciseTimer` with the
+same 750 ms idle debounce. Intermediate selections still restart one single-shot
+timer, while the final callback executes once against the authoritative row and
+all stale generation/key guards remain unchanged. No selection-path work or
+Product Owner-approved responsiveness changed.

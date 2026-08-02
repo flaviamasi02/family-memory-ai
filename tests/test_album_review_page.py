@@ -1121,6 +1121,9 @@ class AlbumReviewPageTests(unittest.TestCase):
         self.assertEqual(page._update_selection_count.call_count, 20)
         self.assertTrue(page._preview_timer.isActive())
         self.assertTrue(page._suggestion_timer.isActive())
+        self.assertEqual(
+            page._suggestion_timer.timerType(), Qt.TimerType.PreciseTimer
+        )
         self.assertEqual(page.grid_rebuild_count(), rebuilds_before)
         self.assertEqual(page.retained_thumbnail_count(), thumbnails_before)
         page._select_key(page._row_key(page._visible_rows[10]), additive=True)

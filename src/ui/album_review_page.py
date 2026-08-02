@@ -309,6 +309,12 @@ class AlbumReviewPage(QWidget):
         self._current_suggestion = None
         self._suggestion_timer = QTimer(self)
         self._suggestion_timer.setSingleShot(True)
+        # The regression observes the final callback shortly after the debounce
+        # boundary. Qt's default CoarseTimer may legally fire ~5% late (more
+        # than the test's 30 ms margin at 750 ms), making the callback appear
+        # lost under CI load. PreciseTimer preserves the same idle delay while
+        # making the single final callback deterministic.
+        self._suggestion_timer.setTimerType(Qt.TimerType.PreciseTimer)
         # Suggestions scan semantic evidence on the UI thread. A 120 ms delay
         # expired between normal Ctrl-clicks, so the previous click's suggestion
         # blocked delivery of the next mouse event. Treat it as idle work.
