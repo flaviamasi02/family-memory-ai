@@ -38,6 +38,7 @@ from vision.embedding_provider import (
     source_identity,
 )
 from vision.semantic_similarity_service import canonical_photo_key
+from core.selection_diagnostics import clear_selection_diagnostics
 
 
 class AlbumReviewPageTests(unittest.TestCase):
@@ -45,9 +46,13 @@ class AlbumReviewPageTests(unittest.TestCase):
     def setUpClass(cls):
         cls._app = QApplication.instance() or QApplication([])
 
+    def setUp(self):
+        clear_selection_diagnostics()
+
     def tearDown(self):
         os.environ.pop("FAMILY_MEMORY_CATEGORIES_ROOT", None)
         reset_category_registry()
+        clear_selection_diagnostics()
 
     def _make_breakdown(
         self,

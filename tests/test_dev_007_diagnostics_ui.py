@@ -19,9 +19,11 @@ def page(tmp_path, monkeypatch):
     QApplication = widgets.QApplication
     from ui.settings_page import SettingsPage
     from core.perf_stats import clear_performance_history
+    from core.selection_diagnostics import clear_selection_diagnostics
 
     monkeypatch.setenv("FAMILY_MEMORY_APP_DATA_ROOT", str(tmp_path / "runtime"))
     clear_performance_history()
+    clear_selection_diagnostics()
     paths = ApplicationDataPathService(tmp_path / "app")
     registry = LibraryRegistry(paths)
     services = ApplicationServices(paths, registry, MetadataStore(paths, registry))
@@ -32,6 +34,7 @@ def page(tmp_path, monkeypatch):
     services.close()
     result.deleteLater()
     clear_performance_history()
+    clear_selection_diagnostics()
 
 
 def test_section_present_collapsed_and_safe_without_active_library(page):

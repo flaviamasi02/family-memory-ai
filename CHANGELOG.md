@@ -7,6 +7,7 @@
 - Completed event-loop-aware measurement through first selected-card paint and deferred settling, moved the requested report above legacy aggregates, deferred/coalesced preview scaling/loading until after selection handling, and removed literal `<b>` tags from Import Performance text.
 - Fixed the second-click path by making normal Ctrl-click delta calculation strictly one-key/O(1) and moving semantic suggestion execution to a 750 ms idle debounce; one preview timer and one suggestion timer are restarted rather than accumulated across rapid clicks.
 - Bound detail text, preview, and AI work to one authoritative row snapshot plus generation token, invalidated pending work on data/view reset, and corrected the 423-row regression to select photo 9/12 by stable key rather than score-sorted visible index.
+- Made duplicate push/pull-request CI deterministic by batching the selection microbenchmark under controlled GC and clearing process-local selection diagnostics before and after every affected UI test.
 - Added aggregate Memory Review timings and readable Developer Diagnostics for load, grid, filters, sorting, selection, preview, suggestions, thumbnails, scoring, and database reads.
 - Reused and relaid out existing cards for sort-only changes, indexed row lookup, and preserved compatible selection, filters, search, sort, thumbnails, and scroll across refreshes.
 - Documented measured code-path bottlenecks and added bounded diagnostics regression coverage without changing scoring or AI suggestion behavior.

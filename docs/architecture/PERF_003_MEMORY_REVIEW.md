@@ -159,3 +159,17 @@ discarded. Clearing selection, replacing page data, or changing filter/sort
 invalidates both deferred contexts. The regression explicitly verifies
 `photo_9.jpg → photo_12.jpg` and invokes a stale preview generation to prove it
 cannot overwrite the final row.
+
+## Duplicate CI determinism
+
+The repository runs the same workflow for `push` and `pull_request`; there is no
+step or dependency difference. A same-commit pass/fail split therefore exposed
+test isolation rather than product behavior. The only wall-clock assertion in
+the PERF-003 suite timed individual sub-microsecond calls, allowing scheduler/GC
+noise to invert one push-run sample. It now measures 25 medians of 1,000-call
+batches with GC restored afterward and retains a meaningful 20% improvement
+threshold. In addition, the process-local selection diagnostic collector is
+explicitly cleared before and after every Album Review, Cleanup Review, and
+Developer Diagnostics UI test, preventing armed state, reports, bypasses, or
+deferred Qt timers from leaking into later tests under a different collection
+order. Assertions and product coverage are unchanged.

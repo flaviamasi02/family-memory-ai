@@ -19,6 +19,7 @@ from core.selection_diagnostics import (
 )
 from time import perf_counter
 import statistics
+import gc
 
 
 def test_memory_review_performance_counters_are_aggregated():
@@ -66,15 +67,22 @@ def test_incremental_highlight_work_is_measurably_lower_than_full_refresh():
 
     def median_seconds(callback):
         samples = []
-        for _ in range(200):
+        gc_enabled = gc.isenabled()
+        gc.disable()
+        for _ in range(25):
             started = perf_counter()
-            callback()
+            for _iteration in range(1_000):
+                callback()
             samples.append(perf_counter() - started)
+        if gc_enabled:
+            gc.enable()
         return statistics.median(samples)
 
     before = median_seconds(lambda: [key in current for key in keys])
     after = median_seconds(lambda: changed_selection_keys(keys, current))
-    assert after < before
+    # Batched medians avoid scheduler/timer noise that made the previous
+    # single-call microbenchmark ordering-dependent across duplicate CI jobs.
+    assert after < before * 0.8
 
 
 def test_real_selection_diagnostic_is_aggregate_and_path_free():
