@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from html import escape
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -40,6 +41,11 @@ from core.media_classifier import (
     ordered_media_category_values,
 )
 from core.image_display_loader import load_display_pixmap, load_display_thumbnail
+from core.memory_review_perf import (
+    increment_memory_review_counter,
+    measure_memory_review,
+    record_memory_review,
+)
 from core.user_metadata_service import UserMetadataService
 from learning.category_learning_engine import get_category_learning_engine
 from learning.preference_learning_engine import get_preference_learning_engine
@@ -256,6 +262,7 @@ class AlbumReviewPage(QWidget):
         self._empty_reason_text: str = ""
         self._last_view_signature: Optional[tuple[str, str, str]] = None
         self._last_visible_key_order: List[str] = []
+        self._rows_by_key: Dict[str, AlbumReviewRow] = {}
         self._grid_rebuild_count = 0
         self._decision_history = DecisionHistory()
         self._decision_selector_syncing = False
@@ -817,6 +824,7 @@ class AlbumReviewPage(QWidget):
             )
             for item in scored_photos
         ]
+        self._rows_by_key = {self._row_key(row): row for row in self._all_rows}
         self._selected_key = None
         self._selected_keys = set()
         self._selection_anchor_key = None
@@ -893,14 +901,14 @@ class AlbumReviewPage(QWidget):
                 )
             )
 
+        had_rows = bool(self._all_rows)
         self._all_rows = rows
-        self._selected_key = None
-        self._selected_keys = set()
-        self._selection_anchor_key = None
-        self.sort_combo.setCurrentText(self.SORT_HIGHEST)
-        self.filter_combo.setCurrentText(self.FILTER_ALL)
-        self.category_filter_combo.setCurrentText(self.CATEGORY_FILTER_ALL)
-        self.search_input.clear()
+        self._rows_by_key = {self._row_key(row): row for row in rows}
+        if not had_rows:
+            self.sort_combo.setCurrentText(self.SORT_HIGHEST)
+            self.filter_combo.setCurrentText(self.FILTER_ALL)
+            self.category_filter_combo.setCurrentText(self.CATEGORY_FILTER_ALL)
+            self.search_input.clear()
         self._trigger_refresh(force=True)
 
     def _on_search_text_changed(self) -> None:
@@ -919,9 +927,14 @@ class AlbumReviewPage(QWidget):
         if not force and view_signature == self._last_view_signature:
             return
 
+        previous_signature = self._last_view_signature
         self._last_view_signature = view_signature
+        previous_scroll = self.grid_scroll.verticalScrollBar().value()
+        previous_keys = [self._row_key(row) for row in self._visible_rows]
 
-        self._visible_rows = self._filtered_sorted_rows()
+        operation = "Sort update" if previous_signature and previous_signature[:2] == view_signature[:2] and previous_signature[3] == view_signature[3] else "Filter update"
+        with measure_memory_review(operation, items=len(self._all_rows)):
+            self._visible_rows = self._filtered_sorted_rows()
         self._selected_keys = {
             key
             for key in self._selected_keys
@@ -929,6 +942,19 @@ class AlbumReviewPage(QWidget):
         }
         if self._selected_key not in {self._row_key(row) for row in self._visible_rows}:
             self._selected_key = None
+
+        new_keys = [self._row_key(row) for row in self._visible_rows]
+        # Sorting does not invalidate cards or thumbnails: only move the already
+        # rendered widgets. This is the common expensive rebuild found by PERF-003.
+        if set(new_keys) == set(previous_keys) and self._cards_by_key:
+            self._rendered_keys = [key for key in new_keys if key in self._cards_by_key]
+            with measure_memory_review("Grid creation", items=len(self._rendered_keys)):
+                self._relayout_existing_cards(self._calculate_columns())
+            increment_memory_review_counter("grid_rebuilds_avoided")
+            self.results_label.setText(self._results_label_text())
+            self._restore_scroll_position(previous_scroll)
+            self._update_selection_count()
+            return
 
         self._clear_grid()
         self._cards_by_key = {}
@@ -942,7 +968,10 @@ class AlbumReviewPage(QWidget):
 
         self.results_label.setText(self._results_label_text())
 
-        self._add_next_batch()
+        with measure_memory_review("Grid creation", items=self._target_render_count):
+            self._add_next_batch()
+        increment_memory_review_counter("grid_rebuilds")
+        self._restore_scroll_position(previous_scroll)
 
         if self._visible_rows and self._selected_key is None:
             first_key = self._row_key(self._visible_rows[0])
@@ -1148,6 +1177,7 @@ class AlbumReviewPage(QWidget):
     def _select_key(
         self, key: str, additive: bool = False, range_select: bool = False
     ) -> None:
+        started = time.perf_counter()
         visible_keys = [self._row_key(row) for row in self._visible_rows]
         if key not in visible_keys:
             return
@@ -1180,6 +1210,9 @@ class AlbumReviewPage(QWidget):
             self._show_details(row)
 
         self._update_selection_count()
+        elapsed = (time.perf_counter() - started) * 1000.0
+        record_memory_review("Selection update", elapsed, items=len(self._selected_keys))
+        increment_memory_review_counter("selection_updates")
 
     def _on_card_double_clicked(self, key: str) -> None:
         rows = list(self._visible_rows)
@@ -1247,10 +1280,7 @@ class AlbumReviewPage(QWidget):
         return self._row_for_key(self._selected_key)
 
     def _row_for_key(self, key: str) -> Optional[AlbumReviewRow]:
-        for row in self._all_rows:
-            if self._row_key(row) == key:
-                return row
-        return None
+        return self._rows_by_key.get(key)
 
     def _row_key(self, row: AlbumReviewRow) -> str:
         return self._photo_key(row.breakdown.photo)
@@ -1274,6 +1304,7 @@ class AlbumReviewPage(QWidget):
             return
 
         self._details_key = key
+        detail_started = time.perf_counter()
         photo = row.breakdown.photo
         breakdown = row.breakdown
 
@@ -1388,6 +1419,10 @@ class AlbumReviewPage(QWidget):
 
         self._sync_selectors_to_row(row)
         self._request_category_suggestion(row)
+        increment_memory_review_counter("detail_refreshes")
+        record_memory_review(
+            "Preview refresh", (time.perf_counter() - detail_started) * 1000.0, items=1
+        )
 
     def _clear_details(self) -> None:
         self._details_key = None
@@ -1439,11 +1474,12 @@ class AlbumReviewPage(QWidget):
         def compute() -> None:
             if request_id != self._suggestion_request_id:
                 return
-            result = self._category_suggestion_service.suggest(
-                row.breakdown.photo,
-                [r.breakdown.photo for r in self._all_rows],
-                self._suggestion_metadata,
-            )
+            with measure_memory_review("Suggestion refresh", items=len(self._all_rows)):
+                result = self._category_suggestion_service.suggest(
+                    row.breakdown.photo,
+                    [r.breakdown.photo for r in self._all_rows],
+                    self._suggestion_metadata,
+                )
             if (
                 request_id != self._suggestion_request_id
                 or self._details_key != self._row_key(row)
@@ -2093,6 +2129,7 @@ class AlbumReviewPage(QWidget):
         return None
 
     def update_thumbnail(self, photo, pixmap) -> None:
+        started = time.perf_counter()
         key = self._photo_key(photo)
         if not key:
             return
@@ -2124,6 +2161,10 @@ class AlbumReviewPage(QWidget):
                 card.refresh_from_row(thumbnail=pixmap)
             if self._details_key == key:
                 self._show_details(row, force=True)
+            record_memory_review(
+                "Thumbnail refresh", (time.perf_counter() - started) * 1000.0, items=1
+            )
+            increment_memory_review_counter("thumbnail_updates")
             break
 
     def _refresh_selected_preview(self) -> None:

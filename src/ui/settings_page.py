@@ -44,6 +44,7 @@ from core.perf_stats import (
     export_performance_report,
     performance_history,
 )
+from core.memory_review_perf import memory_review_performance_snapshot
 from storage.errors import StorageError
 from storage.schema import SCHEMA_VERSION
 
@@ -416,6 +417,17 @@ class SettingsPage(QWidget):
         self.export_performance_button.clicked.connect(self._export_performance_report)
         panel.addWidget(self.export_performance_button)
 
+        self.memory_review_performance_title = QLabel("Memory Review Performance")
+        self.memory_review_performance_title.setStyleSheet("font-weight: 700; margin-top: 8px;")
+        panel.addWidget(self.memory_review_performance_title)
+        self.memory_review_performance_report = QTextEdit()
+        self.memory_review_performance_report.setReadOnly(True)
+        self.memory_review_performance_report.setMaximumHeight(180)
+        self.memory_review_performance_report.setToolTip(
+            "Aggregate Memory Review UI timings. Values are process-local and contain no per-photo logs."
+        )
+        panel.addWidget(self.memory_review_performance_report)
+
         actions = QGridLayout()
         action_specs = (
             ("diagnostics_refresh_button", "Refresh", self.refresh_developer_diagnostics),
@@ -454,6 +466,28 @@ class SettingsPage(QWidget):
             if index >= 0:
                 self.diagnostics_library_selector.setCurrentIndex(index)
         self.diagnostics_library_selector.blockSignals(False)
+        snapshot = memory_review_performance_snapshot()
+        timings = snapshot["timings"]
+        counters = snapshot["counters"]
+        readable_order = (
+            "Memory Review load", "Score retrieval", "Database reads",
+            "Grid creation", "Filter update", "Sort update", "Selection update",
+            "Preview refresh", "Suggestion refresh", "Thumbnail refresh",
+        )
+        memory_lines = ["Recent aggregate timings (last / average / maximum)"]
+        for name in readable_order:
+            values = timings.get(name)
+            if values is None:
+                memory_lines.append(f"{name}: —")
+            else:
+                memory_lines.append(
+                    f"{name}: {values['last_ms']:.1f} / {values['average_ms']:.1f} / "
+                    f"{values['max_ms']:.1f} ms ({values['count']} samples)"
+                )
+        if counters:
+            memory_lines.extend(("", "Update counters"))
+            memory_lines.extend(f"{key}: {value}" for key, value in sorted(counters.items()))
+        self.memory_review_performance_report.setPlainText("\n".join(memory_lines))
         store = services.metadata_store
         health = store.health_check() if store.library_id else None
         sync = store.incremental_sync_summary() if store.library_id else None

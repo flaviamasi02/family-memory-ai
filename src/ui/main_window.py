@@ -27,6 +27,7 @@ from ai_runtime.manager import create_default_runtime_manager
 from core.application_services import ApplicationServices, build_application_services
 from core.perf_stats import (begin_import_performance_session,
                              finish_import_performance_session, get_session_stats)
+from core.memory_review_perf import measure_memory_review, record_memory_review
 from core.safe_file_move_service import CLEANUP_REVIEW_FOLDER_NAME
 from models.photo_model import PhotoModel
 from ui.album_draft_page import AlbumDraftPage
@@ -932,6 +933,7 @@ class MainWindow(QMainWindow):
         return str(getattr(photo, "relevance_category", "unknown") or "unknown")
 
     def _load_album_review_data(self, relevant_photos, imported_photos=None):
+        load_started = time.perf_counter()
         imported = list(imported_photos or relevant_photos or [])
         relevant = list(relevant_photos or [])
         imported_count = len(imported)
@@ -971,6 +973,10 @@ class MainWindow(QMainWindow):
             return
 
         builder = AlbumBuilder()
+        with measure_memory_review("Database reads", items=0):
+            # Memory Review consumes the already-rehydrated projection. Keeping
+            # this explicit zero-read span guards against accidental UI SQL.
+            pass
         by_year = builder.group_photos_by_year(review_input)
 
         if not by_year:
@@ -1015,7 +1021,8 @@ class MainWindow(QMainWindow):
         )
 
         selection_result = CandidateSelectionEngine().evaluate(album)
-        scoring_result = AlbumScoringEngine().score(album)
+        with measure_memory_review("Score retrieval", items=len(review_input)):
+            scoring_result = AlbumScoringEngine().score(album)
 
         scored_by_key = {
             str(getattr(item.photo, "path", "")): item for item in scoring_result.scored_photos
@@ -1076,6 +1083,10 @@ class MainWindow(QMainWindow):
             "by_year": by_year,
             "status_text": self.status_label.text(),
         }
+        record_memory_review(
+            "Memory Review load", (time.perf_counter() - load_started) * 1000.0,
+            items=len(review_input),
+        )
 
     def _log_memory_review_diagnostics(
         self,

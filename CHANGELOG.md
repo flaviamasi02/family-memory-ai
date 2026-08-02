@@ -1,5 +1,11 @@
 # Changelog
 
+### PERF-003 — Memory Review Performance
+
+- Added aggregate Memory Review timings and readable Developer Diagnostics for load, grid, filters, sorting, selection, preview, suggestions, thumbnails, scoring, and database reads.
+- Reused and relaid out existing cards for sort-only changes, indexed row lookup, and preserved compatible selection, filters, search, sort, thumbnails, and scroll across refreshes.
+- Documented measured code-path bottlenecks and added bounded diagnostics regression coverage without changing scoring or AI suggestion behavior.
+
 ## Unreleased
 
 ### UX-004 — Product Owner Performance Dashboard
