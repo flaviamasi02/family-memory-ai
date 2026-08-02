@@ -12,7 +12,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from models.photo import Photo
 from core.category_registry import get_category_registry, reset_category_registry
-from ui.irrelevant_media_page import IrrelevantMediaPage
+from ui.irrelevant_media_page import IrrelevantMediaPage, cleanup_photo_identity
 from ui.shared_thumbnail_grid import SharedGridItem, SharedThumbnailCard
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -729,6 +729,20 @@ class IrrelevantMediaPageTests(unittest.TestCase):
             page.update_thumbnail(moved, background_thumbnail); self._flush_ui()
             self.assertNotEqual(card.thumbnail_label.pixmap().cacheKey(), placeholder_key)
             self.assertEqual(page.preview_label.pixmap().cacheKey(), background_thumbnail.cacheKey())
+
+    def test_logical_thumbnail_identity_survives_move_and_restore_paths(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            photo = self._make_photo(root, "identity.jpg")
+            photo.id = "stable-photo-id"
+            before = cleanup_photo_identity(photo)
+            photo.metadata["trash_original_path"] = str(photo.path)
+            photo.metadata["trash_workflow_state"] = "moved_to_trash"
+            photo.path = root / "Family Memory Trash" / "identity.jpg"
+            self.assertEqual(cleanup_photo_identity(photo), before)
+            photo.metadata["trash_workflow_state"] = "restored"
+            photo.path = root / "restored" / "identity.jpg"
+            self.assertEqual(cleanup_photo_identity(photo), before)
 
     def test_cleanup_review_grid_renders_multiple_columns_when_wide(self):
         with tempfile.TemporaryDirectory() as tmpdir:

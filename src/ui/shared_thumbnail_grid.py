@@ -203,7 +203,11 @@ class SharedThumbnailGrid(QWidget):
         return super().eventFilter(watched, event)
 
     def set_items(self, items: list[SharedGridItem]) -> None:
-        self._items = list(items or [])
+        incoming = list(items or [])
+        previous_keys = [item.key for item in self._items]
+        incoming_keys = [item.key for item in incoming]
+        same_identity_order = bool(self._items) and previous_keys == incoming_keys
+        self._items = incoming
         self._items_by_key = {item.key: item for item in self._items}
 
         visible_keys = {item.key for item in self._items}
@@ -217,6 +221,22 @@ class SharedThumbnailGrid(QWidget):
             self._selected_key = self._items[0].key
             self._selected_keys = {self._selected_key}
             self._selection_anchor_key = self._selected_key
+
+        # A metadata/view refresh with the same stable identities must not
+        # destroy visible cards. Besides preserving selection and scroll, this
+        # ensures an in-flight background thumbnail updates the same card object
+        # that currently owns the placeholder. Items not rendered yet remain in
+        # _items_by_key and receive the real thumbnail when lazy rendering creates
+        # their card later.
+        if same_identity_order:
+            for item in self._items:
+                card = self._cards_by_key.get(item.key)
+                if card is not None:
+                    card.refresh(item)
+                    card.set_selected(item.key in self._selected_keys)
+            self._relayout_cards()
+            self.selection_changed.emit(set(self._selected_keys), self._selected_key)
+            return
 
         self._rebuild_grid()
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import hashlib
+import os
 import time
 from contextlib import ExitStack, nullcontext
 from dataclasses import dataclass
@@ -60,6 +61,15 @@ RECOMMENDED_ACTION_LABELS = {
     "review": "Needs Review",
     "unknown": "Unknown",
 }
+
+
+def cleanup_photo_identity(photo) -> str:
+    """One identity for rows, cards, selections, caches, and worker results."""
+    photo_id = str(getattr(photo, "id", "") or "").strip()
+    if photo_id:
+        return f"photo:{photo_id}"
+    current_path = Path(getattr(photo, "path", "")).resolve(strict=False)
+    return os.path.normcase(os.path.normpath(str(current_path)))
 
 
 @dataclass
@@ -1590,10 +1600,7 @@ class IrrelevantMediaPage(QWidget):
         return None
 
     def _photo_key(self, photo) -> str:
-        metadata = getattr(photo, "metadata", {}) or {}
-        if metadata.get("trash_workflow_state") and getattr(photo, "id", None):
-            return f"photo:{photo.id}"
-        return str(getattr(photo, "path", ""))
+        return cleanup_photo_identity(photo)
 
     def _thumbnail_for_photo(self, photo, target_size, *, allow_original_decode: bool = False) -> Optional[QPixmap]:
         thumbnail = getattr(photo, "thumbnail", None)
