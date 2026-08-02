@@ -1,6 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 import os
+import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -8,7 +9,8 @@ from PySide6.QtWidgets import QApplication
 
 from faces.models import BoundingBox, FaceEmbedding
 from faces.persistence import SQLiteFaceRepository
-from faces.processing import FaceModelUnavailable
+from faces.processing import (FaceImageProcessingError, FaceModelUnavailable,
+                              ManagedFaceRuntimeClient)
 from faces.services import FaceDetectionCandidate
 from workers.face_processing_worker import FaceProcessingWorker
 from ui.main_window import MainWindow
@@ -156,3 +158,43 @@ def test_verification_failure_recommends_repair_not_internet(tmp_path):
     assert window.settings_page.face_runtime_progress.value() == 0
     assert window.settings_page.face_runtime_repair_button.isEnabled()
     window.close(); app.processEvents()
+
+
+def test_managed_protocol_success_image_failure_runtime_failure_and_logs(tmp_path):
+    responses = iter([
+        SimpleNamespace(returncode=0, stdout='{"ok":true,"faces":[]}\n', stderr='warning'),
+        SimpleNamespace(returncode=0, stdout='{"ok":false,"error_scope":"image","error_code":"decode_failed","message":"This image could not be decoded."}\n', stderr='decoder detail'),
+        SimpleNamespace(returncode=0, stdout='{"ok":false,"error_scope":"runtime","error_code":"runtime_import_failed","message":"The managed runtime could not load OpenCV."}\n', stderr='import detail'),
+    ])
+    client = ManagedFaceRuntimeClient(tmp_path / "runtime with spaces" / "python.exe",
+                                      tmp_path / "runtime.log", runner=lambda *a, **k: next(responses),
+                                      request_root=tmp_path / "requests")
+    assert client.invoke("detect", {"image_path": "C:/Fotos/niño one.jpg"}, suffix=".jpg")["faces"] == []
+    with pytest.raises(FaceImageProcessingError, match="could not be decoded"):
+        client.invoke("detect", {"image_path": "bad.jpg"}, suffix=".jpg")
+    with pytest.raises(FaceModelUnavailable, match="load OpenCV"):
+        client.invoke("detect", {"image_path": "valid.jpg"}, suffix=".jpg")
+    log = (tmp_path / "runtime.log").read_text()
+    assert "decoder detail" in log and "import detail" in log and "image_suffix" in log
+    assert "niño one.jpg" not in log
+
+
+def test_malformed_protocol_and_timeout_are_precisely_classified(tmp_path):
+    import subprocess
+    malformed = ManagedFaceRuntimeClient("managed-python", tmp_path / "bad.log",
+                                         runner=lambda *a, **k: SimpleNamespace(returncode=0, stdout="not-json", stderr="detail"),
+                                         request_root=tmp_path / "requests")
+    with pytest.raises(FaceModelUnavailable, match="invalid protocol"):
+        malformed.invoke("detect", {"image_path": "x.jpg"})
+    timed = ManagedFaceRuntimeClient("managed-python", tmp_path / "timeout.log",
+                                    runner=lambda *a, **k: (_ for _ in ()).throw(subprocess.TimeoutExpired("worker", 120)),
+                                    request_root=tmp_path / "requests2")
+    with pytest.raises(FaceImageProcessingError, match="timed out"):
+        timed.invoke("detect", {"image_path": "x.jpg"})
+
+
+def test_heic_is_excluded_consistently_instead_of_invalidating_runtime(tmp_path):
+    path = tmp_path / "phone.heic"; path.write_bytes(b"fixture")
+    from faces.eligibility import face_processing_eligibility
+    decision = face_processing_eligibility(photo(path, "heic"))
+    assert not decision.eligible and decision.reason_code == "managed_decoder_unsupported"

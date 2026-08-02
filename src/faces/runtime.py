@@ -290,6 +290,14 @@ class FaceRuntimeManager:
         if progress: progress(100, "Face recognition runtime removed.")
         return status
 
+    def mark_runtime_failure(self, message: str) -> FaceRuntimeStatus:
+        status = self.status()
+        status.state = "Needs repair"
+        status.last_error = str(message or "The managed Face Runtime became unavailable.")
+        status.last_verification = _now()
+        self._save(status)
+        return status
+
     def find_supported_interpreter(self):
         candidates = list(self._default_discovery_candidates() if self.discovery_candidates is None else self.discovery_candidates)
         for candidate in candidates:

@@ -34,6 +34,8 @@ def face_processing_eligibility(photo, *, require_file: bool = True) -> FaceElig
     path = Path(getattr(photo, "path", ""))
     if not is_supported_image_path(path):
         return FaceEligibility(False, "Only supported still images can be scanned.", "unsupported_media")
+    if path.suffix.casefold() in {".heic", ".heif"}:
+        return FaceEligibility(False, "HEIC/HEIF face decoding is not available in this runtime.", "managed_decoder_unsupported")
     category = normalize_category_id(
         getattr(photo, "user_corrected_media_category", "")
         or getattr(photo, "effective_media_category", "")
@@ -53,4 +55,3 @@ def set_face_analysis_excluded(photo, excluded: bool) -> None:
     metadata = dict(getattr(photo, "metadata", {}) or {})
     metadata["face_analysis_excluded"] = bool(excluded)
     photo.metadata = metadata
-

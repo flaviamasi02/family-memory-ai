@@ -54,7 +54,7 @@ from vision.managed_mobileclip_provider import ManagedMobileCLIPEmbeddingProvide
 from workers.scan_worker import ScanCompletion, ScanWorker
 from workers.thumbnail_worker import ThumbnailWorker
 from workers.face_processing_worker import FaceProcessingWorker
-from faces.processing import LocalFaceEmbeddingProvider, LocalOpenCVFaceDetector
+from faces.processing import LocalFaceEmbeddingProvider, LocalOpenCVFaceDetector, ManagedFaceRuntimeClient
 
 logger = logging.getLogger(__name__)
 
@@ -302,21 +302,29 @@ class MainWindow(QMainWindow):
         )
         thread = QThread(self)
         runtime_status = self.settings_page.face_runtime_manager.status()
-        detector = LocalOpenCVFaceDetector(runtime_status.interpreter_path)
-        embedder = LocalFaceEmbeddingProvider(interpreter_path=runtime_status.interpreter_path)
+        client = ManagedFaceRuntimeClient(runtime_status.interpreter_path,
+                                          self.settings_page.face_runtime_manager.log_path)
+        detector = LocalOpenCVFaceDetector(runtime_status.interpreter_path, client)
+        embedder = LocalFaceEmbeddingProvider(interpreter_path=runtime_status.interpreter_path,
+                                              runtime_client=client)
         worker = FaceProcessingWorker(photos, self.people_review_page.repository,
                                       detector=detector, embedder=embedder)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
         worker.progress.connect(self.people_review_page.show_scan_progress)
         worker.completed.connect(self.people_review_page.show_scan_completed)
-        worker.unavailable.connect(self.people_review_page.show_scan_unavailable)
+        worker.unavailable.connect(self._on_face_runtime_unavailable)
         worker.finished.connect(thread.quit)
         worker.finished.connect(worker.deleteLater)
         thread.finished.connect(self._on_face_processing_thread_finished)
         thread.finished.connect(thread.deleteLater)
         self.face_processing_thread, self.face_processing_worker = thread, worker
         thread.start()
+
+    def _on_face_runtime_unavailable(self, message: str) -> None:
+        self.settings_page.face_runtime_manager.mark_runtime_failure(message)
+        self.settings_page.refresh_face_runtime_status()
+        self.people_review_page.show_scan_unavailable(message)
 
     def _open_face_runtime_settings(self) -> None:
         settings_index = self.tabs.indexOf(self.settings_page)

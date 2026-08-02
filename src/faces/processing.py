@@ -8,6 +8,8 @@ import math
 import json
 import subprocess
 import sys
+import tempfile
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Event
@@ -39,16 +41,82 @@ class FaceModelUnavailable(RuntimeError):
     pass
 
 
+class FaceImageProcessingError(RuntimeError):
+    def __init__(self, code: str, message: str):
+        super().__init__(message); self.code = code
+
+
+class ManagedFaceRuntimeClient:
+    """One-item JSON subprocess boundary with application-managed requests/logs."""
+    def __init__(self, interpreter_path, log_path=None, runner=None, request_root=None):
+        self.interpreter_path = str(interpreter_path)
+        self.worker_path = Path(__file__).with_name("managed_worker.py").resolve()
+        root = Path(request_root or (get_app_data_service().root / "cache" / "face_requests"))
+        root.mkdir(parents=True, exist_ok=True); self.request_root = root
+        self.log_path = Path(log_path or (get_app_data_service().root / "logs" / "face-runtime-processing.log"))
+        self.log_path.parent.mkdir(parents=True, exist_ok=True)
+        self.runner = runner or subprocess.run
+
+    def invoke(self, command: str, payload: dict, *, suffix="", size=0, timeout=120):
+        request_path = None
+        try:
+            with tempfile.NamedTemporaryFile("w", suffix=".json", prefix="request-", dir=self.request_root,
+                                             encoding="utf-8", delete=False) as stream:
+                json.dump(payload, stream); request_path = Path(stream.name)
+            argv = [self.interpreter_path, str(self.worker_path), command, "--request-file", str(request_path)]
+            try:
+                result = self.runner(argv, capture_output=True, text=True, timeout=timeout)
+            except subprocess.TimeoutExpired as exc:
+                self._log(command, -1, exc.stdout or "", exc.stderr or "", suffix, size, "timeout")
+                raise FaceImageProcessingError("timeout", "Face processing timed out for this image.") from exc
+            except OSError as exc:
+                self._log(command, -1, "", str(exc), suffix, size, "process_start_failed")
+                raise FaceModelUnavailable("The managed Face Runtime process could not start.") from exc
+            if result.returncode != 0:
+                self._log(command, result.returncode, result.stdout, result.stderr, suffix, size, "process_failed")
+                raise FaceModelUnavailable("The managed Face Runtime worker stopped unexpectedly.")
+            try:
+                response = json.loads((result.stdout or "").strip())
+            except (json.JSONDecodeError, TypeError) as exc:
+                self._log(command, result.returncode, result.stdout, result.stderr, suffix, size, "protocol_invalid")
+                raise FaceModelUnavailable("The managed Face Runtime returned an invalid protocol response.") from exc
+            if not isinstance(response, dict) or "ok" not in response:
+                self._log(command, result.returncode, result.stdout, result.stderr, suffix, size, "protocol_invalid")
+                raise FaceModelUnavailable("The managed Face Runtime returned an invalid protocol response.")
+            if not response["ok"]:
+                message = str(response.get("message") or "Face processing failed.")
+                code = str(response.get("error_code") or "unknown")
+                scope = str(response.get("error_scope") or "unknown")
+                self._log(command, result.returncode, result.stdout, result.stderr, suffix, size,
+                          f"{scope}:{code}")
+                if response.get("error_scope") == "runtime":
+                    raise FaceModelUnavailable(message)
+                raise FaceImageProcessingError(code, message)
+            self._log(command, result.returncode, result.stdout, result.stderr, suffix, size, "success")
+            return response
+        finally:
+            if request_path is not None: request_path.unlink(missing_ok=True)
+
+    def _log(self, command, returncode, stdout, stderr, suffix, size, error_type):
+        record = {"time": datetime.now(timezone.utc).isoformat(), "executable": self.interpreter_path,
+                  "worker": str(self.worker_path), "command": command, "return_code": returncode,
+                  "stdout": stdout, "stderr": stderr, "timeout_seconds": 120,
+                  "image_suffix": suffix.casefold(), "image_size": int(size or 0), "result_type": error_type}
+        with self.log_path.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(record, ensure_ascii=True) + "\n")
+
+
 class LocalOpenCVFaceDetector:
     """Lazy, local OpenCV detector. Coordinates use the EXIF-oriented image."""
 
     provider_id = "opencv-haar-frontal"
     model_revision = "1"
 
-    def __init__(self, interpreter_path: str | Path | None = None):
+    def __init__(self, interpreter_path: str | Path | None = None, runtime_client=None, log_path=None):
         self._cascade = None
         self.load_count = 0
         self.interpreter_path = str(interpreter_path or sys.executable)
+        self.runtime_client = runtime_client or ManagedFaceRuntimeClient(self.interpreter_path, log_path)
 
     @property
     def available(self) -> bool:
@@ -75,22 +143,12 @@ class LocalOpenCVFaceDetector:
         if cancel_event and cancel_event.is_set():
             return ()
         if Path(self.interpreter_path).resolve() != Path(sys.executable).resolve():
-            script = r'''import cv2,json,sys
-from PIL import Image,ImageOps
-import numpy as np
-image=np.asarray(ImageOps.exif_transpose(Image.open(sys.argv[1])).convert('RGB'))
-gray=cv2.cvtColor(image,cv2.COLOR_RGB2GRAY)
-p=cv2.data.haarcascades+'haarcascade_frontalface_default.xml'
-model=cv2.CascadeClassifier(p)
-assert not model.empty()
-print(json.dumps(model.detectMultiScale(gray,scaleFactor=1.1,minNeighbors=5,minSize=(24,24)).tolist()))'''
-            result = subprocess.run([self.interpreter_path, "-c", script, str(image_path)],
-                                    capture_output=True, text=True, timeout=120)
-            if result.returncode:
-                raise FaceModelUnavailable("The managed face runtime could not analyze this image.")
-            boxes = json.loads(result.stdout.strip().splitlines()[-1])
-            return tuple(FaceDetectionCandidate(BoundingBox(float(x), float(y), float(w), float(h)), .8)
-                         for x, y, w, h in boxes)
+            path = Path(image_path); response = self.runtime_client.invoke(
+                "detect", {"image_path": str(path)}, suffix=path.suffix,
+                size=path.stat().st_size if path.is_file() else 0)
+            return tuple(FaceDetectionCandidate(BoundingBox(float(x["x"]), float(x["y"]),
+                                                              float(x["width"]), float(x["height"])), x.get("confidence"))
+                         for x in response.get("faces", ()))
         cv, numpy = _load_runtime()
         reader = QImageReader(str(image_path))
         reader.setAutoTransform(True)
@@ -148,26 +206,21 @@ class LocalFaceEmbeddingProvider:
     model_revision = "1"
     embedding_dimension = 128
 
-    def __init__(self, crop_cache: FaceCropCache | None = None, interpreter_path: str | Path | None = None):
+    def __init__(self, crop_cache: FaceCropCache | None = None, interpreter_path: str | Path | None = None,
+                 runtime_client=None, log_path=None):
         self.crop_cache = crop_cache or FaceCropCache()
         self.interpreter_path = str(interpreter_path or sys.executable)
+        self.runtime_client = runtime_client or ManagedFaceRuntimeClient(self.interpreter_path, log_path)
 
     def embed(self, image_path: Path, faces: Sequence[Face], cancel_event: Event | None = None) -> Sequence[FaceEmbedding]:
         if Path(self.interpreter_path).resolve() != Path(sys.executable).resolve():
             output = []
-            script = r'''import cv2,json,sys,numpy as np
-x=cv2.imread(sys.argv[1],cv2.IMREAD_GRAYSCALE)
-assert x is not None
-d=cv2.dct(cv2.resize(x,(32,32)).astype(np.float32)/255.0).flatten()[:128]
-n=float(np.linalg.norm(d)); assert np.isfinite(n) and n>0
-print(json.dumps((d/n).tolist()))'''
             for face in faces:
                 if cancel_event and cancel_event.is_set(): break
                 crop = self.crop_cache.create(image_path, face)
-                result = subprocess.run([self.interpreter_path, "-c", script, str(crop)],
-                                        capture_output=True, text=True, timeout=120)
-                if result.returncode: continue
-                vector = tuple(float(x) for x in json.loads(result.stdout.strip().splitlines()[-1]))
+                response = self.runtime_client.invoke("embed", {"crop_path": str(crop)}, suffix=crop.suffix,
+                                                      size=crop.stat().st_size if crop.is_file() else 0)
+                vector = tuple(float(x) for x in response["vector"])
                 output.append(FaceEmbedding(face.id, self.provider_id, self.model_id,
                                             self.model_revision, len(vector), vector,
                                             face.source_fingerprint))

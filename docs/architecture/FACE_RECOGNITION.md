@@ -90,3 +90,15 @@ per work item, while queue control, persistence, progress, pause, resume, and
 cancellation remain in the main application. No photo is uploaded. The Python
 3.14 application environment, system PATH, system Python, and MobileCLIP runtime
 remain unchanged.
+
+The managed boundary is the application-owned `faces/managed_worker.py` entry
+point. Each invocation receives an application-cache JSON request file and emits
+exactly one JSON response identifying success, an image-scoped failure, or a
+runtime-scoped failure. JPEG, PNG, and WebP are decoded with Pillow and corrected
+with `ImageOps.exif_transpose`; HEIC/HEIF is excluded by eligibility until the
+managed decoder has explicit support. Corrupt, missing, undecodable, or timed-out
+individual images increment the batch failure count and do not change runtime
+Ready state. Missing interpreters, process-start failures, invalid protocol,
+OpenCV import failures, and cascade failures mark the runtime Needs repair.
+Technical invocation logs include executable, worker, return code, stdout,
+stderr, timeout, suffix, size, and error type, but omit source-photo paths.

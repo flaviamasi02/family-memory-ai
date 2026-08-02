@@ -75,13 +75,21 @@ class FaceProcessingWorker(QObject):
                 current = str(getattr(photo, "filename", "") or getattr(photo, "path", ""))
                 try:
                     self._process_photo(photo)
+                    metadata = dict(getattr(photo, "metadata", {}) or {})
+                    metadata.pop("face_processing_failure", None); photo.metadata = metadata
                     count = len(self.repository.faces_for_image(self._image_id(photo)))
                     faces_found += count
                     no_faces += int(count == 0)
                 except FaceModelUnavailable:
                     raise
-                except Exception:
+                except Exception as exc:
                     failures += 1
+                    metadata = dict(getattr(photo, "metadata", {}) or {})
+                    metadata["face_processing_failure"] = {
+                        "code": str(getattr(exc, "code", "image_processing_failed")),
+                        "message": str(exc),
+                    }
+                    photo.metadata = metadata
                 processed += 1
                 progress = FaceScanProgress(total, processed, current, faces_found, no_faces,
                                             failures, total - processed, self._cancel.is_set())
