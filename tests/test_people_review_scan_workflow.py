@@ -98,6 +98,7 @@ def test_main_window_wires_scan_click_filters_inputs_and_updates_immediately(tmp
     monkeypatch.setattr(MainWindow, "_start_face_processing", lambda self, photos: received.append(list(photos)))
     window = MainWindow()
     window.people_review_page.set_photos([eligible, excluded])
+    window.people_review_page.set_runtime_ready(True)
 
     window.people_review_page.scan_button.click(); app.processEvents()
 
@@ -114,6 +115,7 @@ def test_progress_and_control_states_are_explained_to_owner(tmp_path):
     from ui.people_review_page import PeopleReviewPage
     from workers.face_processing_worker import FaceScanProgress
     page = PeopleReviewPage(SQLiteFaceRepository(tmp_path / "faces.sqlite3"))
+    page.set_runtime_ready(True)
     page.show_scan_progress(FaceScanProgress(10, 4, "photo.jpg", 3, 1, 0, 6))
     assert "Processed: 4" in page.progress_label.text()
     assert "Faces found: 3" in page.progress_label.text()
@@ -123,3 +125,20 @@ def test_progress_and_control_states_are_explained_to_owner(tmp_path):
     assert "cancelled safely" in page.progress_label.text()
     assert page.scan_button.isEnabled()
     app.processEvents()
+
+
+def test_missing_runtime_navigates_to_settings_and_ready_update_needs_no_restart(tmp_path, monkeypatch):
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow()
+    page = window.people_review_page
+    page.set_runtime_ready(False)
+    assert not page.scan_button.isEnabled()
+    assert not page.open_runtime_settings_button.isHidden()
+
+    page.open_runtime_settings_button.click(); app.processEvents()
+    assert window.tabs.currentWidget() is window.settings_page
+
+    window.settings_page.face_runtime_ready_changed.emit(True); app.processEvents()
+    assert page.scan_button.isEnabled()
+    assert not page.open_runtime_settings_button.isVisible()
+    window.close()

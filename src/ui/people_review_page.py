@@ -25,6 +25,7 @@ class PeopleReviewPage(QWidget):
     pause_requested = Signal()
     resume_requested = Signal()
     cancel_requested = Signal()
+    runtime_settings_requested = Signal()
 
     def __init__(self, repository: SQLiteFaceRepository | None = None, parent=None):
         super().__init__(parent)
@@ -43,6 +44,9 @@ class PeopleReviewPage(QWidget):
         layout.addWidget(self.info_panel)
         layout.addWidget(QLabel("Face processing happens locally on this computer. Photos are never uploaded, and no identity is claimed without your confirmation."))
         self.progress_label = QLabel("Choose Scan eligible photos for faces to begin."); layout.addWidget(self.progress_label)
+        self.open_runtime_settings_button = QPushButton("Open Face Runtime Settings")
+        self.open_runtime_settings_button.clicked.connect(self.runtime_settings_requested.emit)
+        layout.addWidget(self.open_runtime_settings_button)
         controls = QHBoxLayout()
         self.scan_button = QPushButton("Scan eligible photos for faces")
         self.pause_button = QPushButton("Pause")
@@ -54,7 +58,8 @@ class PeopleReviewPage(QWidget):
                                (self.rebuild_button, self.refresh)):
             button.clicked.connect(signal); controls.addWidget(button)
         layout.addLayout(controls)
-        self.set_scan_state("idle")
+        self._runtime_ready = False
+        self.set_runtime_ready(False)
         actions = QHBoxLayout()
         self.profiles_button = QPushButton("Create suggested family profiles")
         self.profiles_button.clicked.connect(self._create_suggested_profiles); actions.addWidget(self.profiles_button)
@@ -69,7 +74,8 @@ class PeopleReviewPage(QWidget):
         self._photos = list(photos or [])
         eligible = sum(face_processing_eligibility(p).eligible for p in self._photos)
         excluded = len(self._photos) - eligible
-        self.progress_label.setText(f"Eligible photos: {eligible} | Excluded photos: {excluded} | Scan has not started automatically.")
+        suffix = "Scan has not started automatically." if self._runtime_ready else "Face recognition runtime is not installed."
+        self.progress_label.setText(f"Eligible photos: {eligible} | Excluded photos: {excluded} | {suffix}")
 
     def _scan(self) -> None:
         eligible = [p for p in self._photos if face_processing_eligibility(p).eligible]
@@ -79,10 +85,19 @@ class PeopleReviewPage(QWidget):
 
     def set_scan_state(self, state: str) -> None:
         active, paused = state in {"running", "paused"}, state == "paused"
-        self.scan_button.setEnabled(not active)
+        self.scan_button.setEnabled(not active and self._runtime_ready)
         self.pause_button.setEnabled(state == "running")
         self.resume_button.setEnabled(paused)
         self.cancel_button.setEnabled(active)
+
+    def set_runtime_ready(self, ready: bool) -> None:
+        self._runtime_ready = bool(ready)
+        self.open_runtime_settings_button.setVisible(not ready)
+        if not ready:
+            self.progress_label.setText("Face recognition runtime is not installed.")
+        elif "runtime is not installed" in self.progress_label.text():
+            self.progress_label.setText("Face recognition runtime is ready. Choose Scan eligible photos for faces to begin.")
+        self.set_scan_state("idle")
 
     def show_scan_progress(self, progress) -> None:
         self.progress_label.setText(
@@ -100,8 +115,8 @@ class PeopleReviewPage(QWidget):
         )
 
     def show_scan_unavailable(self, message: str) -> None:
-        self.set_scan_state("idle")
-        self.progress_label.setText(message)
+        self.set_runtime_ready(False)
+        self.progress_label.setText(f"Face recognition runtime is not available. {message}")
 
     def refresh(self) -> None:
         self.clusters.clear()

@@ -58,6 +58,8 @@ from ui.components.workspace_header import WorkspaceHeader
 from ui.components.workspace_info_content import WORKSPACE_INFO_CONTENT
 from ui.components.workspace_info_panel import WorkspaceInfoPanel
 from ui.help.workspace_help_content import SETTINGS_WORKSPACE
+from faces.runtime import FaceRuntimeManager
+from workers.face_runtime_worker import FaceRuntimeWorker
 
 
 logger = logging.getLogger(__name__)
@@ -69,6 +71,7 @@ class SettingsPage(QWidget):
     help_requested = Signal(str)
     mobileclip_evaluation_requested = Signal(object)
     runtime_operation_finished = Signal(str)
+    face_runtime_ready_changed = Signal(bool)
 
     WORKSPACE_ID = SETTINGS_WORKSPACE
 
@@ -77,6 +80,7 @@ class SettingsPage(QWidget):
         parent=None,
         runtime_manager: AIRuntimeManager | None = None,
         application_services: ApplicationServices | None = None,
+        face_runtime_manager: FaceRuntimeManager | None = None,
     ):
         t0 = time.perf_counter()
         super().__init__(parent)
@@ -86,6 +90,9 @@ class SettingsPage(QWidget):
         self._last_source_result: EvaluationSourceResult | None = None
         self.ai_runtime_manager = runtime_manager or create_default_runtime_manager()
         self.application_services = application_services or build_application_services()
+        self.face_runtime_manager = face_runtime_manager or FaceRuntimeManager()
+        self._face_runtime_thread = None
+        self._face_runtime_worker = None
         self._last_installation_plan: AIRuntimeInstallationPlan | None = None
         self._active_runtime_thread: QThread | None = None
         self._active_runtime_worker: AIRuntimeOperationWorker | None = None
@@ -131,6 +138,7 @@ class SettingsPage(QWidget):
         self.delete_face_analysis_button = QPushButton("Delete all face analysis data…")
         self.delete_face_analysis_button.clicked.connect(self._delete_face_analysis)
         root.addWidget(self.delete_face_analysis_button)
+        self._build_face_runtime_section(root)
         self._build_developer_diagnostics(root)
         page_layout.addWidget(self.settings_scroll_area, 1)
         self.settings_scroll_area.setWidget(self.settings_scroll_content)
@@ -277,6 +285,110 @@ class SettingsPage(QWidget):
         self._refresh_source_summary()
         logger.info("SettingsPage construction %.1f ms", (time.perf_counter() - t0) * 1000)
         root.addStretch(1)
+
+    def _build_face_runtime_section(self, root: QVBoxLayout) -> None:
+        self.face_runtime_title = QLabel("Face Recognition Runtime")
+        self.face_runtime_title.setStyleSheet("font-size: 16px; font-weight: 700;")
+        self.face_runtime_card = QFrame(); self.face_runtime_card.setFrameShape(QFrame.Shape.StyledPanel)
+        layout = QVBoxLayout(self.face_runtime_card)
+        self.face_runtime_labels = {}
+        grid = QGridLayout()
+        for row, key in enumerate(("Runtime status", "Installed version", "Detector backend", "Model version",
+                                   "Install location", "Last verification", "Last error")):
+            grid.addWidget(QLabel(f"{key}:"), row, 0)
+            value = QLabel("checking…"); value.setWordWrap(True); grid.addWidget(value, row, 1)
+            self.face_runtime_labels[key] = value
+        layout.addLayout(grid)
+        actions = QHBoxLayout()
+        self.face_runtime_install_button = QPushButton("Install")
+        self.face_runtime_verify_button = QPushButton("Verify")
+        self.face_runtime_repair_button = QPushButton("Repair")
+        self.face_runtime_remove_button = QPushButton("Remove")
+        self.face_runtime_logs_button = QPushButton("View Logs")
+        self.face_runtime_folder_button = QPushButton("Open Runtime Folder")
+        for button in (self.face_runtime_install_button, self.face_runtime_verify_button,
+                       self.face_runtime_repair_button, self.face_runtime_remove_button,
+                       self.face_runtime_logs_button, self.face_runtime_folder_button):
+            actions.addWidget(button)
+        layout.addLayout(actions)
+        self.face_runtime_progress = QProgressBar(); self.face_runtime_progress.setRange(0, 100)
+        self.face_runtime_message = QLabel("Face recognition is optional and is never installed automatically.")
+        self.face_runtime_message.setWordWrap(True)
+        self.face_runtime_technical_details = QTextEdit(); self.face_runtime_technical_details.setReadOnly(True)
+        self.face_runtime_technical_details.setMaximumHeight(100); self.face_runtime_technical_details.hide()
+        layout.addWidget(self.face_runtime_progress); layout.addWidget(self.face_runtime_message)
+        layout.addWidget(self.face_runtime_technical_details)
+        root.addWidget(self.face_runtime_title); root.addWidget(self.face_runtime_card)
+        self.face_runtime_install_button.clicked.connect(lambda: self._confirm_face_runtime_operation("install"))
+        self.face_runtime_verify_button.clicked.connect(lambda: self._start_face_runtime_operation("verify"))
+        self.face_runtime_repair_button.clicked.connect(lambda: self._confirm_face_runtime_operation("repair"))
+        self.face_runtime_remove_button.clicked.connect(lambda: self._confirm_face_runtime_operation("remove"))
+        self.face_runtime_logs_button.clicked.connect(self._show_face_runtime_logs)
+        self.face_runtime_folder_button.clicked.connect(lambda: self._open_folder(self.face_runtime_manager.root))
+        self.refresh_face_runtime_status()
+
+    def refresh_face_runtime_status(self) -> None:
+        status = self.face_runtime_manager.status()
+        values = {"Runtime status": status.state, "Installed version": status.installed_version,
+                  "Detector backend": status.detector_backend, "Model version": status.model_version,
+                  "Install location": status.install_location, "Last verification": status.last_verification,
+                  "Last error": status.last_error}
+        for key, value in values.items(): self.face_runtime_labels[key].setText(value)
+        busy = self._face_runtime_thread is not None
+        self.face_runtime_install_button.setEnabled(not busy and not status.ready)
+        self.face_runtime_verify_button.setEnabled(not busy and status.state != "Not installed")
+        self.face_runtime_repair_button.setEnabled(not busy)
+        self.face_runtime_remove_button.setEnabled(not busy and status.state != "Not installed")
+        self.face_runtime_ready_changed.emit(status.ready)
+
+    def _confirm_face_runtime_operation(self, operation: str) -> None:
+        descriptions = {
+            "install": "Install the local face recognition runtime into the application Python environment? No photos are uploaded.",
+            "repair": "Repair the local face recognition runtime by reinstalling its managed packages?",
+            "remove": "Remove the managed face detector runtime? Existing face-analysis data is preserved until separately deleted.",
+        }
+        if QMessageBox.question(self, f"{operation.title()} Face Runtime", descriptions[operation]) != QMessageBox.StandardButton.Yes:
+            return
+        self._start_face_runtime_operation(operation)
+
+    def _start_face_runtime_operation(self, operation: str) -> None:
+        if self._face_runtime_thread is not None: return
+        thread = QThread(self); worker = FaceRuntimeWorker(self.face_runtime_manager, operation)
+        worker.moveToThread(thread); thread.started.connect(worker.run)
+        worker.progress.connect(self._on_face_runtime_progress)
+        worker.completed.connect(self._on_face_runtime_completed)
+        worker.failed.connect(self._on_face_runtime_failed)
+        worker.finished.connect(thread.quit); worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater); thread.finished.connect(self._clear_face_runtime_operation)
+        self._face_runtime_thread, self._face_runtime_worker = thread, worker
+        self.face_runtime_message.setText(f"{operation.title()} in progress…")
+        self.face_runtime_progress.setValue(0); self.refresh_face_runtime_status(); thread.start()
+
+    def _on_face_runtime_progress(self, value: int, message: str) -> None:
+        self.face_runtime_progress.setValue(value); self.face_runtime_message.setText(message)
+
+    def _on_face_runtime_completed(self, status) -> None:
+        self.face_runtime_progress.setValue(100); self.face_runtime_message.setText(
+            "Face recognition runtime is ready." if status.ready else "Face recognition runtime was removed."
+        )
+        self.refresh_face_runtime_status()
+
+    def _on_face_runtime_failed(self, message: str) -> None:
+        self.face_runtime_message.setText(f"Operation failed. Recommended action: check your connection, then choose Repair. Reason: {message}")
+        self.face_runtime_technical_details.setPlainText(message); self.face_runtime_technical_details.show()
+        self.refresh_face_runtime_status()
+
+    def _clear_face_runtime_operation(self) -> None:
+        self._face_runtime_thread = self._face_runtime_worker = None
+        self.refresh_face_runtime_status()
+
+    def _show_face_runtime_logs(self) -> None:
+        text = self.face_runtime_manager.log_path.read_text(encoding="utf-8", errors="replace") if self.face_runtime_manager.log_path.exists() else "No Face Runtime logs yet."
+        self.face_runtime_technical_details.setPlainText(text[-12000:]); self.face_runtime_technical_details.show()
+
+    def open_face_runtime_section(self) -> None:
+        self.settings_scroll_area.ensureWidgetVisible(self.face_runtime_card)
+        self.face_runtime_card.setFocus()
 
     def _build_developer_diagnostics(self, root: QVBoxLayout) -> None:
         self.developer_diagnostics_toggle = QPushButton("Developer Diagnostics")

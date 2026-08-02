@@ -182,6 +182,9 @@ class MainWindow(QMainWindow):
         self.people_review_page.pause_requested.connect(self._pause_face_processing)
         self.people_review_page.resume_requested.connect(self._resume_face_processing)
         self.people_review_page.cancel_requested.connect(self._cancel_face_processing)
+        self.people_review_page.runtime_settings_requested.connect(self._open_face_runtime_settings)
+        self.settings_page.face_runtime_ready_changed.connect(self.people_review_page.set_runtime_ready)
+        self.people_review_page.set_runtime_ready(self.settings_page.face_runtime_manager.status().ready)
 
         browser_page = QWidget()
         browser_layout = QVBoxLayout(browser_page)
@@ -279,6 +282,13 @@ class MainWindow(QMainWindow):
             face_thread.wait(250)
             if app is not None:
                 app.processEvents()
+        while True:
+            runtime_thread = getattr(getattr(self, "settings_page", None), "_face_runtime_thread", None)
+            if runtime_thread is None or not runtime_thread.isRunning():
+                break
+            runtime_thread.wait(250)
+            if app is not None:
+                app.processEvents()
         if app is not None:
             app.processEvents()
         super().closeEvent(event)
@@ -302,6 +312,12 @@ class MainWindow(QMainWindow):
         thread.finished.connect(thread.deleteLater)
         self.face_processing_thread, self.face_processing_worker = thread, worker
         thread.start()
+
+    def _open_face_runtime_settings(self) -> None:
+        settings_index = self.tabs.indexOf(self.settings_page)
+        if settings_index >= 0:
+            self.tabs.setCurrentIndex(settings_index)
+            QTimer.singleShot(0, self.settings_page.open_face_runtime_section)
 
     def _pause_face_processing(self) -> None:
         if self.face_processing_worker is not None:
