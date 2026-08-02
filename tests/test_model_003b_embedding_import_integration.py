@@ -829,9 +829,13 @@ def test_terminal_callback_exception_becomes_explicit_failure(monkeypatch):
 def test_import_state_machine_reaches_embedding_after_thumbnail_completion(monkeypatch):
     window = _embedding_window_for_lifecycle_tests()
     displayed = []
+    people_review_inputs = []
     thumbnail_inputs = []
     embedding_inputs = []
     window.photo_model = type("PhotoModel", (), {"set_photos": lambda self, photos: displayed.append(list(photos))})()
+    window.people_review_page = type(
+        "PeopleReviewPage", (), {"set_photos": lambda self, photos: people_review_inputs.append(list(photos))}
+    )()
     window._apply_browser_filter = lambda: None
     window._deferred_setup_cleanup_review = lambda: None
     window.start_thumbnail_loading = thumbnail_inputs.append
@@ -842,6 +846,7 @@ def test_import_state_machine_reaches_embedding_after_thumbnail_completion(monke
 
     assert window._import_phase == "Thumbnail generation"
     assert displayed == [["photo"]]
+    assert people_review_inputs == [["photo"]]
     assert thumbnail_inputs == [["photo"]]
     assert embedding_inputs == []
 

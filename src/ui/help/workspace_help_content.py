@@ -92,6 +92,8 @@ def build_workspace_help_definitions() -> list[WorkspaceHelpDefinition]:
                 ),
                 _workflow_section(["Start a local scan", "Review unnamed clusters", "Create or select a person", "Confirm an assignment", "Correct false detections"]),
                 _best_practices_section(["Treat faces as sensitive data.", "Use several varied examples before trusting a suggestion.", "Exclude non-photo sources and delete analysis data from Settings when no longer wanted."]),
+                _tips_section([WorkspaceHelpTip(title="Privacy tip", body="Face processing stays local and every identity requires your confirmation.")]),
+                _ai_status_section([WorkspaceAIStatusMetric("People Recognition", 45, "Owner-confirmed local face review")]),
             ),
         ),
         WorkspaceHelpDefinition(

@@ -473,7 +473,9 @@ class MainWindow(QMainWindow):
         # regardless of library size.
         t0 = time.perf_counter()
         self._all_photos = list(photos or [])
-        self.people_review_page.set_photos(self._all_photos)
+        people_review_page = getattr(self, "people_review_page", None)
+        if people_review_page is not None:
+            people_review_page.set_photos(self._all_photos)
         active_photos = [photo for photo in self._all_photos if self._is_active_photo(photo)]
         self.photo_model.set_photos(active_photos)
         self._apply_browser_filter()
@@ -885,7 +887,9 @@ class MainWindow(QMainWindow):
 
     def load_photos(self, photos):
         self._all_photos = list(photos or [])
-        self.people_review_page.set_photos(self._all_photos)
+        people_review_page = getattr(self, "people_review_page", None)
+        if people_review_page is not None:
+            people_review_page.set_photos(self._all_photos)
         active = [photo for photo in self._all_photos if self._is_active_photo(photo)]
         self.photo_model.set_photos(active)
         self._apply_browser_filter()

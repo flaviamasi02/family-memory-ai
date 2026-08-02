@@ -9,6 +9,9 @@ from PySide6.QtWidgets import (QHBoxLayout, QLabel, QListWidget, QMessageBox,
 from faces.eligibility import face_processing_eligibility
 from faces.persistence import SQLiteFaceRepository
 from faces.processing import FaceCropCache
+from ui.components.workspace_header import WorkspaceHeader
+from ui.components.workspace_info_content import WORKSPACE_INFO_CONTENT
+from ui.components.workspace_info_panel import WorkspaceInfoPanel
 
 
 SUGGESTED_PROFILES = ("Flavia", "Miguel", "Luis", "Patrizia", "Cleto", "Fiorenza",
@@ -28,9 +31,16 @@ class PeopleReviewPage(QWidget):
         self.repository = repository or SQLiteFaceRepository()
         self._photos = []
         layout = QVBoxLayout(self)
-        title = QHBoxLayout(); title.addWidget(QLabel("<h2>People Review</h2>")); title.addStretch()
-        help_button = QPushButton("Help"); help_button.clicked.connect(lambda: self.help_requested.emit(self.WORKSPACE_ID)); title.addWidget(help_button)
-        layout.addLayout(title)
+        self.header = WorkspaceHeader("People Review")
+        self.header.help_clicked.connect(lambda: self.help_requested.emit(self.WORKSPACE_ID))
+        layout.addWidget(self.header)
+        info = WORKSPACE_INFO_CONTENT[self.WORKSPACE_ID]
+        self.info_panel = WorkspaceInfoPanel(
+            workspace_id=self.WORKSPACE_ID, title=info.title, purpose=info.purpose,
+            purpose_details=info.purpose_details, typical_actions=info.typical_actions,
+            tip=info.tip, collapsed_label=info.collapsed_label,
+        )
+        layout.addWidget(self.info_panel)
         layout.addWidget(QLabel("Face processing happens locally on this computer. Photos are never uploaded, and no identity is claimed without your confirmation."))
         self.progress_label = QLabel("Choose Scan eligible photos for faces to begin."); layout.addWidget(self.progress_label)
         controls = QHBoxLayout()
@@ -89,4 +99,3 @@ class PeopleReviewPage(QWidget):
             QMessageBox.StandardButton.Cancel)
         if answer != QMessageBox.StandardButton.Yes: return False
         self.repository.clear_face_analysis(); FaceCropCache().clear(); self.refresh(); return True
-
