@@ -1210,7 +1210,15 @@ class IrrelevantMediaPage(QWidget):
             self.alternatives_list.addItem(f"{label} ({score}%)")
         self._refresh_alternatives_visibility(row.confidence < 0.80)
 
-        pixmap = self._thumbnail_for_photo(photo, (320, 220), allow_original_decode=True)
+        # Trash History auto-selects its first card during a view switch.  A
+        # history cache miss must keep both card and detail preview on their
+        # placeholders until the existing background thumbnail worker replies;
+        # otherwise automatic selection decodes the moved original on the UI
+        # thread (and can do so more than once during selection reconciliation).
+        allow_original_decode = self.view_combo.currentData() != "history"
+        pixmap = self._thumbnail_for_photo(
+            photo, (320, 220), allow_original_decode=allow_original_decode
+        )
         if isinstance(pixmap, QPixmap) and not pixmap.isNull():
             self.preview_label.setPixmap(pixmap)
             self.preview_label.setText("")

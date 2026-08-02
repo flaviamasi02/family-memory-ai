@@ -721,6 +721,14 @@ class IrrelevantMediaPageTests(unittest.TestCase):
             card = page.thumbnail_grid._cards_by_key.get(str(moved.path))
             self.assertIsNotNone(card)
             self.assertFalse(card.thumbnail_label.pixmap().isNull())
+            placeholder_key = card.thumbnail_label.pixmap().cacheKey()
+            page._trigger_refresh(force=True); self._flush_ui()
+            self.assertEqual(requested, [moved], "refresh must not queue a duplicate history request")
+            background_thumbnail = QPixmap(40, 40)
+            background_thumbnail.fill(Qt.GlobalColor.cyan)
+            page.update_thumbnail(moved, background_thumbnail); self._flush_ui()
+            self.assertNotEqual(card.thumbnail_label.pixmap().cacheKey(), placeholder_key)
+            self.assertEqual(page.preview_label.pixmap().cacheKey(), background_thumbnail.cacheKey())
 
     def test_cleanup_review_grid_renders_multiple_columns_when_wide(self):
         with tempfile.TemporaryDirectory() as tmpdir:
