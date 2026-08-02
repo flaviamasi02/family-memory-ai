@@ -256,7 +256,9 @@ class PhotoRepository:
         rows = connection.execute(
             "SELECT p.photo_id,p.trash_workflow_state,p.is_active,p.trash_proposal_confidence,"
             "p.trash_proposal_source,p.trash_proposal_explanation,h.source_path,h.destination_path,"
-            "h.error,h.created_at FROM photos p JOIN trash_history h ON h.trash_history_id=("
+            "h.error,h.created_at,l.modified_time_ns,l.file_size FROM photos p "
+            "LEFT JOIN photo_locations l ON l.location_id=p.preferred_location_id "
+            "JOIN trash_history h ON h.trash_history_id=("
             "SELECT h2.trash_history_id FROM trash_history h2 WHERE h2.photo_id=p.photo_id "
             "ORDER BY h2.created_at DESC,h2.trash_history_id DESC LIMIT 1) "
             "WHERE p.library_id=? AND p.trash_workflow_state IS NOT NULL ORDER BY h.created_at DESC",
@@ -264,7 +266,7 @@ class PhotoRepository:
         ).fetchall()
         keys = ("photo_id", "trash_workflow_state", "is_active", "trash_proposal_confidence",
                 "trash_proposal_source", "trash_proposal_explanation", "source_path",
-                "destination_path", "error", "created_at")
+                "destination_path", "error", "created_at", "modified_time_ns", "file_size")
         return [dict(zip(keys, row)) for row in rows]
     def get_location(self, relative_path: str | Path, *, connection=None) -> PhotoLocationRecord | None:
         key = normalise_relative_path(relative_path)

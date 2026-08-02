@@ -46,6 +46,7 @@ from ui.settings_page import SettingsPage
 from workers.embedding_worker import EmbeddingWorker
 from storage.photo_repository import PhotoRepository
 from core.trash_workflow_service import TrashRecord
+from cache.thumbnail_cache import get_thumbnail_cache_path_for_identity
 from vision.batch_embedding_service import embedding_failure_diagnostic_lines
 from vision.batch_embedding_service import BatchEmbeddingService
 from vision.managed_mobileclip_provider import ManagedMobileCLIPEmbeddingProvider
@@ -158,6 +159,7 @@ class MainWindow(QMainWindow):
         self.irrelevant_media_page.categories_changed.connect(self._sync_cleanup_category_options)
         self.irrelevant_media_page.moved_photos.connect(self._handle_irrelevant_media_moved)
         self.irrelevant_media_page.active_state_changed.connect(self._handle_trash_active_state_changed)
+        self.irrelevant_media_page.history_thumbnails_requested.connect(self.start_thumbnail_loading)
         self.irrelevant_media_page.faces_analyzed.connect(self._handle_faces_analyzed)
         self.settings_page = SettingsPage(
             runtime_manager=self.ai_runtime_manager,
@@ -906,6 +908,13 @@ class MainWindow(QMainWindow):
                 photo.metadata["trash_destination_path"] = str(item.get("destination_path") or "")
                 photo.metadata["trash_moved_at"] = str(item.get("created_at") or "")
                 photo.metadata["trash_move_error"] = str(item.get("error") or "")
+                cached = get_thumbnail_cache_path_for_identity(
+                    str(item.get("source_path") or ""), int(item.get("modified_time_ns") or 0),
+                    int(item.get("file_size") or 0),
+                )
+                if cached.is_file():
+                    photo.thumbnail_path = str(cached)
+                    photo.metadata["thumbnail_path"] = str(cached)
                 irrelevant.append(photo)
         self.irrelevant_media_page.set_photos(
             irrelevant,

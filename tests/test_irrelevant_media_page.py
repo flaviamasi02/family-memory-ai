@@ -647,6 +647,9 @@ class IrrelevantMediaPageTests(unittest.TestCase):
             page.view_combo.setCurrentIndex(page.view_combo.findData("history"))
             self._flush_ui()
             self.assertIn("confirmed.jpg", page.visible_filenames())
+            card = page.thumbnail_grid._cards_by_key.get(str(photo.path))
+            self.assertIsNotNone(card)
+            self.assertFalse(card.thumbnail_label.pixmap().isNull())
             self.assertIn("Moved to Trash: 1", page.trash_counts_label.text())
             self.assertEqual(photo.metadata["is_active"], False)
 
@@ -696,6 +699,28 @@ class IrrelevantMediaPageTests(unittest.TestCase):
             self.assertEqual(page.trash_moved_at_value.text(), "2026-08-02T10:00:00+00:00")
             page.view_to_review_button.click(); self._flush_ui()
             self.assertEqual(page.visible_filenames(), ["active.jpg"])
+
+    def test_history_cache_miss_requests_background_thumbnail_from_current_trash_path(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            moved = self._make_photo(root, "current-trash.jpg", {
+                "is_active": False, "trash_workflow_state": "moved_to_trash",
+                "trash_original_path": str(root / "missing-original.jpg"),
+                "trash_destination_path": str(root / "current-trash.jpg"),
+            })
+            moved.thumbnail = None
+            moved.thumbnail_path = ""
+            requested = []
+            page = IrrelevantMediaPage(); page.set_photos([moved], root)
+            page.history_thumbnails_requested.connect(lambda photos: requested.extend(photos))
+            with patch("ui.irrelevant_media_page.load_display_thumbnail") as synchronous_decode:
+                page.view_history_button.click(); self._flush_ui()
+            self.assertEqual(requested, [moved])
+            self.assertEqual(requested[0].path, root / "current-trash.jpg")
+            synchronous_decode.assert_not_called()
+            card = page.thumbnail_grid._cards_by_key.get(str(moved.path))
+            self.assertIsNotNone(card)
+            self.assertFalse(card.thumbnail_label.pixmap().isNull())
 
     def test_cleanup_review_grid_renders_multiple_columns_when_wide(self):
         with tempfile.TemporaryDirectory() as tmpdir:

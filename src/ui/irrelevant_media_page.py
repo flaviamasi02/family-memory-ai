@@ -32,6 +32,7 @@ from core.image_display_loader import load_display_thumbnail
 from core.media_classifier import MediaCategory, MediaClassifier
 from core.safe_file_move_service import CLEANUP_REVIEW_FOLDER_NAME, move_files_to_cleanup_review
 from core.trash_workflow_service import TrashRecord, TrashWorkflowService
+from cache.thumbnail_cache import get_thumbnail_cache_path, preserve_thumbnail_for_relocation
 from core.user_metadata_service import UserMetadataService
 from learning.category_learning_engine import get_category_learning_engine
 from learning.preference_learning_engine import get_preference_learning_engine
@@ -79,6 +80,7 @@ class IrrelevantMediaPage(QWidget):
     faces_analyzed = Signal(object)
     help_requested = Signal(str)
     active_state_changed = Signal(object)
+    history_thumbnails_requested = Signal(object)
 
     WORKSPACE_ID = CLEANUP_REVIEW_WORKSPACE
 
@@ -405,6 +407,8 @@ class IrrelevantMediaPage(QWidget):
         self._reload_category_selector_options()
         self._refresh_group_options()
         self._trigger_refresh(force=True)
+        if view == "history":
+            self._request_missing_history_thumbnails()
 
     def _select_cleanup_view(self, view: str) -> None:
         current = str(self.view_combo.currentData() or "review")
@@ -425,6 +429,17 @@ class IrrelevantMediaPage(QWidget):
         view = str(self.view_combo.currentData() or "review")
         self._sync_visible_view_switch(view)
         self._trigger_refresh(force=True)
+        if view == "history":
+            self._request_missing_history_thumbnails()
+
+    def _request_missing_history_thumbnails(self) -> None:
+        missing = []
+        for row in self._visible_rows:
+            if self._thumbnail_for_photo(row.photo, (140, 140)) is None:
+                row.photo.metadata["thumbnail_history_requested"] = True
+                missing.append(row.photo)
+        if missing:
+            self.history_thumbnails_requested.emit(missing)
 
     def _sync_visible_view_switch(self, view: str) -> None:
         self.view_to_review_button.setChecked(view == "review")
@@ -819,6 +834,9 @@ class IrrelevantMediaPage(QWidget):
             for row in rows:
                 key = str(getattr(row.photo, "id", "") or self._photo_key(row.photo))
                 record = by_id[key]
+                old_path = Path(row.photo.path)
+                old_card_key = self._photo_key(row.photo)
+                retained_card_thumbnail = self._thumbnail_cache.get(old_card_key)
                 row.photo.metadata["trash_workflow_state"] = record.state
                 row.photo.metadata["is_active"] = record.state != "moved_to_trash"
                 row.photo.metadata.setdefault("trash_original_path", record.source_path)
@@ -829,6 +847,16 @@ class IrrelevantMediaPage(QWidget):
                     row.photo.metadata["trash_moved_at"] = record.history[-1].get("timestamp", "")
                 if record.state == "moved_to_trash":
                     row.photo.path = Path(record.destination_path)
+                    preserve_thumbnail_for_relocation(
+                        str(old_path), int(getattr(row.photo, "modified_time_ns", 0) or 0),
+                        int(getattr(row.photo, "file_size", 0) or 0), str(row.photo.path),
+                    )
+                    moved_cache = get_thumbnail_cache_path(str(row.photo.path))
+                    if moved_cache.is_file():
+                        row.photo.thumbnail_path = str(moved_cache)
+                        row.photo.metadata["thumbnail_path"] = str(moved_cache)
+                    if retained_card_thumbnail is not None:
+                        self._thumbnail_cache[self._photo_key(row.photo)] = retained_card_thumbnail
                 self._save_photo_user_metadata(row.photo)
             if result.moved_count == 0 and result.failed_count:
                 message, state = "No photos were moved. Review the error details.", "error"
@@ -1552,6 +1580,9 @@ class IrrelevantMediaPage(QWidget):
         return None
 
     def _photo_key(self, photo) -> str:
+        metadata = getattr(photo, "metadata", {}) or {}
+        if metadata.get("trash_workflow_state") and getattr(photo, "id", None):
+            return f"photo:{photo.id}"
         return str(getattr(photo, "path", ""))
 
     def _thumbnail_for_photo(self, photo, target_size, *, allow_original_decode: bool = False) -> Optional[QPixmap]:
