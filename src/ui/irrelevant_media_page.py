@@ -140,20 +140,8 @@ class IrrelevantMediaPage(QWidget):
 
         self.selection_count_label = QLabel("Selected: 0")
         self.user_saved_label = QLabel("")
-        self.user_saved_label.setWordWrap(True)
-        self.user_saved_label.setMinimumHeight(30)
-        self.user_saved_label.setStyleSheet(
-            "font-size: 13px; font-weight: 600; color: #1f6feb; "
-            "background: #eef6ff; border: 1px solid #b6d4fe; "
-            "border-radius: 4px; padding: 5px 8px;"
-        )
+        self.user_saved_label.setStyleSheet("font-size: 12px; color: #1f6feb;")
         self.user_saved_label.setVisible(False)
-        self._user_message_timer = QTimer(self)
-        self._user_message_timer.setSingleShot(True)
-        self._user_message_timer.setInterval(8000)
-        self._user_message_timer.timeout.connect(self.user_saved_label.hide)
-        self._last_user_message = ""
-        self._user_message_show_count = 0
         self.select_all_button = QPushButton("Select All Visible")
         self.select_all_button.clicked.connect(self.select_all_visible)
         self.clear_selection_button = QPushButton("Clear Selection")
@@ -180,6 +168,7 @@ class IrrelevantMediaPage(QWidget):
         toolbar.addWidget(QLabel("Search:"))
         toolbar.addWidget(self.search_input, 1)
         toolbar.addWidget(self.selection_count_label)
+        toolbar.addWidget(self.user_saved_label)
         toolbar.addWidget(self.manage_categories_button)
         toolbar.addWidget(self.reclassify_unknowns_button)
         toolbar.addWidget(self.analyze_faces_button)
@@ -234,6 +223,18 @@ class IrrelevantMediaPage(QWidget):
         self.category_selector = QComboBox()
         self.apply_category_button = QPushButton("Apply Category to Selected")
         self.apply_category_button.clicked.connect(lambda: self._apply_category_to_selected(str(self.category_selector.currentData() or "unknown")))
+        self.category_action_status_label = QLabel("")
+        self.category_action_status_label.setObjectName("cleanupCategoryActionStatus")
+        self.category_action_status_label.setAccessibleName("Category action status")
+        self.category_action_status_label.setWordWrap(True)
+        self.category_action_status_label.setMinimumHeight(30)
+        self.category_action_status_label.setVisible(False)
+        self._category_status_timer = QTimer(self)
+        self._category_status_timer.setSingleShot(True)
+        self._category_status_timer.setInterval(8000)
+        self._category_status_timer.timeout.connect(self.category_action_status_label.hide)
+        self._last_category_status = ""
+        self._category_status_show_count = 0
 
         actions_row_one = QHBoxLayout()
         actions_row_one.addWidget(self.keep_button)
@@ -254,6 +255,7 @@ class IrrelevantMediaPage(QWidget):
         details_layout.addWidget(self.alternatives_list)
         details_layout.addLayout(actions_row_one)
         details_layout.addLayout(actions_row_two)
+        details_layout.addWidget(self.category_action_status_label)
         details_layout.addStretch(0)
 
         details_panel = QWidget()
@@ -263,7 +265,6 @@ class IrrelevantMediaPage(QWidget):
         grid_panel = QWidget()
         grid_layout = QVBoxLayout(grid_panel)
         grid_layout.setContentsMargins(0, 0, 0, 0)
-        grid_layout.addWidget(self.user_saved_label)
         grid_layout.addWidget(self.results_label)
         grid_layout.addWidget(self.thumbnail_grid, 1)
 
@@ -894,13 +895,13 @@ class IrrelevantMediaPage(QWidget):
         started = time.perf_counter()
         self._bulk_category_in_progress = True
         self.apply_category_button.setEnabled(False)
-        self._user_message_timer.stop()
+        self._category_status_timer.stop()
         busy_noun = "photo" if len(selected_rows) == 1 else "photos"
-        self.user_saved_label.setText(
-            f"Applying category to {len(selected_rows)} {busy_noun}..."
+        self._set_category_action_status(
+            f"Applying category to {len(selected_rows)} {busy_noun}...",
+            state="busy",
+            auto_hide=False,
         )
-        self.user_saved_label.setStyleSheet(self._user_message_style(error=False))
-        self.user_saved_label.setVisible(True)
 
         affected_keys = [self._photo_key(row.photo) for row in selected_rows]
         preferred_key = self.thumbnail_grid.selected_key() or (affected_keys[0] if affected_keys else None)
@@ -963,23 +964,6 @@ class IrrelevantMediaPage(QWidget):
             self._build_row(row.photo) if self._photo_key(row.photo) in successful_key_set else row
             for row in self._rows
         ]
-        if failures == len(selected_rows):
-            noun = "photo" if len(selected_rows) == 1 else "photos"
-            self._show_user_saved_indicator(
-                f"Category could not be applied to {len(selected_rows)} {noun}.",
-                error=True,
-            )
-        elif failures:
-            self._show_user_saved_indicator(
-                f"Category applied to {len(successful_rows)} of {len(selected_rows)} photos. "
-                f"{failures} could not be updated.",
-                error=True,
-            )
-        else:
-            noun = "photo" if len(successful_rows) == 1 else "photos"
-            self._show_user_saved_indicator(
-                f"Category applied to {len(successful_rows)} {noun}."
-            )
         self._refresh_group_options()
         ui_started = time.perf_counter()
         self._refresh_after_category_change(
@@ -988,6 +972,23 @@ class IrrelevantMediaPage(QWidget):
             previous_visible_keys=previous_visible_keys,
             previous_scroll=previous_scroll,
         )
+        if failures == len(selected_rows):
+            self._set_category_action_status(
+                "Category could not be applied to the selected photos.",
+                state="error",
+            )
+        elif failures:
+            self._set_category_action_status(
+                f"Category applied to {len(successful_rows)} of {len(selected_rows)} photos. "
+                f"{failures} could not be updated.",
+                state="warning",
+            )
+        else:
+            noun = "photo" if len(successful_rows) == 1 else "photos"
+            self._set_category_action_status(
+                f"Category applied to {len(successful_rows)} {noun}.",
+                state="success",
+            )
         ui_ms = (time.perf_counter() - ui_started) * 1000
         rebuilds = int([self._photo_key(row.photo) for row in self._visible_rows] != previous_visible_keys)
         total_ms = (time.perf_counter() - started) * 1000
@@ -1257,28 +1258,35 @@ class IrrelevantMediaPage(QWidget):
 
         self._rows = [self._build_row(row.photo) for row in self._rows]
 
-    def _user_message_style(self, *, error: bool) -> str:
-        if error:
-            return (
-                "font-size: 13px; font-weight: 600; color: #9b1c1c; "
-                "background: #fff1f0; border: 1px solid #f1aeb5; "
-                "border-radius: 4px; padding: 5px 8px;"
-            )
-        return (
-            "font-size: 13px; font-weight: 600; color: #1f6feb; "
-            "background: #eef6ff; border: 1px solid #b6d4fe; "
-            "border-radius: 4px; padding: 5px 8px;"
-        )
-
-    def _show_user_saved_indicator(self, text: str, *, error: bool = False) -> None:
+    def _set_category_action_status(
+        self, text: str, *, state: str, auto_hide: bool = True
+    ) -> None:
+        styles = {
+            "success": ("#176b34", "#edf8f0", "#9dd5ad"),
+            "warning": ("#7a4d00", "#fff8e1", "#e8c66a"),
+            "error": ("#9b1c1c", "#fff1f0", "#f1aeb5"),
+            "busy": ("#1f6feb", "#eef6ff", "#b6d4fe"),
+        }
         text = str(text or "").strip()
         if not text:
             return
-        if text == self._last_user_message and not self.user_saved_label.isHidden():
+        if text == self._last_category_status and not self.category_action_status_label.isHidden():
             return
-        self._last_user_message = text
-        self._user_message_show_count += 1
+        self._last_category_status = text
+        self._category_status_show_count += 1
+        foreground, background, border = styles.get(state, styles["busy"])
+        self.category_action_status_label.setStyleSheet(
+            f"font-size: 13px; font-weight: 600; color: {foreground}; "
+            f"background: {background}; border: 1px solid {border}; "
+            "border-radius: 4px; padding: 5px 8px;"
+        )
+        self.category_action_status_label.setProperty("statusState", state)
+        self.category_action_status_label.setText(text)
+        self.category_action_status_label.setVisible(True)
+        if auto_hide:
+            self._category_status_timer.start()
+
+    def _show_user_saved_indicator(self, text: str) -> None:
         self.user_saved_label.setText(text)
-        self.user_saved_label.setStyleSheet(self._user_message_style(error=error))
         self.user_saved_label.setVisible(True)
-        self._user_message_timer.start()
+        QTimer.singleShot(2500, lambda: self.user_saved_label.setVisible(False))

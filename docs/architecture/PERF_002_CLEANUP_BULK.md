@@ -38,7 +38,8 @@ a claim about a particular user's disk or complete UI latency.
   currently displayed pixmap are all valid, so a later real thumbnail replaces
   the placeholder normally and an accidentally cleared label is repaired.
 - A duplicate category submission is ignored while the action is active, and a
-  concise busy/result banner is shown above the grid. Completion remains visible
+  dedicated busy/result status is shown directly below the category selector and
+  Apply button. Completion remains visible
   for eight seconds, distinguishes success, partial failure, and complete failure,
   and coalesces an immediately repeated identical completion. Widgets and the final refresh stay on the
   Qt UI thread. Sidecars remain synchronous because the current mutable Photo and

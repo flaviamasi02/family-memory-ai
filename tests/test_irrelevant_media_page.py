@@ -374,7 +374,7 @@ class IrrelevantMediaPageTests(unittest.TestCase):
             original_save = page._user_metadata_service.save_photo_metadata
 
             def save(photo_to_save):
-                labels_during_save.append(page.user_saved_label.text())
+                labels_during_save.append(page.category_action_status_label.text())
                 return original_save(photo_to_save)
 
             with patch.object(page._user_metadata_service, "save_photo_metadata", side_effect=save), \
@@ -382,12 +382,19 @@ class IrrelevantMediaPageTests(unittest.TestCase):
                 page._apply_category_to_selected("meme")
 
             self.assertEqual(labels_during_save, ["Applying category to 1 photo..."])
-            self.assertEqual(page.user_saved_label.text(), "Category applied to 1 photo.")
-            self.assertTrue(page.user_saved_label.isVisible())
+            self.assertEqual(page.category_action_status_label.text(), "Category applied to 1 photo.")
+            self.assertTrue(page.category_action_status_label.isVisible())
+            self.assertIsNotNone(page.category_action_status_label.parentWidget())
+            self.assertIs(
+                page.findChild(type(page.category_action_status_label), "cleanupCategoryActionStatus"),
+                page.category_action_status_label,
+            )
+            self.assertEqual(page.category_action_status_label.property("statusState"), "success")
             success_modal.assert_not_called()
+            page._trigger_refresh(force=True)
             self._flush_ui(wait_ms=100)
-            self.assertEqual(page.user_saved_label.text(), "Category applied to 1 photo.")
-            self.assertTrue(page.user_saved_label.isVisible())
+            self.assertEqual(page.category_action_status_label.text(), "Category applied to 1 photo.")
+            self.assertTrue(page.category_action_status_label.isVisible())
 
     def test_multi_photo_category_success_message_is_visible_and_deduplicated(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -403,12 +410,12 @@ class IrrelevantMediaPageTests(unittest.TestCase):
             page.select_all_visible()
 
             page._apply_category_to_selected("document")
-            message_count = page._user_message_show_count
-            page._show_user_saved_indicator("Category applied to 3 photos.")
+            message_count = page._category_status_show_count
+            page._set_category_action_status("Category applied to 3 photos.", state="success")
 
-            self.assertEqual(page.user_saved_label.text(), "Category applied to 3 photos.")
-            self.assertTrue(page.user_saved_label.isVisible())
-            self.assertEqual(page._user_message_show_count, message_count)
+            self.assertEqual(page.category_action_status_label.text(), "Category applied to 3 photos.")
+            self.assertTrue(page.category_action_status_label.isVisible())
+            self.assertEqual(page._category_status_show_count, message_count)
 
     def test_partial_category_failure_message_reports_exact_counts(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -434,10 +441,11 @@ class IrrelevantMediaPageTests(unittest.TestCase):
                 page._apply_category_to_selected("meme")
 
             self.assertEqual(
-                page.user_saved_label.text(),
+                page.category_action_status_label.text(),
                 "Category applied to 2 of 3 photos. 1 could not be updated.",
             )
-            self.assertTrue(page.user_saved_label.isVisible())
+            self.assertTrue(page.category_action_status_label.isVisible())
+            self.assertEqual(page.category_action_status_label.property("statusState"), "warning")
 
     def test_complete_category_failure_shows_error_without_success_claim(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -459,11 +467,12 @@ class IrrelevantMediaPageTests(unittest.TestCase):
                 page._apply_category_to_selected("meme")
 
             self.assertEqual(
-                page.user_saved_label.text(),
-                "Category could not be applied to 2 photos.",
+                page.category_action_status_label.text(),
+                "Category could not be applied to the selected photos.",
             )
-            self.assertNotIn("Category applied to", page.user_saved_label.text())
-            self.assertTrue(page.user_saved_label.isVisible())
+            self.assertNotIn("Category applied to", page.category_action_status_label.text())
+            self.assertTrue(page.category_action_status_label.isVisible())
+            self.assertEqual(page.category_action_status_label.property("statusState"), "error")
             error_modal.assert_not_called()
 
     def test_cleanup_category_change_preserves_scroll_and_selection(self):

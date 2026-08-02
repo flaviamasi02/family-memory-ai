@@ -754,5 +754,5 @@
 - CI follow-up: null or missing thumbnails now always install the shared non-null
   placeholder; only the same valid pixmap with a valid displayed image is reused.
 - Product Owner follow-up: bulk-category completion is now shown for eight seconds
-  in a full-width inline banner above the grid, with singular/plural and failure
-  wording and duplicate-notification coalescing.
+  in a dedicated inline status area directly below the category action controls,
+  with singular/plural and failure wording and duplicate-notification coalescing.

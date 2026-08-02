@@ -333,5 +333,6 @@ After optimization, the UI is responsive immediately after clicking Import (scan
 - Added reproducible 10/100/1,000-photo synthetic regression benchmarks.
 - Restored deterministic non-null Cleanup Review placeholders while retaining
   the unchanged-valid-thumbnail rescale optimization.
-- Moved bulk-category completion feedback into a full-width, non-modal Cleanup
-  Review banner with readable success, partial-failure, and complete-failure text.
+- Added a dedicated non-modal category-action status area directly below Cleanup
+  Review's category selector and Apply button, with readable success,
+  partial-failure, and complete-failure text.
