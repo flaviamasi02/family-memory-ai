@@ -67,6 +67,11 @@ def test_memory_review_selection_measurement_controls_default_off(page):
     assert "Waiting for Memory Review selection..." in widget.memory_review_performance_report.toPlainText()
 
 
+def test_import_performance_summary_does_not_show_raw_html(page):
+    widget, _, _, _ = page
+    assert "<b>" not in widget.import_performance_summary.text()
+
+
 def test_import_efficiency_no_session_is_clear_and_explained(page):
     widget, _, _, _ = page
     report = widget.import_performance_report.toPlainText()

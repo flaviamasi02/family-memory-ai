@@ -93,6 +93,8 @@ def test_real_selection_diagnostic_is_aggregate_and_path_free():
     assert "Selected photos: 10" in report
     assert "Cards restyled: 1" in report
     assert "Selections measured: 1" in report
+    assert "Completed:" in report
+    assert "Deferred work completion" in report
     assert "/" not in report and "\\" not in report
 
 

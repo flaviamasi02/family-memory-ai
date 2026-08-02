@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 
 @dataclass
@@ -11,6 +12,8 @@ class SelectionMeasurement:
     timings_ms: dict[str, float] = field(default_factory=dict)
     counts: dict[str, int] = field(default_factory=dict)
     started: float = field(default_factory=time.perf_counter)
+    handler_completed: float | None = None
+    completed_at: str = ""
 
 
 _armed_workspace: str | None = None
@@ -51,6 +54,23 @@ def add_selection_count(name: str, amount: int = 1) -> None:
         _active.counts[name] = _active.counts.get(name, 0) + int(amount)
 
 
+def mark_selection_handler_completed() -> None:
+    if _active is not None:
+        _active.handler_completed = time.perf_counter()
+
+
+def mark_selection_highlight_painted() -> None:
+    if _active is None or _active.handler_completed is None:
+        return
+    if "Handler completion to first highlight paint" not in _active.timings_ms:
+        _active.timings_ms["Handler completion to first highlight paint"] = (
+            time.perf_counter() - _active.handler_completed
+        ) * 1000.0
+        _active.timings_ms["Time until highlight"] = (
+            time.perf_counter() - _active.started
+        ) * 1000.0
+
+
 def finish_selection_measurement(*, deferred: bool = False) -> None:
     global _active
     if _active is None:
@@ -58,8 +78,11 @@ def finish_selection_measurement(*, deferred: bool = False) -> None:
     total = (time.perf_counter() - _active.started) * 1000.0
     key = "Deferred work completion" if deferred else "Total synchronous UI-thread time"
     _active.timings_ms[key] = total
+    if deferred:
+        _active.timings_ms["Total event-loop settling time"] = total
     _reports[_active.workspace] = _active
     if deferred:
+        _active.completed_at = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
         _active = None
 
 
@@ -84,6 +107,7 @@ def selection_diagnostic_report() -> str:
                 lines.append("No measured selection yet.")
             continue
         lines.append("Selections measured: 1")
+        lines.append(f"Completed: {report.completed_at or 'Synchronous phase complete'}")
         for name, value in report.timings_ms.items():
             lines.append(f"{name}: {value:.1f} ms")
         lines.append("Counts:")

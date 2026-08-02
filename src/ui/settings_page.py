@@ -528,7 +528,7 @@ class SettingsPage(QWidget):
             "Selection highlight visible", "Selected-count label update",
             "Preview refresh", "Suggestion refresh", "Thumbnail refresh",
         )
-        memory_lines = ["Recent aggregate timings (last / average / maximum)"]
+        memory_lines = [selection_diagnostic_report(), "", "Recent aggregate timings (last / average / maximum)"]
         for name in readable_order:
             values = timings.get(name)
             if values is None:
@@ -541,7 +541,6 @@ class SettingsPage(QWidget):
         if counters:
             memory_lines.extend(("", "Update counters"))
             memory_lines.extend(f"{key}: {value}" for key, value in sorted(counters.items()))
-        memory_lines.extend(("", selection_diagnostic_report()))
         self.memory_review_performance_report.setPlainText("\n".join(memory_lines))
         store = services.metadata_store
         health = store.health_check() if store.library_id else None
@@ -649,8 +648,8 @@ class SettingsPage(QWidget):
         self.import_efficiency_completion.setText("Import completed successfully")
         self.import_efficiency_result.setText(f"{'★' * stars}{'☆' * (5 - stars)}  {status}")
         self.import_performance_summary.setText(
-            f"Import completed in\n<b>{session.total_ms / 1000:.2f} seconds</b>\n\n"
-            f"Slowest activity\n<b>{session.identify_bottleneck() or 'Not available'}</b>"
+            f"Import completed in\n{session.total_ms / 1000:.2f} seconds\n\n"
+            f"Slowest activity\n{session.identify_bottleneck() or 'Not available'}"
         )
         lines = [
             "All timings and developer counters",

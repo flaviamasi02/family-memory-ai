@@ -53,6 +53,8 @@ from core.selection_diagnostics import (
     add_selection_time,
     begin_selection_measurement,
     finish_selection_measurement,
+    mark_selection_handler_completed,
+    mark_selection_highlight_painted,
     selection_bypass,
 )
 from core.user_metadata_service import UserMetadataService
@@ -227,6 +229,18 @@ class AlbumReviewCardWidget(QFrame):
         self.clicked.emit(self.key, int(event.modifiers().value))
         super().mousePressEvent(event)
 
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        if self._selected:
+            add_selection_count("QEvent.Paint count")
+            add_selection_count("Card repaint count")
+            mark_selection_highlight_painted()
+
+    def event(self, event) -> bool:
+        if event.type() in (QEvent.Type.Polish, QEvent.Type.PolishRequest):
+            add_selection_count("Style polish count")
+        return super().event(event)
+
     def mouseDoubleClickEvent(self, event):
         self.double_clicked.emit(self.key)
         super().mouseDoubleClickEvent(event)
@@ -296,6 +310,11 @@ class AlbumReviewPage(QWidget):
         self._suggestion_timer.setSingleShot(True)
         self._suggestion_timer.setInterval(120)
         self._suggestion_timer.timeout.connect(self._compute_pending_suggestion)
+        self._preview_generation = 0
+        self._pending_preview_row: Optional[AlbumReviewRow] = None
+        self._preview_timer = QTimer(self)
+        self._preview_timer.setSingleShot(True)
+        self._preview_timer.timeout.connect(self._complete_deferred_preview)
         self._pending_suggestion_row: Optional[AlbumReviewRow] = None
         self._suggestion_metadata = ManagedMobileCLIPEmbeddingProvider().metadata
 
@@ -409,6 +428,7 @@ class AlbumReviewPage(QWidget):
         self.grid_layout.setSpacing(10)
         self.grid_scroll.setWidget(self.grid_content)
         self.grid_scroll.viewport().installEventFilter(self)
+        self.grid_content.installEventFilter(self)
         self.grid_scroll.verticalScrollBar().valueChanged.connect(
             self._on_scroll_value_changed
         )
@@ -623,6 +643,7 @@ class AlbumReviewPage(QWidget):
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
         self.details_scroll.setWidget(details_content)
+        details_content.installEventFilter(self)
         self.details_scroll.setMinimumWidth(430)
         self.details_scroll.viewport().installEventFilter(self)
 
@@ -1160,6 +1181,16 @@ class AlbumReviewPage(QWidget):
             self._add_next_batch()
 
     def eventFilter(self, watched, event):
+        if active_selection_measurement("memory") is not None:
+            if event.type() == QEvent.Type.Paint:
+                add_selection_count("QEvent.Paint count")
+                grid_scroll_for_diagnostics = getattr(self, "grid_scroll", None)
+                if grid_scroll_for_diagnostics is not None and watched is grid_scroll_for_diagnostics.viewport():
+                    add_selection_count("Viewport repaint count")
+            elif event.type() == QEvent.Type.LayoutRequest:
+                add_selection_count("QEvent.LayoutRequest count")
+            elif event.type() == QEvent.Type.UpdateRequest:
+                add_selection_count("QEvent.UpdateRequest count")
         grid_scroll = getattr(self, "grid_scroll", None)
         if (
             grid_scroll is not None
@@ -1256,6 +1287,7 @@ class AlbumReviewPage(QWidget):
         add_selection_count("Visible cards", len(self._cards_by_key))
         add_selection_time("Total synchronous UI-thread time", elapsed)
         finish_selection_measurement()
+        mark_selection_handler_completed()
         if selection_bypass("details") or selection_bypass("suggestions"):
             finish_selection_measurement(deferred=True)
 
@@ -1383,6 +1415,9 @@ class AlbumReviewPage(QWidget):
         increment_memory_review_counter("selection_details_refreshes")
         add_selection_time(
             "Detail text update", (time.perf_counter() - detail_started) * 1000.0
+        )
+        add_selection_time(
+            "Details panel layout time", (time.perf_counter() - detail_started) * 1000.0
         )
         add_selection_count("Detail refreshes", 0 if selection_bypass("details") else 1)
         record_memory_review(
@@ -1550,17 +1585,13 @@ class AlbumReviewPage(QWidget):
         if not breakdown.explanation:
             self.explanations_list.addItem("No score explanation available.")
 
-        preview_started = time.perf_counter()
-        preview = None if selection_bypass("preview") else self._get_cached_preview(photo)
-        if isinstance(preview, QPixmap) and not preview.isNull():
-            self.preview_label.setPixmap(preview)
-            self.preview_label.setText("")
-        else:
-            self.preview_label.setPixmap(QPixmap())
-            self.preview_label.setText("Preview unavailable")
-        add_selection_time(
-            "Preview image update", (time.perf_counter() - preview_started) * 1000.0
-        )
+        # Preview scaling/filesystem work was the only image work remaining in
+        # the synchronous selection path. Defer and coalesce it so the selected
+        # card can paint first; generation/key checks prevent stale replacement.
+        self._preview_generation += 1
+        self._pending_preview_row = row
+        self._preview_timer.setProperty("generation", self._preview_generation)
+        self._preview_timer.start(1)
 
         self._sync_selectors_to_row(row)
         suggestion_started = time.perf_counter()
@@ -1576,6 +1607,31 @@ class AlbumReviewPage(QWidget):
         increment_memory_review_counter("detail_refreshes")
         record_memory_review(
             "Preview refresh", (time.perf_counter() - detail_started) * 1000.0, items=1
+        )
+
+    def _complete_deferred_preview(self) -> None:
+        started = time.perf_counter()
+        row = self._pending_preview_row
+        generation = int(self._preview_timer.property("generation") or 0)
+        self._pending_preview_row = None
+        if (
+            row is None
+            or generation != self._preview_generation
+            or self._row_key(row) != self._selected_key
+        ):
+            add_selection_count("Stale preview results ignored")
+            return
+        if selection_bypass("preview"):
+            return
+        preview = self._get_cached_preview(row.breakdown.photo)
+        if isinstance(preview, QPixmap) and not preview.isNull():
+            self.preview_label.setPixmap(preview)
+            self.preview_label.setText("")
+        else:
+            self.preview_label.setPixmap(QPixmap())
+            self.preview_label.setText("Preview unavailable")
+        add_selection_time(
+            "Preview image update", (time.perf_counter() - started) * 1000.0
         )
 
     def _clear_details(self) -> None:

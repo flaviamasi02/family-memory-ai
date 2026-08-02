@@ -108,3 +108,20 @@ workspace-scoped, clears incomplete active state, ignores events from the other
 workspace, and displays “Waiting for Memory Review selection...” until the
 matching interaction begins. Separate Memory Review and Cleanup Review buttons
 populate their respective retained comparison reports.
+
+The incomplete 1.7 ms value was the Python selection-handler duration, not
+visible latency: it stopped before Qt painted the selected card and before queued
+preview/suggestion work settled. The diagnostic now records handler completion,
+first selected-card paint, Paint/LayoutRequest/UpdateRequest events, card and
+viewport repaints, style polish, preview scaling/loading, details work, suggestion
+execution, and total event-loop settling. The requested measurement appears at
+the top of the report rather than below legacy aggregate history and includes a
+completion timestamp and measured card counts.
+
+Code-path comparison with Cleanup Review proved one extra synchronous image cost:
+Memory Review scaled or loaded the right-panel preview inside `_show_details`
+before returning from selection. Preview work is now a single replaceable 1 ms
+deferred callback guarded by preview generation and the final selected key. Rapid
+clicks coalesce it, stale previews cannot overwrite the final item, and the
+selection highlight can paint before preview filesystem/scaling work. Basic text
+details remain deterministic; AI suggestions retain their separate debounce.
