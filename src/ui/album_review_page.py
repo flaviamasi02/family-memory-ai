@@ -46,7 +46,6 @@ from core.memory_review_perf import (
     measure_memory_review,
     record_memory_review,
 )
-from core.selection_update import changed_selection_keys
 from core.selection_diagnostics import (
     active_selection_measurement,
     add_selection_count,
@@ -308,7 +307,10 @@ class AlbumReviewPage(QWidget):
         self._current_suggestion = None
         self._suggestion_timer = QTimer(self)
         self._suggestion_timer.setSingleShot(True)
-        self._suggestion_timer.setInterval(120)
+        # Suggestions scan semantic evidence on the UI thread. A 120 ms delay
+        # expired between normal Ctrl-clicks, so the previous click's suggestion
+        # blocked delivery of the next mouse event. Treat it as idle work.
+        self._suggestion_timer.setInterval(750)
         self._suggestion_timer.timeout.connect(self._compute_pending_suggestion)
         self._preview_generation = 0
         self._pending_preview_row: Optional[AlbumReviewRow] = None
@@ -1249,10 +1251,11 @@ class AlbumReviewPage(QWidget):
         if key not in self._visible_index_by_key:
             return
 
-        previous_keys = set(self._selected_keys)
         operation = "Single selection"
+        changed_keys: set[str]
 
         if range_select and self._selection_anchor_key in self._visible_index_by_key:
+            previous_keys = set(self._selected_keys)
             operation = "Shift range selection"
             start = self._visible_index_by_key[self._selection_anchor_key]
             end = self._visible_index_by_key[key]
@@ -1261,6 +1264,7 @@ class AlbumReviewPage(QWidget):
             if not additive:
                 self._selected_keys.clear()
             self._selected_keys.update(visible_keys[start : end + 1])
+            changed_keys = previous_keys.symmetric_difference(self._selected_keys)
         elif additive:
             if key in self._selected_keys:
                 operation = "Deselection"
@@ -1268,16 +1272,20 @@ class AlbumReviewPage(QWidget):
             else:
                 operation = "Ctrl-click selection"
                 self._selected_keys.add(key)
+            # Normal Ctrl-click is strictly O(1): exactly one key changed.
+            changed_keys = {key}
             self._selection_anchor_key = key
         else:
+            previous_keys = set(self._selected_keys)
             self._selected_keys = {key}
+            changed_keys = previous_keys.symmetric_difference(self._selected_keys)
             self._selection_anchor_key = key
 
         self._selected_key = key
         add_selection_time(
             "Selected-key calculation", (time.perf_counter() - started) * 1000.0
         )
-        self._apply_selection_ui(previous_keys, active_key=key)
+        self._apply_selection_ui(changed_keys, active_key=key)
         elapsed = (time.perf_counter() - started) * 1000.0
         record_memory_review(operation, elapsed, items=len(self._selected_keys))
         record_memory_review("Selection update", elapsed, items=len(self._selected_keys))
@@ -1316,7 +1324,10 @@ class AlbumReviewPage(QWidget):
         if self._rendered_keys:
             self._selected_key = self._rendered_keys[0]
             self._selection_anchor_key = self._selected_key
-        self._apply_selection_ui(previous_keys, active_key=self._selected_key)
+        self._apply_selection_ui(
+            previous_keys.symmetric_difference(self._selected_keys),
+            active_key=self._selected_key,
+        )
         record_memory_review(
             "Select all visible", (time.perf_counter() - started) * 1000.0,
             items=len(self._selected_keys),
@@ -1346,10 +1357,9 @@ class AlbumReviewPage(QWidget):
         finish_selection_measurement(deferred=True)
 
     def _apply_selection_ui(
-        self, previous_keys: set[str], *, active_key: Optional[str]
+        self, changed_keys: set[str], *, active_key: Optional[str]
     ) -> None:
         """Apply one selection transaction and touch changed cards only."""
-        changed_keys = changed_selection_keys(previous_keys, self._selected_keys)
         highlight_started = time.perf_counter()
         if not selection_bypass("styling"):
             for changed_key in changed_keys:
@@ -1365,10 +1375,8 @@ class AlbumReviewPage(QWidget):
         )
         increment_memory_review_counter("selection_cards_updated", len(changed_keys))
         increment_memory_review_counter("selection_rows_scanned", 0)
-        increment_memory_review_counter("selection_viewport_updates", len(changed_keys))
         increment_memory_review_counter("selection_layout_activations", 0)
         add_selection_count("Cards whose selection state changed", len(changed_keys))
-        add_selection_count("Viewport update calls", len(changed_keys))
         add_selection_count("Layout activation calls", 0)
         add_selection_count("Grid rebuilds", 0)
         add_selection_count("Filter operations", 0)
@@ -1601,6 +1609,8 @@ class AlbumReviewPage(QWidget):
             self._pending_suggestion_row = None
         else:
             self._request_category_suggestion(row)
+        add_selection_count("Pending preview callbacks", 1 if self._preview_timer.isActive() else 0)
+        add_selection_count("Pending suggestion callbacks", 1 if self._suggestion_timer.isActive() else 0)
         add_selection_time(
             "AI suggestion scheduling", (time.perf_counter() - suggestion_started) * 1000.0
         )

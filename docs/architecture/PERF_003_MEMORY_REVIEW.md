@@ -125,3 +125,23 @@ deferred callback guarded by preview generation and the final selected key. Rapi
 clicks coalesce it, stale previews cannot overwrite the final item, and the
 selection highlight can paint before preview filesystem/scaling work. Basic text
 details remain deterministic; AI suggestions retain their separate debounce.
+
+## Second-and-subsequent Ctrl-click root cause
+
+The authoritative Product Owner reproduction—first click immediate, later clicks
+slow—isolated work created by the previous click. Memory Review alone schedules a
+semantic suggestion scan on the UI thread. The prior 120 ms timer commonly fired
+between ordinary Ctrl-clicks, so its evidence scan blocked delivery of the next
+mouse event; Cleanup Review has no equivalent suggestion stage. The selection
+handler also copied the growing selected set and computed a symmetric difference
+even though a normal Ctrl-click changes exactly one known key.
+
+Normal Ctrl-click now mutates and styles exactly that one key without copying or
+comparing the selected set. Range, single, Select All, and Clear retain explicit
+delta calculation. Suggestion work is treated as idle work with a single
+replaceable 750 ms timer, while the preview uses one replaceable 1 ms timer.
+Twenty rapid clicks therefore retain exactly one pending preview callback and one
+pending suggestion callback; neither callback accumulates per click, and their
+generation/current-key checks discard stale results. The 423-row Qt regression
+asserts 20 card style calls for 20 additions, one more for a removal, unchanged
+grid/thumbnail counts, exact final selection, and one active timer of each kind.

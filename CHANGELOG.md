@@ -5,6 +5,7 @@
 - Added an opt-in, non-persistent real-device selection measurement and isolation panel for side-by-side Memory Review/Cleanup Review diagnosis; Product Owner acceptance remains pending and no new bottleneck fix is claimed.
 - Fixed diagnostic arming so the Memory Review button targets only Memory Review, cannot be consumed by Cleanup Review events, clears incomplete prior runs, and visibly reports its waiting state until selection completes.
 - Completed event-loop-aware measurement through first selected-card paint and deferred settling, moved the requested report above legacy aggregates, deferred/coalesced preview scaling/loading until after selection handling, and removed literal `<b>` tags from Import Performance text.
+- Fixed the second-click path by making normal Ctrl-click delta calculation strictly one-key/O(1) and moving semantic suggestion execution to a 750 ms idle debounce; one preview timer and one suggestion timer are restarted rather than accumulated across rapid clicks.
 - Added aggregate Memory Review timings and readable Developer Diagnostics for load, grid, filters, sorting, selection, preview, suggestions, thumbnails, scoring, and database reads.
 - Reused and relaid out existing cards for sort-only changes, indexed row lookup, and preserved compatible selection, filters, search, sort, thumbnails, and scroll across refreshes.
 - Documented measured code-path bottlenecks and added bounded diagnostics regression coverage without changing scoring or AI suggestion behavior.

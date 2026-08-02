@@ -1056,7 +1056,7 @@ class AlbumReviewPageTests(unittest.TestCase):
         self.assertEqual(page.filename_value.text(), "photo_5.jpg")
 
     def test_perf_003_selection_updates_only_delta_and_finalizes_details(self):
-        breakdowns = [self._make_virtual_breakdown(index) for index in range(100)]
+        breakdowns = [self._make_virtual_breakdown(index) for index in range(423)]
         page = AlbumReviewPage()
         page.set_scored_photos(breakdowns)
         self._flush_ui(wait_ms=80)
@@ -1079,6 +1079,35 @@ class AlbumReviewPageTests(unittest.TestCase):
         page._select_key(second_key, additive=False)
         self.assertEqual(page._details_key, second_key)
         self.assertEqual(page.filename_value.text(), "photo_12.jpg")
+
+    def test_perf_003_twenty_ctrl_clicks_have_constant_card_work(self):
+        breakdowns = [self._make_virtual_breakdown(index) for index in range(423)]
+        page = AlbumReviewPage()
+        page.set_scored_photos(breakdowns)
+        self._flush_ui(wait_ms=100)
+        page.clear_selection()
+        cards = list(page._cards_by_key.values())
+        for card in cards:
+            card.set_selected = Mock(wraps=card.set_selected)
+        page._update_selection_count = Mock(wraps=page._update_selection_count)
+        rebuilds_before = page.grid_rebuild_count()
+        thumbnails_before = page.retained_thumbnail_count()
+
+        for index in range(20):
+            page._select_key(page._row_key(page._visible_rows[index]), additive=True)
+
+        self.assertEqual(page.selected_count(), 20)
+        self.assertEqual(
+            sum(card.set_selected.call_count for card in cards), 20
+        )
+        self.assertEqual(page._update_selection_count.call_count, 20)
+        self.assertTrue(page._preview_timer.isActive())
+        self.assertTrue(page._suggestion_timer.isActive())
+        self.assertEqual(page.grid_rebuild_count(), rebuilds_before)
+        self.assertEqual(page.retained_thumbnail_count(), thumbnails_before)
+        page._select_key(page._row_key(page._visible_rows[10]), additive=True)
+        self.assertEqual(page.selected_count(), 19)
+        self.assertEqual(sum(card.set_selected.call_count for card in cards), 21)
 
     def test_perf_003_bulk_selection_defers_one_final_suggestion(self):
         breakdowns = [self._make_virtual_breakdown(index) for index in range(100)]
@@ -1104,7 +1133,7 @@ class AlbumReviewPageTests(unittest.TestCase):
         self.assertEqual(page.retained_thumbnail_count(), thumbnails_before)
         self.assertEqual(page._category_suggestion_service.suggest.call_count, 0)
 
-        self._flush_ui(wait_ms=130)
+        self._flush_ui(wait_ms=780)
         self.assertEqual(page._category_suggestion_service.suggest.call_count, 1)
 
     def test_perf_003_clear_selection_skips_filter_sort_and_updates_count_once(self):
