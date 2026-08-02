@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import logging
+import time
+from contextlib import ExitStack, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -35,6 +38,8 @@ from ui.image_preview_dialog import ImagePreviewDialog
 from ui.shared_thumbnail_grid import SharedGridItem, SharedThumbnailGrid
 from ui.help.workspace_help_content import CLEANUP_REVIEW_WORKSPACE
 from workers.face_detection_worker import FaceDetectionWorker
+
+LOGGER = logging.getLogger(__name__)
 
 RECOMMENDED_ACTION_LABELS = {
     "keep": "Keep",
@@ -85,6 +90,8 @@ class IrrelevantMediaPage(QWidget):
         self._media_classifier = MediaClassifier()
         self._face_detection_thread: Optional[QThread] = None
         self._face_detection_worker: Optional[FaceDetectionWorker] = None
+        self._bulk_category_in_progress = False
+        self.last_bulk_performance: dict[str, int | float] = {}
 
         self.header = WorkspaceHeader("Cleanup Review")
         self.header.help_clicked.connect(self._on_help_clicked)
@@ -216,6 +223,18 @@ class IrrelevantMediaPage(QWidget):
         self.category_selector = QComboBox()
         self.apply_category_button = QPushButton("Apply Category to Selected")
         self.apply_category_button.clicked.connect(lambda: self._apply_category_to_selected(str(self.category_selector.currentData() or "unknown")))
+        self.category_action_status_label = QLabel("")
+        self.category_action_status_label.setObjectName("cleanupCategoryActionStatus")
+        self.category_action_status_label.setAccessibleName("Category action status")
+        self.category_action_status_label.setWordWrap(True)
+        self.category_action_status_label.setMinimumHeight(30)
+        self.category_action_status_label.setVisible(False)
+        self._category_status_timer = QTimer(self)
+        self._category_status_timer.setSingleShot(True)
+        self._category_status_timer.setInterval(8000)
+        self._category_status_timer.timeout.connect(self.category_action_status_label.hide)
+        self._last_category_status = ""
+        self._category_status_show_count = 0
 
         actions_row_one = QHBoxLayout()
         actions_row_one.addWidget(self.keep_button)
@@ -236,6 +255,7 @@ class IrrelevantMediaPage(QWidget):
         details_layout.addWidget(self.alternatives_list)
         details_layout.addLayout(actions_row_one)
         details_layout.addLayout(actions_row_two)
+        details_layout.addWidget(self.category_action_status_label)
         details_layout.addStretch(0)
 
         details_panel = QWidget()
@@ -869,65 +889,148 @@ class IrrelevantMediaPage(QWidget):
             return
 
         selected_rows = self._selected_rows()
-        if not selected_rows:
+        if not selected_rows or self._bulk_category_in_progress:
             return
+
+        started = time.perf_counter()
+        self._bulk_category_in_progress = True
+        self.apply_category_button.setEnabled(False)
+        self._category_status_timer.stop()
+        busy_noun = "photo" if len(selected_rows) == 1 else "photos"
+        self._set_category_action_status(
+            f"Applying category to {len(selected_rows)} {busy_noun}...",
+            state="busy",
+            auto_hide=False,
+        )
 
         affected_keys = [self._photo_key(row.photo) for row in selected_rows]
         preferred_key = self.thumbnail_grid.selected_key() or (affected_keys[0] if affected_keys else None)
         previous_visible_keys = [self._photo_key(row.photo) for row in self._visible_rows]
         previous_scroll = self.thumbnail_grid.scroll_value()
 
-        for row in selected_rows:
-            previous = row.effective_category
-            metadata = dict(getattr(row.photo, "metadata", {}) or {})
-            automatic = str(
-                metadata.get("automatic_media_category", "")
-                or row.automatic_category
-                or getattr(row.photo, "automatic_media_category", "")
-                or previous
-            ).strip().lower()
+        persistence_started = time.perf_counter()
+        successful_rows: list[CleanupReviewRow] = []
+        failures = 0
+        sidecar_ms = 0.0
+        source = "user_bulk" if len(selected_rows) > 1 else "user"
+        category_batch = getattr(self._category_learning_engine, "bulk_update", nullcontext)
+        preference_batch = getattr(self._preference_learning_engine, "bulk_update", nullcontext)
+        try:
+            with ExitStack() as stack:
+                stack.enter_context(category_batch())
+                stack.enter_context(preference_batch())
+                for row in selected_rows:
+                    previous = row.effective_category
+                    old_metadata = dict(getattr(row.photo, "metadata", {}) or {})
+                    old_values = (
+                        getattr(row.photo, "automatic_media_category", ""),
+                        getattr(row.photo, "user_corrected_media_category", ""),
+                        getattr(row.photo, "effective_media_category", ""),
+                        getattr(row.photo, "media_category", ""),
+                    )
+                    self._set_photo_category(row, category)
+                    sidecar_started = time.perf_counter()
+                    try:
+                        self._user_metadata_service.save_photo_metadata(row.photo)
+                    except Exception:
+                        failures += 1
+                        row.photo.metadata = old_metadata
+                        (row.photo.automatic_media_category,
+                         row.photo.user_corrected_media_category,
+                         row.photo.effective_media_category,
+                         row.photo.media_category) = old_values
+                        row.photo.sync_intelligence_from_metadata()
+                        continue
+                    finally:
+                        sidecar_ms += (time.perf_counter() - sidecar_started) * 1000
+                    self._category_learning_engine.record_category_correction(
+                        row.photo, previous_category=previous,
+                        corrected_category=category, source=source,
+                    )
+                    self._preference_learning_engine.record_category_correction(
+                        row.photo, previous_category=previous,
+                        corrected_category=category, source=source,
+                    )
+                    successful_rows.append(row)
+        finally:
+            persistence_ms = (time.perf_counter() - persistence_started) * 1000
+        learning_ms = max(0.0, persistence_ms - sidecar_ms)
 
-            metadata["automatic_media_category"] = automatic
-            metadata["user_corrected_media_category"] = category
-            metadata["effective_media_category"] = category
-            metadata["media_category"] = category
-            metadata["cleanup_automatic_category"] = automatic
-            metadata["cleanup_user_corrected_category"] = category
-            metadata["cleanup_effective_category"] = category
-            metadata["relevance_category"] = category
-            row.photo.metadata = metadata
-
-            row.photo.automatic_media_category = automatic
-            row.photo.user_corrected_media_category = category
-            row.photo.effective_media_category = category
-            row.photo.media_category = category
-            row.photo.sync_intelligence_from_metadata()
-
-            self._category_learning_engine.record_category_correction(
-                row.photo,
-                previous_category=previous,
-                corrected_category=category,
-                source="user_bulk" if len(selected_rows) > 1 else "user",
-            )
+        if successful_rows:
             self._category_learning_engine.start_pending_visual_analysis_worker(limit=25)
-            self._preference_learning_engine.record_category_correction(
-                row.photo,
-                previous_category=previous,
-                corrected_category=category,
-                source="user_bulk" if len(selected_rows) > 1 else "user",
-            )
-            self._save_photo_user_metadata(row.photo)
-
-        self._category_learning_engine.start_pending_visual_analysis_worker(limit=25)
-        self._rows = [self._build_row(row.photo) for row in self._rows]
-        self._show_user_saved_indicator("User category saved")
+        successful_keys = [self._photo_key(row.photo) for row in successful_rows]
+        successful_key_set = set(successful_keys)
+        self._rows = [
+            self._build_row(row.photo) if self._photo_key(row.photo) in successful_key_set else row
+            for row in self._rows
+        ]
         self._refresh_group_options()
+        ui_started = time.perf_counter()
         self._refresh_after_category_change(
-            affected_keys=affected_keys,
+            affected_keys=successful_keys,
             preferred_key=preferred_key,
             previous_visible_keys=previous_visible_keys,
             previous_scroll=previous_scroll,
         )
+        if failures == len(selected_rows):
+            self._set_category_action_status(
+                "Category could not be applied to the selected photos.",
+                state="error",
+            )
+        elif failures:
+            self._set_category_action_status(
+                f"Category applied to {len(successful_rows)} of {len(selected_rows)} photos. "
+                f"{failures} could not be updated.",
+                state="warning",
+            )
+        else:
+            noun = "photo" if len(successful_rows) == 1 else "photos"
+            self._set_category_action_status(
+                f"Category applied to {len(successful_rows)} {noun}.",
+                state="success",
+            )
+        ui_ms = (time.perf_counter() - ui_started) * 1000
+        rebuilds = int([self._photo_key(row.photo) for row in self._visible_rows] != previous_visible_keys)
+        total_ms = (time.perf_counter() - started) * 1000
+        self.last_bulk_performance = {
+            "selected_photos": len(selected_rows), "successful_photos": len(successful_rows),
+            "failed_photos": failures, "total_ms": total_ms,
+            "metadata_persistence_ms": persistence_ms, "sidecar_persistence_ms": sidecar_ms,
+            "database_persistence_ms": 0.0, "learning_event_ms": learning_ms,
+            "grid_cards_updated": len(successful_keys) if not rebuilds else 0,
+            "full_grid_rebuilds": rebuilds, "thumbnail_reloads": 0,
+            "ui_update_requests": len(successful_keys) + 1, "ui_update_ms": ui_ms,
+            "responsive_ms": total_ms,
+        }
+        LOGGER.info(
+            "[PERF] Cleanup bulk category assignment: %d photos, %.1f ms; "
+            "persistence %.1f ms (sidecar %.1f ms, database 0.0 ms); learning %.1f ms; "
+            "UI %.1f ms, cards %d, full grid rebuilds %d, thumbnail reloads 0, "
+            "update requests %d, responsive %.1f ms",
+            len(selected_rows), total_ms, persistence_ms, sidecar_ms, learning_ms,
+            ui_ms, self.last_bulk_performance["grid_cards_updated"], rebuilds,
+            self.last_bulk_performance["ui_update_requests"], total_ms,
+        )
+        self._bulk_category_in_progress = False
+        self.apply_category_button.setEnabled(True)
+
+    def _set_photo_category(self, row: CleanupReviewRow, category: str) -> None:
+        previous = row.effective_category
+        metadata = dict(getattr(row.photo, "metadata", {}) or {})
+        automatic = str(metadata.get("automatic_media_category", "") or row.automatic_category
+                        or getattr(row.photo, "automatic_media_category", "") or previous).strip().lower()
+        metadata.update({
+            "automatic_media_category": automatic, "user_corrected_media_category": category,
+            "effective_media_category": category, "media_category": category,
+            "cleanup_automatic_category": automatic, "cleanup_user_corrected_category": category,
+            "cleanup_effective_category": category, "relevance_category": category,
+        })
+        row.photo.metadata = metadata
+        row.photo.automatic_media_category = automatic
+        row.photo.user_corrected_media_category = category
+        row.photo.effective_media_category = category
+        row.photo.media_category = category
+        row.photo.sync_intelligence_from_metadata()
 
     def _refresh_after_category_change(
         self,
@@ -1020,7 +1123,7 @@ class IrrelevantMediaPage(QWidget):
         self.analyze_faces_button.setEnabled(True)
 
     def _selected_rows(self) -> list[CleanupReviewRow]:
-        selected_keys = self.thumbnail_grid.selected_keys()
+        selected_keys = set(self.thumbnail_grid.selected_keys())
         return [row for row in self._rows if self._photo_key(row.photo) in selected_keys]
 
     def _row_for_key(self, key: str) -> Optional[CleanupReviewRow]:
@@ -1154,6 +1257,34 @@ class IrrelevantMediaPage(QWidget):
                 row.photo.sync_intelligence_from_metadata()
 
         self._rows = [self._build_row(row.photo) for row in self._rows]
+
+    def _set_category_action_status(
+        self, text: str, *, state: str, auto_hide: bool = True
+    ) -> None:
+        styles = {
+            "success": ("#176b34", "#edf8f0", "#9dd5ad"),
+            "warning": ("#7a4d00", "#fff8e1", "#e8c66a"),
+            "error": ("#9b1c1c", "#fff1f0", "#f1aeb5"),
+            "busy": ("#1f6feb", "#eef6ff", "#b6d4fe"),
+        }
+        text = str(text or "").strip()
+        if not text:
+            return
+        if text == self._last_category_status and not self.category_action_status_label.isHidden():
+            return
+        self._last_category_status = text
+        self._category_status_show_count += 1
+        foreground, background, border = styles.get(state, styles["busy"])
+        self.category_action_status_label.setStyleSheet(
+            f"font-size: 13px; font-weight: 600; color: {foreground}; "
+            f"background: {background}; border: 1px solid {border}; "
+            "border-radius: 4px; padding: 5px 8px;"
+        )
+        self.category_action_status_label.setProperty("statusState", state)
+        self.category_action_status_label.setText(text)
+        self.category_action_status_label.setVisible(True)
+        if auto_hide:
+            self._category_status_timer.start()
 
     def _show_user_saved_indicator(self, text: str) -> None:
         self.user_saved_label.setText(text)

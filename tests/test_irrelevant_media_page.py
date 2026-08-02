@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 from models.photo import Photo
 from core.category_registry import get_category_registry, reset_category_registry
 from ui.irrelevant_media_page import IrrelevantMediaPage
+from ui.shared_thumbnail_grid import SharedGridItem, SharedThumbnailCard
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -119,6 +120,77 @@ class IrrelevantMediaPageTests(unittest.TestCase):
                 card.thumbnail_label.pixmap().isNull(),
                 "Card must display a non-null placeholder pixmap when no cached thumbnail exists",
             )
+
+    def _grid_item(self, thumbnail, badge_one="Unknown"):
+        return SharedGridItem(
+            key="photo", filename="photo.jpg", thumbnail=thumbnail,
+            badge_one=badge_one, badge_two="50%", badge_three="Review",
+        )
+
+    def test_null_pixmap_refresh_keeps_non_null_placeholder(self):
+        card = SharedThumbnailCard(self._grid_item(QPixmap()))
+        self.assertFalse(card.thumbnail_label.pixmap().isNull())
+
+        card.refresh(self._grid_item(QPixmap(), badge_one="Document"))
+        self.assertFalse(card.thumbnail_label.pixmap().isNull())
+        self.assertEqual(card.thumbnail_rescale_count, 0)
+
+    def test_valid_cached_thumbnail_is_displayed(self):
+        thumbnail = QPixmap(32, 32)
+        thumbnail.fill(Qt.GlobalColor.blue)
+        card = SharedThumbnailCard(self._grid_item(thumbnail))
+
+        displayed = card.thumbnail_label.pixmap()
+        self.assertFalse(displayed.isNull())
+        self.assertEqual(card.thumbnail_rescale_count, 1)
+
+    def test_same_valid_pixmap_reuse_skips_rescale(self):
+        thumbnail = QPixmap(32, 32)
+        thumbnail.fill(Qt.GlobalColor.green)
+        card = SharedThumbnailCard(self._grid_item(thumbnail))
+        rescale_count = card.thumbnail_rescale_count
+
+        card.refresh(self._grid_item(thumbnail, badge_one="Meme"))
+
+        self.assertEqual(card.thumbnail_rescale_count, rescale_count)
+        self.assertFalse(card.thumbnail_label.pixmap().isNull())
+
+    def test_same_valid_pixmap_restores_accidentally_cleared_label(self):
+        thumbnail = QPixmap(32, 32)
+        thumbnail.fill(Qt.GlobalColor.green)
+        card = SharedThumbnailCard(self._grid_item(thumbnail))
+        rescale_count = card.thumbnail_rescale_count
+        card.thumbnail_label.setPixmap(QPixmap())
+
+        card.refresh(self._grid_item(thumbnail))
+
+        self.assertFalse(card.thumbnail_label.pixmap().isNull())
+        self.assertEqual(card.thumbnail_rescale_count, rescale_count + 1)
+
+    def test_placeholder_is_replaced_by_real_thumbnail(self):
+        card = SharedThumbnailCard(self._grid_item(None))
+        placeholder = card.thumbnail_label.pixmap()
+        thumbnail = QPixmap(32, 32)
+        thumbnail.fill(Qt.GlobalColor.red)
+
+        card.refresh(self._grid_item(thumbnail))
+
+        self.assertFalse(card.thumbnail_label.pixmap().isNull())
+        self.assertEqual(card.thumbnail_rescale_count, 1)
+        self.assertNotEqual(card.thumbnail_label.pixmap().cacheKey(), placeholder.cacheKey())
+
+    def test_incremental_category_refresh_preserves_valid_thumbnail(self):
+        thumbnail = QPixmap(32, 32)
+        thumbnail.fill(Qt.GlobalColor.yellow)
+        card = SharedThumbnailCard(self._grid_item(thumbnail))
+        displayed_key = card.thumbnail_label.pixmap().cacheKey()
+        rescale_count = card.thumbnail_rescale_count
+
+        card.refresh(self._grid_item(thumbnail, badge_one="Family Photo"))
+
+        self.assertEqual(card.badge_one.text(), "Family Photo")
+        self.assertEqual(card.thumbnail_label.pixmap().cacheKey(), displayed_key)
+        self.assertEqual(card.thumbnail_rescale_count, rescale_count)
 
     def test_details_panel_updates_with_structured_explanations(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -288,6 +360,120 @@ class IrrelevantMediaPageTests(unittest.TestCase):
 
             page.clear_selection()
             self.assertEqual(page.selected_count(), 0)
+
+    def test_one_photo_category_success_message_is_visible_after_persistence(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            photo = self._make_photo(root, "one.jpg", {"relevance_category": "unknown"})
+            page = IrrelevantMediaPage()
+            page.show()
+            page.set_photos([photo], root, total_imported_count=1)
+            self._flush_ui(wait_ms=80)
+            page.select_all_visible()
+            labels_during_save = []
+            original_save = page._user_metadata_service.save_photo_metadata
+
+            def save(photo_to_save):
+                labels_during_save.append(page.category_action_status_label.text())
+                return original_save(photo_to_save)
+
+            with patch.object(page._user_metadata_service, "save_photo_metadata", side_effect=save), \
+                 patch.object(QMessageBox, "information") as success_modal:
+                page._apply_category_to_selected("meme")
+
+            self.assertEqual(labels_during_save, ["Applying category to 1 photo..."])
+            self.assertEqual(page.category_action_status_label.text(), "Category applied to 1 photo.")
+            self.assertTrue(page.category_action_status_label.isVisible())
+            self.assertIsNotNone(page.category_action_status_label.parentWidget())
+            self.assertIs(
+                page.findChild(type(page.category_action_status_label), "cleanupCategoryActionStatus"),
+                page.category_action_status_label,
+            )
+            self.assertEqual(page.category_action_status_label.property("statusState"), "success")
+            success_modal.assert_not_called()
+            page._trigger_refresh(force=True)
+            self._flush_ui(wait_ms=100)
+            self.assertEqual(page.category_action_status_label.text(), "Category applied to 1 photo.")
+            self.assertTrue(page.category_action_status_label.isVisible())
+
+    def test_multi_photo_category_success_message_is_visible_and_deduplicated(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            photos = [
+                self._make_photo(root, f"bulk_{index}.jpg", {"relevance_category": "unknown"})
+                for index in range(3)
+            ]
+            page = IrrelevantMediaPage()
+            page.show()
+            page.set_photos(photos, root, total_imported_count=3)
+            self._flush_ui(wait_ms=80)
+            page.select_all_visible()
+
+            page._apply_category_to_selected("document")
+            message_count = page._category_status_show_count
+            page._set_category_action_status("Category applied to 3 photos.", state="success")
+
+            self.assertEqual(page.category_action_status_label.text(), "Category applied to 3 photos.")
+            self.assertTrue(page.category_action_status_label.isVisible())
+            self.assertEqual(page._category_status_show_count, message_count)
+
+    def test_partial_category_failure_message_reports_exact_counts(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            photos = [
+                self._make_photo(root, f"partial_{index}.jpg", {"relevance_category": "unknown"})
+                for index in range(3)
+            ]
+            page = IrrelevantMediaPage()
+            page.show()
+            page.set_photos(photos, root, total_imported_count=3)
+            self._flush_ui(wait_ms=80)
+            page.select_all_visible()
+            calls = 0
+
+            def save(_photo):
+                nonlocal calls
+                calls += 1
+                if calls == 3:
+                    raise OSError("synthetic sidecar failure")
+
+            with patch.object(page._user_metadata_service, "save_photo_metadata", side_effect=save):
+                page._apply_category_to_selected("meme")
+
+            self.assertEqual(
+                page.category_action_status_label.text(),
+                "Category applied to 2 of 3 photos. 1 could not be updated.",
+            )
+            self.assertTrue(page.category_action_status_label.isVisible())
+            self.assertEqual(page.category_action_status_label.property("statusState"), "warning")
+
+    def test_complete_category_failure_shows_error_without_success_claim(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            photos = [
+                self._make_photo(root, f"failed_{index}.jpg", {"relevance_category": "unknown"})
+                for index in range(2)
+            ]
+            page = IrrelevantMediaPage()
+            page.show()
+            page.set_photos(photos, root, total_imported_count=2)
+            self._flush_ui(wait_ms=80)
+            page.select_all_visible()
+
+            with patch.object(
+                page._user_metadata_service, "save_photo_metadata",
+                side_effect=OSError("synthetic sidecar failure"),
+            ), patch.object(QMessageBox, "warning") as error_modal:
+                page._apply_category_to_selected("meme")
+
+            self.assertEqual(
+                page.category_action_status_label.text(),
+                "Category could not be applied to the selected photos.",
+            )
+            self.assertNotIn("Category applied to", page.category_action_status_label.text())
+            self.assertTrue(page.category_action_status_label.isVisible())
+            self.assertEqual(page.category_action_status_label.property("statusState"), "error")
+            error_modal.assert_not_called()
 
     def test_cleanup_category_change_preserves_scroll_and_selection(self):
         with tempfile.TemporaryDirectory() as tmpdir:

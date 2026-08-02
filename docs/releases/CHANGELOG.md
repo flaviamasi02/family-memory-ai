@@ -743,3 +743,16 @@
 - Removed the remaining automatic Family Photo paths, including strong-face overrides and legacy learned Family Photo outputs. New photographs remain Unknown with a semantic-evidence waiting reason; only MODEL-003D may suggest Family Photo, and assignment still requires explicit user acceptance or manual correction.
 
 - Fixed immediate manual-evidence suggestions by canonicalizing photo identities consistently across the UI collection, semantic result paths, evidence signatures, and cache keys (including Windows case/separator differences). Opt-in suggestion diagnostics now report every semantic match, resolution result, similarity, raw/normalized category, confirmation state, trust decision, and acceptance/rejection reason.
+# PERF-002 — Cleanup Review bulk interactions
+
+- Measured repeated learning-profile rebuild/save work as the dominant synthetic
+  bulk-category cost and coalesced it to one save per profile per user action.
+- Cleanup Review now records aggregate operation/persistence/learning/UI metrics,
+  updates only affected cards when filter membership is stable, avoids rescaling
+  unchanged thumbnails, reports partial success, and blocks duplicate submission.
+- See `docs/architecture/PERF_002_CLEANUP_BULK.md` for benchmark results and scope.
+- CI follow-up: null or missing thumbnails now always install the shared non-null
+  placeholder; only the same valid pixmap with a valid displayed image is reused.
+- Product Owner follow-up: bulk-category completion is now shown for eight seconds
+  in a dedicated inline status area directly below the category action controls,
+  with singular/plural and failure wording and duplicate-notification coalescing.

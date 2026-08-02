@@ -45,8 +45,9 @@ class SharedThumbnailCard(QFrame):
 
     def __init__(self, item: SharedGridItem, parent=None):
         super().__init__(parent)
-        self.item = item
+        self.item = None
         self.key = item.key
+        self.thumbnail_rescale_count = 0
 
         self.setObjectName("sharedReviewCard")
         self.setFrameShape(QFrame.Shape.StyledPanel)
@@ -90,22 +91,45 @@ class SharedThumbnailCard(QFrame):
         self.set_selected(False)
 
     def refresh(self, item: SharedGridItem) -> None:
+        previous_thumbnail = getattr(getattr(self, "item", None), "thumbnail", None)
         self.item = item
         self.key = item.key
 
         pixmap = item.thumbnail
-        if isinstance(pixmap, QPixmap) and not pixmap.isNull():
-            scaled = pixmap.scaled(
-                140,
-                140,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-            self.thumbnail_label.setPixmap(scaled)
-            self.thumbnail_label.setText("")
-        else:
-            self.thumbnail_label.setPixmap(_get_shared_placeholder_pixmap())
-            self.thumbnail_label.setText("")
+        # Category/decision changes reuse the same thumbnail object.  Avoid the
+        # relatively expensive smooth rescale and cache churn in that case. A
+        # null pixmap is never reusable: it must deterministically restore the
+        # shared non-null placeholder, including on a card's first refresh.
+        incoming_valid = isinstance(pixmap, QPixmap) and not pixmap.isNull()
+        previous_valid = (
+            isinstance(previous_thumbnail, QPixmap)
+            and not previous_thumbnail.isNull()
+        )
+        displayed_pixmap = self.thumbnail_label.pixmap()
+        displayed_valid = (
+            isinstance(displayed_pixmap, QPixmap)
+            and not displayed_pixmap.isNull()
+        )
+        can_reuse = (
+            incoming_valid
+            and previous_valid
+            and pixmap is previous_thumbnail
+            and displayed_valid
+        )
+        if not can_reuse:
+            if incoming_valid:
+                scaled = pixmap.scaled(
+                    140,
+                    140,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+                self.thumbnail_label.setPixmap(scaled)
+                self.thumbnail_label.setText("")
+                self.thumbnail_rescale_count += 1
+            else:
+                self.thumbnail_label.setPixmap(_get_shared_placeholder_pixmap())
+                self.thumbnail_label.setText("")
 
         self.filename_label.setToolTip(item.filename)
         metrics = QFontMetrics(self.filename_label.font())
@@ -391,15 +415,14 @@ class SharedThumbnailGrid(QWidget):
         self.card_double_clicked.emit(key)
 
     def _range_keys_between(self, start_key: str, end_key: str) -> list[str]:
-        visible_keys = self.visible_keys()
-        if start_key not in visible_keys or end_key not in visible_keys:
+        index_by_key = {item.key: index for index, item in enumerate(self._items)}
+        if start_key not in index_by_key or end_key not in index_by_key:
             return [end_key]
-
-        start_index = visible_keys.index(start_key)
-        end_index = visible_keys.index(end_key)
+        start_index = index_by_key[start_key]
+        end_index = index_by_key[end_key]
         if start_index <= end_index:
-            return visible_keys[start_index:end_index + 1]
-        return visible_keys[end_index:start_index + 1]
+            return [item.key for item in self._items[start_index:end_index + 1]]
+        return [item.key for item in self._items[end_index:start_index + 1]]
 
     def _calculate_grid_columns(self) -> int:
         viewport_width = self.scroll_area.viewport().width()

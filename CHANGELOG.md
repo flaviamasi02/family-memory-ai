@@ -324,3 +324,15 @@ After optimization, the UI is responsive immediately after clicking Import (scan
 - Persisted the selected interpreter before install/verify/test execution and required verification to use that persisted runtime interpreter.
 - Moved MobileCLIP checkpoint URL metadata out of the generic manager and into MobileCLIP runtime registration.
 - Added safe confirmed removal execution for manager-owned model files only, plus additional tests for confirmation, threading wiring, removal, download progress, invalid checkpoints, and provider-agnostic manager behavior.
+# PERF-002 — Cleanup Review bulk interactions
+
+- Batched category/preference learning profile derivation and persistence once
+  per Cleanup Review bulk category action.
+- Added aggregate `[PERF]` timings, partial-failure feedback, duplicate-action
+  protection, incremental affected-card updates, and unchanged-thumbnail reuse.
+- Added reproducible 10/100/1,000-photo synthetic regression benchmarks.
+- Restored deterministic non-null Cleanup Review placeholders while retaining
+  the unchanged-valid-thumbnail rescale optimization.
+- Added a dedicated non-modal category-action status area directly below Cleanup
+  Review's category selector and Apply button, with readable success,
+  partial-failure, and complete-failure text.

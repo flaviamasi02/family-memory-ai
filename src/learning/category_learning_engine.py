@@ -5,6 +5,7 @@ import json
 import os
 import tempfile
 import threading
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -93,6 +94,8 @@ class CategoryLearningEngine:
         self.diagnostics = {"corrections_received": 0, "visual_profiles_reused": 0, "visual_profiles_queued": 0, "visual_profiles_completed": 0, "category_profiles_updated": 0, "recommendations_with_visual_match": 0, "recommendations_unknown": 0, "visual_analysis_workers_started": 0, "visual_analysis_workers_finished": 0}
         self._visual_analysis_thread: threading.Thread | None = None
         self._visual_analysis_lock = threading.Lock()
+        self._batch_depth = 0
+        self._batch_dirty = False
         self._load_profile()
 
     @property
@@ -145,7 +148,27 @@ class CategoryLearningEngine:
         elif _is_content_category(category):
             self.profile.pending_visual_analyses[event_id] = {"event_id": event_id, "file_path": event.file_path, "category_id": category, "previous_category": previous, "source": event.source, "timestamp": event.timestamp}
             self.diagnostics["visual_profiles_queued"] += 1
-        self._recompute_profile(); self._save_profile(); return event
+        self._profile_changed(); return event
+
+    @contextmanager
+    def bulk_update(self):
+        """Coalesce derived-profile calculation and persistence for one user action."""
+        self._batch_depth += 1
+        try:
+            yield self
+        finally:
+            self._batch_depth -= 1
+            if self._batch_depth == 0 and self._batch_dirty:
+                self._batch_dirty = False
+                self._recompute_profile()
+                self._save_profile()
+
+    def _profile_changed(self) -> None:
+        if self._batch_depth:
+            self._batch_dirty = True
+            return
+        self._recompute_profile()
+        self._save_profile()
 
     def record_completed_visual_analysis(self, event_id: str, visual_profile: VisualFeatureProfile | dict[str, Any]) -> bool:
         pending = self.profile.pending_visual_analyses.pop(str(event_id), None)

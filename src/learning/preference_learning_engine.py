@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from contextlib import contextmanager
 import json
 import os
 from dataclasses import asdict, dataclass, field
@@ -75,6 +76,8 @@ class PreferenceLearningEngine:
         self._storage_path = service.profile_path("preference_learning_profile.json")
         self._event_summaries: list[dict[str, Any]] = []
         self.profile = PreferenceLearningProfile()
+        self._batch_depth = 0
+        self._batch_dirty = False
         self._load_profile()
 
     @property
@@ -140,8 +143,7 @@ class PreferenceLearningEngine:
         event.event_type = "cleanup_decision"
         if self._event_summaries:
             self._event_summaries[-1]["event_type"] = "cleanup_decision"
-            self._recompute_profile()
-            self._save_profile()
+            self._profile_changed()
         return event
 
     def record_event(self, event: PreferenceLearningEvent) -> None:
@@ -157,6 +159,25 @@ class PreferenceLearningEngine:
             "context": dict(event.context or {}),
         }
         self._event_summaries.append(summary)
+        self._profile_changed()
+
+    @contextmanager
+    def bulk_update(self):
+        """Persist a learning profile once for a completed bulk action."""
+        self._batch_depth += 1
+        try:
+            yield self
+        finally:
+            self._batch_depth -= 1
+            if self._batch_depth == 0 and self._batch_dirty:
+                self._batch_dirty = False
+                self._recompute_profile()
+                self._save_profile()
+
+    def _profile_changed(self) -> None:
+        if self._batch_depth:
+            self._batch_dirty = True
+            return
         self._recompute_profile()
         self._save_profile()
 
