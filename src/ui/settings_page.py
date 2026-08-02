@@ -472,6 +472,9 @@ class SettingsPage(QWidget):
         readable_order = (
             "Memory Review load", "Score retrieval", "Database reads",
             "Grid creation", "Filter update", "Sort update", "Selection update",
+            "Ctrl-click selection", "Deselection", "Shift range selection",
+            "Select all visible", "Clear selection", "Selection highlight update",
+            "Selected-count label update",
             "Preview refresh", "Suggestion refresh", "Thumbnail refresh",
         )
         memory_lines = ["Recent aggregate timings (last / average / maximum)"]

@@ -2,7 +2,8 @@
 
 ## Current status — 2026-08-02
 
-**PERF-003 — Memory Review Performance is implemented.** Aggregate measurements
+**PERF-003 — Memory Review Performance is implemented and awaiting Product Owner
+re-validation.** Aggregate measurements
 identified full rendered-card recreation on every sort as the main avoidable UI
 work. Sort-only updates now relayout retained cards, normalized-path row lookup
 is indexed, refreshes preserve compatible controls/selection/scroll, and Memory

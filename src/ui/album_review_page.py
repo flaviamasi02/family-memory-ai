@@ -46,6 +46,7 @@ from core.memory_review_perf import (
     measure_memory_review,
     record_memory_review,
 )
+from core.selection_update import changed_selection_keys
 from core.user_metadata_service import UserMetadataService
 from learning.category_learning_engine import get_category_learning_engine
 from learning.preference_learning_engine import get_preference_learning_engine
@@ -82,7 +83,7 @@ class AlbumReviewCardWidget(QFrame):
         super().__init__(parent)
         self.row = row
         self.key = key
-        self._selected = False
+        self._selected: Optional[bool] = None
 
         self.setObjectName("albumReviewCard")
         self.setFrameShape(QFrame.Shape.StyledPanel)
@@ -199,7 +200,10 @@ class AlbumReviewCardWidget(QFrame):
             )
 
     def set_selected(self, selected: bool) -> None:
-        self._selected = bool(selected)
+        selected = bool(selected)
+        if self._selected == selected:
+            return
+        self._selected = selected
         if self._selected:
             self.setStyleSheet(
                 "QFrame#albumReviewCard { border: 3px solid palette(highlight); "
@@ -279,6 +283,15 @@ class AlbumReviewPage(QWidget):
         )
         self._suggestion_request_id = 0
         self._current_suggestion = None
+        self._pending_details_key: Optional[str] = None
+        self._details_refresh_timer = QTimer(self)
+        self._details_refresh_timer.setSingleShot(True)
+        self._details_refresh_timer.timeout.connect(self._refresh_pending_selection_details)
+        self._suggestion_timer = QTimer(self)
+        self._suggestion_timer.setSingleShot(True)
+        self._suggestion_timer.setInterval(120)
+        self._suggestion_timer.timeout.connect(self._compute_pending_suggestion)
+        self._pending_suggestion_row: Optional[AlbumReviewRow] = None
         self._suggestion_metadata = ManagedMobileCLIPEmbeddingProvider().metadata
 
         self.header = WorkspaceHeader("Memory Review")
@@ -1179,12 +1192,17 @@ class AlbumReviewPage(QWidget):
     ) -> None:
         started = time.perf_counter()
         visible_keys = [self._row_key(row) for row in self._visible_rows]
-        if key not in visible_keys:
+        index_by_key = {visible_key: index for index, visible_key in enumerate(visible_keys)}
+        if key not in index_by_key:
             return
 
+        previous_keys = set(self._selected_keys)
+        operation = "Single selection"
+
         if range_select and self._selection_anchor_key in visible_keys:
-            start = visible_keys.index(self._selection_anchor_key)
-            end = visible_keys.index(key)
+            operation = "Shift range selection"
+            start = index_by_key[self._selection_anchor_key]
+            end = index_by_key[key]
             if start > end:
                 start, end = end, start
             if not additive:
@@ -1192,8 +1210,10 @@ class AlbumReviewPage(QWidget):
             self._selected_keys.update(visible_keys[start : end + 1])
         elif additive:
             if key in self._selected_keys:
+                operation = "Deselection"
                 self._selected_keys.remove(key)
             else:
+                operation = "Ctrl-click selection"
                 self._selected_keys.add(key)
             self._selection_anchor_key = key
         else:
@@ -1201,18 +1221,12 @@ class AlbumReviewPage(QWidget):
             self._selection_anchor_key = key
 
         self._selected_key = key
-
-        for card_key, card in self._cards_by_key.items():
-            card.set_selected(card_key in self._selected_keys)
-
-        row = self._row_for_key(key)
-        if row is not None:
-            self._show_details(row)
-
-        self._update_selection_count()
+        self._apply_selection_ui(previous_keys, active_key=key)
         elapsed = (time.perf_counter() - started) * 1000.0
+        record_memory_review(operation, elapsed, items=len(self._selected_keys))
         record_memory_review("Selection update", elapsed, items=len(self._selected_keys))
         increment_memory_review_counter("selection_updates")
+        increment_memory_review_counter("selection_signal_emissions")
 
     def _on_card_double_clicked(self, key: str) -> None:
         rows = list(self._visible_rows)
@@ -1230,30 +1244,81 @@ class AlbumReviewPage(QWidget):
         self._preview_dialog.activateWindow()
 
     def select_all_visible(self) -> None:
+        started = time.perf_counter()
+        previous_keys = set(self._selected_keys)
         rendered_keys = set(self._rendered_keys)
-        self._selected_keys = set(rendered_keys)
+        self._selected_keys = rendered_keys
         if self._rendered_keys:
             self._selected_key = self._rendered_keys[0]
             self._selection_anchor_key = self._selected_key
-            row = self._row_for_key(self._selected_key)
-            if row is not None:
-                self._show_details(row)
-
-        for key, card in self._cards_by_key.items():
-            card.set_selected(key in self._selected_keys)
-
-        self._update_selection_count()
+        self._apply_selection_ui(previous_keys, active_key=self._selected_key)
+        record_memory_review(
+            "Select all visible", (time.perf_counter() - started) * 1000.0,
+            items=len(self._selected_keys),
+        )
+        increment_memory_review_counter("selection_signal_emissions")
 
     def clear_selection(self) -> None:
+        started = time.perf_counter()
+        previous_keys = set(self._selected_keys)
         self._selected_keys.clear()
         self._selected_key = None
         self._selection_anchor_key = None
 
-        for card in self._cards_by_key.values():
-            card.set_selected(False)
+        self._apply_selection_ui(previous_keys, active_key=None)
+        record_memory_review(
+            "Clear selection", (time.perf_counter() - started) * 1000.0,
+            items=len(previous_keys),
+        )
+        increment_memory_review_counter("selection_signal_emissions")
 
-        self._clear_details()
+    def _apply_selection_ui(
+        self, previous_keys: set[str], *, active_key: Optional[str]
+    ) -> None:
+        """Apply one selection transaction and touch changed cards only."""
+        changed_keys = changed_selection_keys(previous_keys, self._selected_keys)
+        highlight_started = time.perf_counter()
+        self.grid_content.setUpdatesEnabled(False)
+        try:
+            for changed_key in changed_keys:
+                card = self._cards_by_key.get(changed_key)
+                if card is not None:
+                    card.set_selected(changed_key in self._selected_keys)
+        finally:
+            self.grid_content.setUpdatesEnabled(True)
+        record_memory_review(
+            "Selection highlight update",
+            (time.perf_counter() - highlight_started) * 1000.0,
+            items=len(changed_keys),
+        )
+        increment_memory_review_counter("selection_cards_updated", len(changed_keys))
+
+        count_started = time.perf_counter()
         self._update_selection_count()
+        record_memory_review(
+            "Selected-count label update",
+            (time.perf_counter() - count_started) * 1000.0,
+            items=len(self._selected_keys),
+        )
+        increment_memory_review_counter("selected_count_updates")
+
+        self._pending_details_key = active_key
+        # One frame coalesces rapid Ctrl-clicks without delaying the immediate
+        # card highlight and selected-count update.
+        self._details_refresh_timer.start(16)
+
+    def _refresh_pending_selection_details(self) -> None:
+        key = self._pending_details_key
+        self._pending_details_key = None
+        if key is None:
+            self._suggestion_timer.stop()
+            self._pending_suggestion_row = None
+            self._clear_details()
+        else:
+            row = self._row_for_key(key)
+            if row is not None and key == self._selected_key:
+                self._show_details(row)
+        increment_memory_review_counter("selection_details_refreshes")
 
     def _update_selection_count(self) -> None:
         count = len(self._selected_keys)
@@ -1471,23 +1536,31 @@ class AlbumReviewPage(QWidget):
         self.apply_suggestion_button.setEnabled(False)
         self.reject_suggestion_button.setEnabled(False)
 
-        def compute() -> None:
-            if request_id != self._suggestion_request_id:
-                return
-            with measure_memory_review("Suggestion refresh", items=len(self._all_rows)):
-                result = self._category_suggestion_service.suggest(
-                    row.breakdown.photo,
-                    [r.breakdown.photo for r in self._all_rows],
-                    self._suggestion_metadata,
-                )
-            if (
-                request_id != self._suggestion_request_id
-                or self._details_key != self._row_key(row)
-            ):
-                return
-            self._render_category_suggestion(result)
+        self._pending_suggestion_row = row
+        self._suggestion_timer.setProperty("request_id", request_id)
+        self._suggestion_timer.start()
+        increment_memory_review_counter("suggestion_refreshes_deferred")
 
-        QTimer.singleShot(0, compute)
+    def _compute_pending_suggestion(self) -> None:
+        row = self._pending_suggestion_row
+        request_id = int(self._suggestion_timer.property("request_id") or 0)
+        self._pending_suggestion_row = None
+        if row is None or request_id != self._suggestion_request_id:
+            increment_memory_review_counter("stale_suggestions_ignored")
+            return
+        with measure_memory_review("Suggestion refresh", items=len(self._all_rows)):
+            result = self._category_suggestion_service.suggest(
+                row.breakdown.photo,
+                [r.breakdown.photo for r in self._all_rows],
+                self._suggestion_metadata,
+            )
+        if (
+            request_id != self._suggestion_request_id
+            or self._details_key != self._row_key(row)
+        ):
+            increment_memory_review_counter("stale_suggestions_ignored")
+            return
+        self._render_category_suggestion(result)
 
     def _render_category_suggestion(self, result) -> None:
         self._current_suggestion = result if result.status == "suggested" else None

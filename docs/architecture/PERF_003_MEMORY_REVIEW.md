@@ -30,3 +30,28 @@ detail selection continues to skip refresh.
 The diagnostics counter `grid_rebuilds_avoided` provides direct measurable
 evidence for the optimized path. No scoring, filtering, sorting, thumbnail,
 suggestion, category, or Cleanup Review behavior is changed.
+
+## Selection follow-up measurement
+
+Product Owner testing of the first PERF-003 version found that rapid Memory
+Review multi-selection was still visibly slower than Cleanup Review. Inspection
+showed that every click reapplied a Qt stylesheet to every rendered card and
+immediately rebuilt preview/details state; each detail refresh also queued an AI
+suggestion. Range, select-all, and clear therefore paid one expensive card-style
+update per rendered item even when most selection states were unchanged.
+
+The follow-up applies styles only to the symmetric selection delta, disables
+grid painting during that transaction, updates the count once, and coalesces
+details refreshes within one 16 ms frame. AI suggestions use a separate 120 ms
+single-shot timer, so rapid changes produce one suggestion for the final primary
+photo. Request identity and primary-photo checks reject stale results. Selection
+does not call filtering, sorting, scoring, persistence, thumbnail loading, or
+grid rebuild code.
+
+A reproducible 10,000-iteration median CPU benchmark compared the former
+all-visible-card selection planning loop with the incremental delta calculation.
+Results were: 1 item, 0.326 to 0.278 microseconds; 10 items, 0.653 to 0.452;
+100 items, 3.993 to 2.037; 423 items, 15.472 to 6.614 (57.3% lower); and 1,000
+items, 39.391 to 13.888 (64.7% lower). These are isolated selection-planning
+measurements from the Linux test environment, not Product Owner end-to-end UI
+latency. Runtime Developer Diagnostics remains the authority for UI timings.

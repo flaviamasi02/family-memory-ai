@@ -1055,6 +1055,69 @@ class AlbumReviewPageTests(unittest.TestCase):
         self.assertEqual(page._grid_rebuild_count, rebuild_before)
         self.assertEqual(page.filename_value.text(), "photo_5.jpg")
 
+    def test_perf_003_selection_updates_only_delta_and_coalesces_details(self):
+        breakdowns = [self._make_virtual_breakdown(index) for index in range(100)]
+        page = AlbumReviewPage()
+        page.set_scored_photos(breakdowns)
+        self._flush_ui(wait_ms=80)
+        cards = list(page._cards_by_key.values())
+        for card in cards:
+            card.set_selected = Mock(wraps=card.set_selected)
+        details_before = page._details_key
+        rebuilds_before = page.grid_rebuild_count()
+        scroll_before = page.grid_scroll.verticalScrollBar().value()
+
+        target_key = page._row_key(page._visible_rows[9])
+        page._select_key(target_key, additive=True)
+
+        changed_calls = sum(card.set_selected.call_count for card in cards)
+        self.assertEqual(changed_calls, 1)
+        self.assertEqual(page.grid_rebuild_count(), rebuilds_before)
+        self.assertEqual(page.grid_scroll.verticalScrollBar().value(), scroll_before)
+        self.assertEqual(page._details_key, details_before)
+        self._flush_ui(wait_ms=25)
+        self.assertEqual(page._details_key, target_key)
+
+    def test_perf_003_bulk_selection_defers_one_final_suggestion(self):
+        breakdowns = [self._make_virtual_breakdown(index) for index in range(100)]
+        page = AlbumReviewPage()
+        page.set_scored_photos(breakdowns)
+        self._flush_ui(wait_ms=140)
+        page._category_suggestion_service.suggest = Mock(
+            return_value=CategorySuggestionResult(
+                source_photo_key="photo_20.jpg", status="insufficient_evidence"
+            )
+        )
+        page._category_suggestion_service.suggest.reset_mock()
+        rebuilds_before = page.grid_rebuild_count()
+        thumbnails_before = page.retained_thumbnail_count()
+
+        page._select_key(page._row_key(page._visible_rows[10]), additive=False)
+        page._select_key(page._row_key(page._visible_rows[20]), range_select=True)
+        self._flush_ui(wait_ms=25)
+        self.assertEqual(page.selected_count(), 11)
+        self.assertEqual(page.grid_rebuild_count(), rebuilds_before)
+        self.assertEqual(page.retained_thumbnail_count(), thumbnails_before)
+        self.assertEqual(page._category_suggestion_service.suggest.call_count, 0)
+
+        self._flush_ui(wait_ms=130)
+        self.assertEqual(page._category_suggestion_service.suggest.call_count, 1)
+
+    def test_perf_003_clear_selection_skips_filter_sort_and_updates_count_once(self):
+        breakdowns = [self._make_virtual_breakdown(index) for index in range(20)]
+        page = AlbumReviewPage()
+        page.set_scored_photos(breakdowns)
+        self._flush_ui(wait_ms=80)
+        page.select_all_visible()
+        page._filtered_sorted_rows = Mock(wraps=page._filtered_sorted_rows)
+        page._update_selection_count = Mock(wraps=page._update_selection_count)
+
+        page.clear_selection()
+
+        page._filtered_sorted_rows.assert_not_called()
+        page._update_selection_count.assert_called_once()
+        self.assertEqual(page.selected_count(), 0)
+
     def test_cached_thumbnails_are_reused(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
