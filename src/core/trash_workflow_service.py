@@ -48,7 +48,8 @@ class TrashOperationResult:
     def message(self) -> str:
         if self.failed_count:
             return f"{self.moved_count} of {self.requested_count} photos moved to Trash. {self.failed_count} could not be moved."
-        return f"{self.moved_count} photos moved to Trash."
+        noun = "photo" if self.moved_count == 1 else "photos"
+        return f"{self.moved_count} {noun} moved to Trash."
 
 
 class TrashWorkflowService:

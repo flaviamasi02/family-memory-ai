@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 from core.selection_diagnostics import clear_selection_diagnostics
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from models.photo import Photo
 from core.category_registry import get_category_registry, reset_category_registry
@@ -551,6 +551,93 @@ class IrrelevantMediaPageTests(unittest.TestCase):
         self.assertFalse(hasattr(page, "mark_screenshot_button"))
         self.assertFalse(hasattr(page, "mark_duplicate_button"))
         self.assertFalse(hasattr(page, "mark_unknown_button"))
+
+    def test_trash_action_area_shows_destination_counts_and_distinct_status(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "library"; root.mkdir()
+            proposed = self._make_photo(root, "proposed.jpg", {
+                "trash_proposal_category": "to_trash", "trash_workflow_state": "proposed_to_trash",
+            })
+            confirmed = self._make_photo(root, "confirmed.jpg", {
+                "trash_proposal_category": "to_trash", "trash_workflow_state": "confirmed_to_trash",
+            })
+            page = IrrelevantMediaPage(); page.set_photos([proposed, confirmed], root)
+            self.assertEqual(page.trash_destination_label.text(), str(root.parent / "Family Memory Trash"))
+            self.assertIn("Proposed for Trash: 1", page.trash_counts_label.text())
+            self.assertIn("Confirmed for Trash: 1", page.trash_counts_label.text())
+            self.assertEqual(page.move_trash_button.parentWidget().objectName(), "trashActionsSection")
+            self.assertGreaterEqual(page.move_trash_button.minimumHeight(), 48)
+            page.select_photo_by_filename("proposed.jpg")
+            self.assertEqual(page.trash_status_value.text(), "Proposed")
+            page.select_photo_by_filename("confirmed.jpg")
+            self.assertEqual(page.trash_status_value.text(), "Confirmed")
+
+    def test_trash_confirmation_contains_exact_count_destination_and_required_warning(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "library"; root.mkdir()
+            page = IrrelevantMediaPage(); page.set_photos([], root)
+            dialog, move_button = page._create_trash_confirmation_dialog(3, page._trash_destination)
+            self.assertEqual(dialog.windowTitle(), "Move photos to Trash")
+            self.assertIn("3 confirmed", dialog.text())
+            self.assertIn(str(page._trash_destination), dialog.informativeText())
+            self.assertIn("moved, not permanently deleted", dialog.informativeText())
+            self.assertIn("Other programs may no longer find", dialog.informativeText())
+            self.assertEqual(move_button.text(), "Move to Trash")
+
+    def test_zero_confirmed_and_cancel_move_nothing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "library"; root.mkdir()
+            proposed = self._make_photo(root, "proposed.jpg", {
+                "trash_proposal_category": "to_trash", "trash_workflow_state": "proposed_to_trash",
+            })
+            page = IrrelevantMediaPage(); page.set_photos([proposed], root)
+            with patch.object(QMessageBox, "information") as information:
+                page.move_confirmed_to_trash()
+            information.assert_called_once()
+            self.assertTrue(proposed.path.exists())
+
+            proposed.metadata["trash_workflow_state"] = "confirmed_to_trash"
+            page._rows = [page._build_row(proposed)]
+            fake_dialog = unittest.mock.Mock()
+            move_button = object()
+            fake_dialog.clickedButton.return_value = object()
+            with patch.object(page, "_create_trash_confirmation_dialog", return_value=(fake_dialog, move_button)), \
+                    patch("ui.irrelevant_media_page.TrashWorkflowService.move_confirmed") as move:
+                page.move_confirmed_to_trash()
+            fake_dialog.exec.assert_called_once()
+            move.assert_not_called()
+            self.assertTrue(proposed.path.exists())
+
+    def test_change_and_invalid_trash_destination_are_explicit(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "library"; root.mkdir()
+            alternate = Path(tmpdir) / "alternate"; alternate.mkdir()
+            page = IrrelevantMediaPage(); page.set_photos([], root)
+            with patch.object(QFileDialog, "getExistingDirectory", return_value=str(alternate)):
+                page.change_trash_folder()
+            self.assertEqual(page.trash_destination_label.text(), str(alternate))
+            self.assertTrue(page.move_trash_button.isEnabled())
+            self.assertFalse(page._set_trash_destination(root / "inside"))
+            self.assertFalse(page.move_trash_button.isEnabled())
+            self.assertIn("actively scanned library", page.trash_destination_label.text())
+
+    def test_move_to_trash_button_confirmation_performs_confirmed_move(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "library"; root.mkdir()
+            photo = self._make_photo(root, "confirmed.jpg", {
+                "trash_proposal_category": "to_trash", "trash_workflow_state": "confirmed_to_trash",
+            })
+            page = IrrelevantMediaPage(); page.set_photos([photo], root)
+            fake_dialog = unittest.mock.Mock()
+            move_button = object()
+            fake_dialog.clickedButton.return_value = move_button
+            with patch.object(page, "_create_trash_confirmation_dialog", return_value=(fake_dialog, move_button)):
+                page.move_confirmed_to_trash()
+            fake_dialog.exec.assert_called_once()
+            self.assertFalse((root / "confirmed.jpg").exists())
+            self.assertTrue((root.parent / "Family Memory Trash" / "confirmed.jpg").exists())
+            self.assertEqual(photo.metadata["trash_workflow_state"], "moved_to_trash")
+            self.assertEqual(page.trash_action_status_label.text(), "1 photo moved to Trash.")
 
     def test_cleanup_review_grid_renders_multiple_columns_when_wide(self):
         with tempfile.TemporaryDirectory() as tmpdir:
