@@ -47,6 +47,14 @@ from core.memory_review_perf import (
     record_memory_review,
 )
 from core.selection_update import changed_selection_keys
+from core.selection_diagnostics import (
+    active_selection_measurement,
+    add_selection_count,
+    add_selection_time,
+    begin_selection_measurement,
+    finish_selection_measurement,
+    selection_bypass,
+)
 from core.user_metadata_service import UserMetadataService
 from learning.category_learning_engine import get_category_learning_engine
 from learning.preference_learning_engine import get_preference_learning_engine
@@ -1189,15 +1197,23 @@ class AlbumReviewPage(QWidget):
         self.grid_content.adjustSize()
 
     def _on_card_clicked(self, key: str, modifiers_value: int) -> None:
+        event_started = time.perf_counter()
+        if active_selection_measurement() is None:
+            begin_selection_measurement("memory")
         modifiers = Qt.KeyboardModifier(modifiers_value)
         additive = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
         range_select = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
         self._select_key(key, additive=additive, range_select=range_select)
+        add_selection_time(
+            "Mouse/card event handling", (time.perf_counter() - event_started) * 1000.0
+        )
 
     def _select_key(
         self, key: str, additive: bool = False, range_select: bool = False
     ) -> None:
         started = time.perf_counter()
+        if active_selection_measurement() is None:
+            begin_selection_measurement("memory")
         visible_keys = self._last_visible_key_order
         if key not in self._visible_index_by_key:
             return
@@ -1227,12 +1243,21 @@ class AlbumReviewPage(QWidget):
             self._selection_anchor_key = key
 
         self._selected_key = key
+        add_selection_time(
+            "Selected-key calculation", (time.perf_counter() - started) * 1000.0
+        )
         self._apply_selection_ui(previous_keys, active_key=key)
         elapsed = (time.perf_counter() - started) * 1000.0
         record_memory_review(operation, elapsed, items=len(self._selected_keys))
         record_memory_review("Selection update", elapsed, items=len(self._selected_keys))
         increment_memory_review_counter("selection_updates")
         increment_memory_review_counter("selection_signal_emissions")
+        add_selection_count("Selected photos", len(self._selected_keys))
+        add_selection_count("Visible cards", len(self._cards_by_key))
+        add_selection_time("Total synchronous UI-thread time", elapsed)
+        finish_selection_measurement()
+        if selection_bypass("details") or selection_bypass("suggestions"):
+            finish_selection_measurement(deferred=True)
 
     def _on_card_double_clicked(self, key: str) -> None:
         rows = list(self._visible_rows)
@@ -1251,6 +1276,8 @@ class AlbumReviewPage(QWidget):
 
     def select_all_visible(self) -> None:
         started = time.perf_counter()
+        if active_selection_measurement() is None:
+            begin_selection_measurement("memory")
         previous_keys = set(self._selected_keys)
         rendered_keys = set(self._rendered_keys)
         self._selected_keys = rendered_keys
@@ -1263,9 +1290,14 @@ class AlbumReviewPage(QWidget):
             items=len(self._selected_keys),
         )
         increment_memory_review_counter("selection_signal_emissions")
+        add_selection_count("Selected photos", len(self._selected_keys))
+        add_selection_count("Visible cards", len(self._cards_by_key))
+        finish_selection_measurement()
 
     def clear_selection(self) -> None:
         started = time.perf_counter()
+        if active_selection_measurement() is None:
+            begin_selection_measurement("memory")
         previous_keys = set(self._selected_keys)
         self._selected_keys.clear()
         self._selected_key = None
@@ -1277,6 +1309,9 @@ class AlbumReviewPage(QWidget):
             items=len(previous_keys),
         )
         increment_memory_review_counter("selection_signal_emissions")
+        add_selection_count("Selected photos", 0)
+        add_selection_count("Visible cards", len(self._cards_by_key))
+        finish_selection_measurement(deferred=True)
 
     def _apply_selection_ui(
         self, previous_keys: set[str], *, active_key: Optional[str]
@@ -1284,10 +1319,13 @@ class AlbumReviewPage(QWidget):
         """Apply one selection transaction and touch changed cards only."""
         changed_keys = changed_selection_keys(previous_keys, self._selected_keys)
         highlight_started = time.perf_counter()
-        for changed_key in changed_keys:
-            card = self._cards_by_key.get(changed_key)
-            if card is not None:
-                card.set_selected(changed_key in self._selected_keys)
+        if not selection_bypass("styling"):
+            for changed_key in changed_keys:
+                card = self._cards_by_key.get(changed_key)
+                if card is not None:
+                    card.set_selected(changed_key in self._selected_keys)
+                    add_selection_count("Cards restyled")
+                    add_selection_count("setStyleSheet calls")
         record_memory_review(
             "Selection highlight update",
             (time.perf_counter() - highlight_started) * 1000.0,
@@ -1297,6 +1335,20 @@ class AlbumReviewPage(QWidget):
         increment_memory_review_counter("selection_rows_scanned", 0)
         increment_memory_review_counter("selection_viewport_updates", len(changed_keys))
         increment_memory_review_counter("selection_layout_activations", 0)
+        add_selection_count("Cards whose selection state changed", len(changed_keys))
+        add_selection_count("Viewport update calls", len(changed_keys))
+        add_selection_count("Layout activation calls", 0)
+        add_selection_count("Grid rebuilds", 0)
+        add_selection_count("Filter operations", 0)
+        add_selection_count("Sort operations", 0)
+        add_selection_count("Rows scanned", 0)
+        add_selection_count("Preview image loads", 0)
+        add_selection_count("Original image decodes", 0)
+        add_selection_count("Thumbnail loads/rescales", 0)
+        add_selection_count("Suggestion requests", 0)
+        add_selection_time(
+            "Selection highlight update", (time.perf_counter() - highlight_started) * 1000.0
+        )
 
         count_started = time.perf_counter()
         self._update_selection_count()
@@ -1306,12 +1358,20 @@ class AlbumReviewPage(QWidget):
             items=len(self._selected_keys),
         )
         increment_memory_review_counter("selected_count_updates")
+        add_selection_time(
+            "Selected-count update", (time.perf_counter() - count_started) * 1000.0
+        )
 
         # One authoritative finalization path owns the complete detail state.
         # This must be deterministic for programmatic selection and must clear
         # values absent from the new row. Only AI suggestion computation remains
         # deferred by _request_category_suggestion().
-        if active_key is None:
+        detail_started = time.perf_counter()
+        if selection_bypass("details"):
+            self._suggestion_request_id += 1
+            self._suggestion_timer.stop()
+            self._pending_suggestion_row = None
+        elif active_key is None:
             self._suggestion_request_id += 1
             self._suggestion_timer.stop()
             self._pending_suggestion_row = None
@@ -1321,6 +1381,10 @@ class AlbumReviewPage(QWidget):
             if row is not None:
                 self._show_details(row, force=True)
         increment_memory_review_counter("selection_details_refreshes")
+        add_selection_time(
+            "Detail text update", (time.perf_counter() - detail_started) * 1000.0
+        )
+        add_selection_count("Detail refreshes", 0 if selection_bypass("details") else 1)
         record_memory_review(
             "Selection highlight visible",
             (time.perf_counter() - highlight_started) * 1000.0,
@@ -1388,6 +1452,7 @@ class AlbumReviewPage(QWidget):
             f"Date {breakdown.date_score:.2f}"
         )
 
+        classification_started = time.perf_counter()
         category_value = self._effective_category_for_photo(photo)
         self.media_category_value.setText(media_category_label(category_value))
         metadata = dict(getattr(photo, "metadata", {}) or {})
@@ -1435,6 +1500,10 @@ class AlbumReviewPage(QWidget):
                 "reliable import-time classification rules."
             )
         self.classification_summary_value.setText(summary)
+        add_selection_time(
+            "Classification summary update",
+            (time.perf_counter() - classification_started) * 1000.0,
+        )
         visual_parts = [
             str(photo.metadata.get("visual_signals_summary", "") or "").strip(),
             str(photo.metadata.get("visual_evidence", "") or "").strip(),
@@ -1481,16 +1550,29 @@ class AlbumReviewPage(QWidget):
         if not breakdown.explanation:
             self.explanations_list.addItem("No score explanation available.")
 
-        preview = self._get_cached_preview(photo)
+        preview_started = time.perf_counter()
+        preview = None if selection_bypass("preview") else self._get_cached_preview(photo)
         if isinstance(preview, QPixmap) and not preview.isNull():
             self.preview_label.setPixmap(preview)
             self.preview_label.setText("")
         else:
             self.preview_label.setPixmap(QPixmap())
             self.preview_label.setText("Preview unavailable")
+        add_selection_time(
+            "Preview image update", (time.perf_counter() - preview_started) * 1000.0
+        )
 
         self._sync_selectors_to_row(row)
-        self._request_category_suggestion(row)
+        suggestion_started = time.perf_counter()
+        if selection_bypass("suggestions"):
+            self._suggestion_request_id += 1
+            self._suggestion_timer.stop()
+            self._pending_suggestion_row = None
+        else:
+            self._request_category_suggestion(row)
+        add_selection_time(
+            "AI suggestion scheduling", (time.perf_counter() - suggestion_started) * 1000.0
+        )
         increment_memory_review_counter("detail_refreshes")
         record_memory_review(
             "Preview refresh", (time.perf_counter() - detail_started) * 1000.0, items=1
@@ -1549,11 +1631,13 @@ class AlbumReviewPage(QWidget):
         increment_memory_review_counter("suggestion_refreshes_deferred")
 
     def _compute_pending_suggestion(self) -> None:
+        diagnostic_started = time.perf_counter()
         row = self._pending_suggestion_row
         request_id = int(self._suggestion_timer.property("request_id") or 0)
         self._pending_suggestion_row = None
         if row is None or request_id != self._suggestion_request_id:
             increment_memory_review_counter("stale_suggestions_ignored")
+            finish_selection_measurement(deferred=True)
             return
         with measure_memory_review("Suggestion refresh", items=len(self._all_rows)):
             result = self._category_suggestion_service.suggest(
@@ -1566,8 +1650,14 @@ class AlbumReviewPage(QWidget):
             or self._details_key != self._row_key(row)
         ):
             increment_memory_review_counter("stale_suggestions_ignored")
+            finish_selection_measurement(deferred=True)
             return
         self._render_category_suggestion(result)
+        add_selection_time(
+            "AI suggestion execution", (time.perf_counter() - diagnostic_started) * 1000.0
+        )
+        add_selection_count("Suggestion requests")
+        finish_selection_measurement(deferred=True)
 
     def _render_category_suggestion(self, result) -> None:
         self._current_suggestion = result if result.status == "suggested" else None
@@ -2266,14 +2356,22 @@ class AlbumReviewPage(QWidget):
         return QSize(target_width, target_height)
 
     def _get_cached_preview(self, photo) -> Optional[QPixmap]:
+        diagnostic_started = time.perf_counter()
+        def finish_diagnostic() -> None:
+            add_selection_time(
+                "Preview image decoding/loading",
+                (time.perf_counter() - diagnostic_started) * 1000.0,
+            )
         photo_key = self._photo_key(photo)
         if not photo_key:
+            finish_diagnostic()
             return None
 
         target_size = self._preview_target_size()
         cache_key = self._thumbnail_cache_key(photo_key, target_size)
         cached = self._preview_cache.get(cache_key)
         if cached is not None:
+            finish_diagnostic()
             return cached[1]
 
         retained = self._retained_thumbnail_by_key.get(photo_key)
@@ -2284,6 +2382,8 @@ class AlbumReviewPage(QWidget):
                 Qt.TransformationMode.SmoothTransformation,
             )
             self._preview_cache[cache_key] = (0, scaled)
+            add_selection_count("Thumbnail loads/rescales")
+            finish_diagnostic()
             return scaled
 
         photo_thumbnail = getattr(photo, "thumbnail", None)
@@ -2294,16 +2394,21 @@ class AlbumReviewPage(QWidget):
                 Qt.TransformationMode.SmoothTransformation,
             )
             self._preview_cache[cache_key] = (0, scaled)
+            add_selection_count("Thumbnail loads/rescales")
+            finish_diagnostic()
             return scaled
 
         thumbnail_path = str(getattr(photo, "thumbnail_path", "") or "")
         pixmap = None
         if thumbnail_path and Path(thumbnail_path).exists():
+            add_selection_count("Preview image loads")
             pixmap = load_display_thumbnail(thumbnail_path, target_size)
         if pixmap is not None and not pixmap.isNull():
             self._preview_cache[cache_key] = (0, pixmap)
+            add_selection_count("Thumbnail loads/rescales")
+            finish_diagnostic()
             return pixmap
-
+        finish_diagnostic()
         return None
 
     def _thumbnail_cache_key(self, photo_key: str, size: QSize) -> str:

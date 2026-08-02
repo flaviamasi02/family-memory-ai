@@ -2,8 +2,11 @@
 
 ## Current status — 2026-08-02
 
-**PERF-003 — Memory Review Performance is implemented and awaiting Product Owner
-re-validation.** Aggregate measurements
+**PERF-003 — Memory Review Performance is not complete; Product Owner acceptance
+remains pending.** Earlier optimizations produced no perceived improvement on the
+Product Owner's Windows library. Developer Diagnostics now provides an opt-in
+real-device Memory Review/Cleanup Review selection comparison and temporary,
+non-persistent isolation controls. Aggregate measurements
 identified full rendered-card recreation on every sort as the main avoidable UI
 work. Sort-only updates now relayout retained cards, normalized-path row lookup
 is indexed, refreshes preserve compatible controls/selection/scroll, and Memory

@@ -15,7 +15,7 @@
 1. DATA-001 — Central Metadata Storage (**DATA-001A–D implemented and Product Owner validated; DATA-001E–H planned**)
 2. PERF-001 — Semantic Embedding Performance (**PERF-001A and PERF-001B implemented**)
 3. PERF-002 — Cleanup Review bulk interaction performance (**implemented**)
-4. PERF-003 — Memory Review responsiveness (**implemented; Product Owner re-validation pending**)
+4. PERF-003 — Memory Review responsiveness (**in progress; Product Owner acceptance pending**)
 5. MODEL-004B — Face Detection (**planned; not started**)
 6. MODEL-004C — Face Embeddings (**planned; not started**)
 7. MODEL-004D — Face Clustering (**planned; not started**)

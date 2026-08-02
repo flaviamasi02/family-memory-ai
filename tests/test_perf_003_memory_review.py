@@ -6,6 +6,17 @@ from core.memory_review_perf import (
     record_memory_review,
 )
 from core.selection_update import changed_selection_keys
+from core.selection_diagnostics import (
+    add_selection_count,
+    add_selection_time,
+    arm_selection_measurement,
+    begin_selection_measurement,
+    clear_selection_diagnostics,
+    finish_selection_measurement,
+    selection_bypass,
+    selection_diagnostic_report,
+    set_selection_bypass,
+)
 from time import perf_counter
 import statistics
 
@@ -64,3 +75,29 @@ def test_incremental_highlight_work_is_measurably_lower_than_full_refresh():
     before = median_seconds(lambda: [key in current for key in keys])
     after = median_seconds(lambda: changed_selection_keys(keys, current))
     assert after < before
+
+
+def test_real_selection_diagnostic_is_aggregate_and_path_free():
+    clear_selection_diagnostics()
+    arm_selection_measurement()
+    assert begin_selection_measurement("memory") is not None
+    add_selection_time("Selection highlight update", 12.5)
+    add_selection_count("Selected photos", 10)
+    add_selection_count("Cards restyled", 1)
+    finish_selection_measurement(deferred=True)
+    report = selection_diagnostic_report()
+    assert "Memory Review selection" in report
+    assert "Cleanup Review selection" in report
+    assert "Selected photos: 10" in report
+    assert "Cards restyled: 1" in report
+    assert "/" not in report and "\\" not in report
+
+
+def test_diagnostic_bypasses_are_off_after_reset():
+    clear_selection_diagnostics()
+    for key in ("preview", "details", "suggestions", "styling"):
+        assert not selection_bypass(key)
+        set_selection_bypass(key, True)
+        assert selection_bypass(key)
+    clear_selection_diagnostics()
+    assert not any(selection_bypass(key) for key in ("preview", "details", "suggestions", "styling"))

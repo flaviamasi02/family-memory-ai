@@ -56,6 +56,15 @@ def test_import_performance_title_has_valid_point_size(page):
     assert "font-size" not in widget.import_performance_title.styleSheet()
 
 
+def test_memory_review_selection_measurement_controls_default_off(page):
+    widget, _, _, _ = page
+    assert widget.measure_memory_review_selection_button.text() == "Measure Memory Review selection"
+    assert "Open Memory Review" in widget.memory_review_measurement_instructions.text()
+    assert all(not checkbox.isChecked() for checkbox in widget.selection_diagnostic_bypasses.values())
+    widget.measure_memory_review_selection_button.click()
+    assert "measurement armed" in widget.diagnostics_status_label.text().lower()
+
+
 def test_import_efficiency_no_session_is_clear_and_explained(page):
     widget, _, _, _ = page
     report = widget.import_performance_report.toPlainText()

@@ -82,3 +82,20 @@ selection delta after): 1 item, 0.680 to 0.278 microseconds; 10 items, 1.591 to
 and 1,000 items, 124.069 to 0.280 (99.8% lower). This isolates CPU work before
 the repaint request; actual time-to-visible-highlight requires Product Owner/Qt
 runtime diagnostics and is not inferred from the microbenchmark.
+
+## Real-device diagnostic mode
+
+The earlier optimizations did not produce a perceived improvement on the Product
+Owner's Windows PC, so PERF-003 is not complete. Settings → Developer Diagnostics
+now offers **Measure Memory Review selection**. It arms one aggregate real
+interaction measurement and retains side-by-side Memory Review and Cleanup Review
+reports without recording image paths or emitting per-card logs.
+
+The report separates mouse/card handling, selected-key calculation, highlighting,
+count update, detail/classification/preview work, preview loading, suggestion
+scheduling/execution, synchronous time, and deferred completion. It includes
+selection/card/style/repaint/layout/preview/thumbnail/detail/suggestion/grid/filter/
+sort/row counts. Temporary process-local bypasses can independently skip preview,
+details, suggestions, or selection styling; all default off and are reset when a
+new Settings page is constructed. No optimization conclusion is drawn until the
+Product Owner captures actual comparison results.

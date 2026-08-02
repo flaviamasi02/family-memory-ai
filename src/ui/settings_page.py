@@ -12,6 +12,7 @@ from PySide6.QtGui import QDesktopServices, QFont, QGuiApplication
 from PySide6.QtWidgets import (
     QFileDialog,
     QButtonGroup,
+    QCheckBox,
     QComboBox,
     QGridLayout,
     QHBoxLayout,
@@ -45,6 +46,11 @@ from core.perf_stats import (
     performance_history,
 )
 from core.memory_review_perf import memory_review_performance_snapshot
+from core.selection_diagnostics import (
+    arm_selection_measurement,
+    selection_diagnostic_report,
+    set_selection_bypass,
+)
 from storage.errors import StorageError
 from storage.schema import SCHEMA_VERSION
 
@@ -427,6 +433,38 @@ class SettingsPage(QWidget):
             "Aggregate Memory Review UI timings. Values are process-local and contain no per-photo logs."
         )
         panel.addWidget(self.memory_review_performance_report)
+        self.measure_memory_review_selection_button = QPushButton(
+            "Measure Memory Review selection"
+        )
+        self.measure_memory_review_selection_button.clicked.connect(
+            self._arm_selection_measurement
+        )
+        panel.addWidget(self.measure_memory_review_selection_button)
+        self.memory_review_measurement_instructions = QLabel(
+            "Open Memory Review, then select several photos. Return here to view the measured result."
+        )
+        self.memory_review_measurement_instructions.setWordWrap(True)
+        panel.addWidget(self.memory_review_measurement_instructions)
+        self.selection_diagnostic_warning = QLabel(
+            "Temporary diagnostic controls: displayed information may be incomplete while a bypass is enabled."
+        )
+        self.selection_diagnostic_warning.setWordWrap(True)
+        panel.addWidget(self.selection_diagnostic_warning)
+        self.selection_diagnostic_bypasses = {}
+        for key, label in (
+            ("preview", "Memory Review diagnostic: skip preview loading"),
+            ("details", "Memory Review diagnostic: skip detail-panel refresh"),
+            ("suggestions", "Memory Review diagnostic: skip AI suggestions"),
+            ("styling", "Memory Review diagnostic: skip selection styling"),
+        ):
+            set_selection_bypass(key, False)
+            checkbox = QCheckBox(label)
+            checkbox.setChecked(False)
+            checkbox.toggled.connect(
+                lambda checked, bypass_key=key: set_selection_bypass(bypass_key, checked)
+            )
+            self.selection_diagnostic_bypasses[key] = checkbox
+            panel.addWidget(checkbox)
 
         actions = QGridLayout()
         action_specs = (
@@ -452,6 +490,12 @@ class SettingsPage(QWidget):
 
     def _set_diagnostics_status(self, text: str) -> None:
         self.diagnostics_status_label.setText(text)
+
+    def _arm_selection_measurement(self) -> None:
+        arm_selection_measurement()
+        self._set_diagnostics_status(
+            "Selection measurement armed. Select in Memory Review or Cleanup Review, then Refresh."
+        )
 
     def refresh_developer_diagnostics(self) -> None:
         services = self.application_services
@@ -490,6 +534,7 @@ class SettingsPage(QWidget):
         if counters:
             memory_lines.extend(("", "Update counters"))
             memory_lines.extend(f"{key}: {value}" for key, value in sorted(counters.items()))
+        memory_lines.extend(("", selection_diagnostic_report()))
         self.memory_review_performance_report.setPlainText("\n".join(memory_lines))
         store = services.metadata_store
         health = store.health_check() if store.library_id else None
