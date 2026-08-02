@@ -82,10 +82,37 @@ class FaceRuntimeStatus:
     bootstrap_interpreter: str = ""
     last_verification: str = "never"
     last_error: str = "none"
+    runtime_python_version: str = ""
+    runtime_architecture: str = ""
 
     @property
     def ready(self):
         return self.state == "Ready"
+
+
+@dataclass(frozen=True)
+class InterpreterDiagnostic:
+    executable: Path
+    major: int
+    minor: int
+    patch: int
+    version: str
+    architecture: str
+    prefix: Path
+    is_virtual_environment: bool
+    pip_version: str = ""
+
+    @classmethod
+    def from_mapping(cls, value):
+        version = str(value.get("python_version", "unknown"))
+        parts = version.split(".")
+        major = int(value.get("python_major", parts[0] if parts and parts[0].isdigit() else 0))
+        minor = int(value.get("python_minor", parts[1] if len(parts) > 1 and parts[1].isdigit() else 0))
+        patch_text = parts[2].split()[0] if len(parts) > 2 else "0"
+        patch = int(patch_text) if patch_text.isdigit() else 0
+        executable, prefix = Path(value.get("executable", "")), Path(value.get("prefix", ""))
+        return cls(executable, major, minor, patch, version, str(value.get("architecture", "")),
+                   prefix, executable.parent.resolve() != prefix.resolve(), str(value.get("pip_version", "")))
 
 
 def compatible_packages(major: int, minor: int) -> tuple[str, ...] | None:
@@ -135,6 +162,7 @@ class FaceRuntimeManager:
         self.platform_name = platform_name or sys.platform
         self.discovery_candidates = discovery_candidates
         self._bootstrap_interpreter = None
+        self._runtime_diagnostic = None
 
     @property
     def managed_python_root(self):
@@ -181,7 +209,8 @@ class FaceRuntimeManager:
         bootstrap = self.find_supported_interpreter()
         if bootstrap is None:
             if self.platform_name != "win32":
-                version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+                candidate = self._probe_interpreter(Path(sys.executable), require_venv=False)
+                version = candidate.version if candidate else "unknown"
                 return self._fail("unsupported_python", f"Python {version} has no validated Face Runtime package set.", version)
             bootstrap = self.install_managed_python(progress, cancel_event)
         self._bootstrap_interpreter = Path(bootstrap)
@@ -191,26 +220,27 @@ class FaceRuntimeManager:
                 return self._fail("venv", combined_output(result))
         environment = self._environment_details()
         self._validate_environment(environment)
-        packages = compatible_packages(environment["python_major"], environment["python_minor"])
+        self._runtime_diagnostic = environment
+        packages = compatible_packages(environment.major, environment.minor)
         if packages is None:
-            version = environment["python_version"]
+            version = environment.version
             return self._fail("unsupported_python", f"Python {version} has no validated Face Runtime package set.", version)
         if progress: progress(15, "Preparing the Face Recognition installer…")
         tooling = self._run([str(self.interpreter_path), "-m", "pip", "install", "--upgrade", *INSTALLER_PACKAGES])
         if tooling.returncode:
-            return self._fail("tooling", combined_output(tooling), environment["python_version"])
+            return self._fail("tooling", combined_output(tooling), environment.version)
         if progress: progress(25, "Diagnosing existing OpenCV packages…")
         diagnosis = self.diagnose()
         conflicts = [x for x in CONFLICTS if x in set(diagnosis.get("distributions", {}))]
         if conflicts:
             result = self._run([str(self.interpreter_path), "-m", "pip", "uninstall", "-y", *conflicts])
             if result.returncode:
-                return self._fail("permission", combined_output(result), environment["python_version"])
-        if progress: progress(40, f"Installing compatible packages for Python {environment['python_version']}…")
+                return self._fail("permission", combined_output(result), environment.version)
+        if progress: progress(40, f"Installing compatible packages for Python {environment.version}…")
         result = self._run([str(self.interpreter_path), "-m", "pip", "install", "--upgrade", "--force-reinstall", *packages])
         if result.returncode:
             kind = classify_pip_failure(combined_output(result))
-            return self._fail(kind, combined_output(result), environment["python_version"])
+            return self._fail(kind, combined_output(result), environment.version)
         if progress: progress(80, "Verifying OpenCV API and detector model…")
         return self.verify(progress)
 
@@ -218,12 +248,12 @@ class FaceRuntimeManager:
         result = self._run([str(self.interpreter_path), "-c", ENVIRONMENT_SCRIPT])
         if result.returncode:
             return self._fail("environment", combined_output(result))
-        return self._json(result)
+        return InterpreterDiagnostic.from_mapping(self._json(result))
 
     def _validate_environment(self, details):
         expected = self.interpreter_path.resolve()
-        actual = Path(details.get("executable", "")).resolve()
-        prefix = Path(details.get("prefix", "")).resolve()
+        actual = details.executable.resolve()
+        prefix = details.prefix.resolve()
         if actual != expected or prefix != self.root.resolve():
             return self._fail("environment", "The reported interpreter or prefix is outside .venv-face-runtime.")
 
@@ -240,7 +270,9 @@ class FaceRuntimeManager:
         active = [x for x in CONFLICTS if x in data.get("distributions", {})]
         if active != ["opencv-python-headless"]:
             return self._fail("conflict", "Multiple or unsupported OpenCV distributions are active: " + ", ".join(active))
-        status = FaceRuntimeStatus("Ready", data["cv2_version"], install_location=str(self.root), interpreter_path=str(self.interpreter_path), last_verification=_now())
+        diagnostic = self._runtime_diagnostic or self._environment_details()
+        status = FaceRuntimeStatus("Ready", data["cv2_version"], install_location=str(self.root), interpreter_path=str(self.interpreter_path), last_verification=_now(),
+                                   runtime_python_version=diagnostic.version, runtime_architecture=diagnostic.architecture)
         status.bootstrap_interpreter = str(self._bootstrap_interpreter or self.find_supported_interpreter() or "")
         self._save(status)
         if progress: progress(100, "Face recognition runtime is ready.")
@@ -265,8 +297,7 @@ class FaceRuntimeManager:
             if path == self.interpreter_path or ".venv-mobileclip" in str(path).casefold():
                 continue
             details = self._probe_interpreter(path)
-            if details and details.get("architecture") == "64-bit" and compatible_packages(
-                    details.get("python_major", 0), details.get("python_minor", 0)):
+            if details and details.architecture == "64-bit" and compatible_packages(details.major, details.minor):
                 return path
         return None
 
@@ -306,17 +337,20 @@ class FaceRuntimeManager:
         order = {"3.12": 0, "3.11": 1, "3.10": 2}
         return [path for version, path in sorted(ranked, key=lambda item: order[item[0]])]
 
-    def _probe_interpreter(self, path):
+    def _probe_interpreter(self, path, require_venv=True):
         if not path.is_file():
             return None
         result = self._run([str(path), "-c", ENVIRONMENT_SCRIPT])
         if result.returncode:
             return None
-        details = self._json(result)
-        if Path(details.get("executable", "")).resolve() != path.resolve():
+        details = InterpreterDiagnostic.from_mapping(self._json(result))
+        if details.executable.resolve() != path.resolve():
             return None
-        venv = self._run([str(path), "-m", "venv", "--help"])
-        return details if venv.returncode == 0 else None
+        if require_venv:
+            venv = self._run([str(path), "-m", "venv", "--help"])
+            if venv.returncode != 0:
+                return None
+        return details
 
     def install_managed_python(self, progress=None, cancel_event=None):
         parsed = urllib.parse.urlparse(MANAGED_PYTHON_URL)
@@ -342,7 +376,7 @@ class FaceRuntimeManager:
             if result.returncode or not self.managed_python_executable.is_file():
                 return self._fail("managed_python", combined_output(result) or "Private Python executable was not created.")
             details = self._probe_interpreter(self.managed_python_executable)
-            if not details or details.get("python_major") != 3 or details.get("python_minor") != 12 or details.get("architecture") != "64-bit":
+            if not details or details.major != 3 or details.minor != 12 or details.architecture != "64-bit":
                 return self._fail("managed_python", "Private Python did not validate as 64-bit Python 3.12 with venv support.")
             installer.replace(self.managed_python_root / "python-installer.exe")
             return self.managed_python_executable

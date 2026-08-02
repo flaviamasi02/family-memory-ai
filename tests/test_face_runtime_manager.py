@@ -152,6 +152,20 @@ def test_existing_supported_interpreter_discovery_requires_64_bit(tmp_path):
     assert rejected.find_supported_interpreter() is None
 
 
+@pytest.mark.parametrize("version", [(3, 12), (3, 13)])
+def test_candidate_diagnostic_selects_candidate_package_set_not_process_version(tmp_path, version):
+    candidate=tmp_path/f"Python{version[1]}/python.exe"; candidate.parent.mkdir(); candidate.write_text('python')
+    runner=FakeRunner(python=version)
+    manager=FaceRuntimeManager(tmp_path/'runtime/.venv-face-runtime',runner,
+                               discovery_candidates=[candidate])
+    assert manager.install().ready
+    install=next(c for c in runner.calls if 'install' in c and 'opencv-python-headless' in ' '.join(c))
+    assert set(COMPATIBILITY[version]).issubset(install)
+    status=manager.status()
+    assert status.runtime_python_version == f'{version[0]}.{version[1]}.0'
+    assert status.runtime_architecture == '64-bit'
+
+
 def test_managed_python_source_is_https_and_allowlisted():
     from urllib.parse import urlparse
     parsed=urlparse(MANAGED_PYTHON_URL)
