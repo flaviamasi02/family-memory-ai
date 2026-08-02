@@ -93,6 +93,13 @@ class SQLiteFaceRepository:
                     PRIMARY KEY(face_id, person_id)
                 );
                 CREATE INDEX IF NOT EXISTS idx_face_audit_face ON face_assignment_audit(face_id);
+                CREATE TABLE IF NOT EXISTS face_processing_results (
+                    image_id TEXT PRIMARY KEY, source_fingerprint TEXT NOT NULL,
+                    detector_key TEXT NOT NULL, processing_version TEXT NOT NULL,
+                    status TEXT NOT NULL, face_count INTEGER NOT NULL DEFAULT 0,
+                    failure_code TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_face_processing_status ON face_processing_results(status,detector_key);
                 """
             )
             row = connection.execute("SELECT version FROM face_schema LIMIT 1").fetchone()
@@ -139,6 +146,24 @@ class SQLiteFaceRepository:
     def list_faces(self) -> list[Face]:
         return self._faces("SELECT payload,person_id,cluster_id FROM faces ORDER BY image_id,id")
 
+    def get_processing_result(self, image_id: str) -> dict[str, Any] | None:
+        with self._lock, self._connect() as connection:
+            row = connection.execute("SELECT * FROM face_processing_results WHERE image_id=?", (image_id,)).fetchone()
+        return dict(row) if row else None
+
+    def save_processing_result(self, image_id: str, fingerprint: str, detector_key: str,
+                               status: str, face_count: int = 0, failure_code: str = "",
+                               processing_version: str = "face-worker-v1") -> None:
+        with self._lock, self._connect() as connection:
+            connection.execute(
+                """INSERT INTO face_processing_results VALUES(?,?,?,?,?,?,?,?)
+                   ON CONFLICT(image_id) DO UPDATE SET source_fingerprint=excluded.source_fingerprint,
+                   detector_key=excluded.detector_key,processing_version=excluded.processing_version,
+                   status=excluded.status,face_count=excluded.face_count,
+                   failure_code=excluded.failure_code,updated_at=excluded.updated_at""",
+                (image_id, fingerprint, detector_key, processing_version, status,
+                 int(face_count), failure_code, utc_now()))
+
     def assign_cluster(self, cluster_id: str, person_id: str) -> int:
         """Confirm all non-false-positive members in one transaction and audit them."""
         now = utc_now()
@@ -171,6 +196,7 @@ class SQLiteFaceRepository:
             connection.execute("DELETE FROM face_embeddings")
             connection.execute("DELETE FROM faces")
             connection.execute("DELETE FROM clusters")
+            connection.execute("DELETE FROM face_processing_results")
 
     def save_person(self, person: Person) -> Person:
         person.updated_at = utc_now()

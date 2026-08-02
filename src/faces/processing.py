@@ -8,8 +8,11 @@ import math
 import json
 import subprocess
 import sys
-import tempfile
 from datetime import datetime, timezone
+import queue
+import threading
+import time
+from uuid import uuid4
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Event
@@ -47,61 +50,125 @@ class FaceImageProcessingError(RuntimeError):
 
 
 class ManagedFaceRuntimeClient:
-    """One-item JSON subprocess boundary with application-managed requests/logs."""
-    def __init__(self, interpreter_path, log_path=None, runner=None, request_root=None):
+    """Persistent NDJSON subprocess boundary shared by one complete scan."""
+    PROTOCOL_VERSION = "face-worker-v1"
+    def __init__(self, interpreter_path, log_path=None, process_factory=None, request_root=None):
         self.interpreter_path = str(interpreter_path)
         self.worker_path = Path(__file__).with_name("managed_worker.py").resolve()
-        root = Path(request_root or (get_app_data_service().root / "cache" / "face_requests"))
-        root.mkdir(parents=True, exist_ok=True); self.request_root = root
         self.log_path = Path(log_path or (get_app_data_service().root / "logs" / "face-runtime-processing.log"))
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
-        self.runner = runner or subprocess.run
+        self.process_factory = process_factory or subprocess.Popen
+        self.process = None; self.launch_count = 0; self.startup_ms = 0.0; self.model_load_count = 0
+        self.processing_times_ms = []
+        self._responses = queue.Queue(); self._stderr_lines = []; self._lock = threading.Lock()
 
     def invoke(self, command: str, payload: dict, *, suffix="", size=0, timeout=120):
-        request_path = None
-        try:
-            with tempfile.NamedTemporaryFile("w", suffix=".json", prefix="request-", dir=self.request_root,
-                                             encoding="utf-8", delete=False) as stream:
-                json.dump(payload, stream); request_path = Path(stream.name)
-            argv = [self.interpreter_path, str(self.worker_path), command, "--request-file", str(request_path)]
+        with self._lock:
+            self.start(timeout=min(timeout, 30))
+            request_id = str(uuid4())
+            request = {"request_id": request_id, "operation": command,
+                       "source_path": payload.get("image_path") or payload.get("crop_path"),
+                       "operation_version": self.PROTOCOL_VERSION}
             try:
-                result = self.runner(argv, capture_output=True, text=True, timeout=timeout)
-            except subprocess.TimeoutExpired as exc:
-                self._log(command, -1, exc.stdout or "", exc.stderr or "", suffix, size, "timeout")
-                raise FaceImageProcessingError("timeout", "Face processing timed out for this image.") from exc
-            except OSError as exc:
-                self._log(command, -1, "", str(exc), suffix, size, "process_start_failed")
+                self.process.stdin.write(json.dumps(request, ensure_ascii=True) + "\n"); self.process.stdin.flush()
+            except (BrokenPipeError, OSError) as exc:
+                self._log(command, -1, "", self._stderr_text(), suffix, size, "broken_pipe", request_id)
                 raise FaceModelUnavailable("The managed Face Runtime process could not start.") from exc
-            if result.returncode != 0:
-                self._log(command, result.returncode, result.stdout, result.stderr, suffix, size, "process_failed")
+            try:
+                line = self._responses.get(timeout=timeout)
+            except queue.Empty as exc:
+                self._log(command, -1, "", self._stderr_text(), suffix, size, "timeout", request_id)
+                # A late response would desynchronise the request stream. Restart
+                # the bounded worker before accepting another item.
+                self.close()
+                raise FaceImageProcessingError("timeout", "Face processing timed out for this image.") from exc
+            if line is None:
+                self._log(command, self.process.poll(), "", self._stderr_text(), suffix, size, "worker_exit", request_id)
                 raise FaceModelUnavailable("The managed Face Runtime worker stopped unexpectedly.")
             try:
-                response = json.loads((result.stdout or "").strip())
+                response = json.loads(line)
             except (json.JSONDecodeError, TypeError) as exc:
-                self._log(command, result.returncode, result.stdout, result.stderr, suffix, size, "protocol_invalid")
+                self._log(command, self.process.poll(), line, self._stderr_text(), suffix, size, "protocol_invalid", request_id)
                 raise FaceModelUnavailable("The managed Face Runtime returned an invalid protocol response.") from exc
-            if not isinstance(response, dict) or "ok" not in response:
-                self._log(command, result.returncode, result.stdout, result.stderr, suffix, size, "protocol_invalid")
+            if not isinstance(response, dict) or "ok" not in response or response.get("request_id") != request_id:
+                self._log(command, self.process.poll(), line, self._stderr_text(), suffix, size, "protocol_mismatch", request_id)
                 raise FaceModelUnavailable("The managed Face Runtime returned an invalid protocol response.")
+            if isinstance(response.get("processing_ms"), (int, float)):
+                self.processing_times_ms.append(float(response["processing_ms"]))
             if not response["ok"]:
                 message = str(response.get("message") or "Face processing failed.")
                 code = str(response.get("error_code") or "unknown")
                 scope = str(response.get("error_scope") or "unknown")
-                self._log(command, result.returncode, result.stdout, result.stderr, suffix, size,
-                          f"{scope}:{code}")
+                self._log(command, self.process.poll(), line, self._stderr_text(), suffix, size,
+                          f"{scope}:{code}", request_id, response.get("processing_ms"))
                 if response.get("error_scope") == "runtime":
                     raise FaceModelUnavailable(message)
                 raise FaceImageProcessingError(code, message)
-            self._log(command, result.returncode, result.stdout, result.stderr, suffix, size, "success")
+            self._log(command, self.process.poll(), line, self._stderr_text(), suffix, size, "success",
+                      request_id, response.get("processing_ms"))
             return response
-        finally:
-            if request_path is not None: request_path.unlink(missing_ok=True)
 
-    def _log(self, command, returncode, stdout, stderr, suffix, size, error_type):
+    def start(self, timeout=30):
+        if self.process is not None and self.process.poll() is None: return
+        self._responses = queue.Queue()
+        self._stderr_lines = []
+        started = time.perf_counter()
+        try:
+            self.process = self.process_factory([self.interpreter_path, str(self.worker_path)], stdin=subprocess.PIPE,
+                                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                                encoding="utf-8", bufsize=1)
+        except OSError as exc:
+            raise FaceModelUnavailable("The managed Face Runtime process could not start.") from exc
+        self.launch_count += 1
+        threading.Thread(target=self._read_stdout, daemon=True).start()
+        threading.Thread(target=self._read_stderr, daemon=True).start()
+        try: line = self._responses.get(timeout=timeout)
+        except queue.Empty as exc:
+            self.close(); raise FaceModelUnavailable("The managed Face Runtime did not become ready.") from exc
+        try: ready = json.loads(line or "")
+        except json.JSONDecodeError as exc:
+            self.close(); raise FaceModelUnavailable("The managed Face Runtime startup protocol was invalid.") from exc
+        if not ready.get("ready") or ready.get("protocol_version") != self.PROTOCOL_VERSION:
+            message = ready.get("message") or "The managed Face Runtime did not become ready."
+            self.close(); raise FaceModelUnavailable(message)
+        self.model_load_count = int(ready.get("model_load_count", 0))
+        self.startup_ms = (time.perf_counter() - started) * 1000.0
+
+    def close(self):
+        process, self.process = self.process, None
+        if process is None: return
+        try:
+            if process.stdin: process.stdin.close()
+            process.wait(timeout=2)
+        except Exception:
+            process.terminate()
+            try: process.wait(timeout=2)
+            except Exception: process.kill()
+
+    def _read_stdout(self):
+        process = self.process
+        while process is not None:
+            line = process.stdout.readline()
+            if not line: break
+            self._responses.put(line.strip())
+        self._responses.put(None)
+
+    def _read_stderr(self):
+        process = self.process
+        while process is not None:
+            line = process.stderr.readline()
+            if not line: break
+            self._stderr_lines.append(line.rstrip())
+
+    def _stderr_text(self): return "\n".join(self._stderr_lines[-100:])
+
+    def _log(self, command, returncode, stdout, stderr, suffix, size, error_type, request_id="", processing_ms=None):
         record = {"time": datetime.now(timezone.utc).isoformat(), "executable": self.interpreter_path,
                   "worker": str(self.worker_path), "command": command, "return_code": returncode,
                   "stdout": stdout, "stderr": stderr, "timeout_seconds": 120,
-                  "image_suffix": suffix.casefold(), "image_size": int(size or 0), "result_type": error_type}
+                  "image_suffix": suffix.casefold(), "image_size": int(size or 0), "result_type": error_type,
+                  "request_id": request_id, "processing_ms": processing_ms, "worker_startup_ms": self.startup_ms,
+                  "process_launch_count": self.launch_count}
         with self.log_path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(record, ensure_ascii=True) + "\n")
 

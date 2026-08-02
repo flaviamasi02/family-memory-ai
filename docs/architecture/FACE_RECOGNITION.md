@@ -84,21 +84,26 @@ installer approach does not extract archives, so archive path traversal is not
 part of the boundary. Remove invokes the retained official installer uninstall
 mode and deletes both application-managed runtime directories.
 
-Detection and descriptor operations cross a bounded JSON subprocess boundary:
-one source image or face crop is sent to the verified Face Runtime interpreter
-per work item, while queue control, persistence, progress, pause, resume, and
-cancellation remain in the main application. No photo is uploaded. The Python
+Detection and descriptor operations cross a bounded persistent subprocess
+boundary. One managed worker is started per scan, loads Pillow, NumPy, OpenCV,
+and the Haar classifier once, then accepts bounded newline-delimited JSON work
+items until completion or cancellation. Queue control, persistence, progress,
+pause, resume, and cancellation remain in the main application. No photo is uploaded. The Python
 3.14 application environment, system PATH, system Python, and MobileCLIP runtime
 remain unchanged.
 
 The managed boundary is the application-owned `faces/managed_worker.py` entry
-point. Each invocation receives an application-cache JSON request file and emits
-exactly one JSON response identifying success, an image-scoped failure, or a
-runtime-scoped failure. JPEG, PNG, and WebP are decoded with Pillow and corrected
+point. Requests and responses carry matching IDs and a protocol version; normal
+logs stay off stdout. Every response identifies success, an image-scoped
+failure, or a runtime-scoped failure and reports processing duration. JPEG, PNG,
+and WebP are decoded with Pillow and corrected
 with `ImageOps.exif_transpose`; HEIC/HEIF is excluded by eligibility until the
 managed decoder has explicit support. Corrupt, missing, undecodable, or timed-out
 individual images increment the batch failure count and do not change runtime
 Ready state. Missing interpreters, process-start failures, invalid protocol,
 OpenCV import failures, and cascade failures mark the runtime Needs repair.
 Technical invocation logs include executable, worker, return code, stdout,
-stderr, timeout, suffix, size, and error type, but omit source-photo paths.
+stderr, timeout, suffix, size, error type, startup duration, per-item duration,
+and process launch count, but omit source-photo paths. Successful results are
+reused only while source fingerprint, detector identity, and protocol version
+remain compatible; zero-face results are cached too.

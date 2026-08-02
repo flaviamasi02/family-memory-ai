@@ -100,18 +100,24 @@ class PeopleReviewPage(QWidget):
         self.set_scan_state("idle")
 
     def show_scan_progress(self, progress) -> None:
+        eta = f"{progress.estimated_remaining_seconds / 60:.1f} min remaining" if progress.remaining else "finishing"
+        warning = (" Warning: many images are failing; review logs or Cancel." if
+                   progress.processed >= 20 and progress.failures / progress.processed > .2 else "")
         self.progress_label.setText(
             f"Eligible: {progress.eligible} | Processed: {progress.processed} | "
             f"Current: {progress.current or 'finishing'} | Faces found: {progress.faces_found} | "
-            f"No faces: {progress.no_faces} | Failures: {progress.failures} | Remaining: {progress.remaining}"
+            f"No faces: {progress.no_faces} | Failures: {progress.failures} | Remaining: {progress.remaining} | "
+            f"{progress.images_per_second:.2f} images/sec | {eta}.{warning}"
         )
 
     def show_scan_completed(self, progress) -> None:
         self.refresh(); self.set_scan_state("idle")
         outcome = "cancelled safely" if progress.cancelled else "complete"
+        reasons = ", ".join(f"{code}: {count}" for code, count in progress.failure_reasons) or "none"
         self.progress_label.setText(
             f"Local face scan {outcome}. Processed {progress.processed} of {progress.eligible} photos; "
-            f"found {progress.faces_found} faces; {progress.no_faces} had no faces; {progress.failures} failed."
+            f"found {progress.faces_found} faces; {progress.no_faces} had no faces; {progress.failures} failed. "
+            f"Reused: {progress.cache_hits}. Failure reasons: {reasons}."
         )
 
     def show_scan_unavailable(self, message: str) -> None:

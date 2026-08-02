@@ -2,6 +2,8 @@ from pathlib import Path
 from types import SimpleNamespace
 import os
 import pytest
+import json
+import queue
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -40,6 +42,40 @@ class FakeEmbedder:
         return tuple(FaceEmbedding(face.id, self.provider_id, self.model_id,
                                    self.model_revision, 2, (1.0, 0.0),
                                    face.source_fingerprint) for face in faces)
+
+
+class _FakePipe:
+    def __init__(self, lines=None, on_write=None): self.lines=queue.Queue(); self.on_write=on_write
+    def write(self, value):
+        if self.on_write: self.on_write(value)
+    def flush(self): pass
+    def close(self): self.lines.put(None)
+    def readline(self):
+        value=self.lines.get(); return "" if value is None else value
+
+
+class _FakePersistentProcess:
+    def __init__(self, responses, stderr=""):
+        self.responses=iter(responses); self.stdout=_FakePipe(); self.stderr=_FakePipe(); self.running=True
+        self.stdin=_FakePipe(on_write=self._request)
+        self.stdout.lines.put(json.dumps({"ready":True,"protocol_version":"face-worker-v1","model_load_count":1})+"\n")
+        for line in stderr.splitlines(): self.stderr.lines.put(line+"\n")
+        self.stderr.lines.put(None)
+    def _request(self, line):
+        request=json.loads(line); response=next(self.responses)
+        if response is None: return
+        if isinstance(response, str): self.stdout.lines.put(response+"\n"); return
+        response=dict(response); response["request_id"]=request["request_id"]
+        self.stdout.lines.put(json.dumps(response)+"\n")
+    def poll(self): return None if self.running else 0
+    def wait(self, timeout=None): self.running=False; self.stdout.lines.put(None); self.stderr.lines.put(None); return 0
+    def terminate(self): self.running=False; self.stdout.lines.put(None)
+    def kill(self): self.terminate()
+
+
+class FakePersistentProcessFactory:
+    def __init__(self, responses, stderr=""): self.responses=responses; self.stderr=stderr; self.launch_count=0
+    def __call__(self, *args, **kwargs): self.launch_count += 1; return _FakePersistentProcess(self.responses, self.stderr)
 
 
 def photo(path, photo_id):
@@ -161,14 +197,14 @@ def test_verification_failure_recommends_repair_not_internet(tmp_path):
 
 
 def test_managed_protocol_success_image_failure_runtime_failure_and_logs(tmp_path):
-    responses = iter([
-        SimpleNamespace(returncode=0, stdout='{"ok":true,"faces":[]}\n', stderr='warning'),
-        SimpleNamespace(returncode=0, stdout='{"ok":false,"error_scope":"image","error_code":"decode_failed","message":"This image could not be decoded."}\n', stderr='decoder detail'),
-        SimpleNamespace(returncode=0, stdout='{"ok":false,"error_scope":"runtime","error_code":"runtime_import_failed","message":"The managed runtime could not load OpenCV."}\n', stderr='import detail'),
-    ])
+    responses = [
+        {"ok":True,"faces":[],"processing_ms":2},
+        {"ok":False,"error_scope":"image","error_code":"decode_failed","message":"This image could not be decoded.","processing_ms":3},
+        {"ok":False,"error_scope":"runtime","error_code":"runtime_import_failed","message":"The managed runtime could not load OpenCV.","processing_ms":1},
+    ]
+    factory = FakePersistentProcessFactory(responses, stderr="decoder detail\nimport detail\n")
     client = ManagedFaceRuntimeClient(tmp_path / "runtime with spaces" / "python.exe",
-                                      tmp_path / "runtime.log", runner=lambda *a, **k: next(responses),
-                                      request_root=tmp_path / "requests")
+                                      tmp_path / "runtime.log", process_factory=factory)
     assert client.invoke("detect", {"image_path": "C:/Fotos/niño one.jpg"}, suffix=".jpg")["faces"] == []
     with pytest.raises(FaceImageProcessingError, match="could not be decoded"):
         client.invoke("detect", {"image_path": "bad.jpg"}, suffix=".jpg")
@@ -177,20 +213,21 @@ def test_managed_protocol_success_image_failure_runtime_failure_and_logs(tmp_pat
     log = (tmp_path / "runtime.log").read_text()
     assert "decoder detail" in log and "import detail" in log and "image_suffix" in log
     assert "niño one.jpg" not in log
+    assert factory.launch_count == 1
+    client.close()
 
 
 def test_malformed_protocol_and_timeout_are_precisely_classified(tmp_path):
     import subprocess
     malformed = ManagedFaceRuntimeClient("managed-python", tmp_path / "bad.log",
-                                         runner=lambda *a, **k: SimpleNamespace(returncode=0, stdout="not-json", stderr="detail"),
-                                         request_root=tmp_path / "requests")
+                                         process_factory=FakePersistentProcessFactory(["not-json"]))
     with pytest.raises(FaceModelUnavailable, match="invalid protocol"):
         malformed.invoke("detect", {"image_path": "x.jpg"})
     timed = ManagedFaceRuntimeClient("managed-python", tmp_path / "timeout.log",
-                                    runner=lambda *a, **k: (_ for _ in ()).throw(subprocess.TimeoutExpired("worker", 120)),
-                                    request_root=tmp_path / "requests2")
+                                    process_factory=FakePersistentProcessFactory([None]))
     with pytest.raises(FaceImageProcessingError, match="timed out"):
-        timed.invoke("detect", {"image_path": "x.jpg"})
+        timed.invoke("detect", {"image_path": "x.jpg"}, timeout=.01)
+    timed.close()
 
 
 def test_heic_is_excluded_consistently_instead_of_invalidating_runtime(tmp_path):
@@ -198,3 +235,13 @@ def test_heic_is_excluded_consistently_instead_of_invalidating_runtime(tmp_path)
     from faces.eligibility import face_processing_eligibility
     decision = face_processing_eligibility(photo(path, "heic"))
     assert not decision.eligible and decision.reason_code == "managed_decoder_unsupported"
+
+
+def test_one_persistent_process_handles_one_hundred_requests(tmp_path):
+    factory=FakePersistentProcessFactory([{"ok":True,"faces":[],"processing_ms":1} for _ in range(100)])
+    client=ManagedFaceRuntimeClient("managed-python", tmp_path/"performance.log", process_factory=factory)
+    for index in range(100):
+        result=client.invoke("detect", {"image_path":f"C:/Photos/image {index}.jpg"})
+        assert result["faces"] == []
+    assert factory.launch_count == 1 and client.launch_count == 1
+    client.close()

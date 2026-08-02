@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import statistics
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Condition, Event
@@ -25,6 +27,14 @@ class FaceScanProgress:
     failures: int = 0
     remaining: int = 0
     cancelled: bool = False
+    images_per_second: float = 0.0
+    estimated_remaining_seconds: float = 0.0
+    failure_reasons: tuple[tuple[str, int], ...] = ()
+    cache_hits: int = 0
+    worker_startup_ms: float = 0.0
+    average_processing_ms: float = 0.0
+    median_processing_ms: float = 0.0
+    slowest_processing_ms: float = 0.0
 
 
 class FaceProcessingWorker(QObject):
@@ -57,6 +67,7 @@ class FaceProcessingWorker(QObject):
     def cancel(self):
         self._cancel.set()
         self.resume()
+        self._close_runtime()
 
     def run(self):
         total = len(self.photos)
@@ -65,7 +76,8 @@ class FaceProcessingWorker(QObject):
         try:
             if hasattr(self.detector, "available") and not self.detector.available:
                 raise FaceModelUnavailable("Local face processing is unavailable. Install the optional face runtime from Settings, then try again.")
-            processed = faces_found = no_faces = failures = 0
+            processed = faces_found = no_faces = failures = cache_hits = 0
+            failure_reasons = {}; run_started = time.perf_counter()
             for photo in self.photos:
                 with self._pause:
                     while self._paused and not self._cancel.is_set():
@@ -74,16 +86,21 @@ class FaceProcessingWorker(QObject):
                     break
                 current = str(getattr(photo, "filename", "") or getattr(photo, "path", ""))
                 try:
-                    self._process_photo(photo)
+                    reused = self._process_photo(photo)
+                    cache_hits += int(reused)
                     metadata = dict(getattr(photo, "metadata", {}) or {})
                     metadata.pop("face_processing_failure", None); photo.metadata = metadata
                     count = len(self.repository.faces_for_image(self._image_id(photo)))
                     faces_found += count
                     no_faces += int(count == 0)
                 except FaceModelUnavailable:
+                    if self._cancel.is_set():
+                        break
                     raise
                 except Exception as exc:
                     failures += 1
+                    code = str(getattr(exc, "code", "image_processing_failed"))
+                    failure_reasons[code] = failure_reasons.get(code, 0) + 1
                     metadata = dict(getattr(photo, "metadata", {}) or {})
                     metadata["face_processing_failure"] = {
                         "code": str(getattr(exc, "code", "image_processing_failed")),
@@ -91,19 +108,27 @@ class FaceProcessingWorker(QObject):
                     }
                     photo.metadata = metadata
                 processed += 1
+                elapsed = max(time.perf_counter() - run_started, .001); rate = processed / elapsed
                 progress = FaceScanProgress(total, processed, current, faces_found, no_faces,
-                                            failures, total - processed, self._cancel.is_set())
+                                            failures, total - processed, self._cancel.is_set(), rate,
+                                            (total - processed) / rate if rate else 0,
+                                            tuple(sorted(failure_reasons.items())), cache_hits,
+                                            *self._runtime_timings())
                 self.progress.emit(progress)
             if not self._cancel.is_set():
                 self._rebuild_clusters()
             progress = FaceScanProgress(total, processed, "", faces_found, no_faces, failures,
-                                        total - processed, self._cancel.is_set())
+                                        total - processed, self._cancel.is_set(),
+                                        processed / max(time.perf_counter()-run_started,.001), 0,
+                                        tuple(sorted(failure_reasons.items())), cache_hits,
+                                        *self._runtime_timings())
             self.completed.emit(progress)
         except FaceModelUnavailable as exc:
             self.unavailable.emit(str(exc))
         except Exception:
             self.unavailable.emit("Local face scan could not finish. Completed results were kept; please try again.")
         finally:
+            self._close_runtime()
             self.finished.emit()
 
     def _image_id(self, photo) -> str:
@@ -119,8 +144,14 @@ class FaceProcessingWorker(QObject):
         fingerprint = self._fingerprint(photo)
         detector_key = f"{self.detector.provider_id}|{self.detector.model_revision}"
         existing = self.repository.faces_for_image(image_id)
+        result = self.repository.get_processing_result(image_id)
+        if (result and result["status"] == "success" and result["source_fingerprint"] == fingerprint
+                and result["detector_key"] == detector_key
+                and result["processing_version"] == "face-worker-v1"):
+            return True
         if existing and all(f.source_fingerprint == fingerprint and f.detector_key == detector_key for f in existing):
-            return
+            self.repository.save_processing_result(image_id, fingerprint, detector_key, "success", len(existing))
+            return True
         self.repository.delete_faces_for_image(image_id)
         candidates = self.detector.detect(path, self._cancel)
         faces = []
@@ -139,6 +170,19 @@ class FaceProcessingWorker(QObject):
             missing = [face for face in faces if self.repository.get_embedding(face.id, model_key) is None]
             for embedding in self.embedder.embed(path, missing, self._cancel):
                 self.repository.save_embedding(embedding)
+        self.repository.save_processing_result(image_id, fingerprint, detector_key, "success", len(faces))
+        return False
+
+    def _close_runtime(self):
+        clients = {getattr(self.detector, "runtime_client", None), getattr(self.embedder, "runtime_client", None)}
+        for client in clients:
+            if client is not None: client.close()
+
+    def _runtime_timings(self):
+        client = getattr(self.detector, "runtime_client", None)
+        values = list(getattr(client, "processing_times_ms", ()) or ())
+        if not values: return (float(getattr(client, "startup_ms", 0) or 0), 0.0, 0.0, 0.0)
+        return (float(client.startup_ms), sum(values)/len(values), statistics.median(values), max(values))
 
     def _rebuild_clusters(self):
         model_key = (f"{self.embedder.provider_id}|{self.embedder.model_id}|"
