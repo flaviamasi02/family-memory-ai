@@ -159,7 +159,10 @@ class ConservativeFaceClusterer:
         for face_id in sorted(by_face):
             vector = by_face[face_id].vector
             group = next((g for g in groups if all(self.similarity(vector, by_face[x].vector) >= self.threshold for x in g)), None)
-            (group if group is not None else groups.append([face_id]))
+            if group is None:
+                groups.append([face_id])
+            else:
+                group.append(face_id)
         old = {tuple(sorted(getattr(c, "face_ids", ()) or ())): c for c in existing}
         result = []
         for group in groups:

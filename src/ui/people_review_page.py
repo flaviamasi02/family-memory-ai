@@ -44,11 +44,17 @@ class PeopleReviewPage(QWidget):
         layout.addWidget(QLabel("Face processing happens locally on this computer. Photos are never uploaded, and no identity is claimed without your confirmation."))
         self.progress_label = QLabel("Choose Scan eligible photos for faces to begin."); layout.addWidget(self.progress_label)
         controls = QHBoxLayout()
-        for text, signal in (("Scan eligible photos for faces", self._scan), ("Pause", self.pause_requested.emit),
-                             ("Resume", self.resume_requested.emit), ("Cancel", self.cancel_requested.emit),
-                             ("Rebuild clusters", self.refresh)):
-            button = QPushButton(text); button.clicked.connect(signal); controls.addWidget(button)
+        self.scan_button = QPushButton("Scan eligible photos for faces")
+        self.pause_button = QPushButton("Pause")
+        self.resume_button = QPushButton("Resume")
+        self.cancel_button = QPushButton("Cancel")
+        self.rebuild_button = QPushButton("Rebuild clusters")
+        for button, signal in ((self.scan_button, self._scan), (self.pause_button, self.pause_requested.emit),
+                               (self.resume_button, self.resume_requested.emit), (self.cancel_button, self.cancel_requested.emit),
+                               (self.rebuild_button, self.refresh)):
+            button.clicked.connect(signal); controls.addWidget(button)
         layout.addLayout(controls)
+        self.set_scan_state("idle")
         actions = QHBoxLayout()
         self.profiles_button = QPushButton("Create suggested family profiles")
         self.profiles_button.clicked.connect(self._create_suggested_profiles); actions.addWidget(self.profiles_button)
@@ -67,7 +73,35 @@ class PeopleReviewPage(QWidget):
 
     def _scan(self) -> None:
         eligible = [p for p in self._photos if face_processing_eligibility(p).eligible]
+        self.progress_label.setText(f"Preparing local face scan for {len(eligible)} eligible photos…")
+        self.set_scan_state("running")
         self.scan_requested.emit(eligible)
+
+    def set_scan_state(self, state: str) -> None:
+        active, paused = state in {"running", "paused"}, state == "paused"
+        self.scan_button.setEnabled(not active)
+        self.pause_button.setEnabled(state == "running")
+        self.resume_button.setEnabled(paused)
+        self.cancel_button.setEnabled(active)
+
+    def show_scan_progress(self, progress) -> None:
+        self.progress_label.setText(
+            f"Eligible: {progress.eligible} | Processed: {progress.processed} | "
+            f"Current: {progress.current or 'finishing'} | Faces found: {progress.faces_found} | "
+            f"No faces: {progress.no_faces} | Failures: {progress.failures} | Remaining: {progress.remaining}"
+        )
+
+    def show_scan_completed(self, progress) -> None:
+        self.refresh(); self.set_scan_state("idle")
+        outcome = "cancelled safely" if progress.cancelled else "complete"
+        self.progress_label.setText(
+            f"Local face scan {outcome}. Processed {progress.processed} of {progress.eligible} photos; "
+            f"found {progress.faces_found} faces; {progress.no_faces} had no faces; {progress.failures} failed."
+        )
+
+    def show_scan_unavailable(self, message: str) -> None:
+        self.set_scan_state("idle")
+        self.progress_label.setText(message)
 
     def refresh(self) -> None:
         self.clusters.clear()

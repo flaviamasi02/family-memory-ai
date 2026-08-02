@@ -53,6 +53,7 @@ from vision.batch_embedding_service import BatchEmbeddingService
 from vision.managed_mobileclip_provider import ManagedMobileCLIPEmbeddingProvider
 from workers.scan_worker import ScanCompletion, ScanWorker
 from workers.thumbnail_worker import ThumbnailWorker
+from workers.face_processing_worker import FaceProcessingWorker
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +97,8 @@ class MainWindow(QMainWindow):
         self._pending_embedding_photos = None
         self._embedding_run_lifecycle: dict[int, dict[str, bool]] = {}
         self._pending_import_folder_path = None
+        self.face_processing_thread = None
+        self.face_processing_worker = None
         self._import_phase = "Idle"
         self._import_generation = 0
         self._current_import_photos = []
@@ -175,6 +178,10 @@ class MainWindow(QMainWindow):
         self.settings_page.runtime_operation_finished.connect(self._on_runtime_operation_finished)
         self.people_review_page = PeopleReviewPage()
         self.people_review_page.help_requested.connect(self._on_workspace_help_requested)
+        self.people_review_page.scan_requested.connect(self._start_face_processing)
+        self.people_review_page.pause_requested.connect(self._pause_face_processing)
+        self.people_review_page.resume_requested.connect(self._resume_face_processing)
+        self.people_review_page.cancel_requested.connect(self._cancel_face_processing)
 
         browser_page = QWidget()
         browser_layout = QVBoxLayout(browser_page)
@@ -252,6 +259,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         self._embedding_close_requested = True
+        self._cancel_face_processing()
         self._request_embedding_worker_cancel()
         if self.thumbnail_worker is not None:
             self.thumbnail_worker.cancel()
@@ -264,9 +272,59 @@ class MainWindow(QMainWindow):
             self.thumbnail_thread.wait(250)
             if app is not None:
                 app.processEvents()
+        while self.face_processing_thread is not None and self.face_processing_thread.isRunning():
+            self.face_processing_thread.wait(250)
+            if app is not None:
+                app.processEvents()
         if app is not None:
             app.processEvents()
         super().closeEvent(event)
+
+    def _start_face_processing(self, photos) -> None:
+        if self.face_processing_thread is not None:
+            return
+        self.people_review_page.progress_label.setText(
+            f"Preparing local face scan for {len(photos)} eligible photos…"
+        )
+        thread = QThread(self)
+        worker = FaceProcessingWorker(photos, self.people_review_page.repository)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.progress.connect(self.people_review_page.show_scan_progress)
+        worker.completed.connect(self.people_review_page.show_scan_completed)
+        worker.unavailable.connect(self.people_review_page.show_scan_unavailable)
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(self._on_face_processing_thread_finished)
+        thread.finished.connect(thread.deleteLater)
+        self.face_processing_thread, self.face_processing_worker = thread, worker
+        thread.start()
+
+    def _pause_face_processing(self) -> None:
+        if self.face_processing_worker is not None:
+            self.face_processing_worker.pause()
+            self.people_review_page.set_scan_state("paused")
+            self.people_review_page.progress_label.setText("Local face scan paused safely between photos.")
+
+    def _resume_face_processing(self) -> None:
+        if self.face_processing_worker is not None:
+            self.face_processing_worker.resume()
+            self.people_review_page.set_scan_state("running")
+            self.people_review_page.progress_label.setText("Resuming local face scan…")
+
+    def _cancel_face_processing(self) -> None:
+        worker = getattr(self, "face_processing_worker", None)
+        if worker is not None:
+            worker.cancel()
+            page = getattr(self, "people_review_page", None)
+            if page is not None:
+                page.progress_label.setText("Cancelling local face scan safely…")
+
+    def _on_face_processing_thread_finished(self) -> None:
+        self.face_processing_worker = None
+        self.face_processing_thread = None
+        if hasattr(self, "people_review_page"):
+            self.people_review_page.set_scan_state("idle")
 
     def _mobileclip_library_photos(self) -> list:
         return list(self._all_photos or [])
