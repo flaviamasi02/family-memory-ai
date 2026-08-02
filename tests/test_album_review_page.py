@@ -1073,12 +1073,10 @@ class AlbumReviewPageTests(unittest.TestCase):
         self.assertEqual(changed_calls, 1)
         self.assertEqual(page.grid_rebuild_count(), rebuilds_before)
         self.assertEqual(page.grid_scroll.verticalScrollBar().value(), scroll_before)
-        self._flush_ui()
         self.assertEqual(page._details_key, target_key)
 
         second_key = page._row_key(page._visible_rows[12])
         page._select_key(second_key, additive=False)
-        self._flush_ui()
         self.assertEqual(page._details_key, second_key)
         self.assertEqual(page.filename_value.text(), "photo_12.jpg")
 
@@ -1099,7 +1097,6 @@ class AlbumReviewPageTests(unittest.TestCase):
         page._select_key(page._row_key(page._visible_rows[10]), additive=False)
         page._select_key(page._row_key(page._visible_rows[20]), range_select=True)
         self.assertEqual(page._category_suggestion_service.suggest.call_count, 0)
-        self._flush_ui(wait_ms=25)
         self.assertEqual(page._details_key, page._row_key(page._visible_rows[20]))
         self.assertEqual(page.filename_value.text(), "photo_20.jpg")
         self.assertEqual(page.selected_count(), 11)
@@ -1120,8 +1117,6 @@ class AlbumReviewPageTests(unittest.TestCase):
         page._update_selection_count = Mock(wraps=page._update_selection_count)
 
         page.clear_selection()
-        self._flush_ui()
-
         page._filtered_sorted_rows.assert_not_called()
         page._update_selection_count.assert_called_once()
         self.assertEqual(page.selected_count(), 0)

@@ -284,11 +284,6 @@ class AlbumReviewPage(QWidget):
         )
         self._suggestion_request_id = 0
         self._current_suggestion = None
-        self._selection_generation = 0
-        self._pending_details_key: Optional[str] = None
-        self._details_timer = QTimer(self)
-        self._details_timer.setSingleShot(True)
-        self._details_timer.timeout.connect(self._complete_deferred_selection)
         self._suggestion_timer = QTimer(self)
         self._suggestion_timer.setSingleShot(True)
         self._suggestion_timer.setInterval(120)
@@ -1312,41 +1307,24 @@ class AlbumReviewPage(QWidget):
         )
         increment_memory_review_counter("selected_count_updates")
 
-        # Match the responsive grid architecture: return after the minimal
-        # selection transaction so Qt can paint highlights. One replaceable
-        # zero-delay callback owns all secondary details for the final key.
-        self._selection_generation += 1
-        self._pending_details_key = active_key
-        self._details_timer.setProperty("generation", self._selection_generation)
-        self._details_timer.start(0)
-        record_memory_review(
-            "Selection highlight visible",
-            (time.perf_counter() - highlight_started) * 1000.0,
-            items=len(changed_keys),
-        )
-
-    def _complete_deferred_selection(self) -> None:
-        started = time.perf_counter()
-        generation = int(self._details_timer.property("generation") or 0)
-        key = self._pending_details_key
-        self._pending_details_key = None
-        if generation != self._selection_generation:
-            increment_memory_review_counter("stale_detail_refreshes_ignored")
-            return
-        if key is None:
+        # One authoritative finalization path owns the complete detail state.
+        # This must be deterministic for programmatic selection and must clear
+        # values absent from the new row. Only AI suggestion computation remains
+        # deferred by _request_category_suggestion().
+        if active_key is None:
             self._suggestion_request_id += 1
             self._suggestion_timer.stop()
             self._pending_suggestion_row = None
             self._clear_details()
-        elif key == self._selected_key:
-            row = self._row_for_key(key)
+        elif active_key == self._selected_key:
+            row = self._row_for_key(active_key)
             if row is not None:
-                self._show_details(row)
+                self._show_details(row, force=True)
         increment_memory_review_counter("selection_details_refreshes")
         record_memory_review(
-            "Selection deferred completion",
-            (time.perf_counter() - started) * 1000.0,
-            items=1 if key else 0,
+            "Selection highlight visible",
+            (time.perf_counter() - highlight_started) * 1000.0,
+            items=len(changed_keys),
         )
 
     def _update_selection_count(self) -> None:

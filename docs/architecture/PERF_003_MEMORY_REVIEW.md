@@ -41,29 +41,30 @@ suggestion. Range, select-all, and clear therefore paid one expensive card-style
 update per rendered item even when most selection states were unchanged.
 
 The follow-up applies styles only to the symmetric selection delta and updates
-the count once. The immediate path then returns so Qt can paint the changed
-cards. One generation-guarded, replaceable zero-delay callback refreshes details
-for the final active item. AI suggestions use a separate 120 ms
+the count once. The same authoritative finalization call then replaces every
+photo-specific detail field for the final active item. AI suggestions alone use
+a separate 120 ms
 single-shot timer, so rapid changes produce one suggestion for the final primary
 photo. Request identity and primary-photo checks reject stale results. Selection
 does not call filtering, sorting, scoring, persistence, thumbnail loading, or
 grid rebuild code.
 
-CI exposed why details cannot share the long suggestion debounce: selected keys
-and the active row could be committed while a 16 ms timer still represented an
-older selection, leaving blank or stale fields in minimal event flushes. The
-final design uses one zero-delay details callback with an explicit selection
-generation and final-key check; rapid clicks replace it before execution. The
-suggestion remains separately debounced and guarded by its own request generation
-and final active key.
+CI exposed why basic details cannot be deferred: selected keys and the active row
+could change while a replaceable callback still represented an older selection,
+leaving classification and pipeline fields stale. The final design synchronously
+and deterministically replaces filename, category/source/reason/summary, visual
+summary, confidence, decision, dates, pipeline/rejection, score explanations,
+preview state, selectors, and suggestion display state. Missing values actively
+write their defaults. Suggestion computation remains separately debounced and
+guarded by its request generation and final active key.
 
 Direct comparison with Cleanup Review also exposed two Memory Review-only costs
 before highlight visibility: rebuilding the visible-key list/index on every
 click, and toggling updates on the entire grid container. Visible-key indexes are
 now built only when filters/sort change, and selection no longer disables and
 re-enables the grid (which can schedule a full-container repaint). Only changed
-cards receive style updates; details, preview scaling/decoding, classification
-summary construction, and suggestions occur after the immediate phase.
+cards receive style updates. Detail correctness is finalized once for the active
+row; only suggestion computation remains asynchronous.
 
 A reproducible 10,000-iteration median CPU benchmark compared the former
 all-visible-card selection planning loop with the incremental delta calculation.

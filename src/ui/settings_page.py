@@ -475,7 +475,6 @@ class SettingsPage(QWidget):
             "Ctrl-click selection", "Deselection", "Shift range selection",
             "Select all visible", "Clear selection", "Selection highlight update",
             "Selection highlight visible", "Selected-count label update",
-            "Selection deferred completion",
             "Preview refresh", "Suggestion refresh", "Thumbnail refresh",
         )
         memory_lines = ["Recent aggregate timings (last / average / maximum)"]
