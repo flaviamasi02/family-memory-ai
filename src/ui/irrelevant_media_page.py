@@ -407,8 +407,6 @@ class IrrelevantMediaPage(QWidget):
         self._reload_category_selector_options()
         self._refresh_group_options()
         self._trigger_refresh(force=True)
-        if view == "history":
-            self._request_missing_history_thumbnails()
 
     def _select_cleanup_view(self, view: str) -> None:
         current = str(self.view_combo.currentData() or "review")
@@ -421,6 +419,8 @@ class IrrelevantMediaPage(QWidget):
         self.view_combo.blockSignals(False)
         self._sync_visible_view_switch(view)
         self._trigger_refresh(force=True)
+        if view == "history":
+            self._request_missing_history_thumbnails()
         target = self._view_scroll_positions.get(view, 0)
         self.thumbnail_grid.restore_scroll_value(target)
         QTimer.singleShot(50, lambda value=target: self.thumbnail_grid.restore_scroll_value(value))
@@ -435,7 +435,9 @@ class IrrelevantMediaPage(QWidget):
     def _request_missing_history_thumbnails(self) -> None:
         missing = []
         for row in self._visible_rows:
-            if self._thumbnail_for_photo(row.photo, (140, 140)) is None:
+            metadata = getattr(row.photo, "metadata", {}) or {}
+            if (self._thumbnail_for_photo(row.photo, (140, 140)) is None
+                    and not metadata.get("thumbnail_history_requested", False)):
                 row.photo.metadata["thumbnail_history_requested"] = True
                 missing.append(row.photo)
         if missing:
