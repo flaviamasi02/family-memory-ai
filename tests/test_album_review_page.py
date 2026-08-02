@@ -1066,7 +1066,7 @@ class AlbumReviewPageTests(unittest.TestCase):
         rebuilds_before = page.grid_rebuild_count()
         scroll_before = page.grid_scroll.verticalScrollBar().value()
 
-        target_key = page._row_key(page._visible_rows[9])
+        target_key = page._photo_key(breakdowns[9].photo)
         page._select_key(target_key, additive=True)
 
         changed_calls = sum(card.set_selected.call_count for card in cards)
@@ -1074,11 +1074,24 @@ class AlbumReviewPageTests(unittest.TestCase):
         self.assertEqual(page.grid_rebuild_count(), rebuilds_before)
         self.assertEqual(page.grid_scroll.verticalScrollBar().value(), scroll_before)
         self.assertEqual(page._details_key, target_key)
+        self.assertEqual(page.filename_value.text(), "photo_9.jpg")
 
-        second_key = page._row_key(page._visible_rows[12])
+        # With 423 rows, score sorting does not preserve numeric fixture order.
+        # Select the intended photo by its authoritative key, not visible index.
+        second_key = page._photo_key(breakdowns[12].photo)
         page._select_key(second_key, additive=False)
         self.assertEqual(page._details_key, second_key)
         self.assertEqual(page.filename_value.text(), "photo_12.jpg")
+        self.assertIs(page._current_details_row.breakdown.photo, breakdowns[12].photo)
+
+        stale_row = page._rows_by_key[target_key]
+        stale_generation = page._details_generation - 1
+        page._pending_preview_row = stale_row
+        page._preview_timer.setProperty("generation", page._preview_generation)
+        page._preview_timer.setProperty("details_generation", stale_generation)
+        page._complete_deferred_preview()
+        self.assertEqual(page.filename_value.text(), "photo_12.jpg")
+        self.assertIs(page._current_details_row.breakdown.photo, breakdowns[12].photo)
 
     def test_perf_003_twenty_ctrl_clicks_have_constant_card_work(self):
         breakdowns = [self._make_virtual_breakdown(index) for index in range(423)]

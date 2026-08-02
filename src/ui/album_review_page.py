@@ -273,6 +273,8 @@ class AlbumReviewPage(QWidget):
         self._selected_keys: set[str] = set()
         self._selection_anchor_key: Optional[str] = None
         self._details_key: Optional[str] = None
+        self._details_generation = 0
+        self._current_details_row: Optional[AlbumReviewRow] = None
         self._pending_render_index = 0
         self._initial_render_count = 100
         self._render_batch_size = 60
@@ -849,6 +851,7 @@ class AlbumReviewPage(QWidget):
                 photo.sync_intelligence_from_metadata()
 
     def set_scored_photos(self, scored_photos: List[AlbumScoreBreakdown]) -> None:
+        self._invalidate_detail_work()
         self._empty_reason_text = ""
         for item in scored_photos:
             self._ensure_category_fields(item.photo)
@@ -884,6 +887,7 @@ class AlbumReviewPage(QWidget):
         scored_breakdowns: Dict[str, AlbumScoreBreakdown],
         rejection_reasons: Optional[Dict[str, int]] = None,
     ) -> None:
+        self._invalidate_detail_work()
         self._empty_reason_text = ""
         self._candidate_count = len(candidate_photos or [])
         self._rejection_reasons_summary = dict(rejection_reasons or {})
@@ -968,6 +972,7 @@ class AlbumReviewPage(QWidget):
         if not force and view_signature == self._last_view_signature:
             return
 
+        self._invalidate_detail_work()
         previous_signature = self._last_view_signature
         self._last_view_signature = view_signature
         previous_scroll = self.grid_scroll.verticalScrollBar().value()
@@ -1417,6 +1422,8 @@ class AlbumReviewPage(QWidget):
             self._pending_suggestion_row = None
             self._clear_details()
         elif active_key == self._selected_key:
+            # Resolve once. Every basic field and deferred context must derive
+            # from this exact immutable selection snapshot.
             row = self._row_for_key(active_key)
             if row is not None:
                 self._show_details(row, force=True)
@@ -1482,7 +1489,10 @@ class AlbumReviewPage(QWidget):
         if not force and self._details_key == key:
             return
 
+        self._details_generation += 1
+        generation = self._details_generation
         self._details_key = key
+        self._current_details_row = row
         detail_started = time.perf_counter()
         photo = row.breakdown.photo
         breakdown = row.breakdown
@@ -1599,6 +1609,7 @@ class AlbumReviewPage(QWidget):
         self._preview_generation += 1
         self._pending_preview_row = row
         self._preview_timer.setProperty("generation", self._preview_generation)
+        self._preview_timer.setProperty("details_generation", generation)
         self._preview_timer.start(1)
 
         self._sync_selectors_to_row(row)
@@ -1623,11 +1634,16 @@ class AlbumReviewPage(QWidget):
         started = time.perf_counter()
         row = self._pending_preview_row
         generation = int(self._preview_timer.property("generation") or 0)
+        details_generation = int(
+            self._preview_timer.property("details_generation") or 0
+        )
         self._pending_preview_row = None
         if (
             row is None
             or generation != self._preview_generation
+            or details_generation != self._details_generation
             or self._row_key(row) != self._selected_key
+            or row is not self._current_details_row
         ):
             add_selection_count("Stale preview results ignored")
             return
@@ -1645,6 +1661,7 @@ class AlbumReviewPage(QWidget):
         )
 
     def _clear_details(self) -> None:
+        self._invalidate_detail_work()
         self._details_key = None
         self.preview_label.setPixmap(QPixmap())
         self.preview_label.setText("No preview")
@@ -1673,6 +1690,19 @@ class AlbumReviewPage(QWidget):
         self.apply_suggestion_button.setEnabled(False)
         self.reject_suggestion_button.setEnabled(False)
 
+    def _invalidate_detail_work(self) -> None:
+        """Invalidate every deferred context derived from a previous row."""
+        self._details_generation += 1
+        self._current_details_row = None
+        self._preview_generation += 1
+        if hasattr(self, "_preview_timer"):
+            self._preview_timer.stop()
+        self._pending_preview_row = None
+        self._suggestion_request_id += 1
+        if hasattr(self, "_suggestion_timer"):
+            self._suggestion_timer.stop()
+        self._pending_suggestion_row = None
+
     def on_embedding_index_updated(self) -> None:
         """Refresh advisory suggestions after background embeddings are committed."""
         self._category_suggestion_service.invalidate_cache()
@@ -1693,6 +1723,9 @@ class AlbumReviewPage(QWidget):
 
         self._pending_suggestion_row = row
         self._suggestion_timer.setProperty("request_id", request_id)
+        self._suggestion_timer.setProperty(
+            "details_generation", self._details_generation
+        )
         self._suggestion_timer.start()
         increment_memory_review_counter("suggestion_refreshes_deferred")
 
@@ -1700,8 +1733,16 @@ class AlbumReviewPage(QWidget):
         diagnostic_started = time.perf_counter()
         row = self._pending_suggestion_row
         request_id = int(self._suggestion_timer.property("request_id") or 0)
+        details_generation = int(
+            self._suggestion_timer.property("details_generation") or 0
+        )
         self._pending_suggestion_row = None
-        if row is None or request_id != self._suggestion_request_id:
+        if (
+            row is None
+            or request_id != self._suggestion_request_id
+            or details_generation != self._details_generation
+            or row is not self._current_details_row
+        ):
             increment_memory_review_counter("stale_suggestions_ignored")
             finish_selection_measurement(deferred=True)
             return
@@ -1713,7 +1754,9 @@ class AlbumReviewPage(QWidget):
             )
         if (
             request_id != self._suggestion_request_id
+            or details_generation != self._details_generation
             or self._details_key != self._row_key(row)
+            or row is not self._current_details_row
         ):
             increment_memory_review_counter("stale_suggestions_ignored")
             finish_selection_measurement(deferred=True)

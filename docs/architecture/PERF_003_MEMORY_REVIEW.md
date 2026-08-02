@@ -145,3 +145,17 @@ pending suggestion callback; neither callback accumulates per click, and their
 generation/current-key checks discard stale results. The 423-row Qt regression
 asserts 20 card style calls for 20 additions, one more for a removal, unchanged
 grid/thumbnail counts, exact final selection, and one active timer of each kind.
+
+## Authoritative detail-row snapshot
+
+The 423-row regression exposed an ambiguity that the earlier 100-row fixture hid:
+score sorting means visible index 12 can be `photo_202.jpg`, not `photo_12.jpg`.
+The test now selects the intended photos by stable photo key. Independently, the
+runtime finalization now resolves that key exactly once and stores the resulting
+row as the authoritative detail snapshot. All synchronous fields derive from that
+row. Preview and suggestion timers capture the same detail generation and row
+identity; callbacks must match generation, key, and object identity or are
+discarded. Clearing selection, replacing page data, or changing filter/sort
+invalidates both deferred contexts. The regression explicitly verifies
+`photo_9.jpg → photo_12.jpg` and invokes a stale preview generation to prove it
+cannot overwrite the final row.
