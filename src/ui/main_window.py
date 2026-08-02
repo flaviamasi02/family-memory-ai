@@ -183,6 +183,7 @@ class MainWindow(QMainWindow):
         self.people_review_page.pause_requested.connect(self._pause_face_processing)
         self.people_review_page.resume_requested.connect(self._resume_face_processing)
         self.people_review_page.cancel_requested.connect(self._cancel_face_processing)
+        self.people_review_page.skip_requested.connect(self._skip_face_processing)
         self.people_review_page.runtime_settings_requested.connect(self._open_face_runtime_settings)
         self.settings_page.face_runtime_ready_changed.connect(self.people_review_page.set_runtime_ready)
         self.people_review_page.set_runtime_ready(self.settings_page.face_runtime_manager.status().ready)
@@ -312,6 +313,7 @@ class MainWindow(QMainWindow):
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
         worker.progress.connect(self.people_review_page.show_scan_progress)
+        worker.stage_changed.connect(self.people_review_page.show_scan_stage)
         worker.completed.connect(self.people_review_page.show_scan_completed)
         worker.unavailable.connect(self._on_face_runtime_unavailable)
         worker.finished.connect(thread.quit)
@@ -351,6 +353,14 @@ class MainWindow(QMainWindow):
             page = getattr(self, "people_review_page", None)
             if page is not None:
                 page.progress_label.setText("Cancelling local face scan safely…")
+
+    def _skip_face_processing(self) -> None:
+        worker = getattr(self, "face_processing_worker", None)
+        if worker is not None:
+            worker.skip_current()
+            page = getattr(self, "people_review_page", None)
+            if page is not None:
+                page.progress_label.setText("Skipping the current photo safely…")
 
     def _on_face_processing_thread_finished(self) -> None:
         self.face_processing_worker = None

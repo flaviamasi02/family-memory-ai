@@ -263,6 +263,17 @@ class SQLiteFaceRepository:
         rows = self._embedding_rows("SELECT * FROM face_embeddings WHERE face_id=? AND model_key=?", (face_id, model_key))
         return rows[0] if rows else None
 
+    def embedding_face_ids(self, model_key: str, face_ids) -> set[str]:
+        """Return cached IDs in one bounded query instead of one query per face."""
+        values = tuple(str(value) for value in face_ids)
+        if not values: return set()
+        placeholders = ",".join("?" for _ in values)
+        with self._lock, self._connect() as connection:
+            rows = connection.execute(
+                f"SELECT face_id FROM face_embeddings WHERE model_key=? AND face_id IN ({placeholders})",
+                (model_key, *values)).fetchall()
+        return {str(row[0]) for row in rows}
+
     def embeddings_for_model(self, model_key: str, only_current: bool = True) -> list[FaceEmbedding]:
         query = "SELECT e.* FROM face_embeddings e"
         if only_current:

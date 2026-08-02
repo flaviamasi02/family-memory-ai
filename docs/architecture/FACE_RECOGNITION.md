@@ -107,6 +107,13 @@ or descriptor failure is reported separately and does not discard a usable face
 box or count the entire photo as a hard image failure. Completion and cancellation
 summaries group hard failures by worker error code and report crop, embedding, and
 persistence failures independently.
+Crop generation decodes each EXIF-oriented source once per photo, not once per
+face. Managed detections are bounds-checked, suppress boxes with at least 35%
+intersection-over-union, enforce a minimum side of 24 pixels or 1.5% of the shorter image
+dimension, and accept at most 50 candidates per image. Images reaching that cap
+are flagged as unusually face-heavy rather than allowed to create unbounded
+downstream work. Full clustering is deferred and runs once after scanning, not
+once per photo. Cached embedding lookup is one bounded query per photo.
 Technical invocation logs include executable, worker, return code, stdout,
 stderr, timeout, suffix, size, error type, startup duration, per-item duration,
 and process launch count, but omit source-photo paths. Successful results are

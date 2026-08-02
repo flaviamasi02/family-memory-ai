@@ -186,6 +186,7 @@ class LocalOpenCVFaceDetector:
         self.load_count = 0
         self.interpreter_path = str(interpreter_path or sys.executable)
         self.runtime_client = runtime_client or ManagedFaceRuntimeClient(self.interpreter_path, log_path)
+        self.last_detection_stats = {}
 
     @property
     def available(self) -> bool:
@@ -215,6 +216,14 @@ class LocalOpenCVFaceDetector:
             path = Path(image_path); response = self.runtime_client.invoke(
                 "detect", {"image_path": str(path)}, suffix=path.suffix,
                 size=path.stat().st_size if path.is_file() else 0)
+            self.last_detection_stats = {
+                "raw": int(response.get("raw_detection_count", len(response.get("faces", ())))),
+                "accepted": int(response.get("accepted_detection_count", len(response.get("faces", ())))),
+                "rejected": int(response.get("rejected_detection_count", 0)),
+                "unusually_many": bool(response.get("unusually_many_faces", False)),
+                "decode_ms": float(response.get("decode_ms", 0)),
+                "detection_ms": float(response.get("detection_ms", 0)),
+            }
             return tuple(FaceDetectionCandidate(BoundingBox(float(x["x"]), float(x["y"]),
                                                               float(x["width"]), float(x["height"])), x.get("confidence"))
                          for x in response.get("faces", ()))
@@ -245,23 +254,35 @@ class FaceCropCache:
         return self.root / f"{self.cache_key(face)}.jpg"
 
     def create(self, source: Path, face: Face) -> Path:
-        target = self.path_for(face)
-        if target.is_file():
-            return target
+        return self.create_many(source, (face,))[face.id]
+
+    def create_many(self, source: Path, faces: Sequence[Face]) -> dict[str, Path]:
+        """Decode the oriented source once, even when it contains many faces."""
+        pending = [face for face in faces if not self.path_for(face).is_file()]
+        results = {face.id: self.path_for(face) for face in faces if self.path_for(face).is_file()}
+        for face in faces:
+            if face.id in results:
+                face.crop_cache_key, face.crop_cache_path = self.cache_key(face), str(results[face.id])
+        if not pending:
+            return results
         reader = QImageReader(str(source)); reader.setAutoTransform(True)
         image = reader.read()
         if image.isNull():
             raise ValueError("Face crop source could not be decoded.")
-        box = face.bounding_box
-        px, py = box.width * self.padding, box.height * self.padding
-        left, top = max(0, int(box.x - px)), max(0, int(box.y - py))
-        right, bottom = min(image.width(), math.ceil(box.x + box.width + px)), min(image.height(), math.ceil(box.y + box.height + py))
-        crop = image.copy(QRect(left, top, max(1, right-left), max(1, bottom-top))).scaled(
-            QSize(self.size, self.size), aspectMode=1, mode=1)
-        if not crop.save(str(target), "JPEG", 88):
-            raise OSError("Face thumbnail could not be written.")
-        face.crop_cache_key, face.crop_cache_path = self.cache_key(face), str(target)
-        return target
+        for face in pending:
+            target = self.path_for(face)
+            box = face.bounding_box
+            px, py = box.width * self.padding, box.height * self.padding
+            left, top = max(0, int(box.x - px)), max(0, int(box.y - py))
+            right = min(image.width(), math.ceil(box.x + box.width + px))
+            bottom = min(image.height(), math.ceil(box.y + box.height + py))
+            crop = image.copy(QRect(left, top, max(1, right-left), max(1, bottom-top))).scaled(
+                QSize(self.size, self.size), aspectMode=1, mode=1)
+            if not crop.save(str(target), "JPEG", 88):
+                raise OSError("Face thumbnail could not be written.")
+            face.crop_cache_key, face.crop_cache_path = self.cache_key(face), str(target)
+            results[face.id] = target
+        return results
 
     def clear(self) -> None:
         for path in self.root.glob("*.jpg"):

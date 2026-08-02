@@ -4,6 +4,27 @@ import json, sys, time
 from pathlib import Path
 
 PROTOCOL_VERSION = "face-worker-v1"
+MAX_ACCEPTED_FACES = 50
+
+def _iou(a, b):
+    ax, ay, aw, ah = (int(v) for v in a); bx, by, bw, bh = (int(v) for v in b)
+    left, top, right, bottom = max(ax,bx), max(ay,by), min(ax+aw,bx+bw), min(ay+ah,by+bh)
+    intersection = max(0,right-left)*max(0,bottom-top)
+    union = aw*ah+bw*bh-intersection
+    return intersection/union if union else 0.0
+
+def _accepted_boxes(boxes, width, height):
+    """Deterministic bounds validation and overlap suppression."""
+    minimum = max(24, int(min(width, height)*.015))
+    valid = [(int(x),int(y),int(w),int(h)) for x,y,w,h in boxes
+             if int(w)>=minimum and int(h)>=minimum and int(x)>=0 and int(y)>=0
+             and int(x)+int(w)<=width and int(y)+int(h)<=height]
+    accepted = []
+    for box in sorted(valid, key=lambda item: (-item[2]*item[3], item[1], item[0])):
+        if all(_iou(box, prior)<.35 for prior in accepted): accepted.append(box)
+    limited = len(accepted)>MAX_ACCEPTED_FACES
+    returned = accepted[:MAX_ACCEPTED_FACES]
+    return returned, len(boxes)-len(returned), limited
 
 def emit(value):
     sys.stdout.write(json.dumps(value, ensure_ascii=True, separators=(",", ":")) + "\n")
@@ -44,6 +65,7 @@ def process(request, runtime):
     if not source.is_file():
         return fail(request_id, started, "image", "source_missing", "The source image is missing.")
     if operation == "detect":
+        decode_started = time.perf_counter()
         try:
             with Image.open(source) as opened:
                 image = np.asarray(ImageOps.exif_transpose(opened).convert("RGB"))
@@ -51,10 +73,19 @@ def process(request, runtime):
             return fail(request_id, started, "image", "decode_failed", "This image could not be decoded.")
         except Exception:
             return fail(request_id, started, "image", "image_processing_failed", "This image could not be prepared for face detection.")
+        decode_ms = (time.perf_counter()-decode_started)*1000
         try:
+            detection_started = time.perf_counter()
             gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-            faces = model.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(24, 24))
-            return response(request_id, started, ok=True, faces=[{"x":int(x),"y":int(y),"width":int(w),"height":int(h),"confidence":.8} for x,y,w,h in faces])
+            raw = model.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(24, 24))
+            faces, rejected, limited = _accepted_boxes(raw, image.shape[1], image.shape[0])
+            return response(request_id, started, ok=True,
+                            faces=[{"x":x,"y":y,"width":w,"height":h,"confidence":.8} for x,y,w,h in faces],
+                            raw_detection_count=int(len(raw)), accepted_detection_count=int(len(faces)),
+                            rejected_detection_count=int(rejected), unusually_many_faces=bool(limited),
+                            image_width=int(image.shape[1]), image_height=int(image.shape[0]),
+                            decode_ms=float(round(decode_ms,3)),
+                            detection_ms=float(round((time.perf_counter()-detection_started)*1000,3)))
         except Exception:
             return fail(request_id, started, "image", "detection_failed", "Face detection failed for this image.")
     if operation == "embed":

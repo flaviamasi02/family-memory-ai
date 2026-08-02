@@ -300,3 +300,49 @@ def test_high_failure_warning_shows_top_reason_and_can_cancel(tmp_path, monkeypa
     assert "top reason: crop_failed" in page.progress_label.text()
     assert cancelled == [True]
     app.processEvents()
+
+
+def test_duplicate_detection_filter_is_bounded_and_deterministic():
+    from faces.managed_worker import MAX_ACCEPTED_FACES, _accepted_boxes
+    boxes = [(10, 10, 100, 100), (12, 12, 98, 98), (300, 300, 80, 80)]
+    accepted, rejected, limited = _accepted_boxes(boxes, 1000, 1000)
+    assert accepted == [(10, 10, 100, 100), (300, 300, 80, 80)]
+    assert rejected == 1 and not limited
+    many = [(index * 30, 0, 25, 25) for index in range(MAX_ACCEPTED_FACES + 5)]
+    accepted, _, limited = _accepted_boxes(many, 2000, 1000)
+    assert len(accepted) == MAX_ACCEPTED_FACES and limited
+
+
+def test_many_faces_decode_source_once_and_cluster_once(tmp_path):
+    class ManyDetector(FakeDetector):
+        def detect(self, path, cancel_event=None):
+            return tuple(FaceDetectionCandidate(BoundingBox(i * 12, 1, 10, 10), .9) for i in range(20))
+    class BatchCrop(FakeCropCache):
+        calls = 0
+        def create_many(self, path, faces):
+            self.calls += 1
+            return {face.id: self.create(path, face) for face in faces}
+    class CountingClusterer:
+        calls = 0
+        def cluster(self, embeddings, existing=()): self.calls += 1; return ()
+    path = tmp_path / "group.jpg"; path.write_bytes(b"fixture")
+    crop, clusterer = BatchCrop(), CountingClusterer()
+    worker = FaceProcessingWorker([photo(path, "group")], SQLiteFaceRepository(tmp_path / "faces.sqlite3"),
+                                  ManyDetector(), FakeEmbedder(), clusterer=clusterer, crop_cache=crop)
+    worker.run()
+    assert crop.calls == 1
+    assert clusterer.calls == 1
+
+
+def test_stage_updates_and_skip_control_are_wired(tmp_path):
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow(); worker = SimpleNamespace(skip_current=lambda: setattr(worker, "skipped", True), skipped=False)
+    window.face_processing_worker = worker
+    window._skip_face_processing()
+    assert worker.skipped
+    window.people_review_page.show_scan_stage({"stage":"embedding faces", "current":"safe-name.jpg",
+                                               "elapsed_seconds":31, "faces":12})
+    assert "embedding faces" in window.people_review_page.progress_label.text()
+    assert "taking longer" in window.people_review_page.progress_label.text()
+    window.face_processing_worker = None
+    window.close(); app.processEvents()

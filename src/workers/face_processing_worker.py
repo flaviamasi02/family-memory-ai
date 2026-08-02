@@ -55,6 +55,7 @@ class PhotoProcessingOutcome:
 
 class FaceProcessingWorker(QObject):
     progress = Signal(object)
+    stage_changed = Signal(object)
     completed = Signal(object)
     unavailable = Signal(str)
     finished = Signal()
@@ -68,6 +69,7 @@ class FaceProcessingWorker(QObject):
         self.embedder = embedder or LocalFaceEmbeddingProvider(self.crop_cache)
         self.clusterer = clusterer or ConservativeFaceClusterer()
         self._cancel = Event()
+        self._skip = Event()
         self._pause = Condition()
         self._paused = False
 
@@ -85,6 +87,10 @@ class FaceProcessingWorker(QObject):
         self.resume()
         self._close_runtime()
 
+    def skip_current(self):
+        self._skip.set()
+        self._close_runtime()
+
     def run(self):
         total = len(self.photos)
         progress = FaceScanProgress(total, remaining=total)
@@ -96,6 +102,7 @@ class FaceProcessingWorker(QObject):
             decoded = photos_with_faces = crop_failures = embedding_failures = persistence_failures = 0
             failure_reasons = {}; run_started = time.perf_counter()
             for photo in self.photos:
+                self._skip.clear()
                 with self._pause:
                     while self._paused and not self._cancel.is_set():
                         self._pause.wait()
@@ -165,6 +172,8 @@ class FaceProcessingWorker(QObject):
 
     def _process_photo(self, photo):
         path, image_id = Path(photo.path), self._image_id(photo)
+        image_started = time.perf_counter(); timings = {}
+        self._stage(photo, "checking cached results", image_started)
         fingerprint = self._fingerprint(photo)
         detector_key = f"{self.detector.provider_id}|{self.detector.model_revision}"
         existing = self.repository.faces_for_image(image_id)
@@ -177,8 +186,21 @@ class FaceProcessingWorker(QObject):
             self.repository.save_processing_result(image_id, fingerprint, detector_key, "success", len(existing))
             return PhotoProcessingOutcome(len(existing), reused=True)
         self.repository.delete_faces_for_image(image_id)
-        candidates = self.detector.detect(path, self._cancel)
+        self._stage(photo, "decoding and detecting faces", image_started)
+        started = time.perf_counter()
+        try:
+            candidates = self.detector.detect(path, self._cancel)
+        except FaceModelUnavailable as exc:
+            if self._skip.is_set():
+                raise FaceImageProcessingError("skipped", "This slow photo was skipped.") from exc
+            raise
+        timings["detection_ms"] = (time.perf_counter()-started)*1000
+        detection_stats = dict(getattr(self.detector, "last_detection_stats", {}) or {})
+        timings["decode_ms"] = detection_stats.get("decode_ms", 0)
+        timings["managed_detection_ms"] = detection_stats.get("detection_ms", timings["detection_ms"])
+        self._stage(photo, "persisting detections", image_started, len(candidates), detection_stats)
         faces = []; crop_failures = persistence_failures = 0
+        started = time.perf_counter()
         for candidate in candidates:
             stable = hashlib.sha256(f"{image_id}|{fingerprint}|{candidate.bounding_box.to_dict()}|{detector_key}".encode()).hexdigest()
             face = Face(image_id=image_id, id=stable, source_fingerprint=fingerprint,
@@ -194,25 +216,41 @@ class FaceProcessingWorker(QObject):
                 self._log_stage(photo, "persist", "persistence_failed", exc)
                 continue
             faces.append(face)
-            try:
-                self.crop_cache.create(path, face)
-                self.repository.save_face(face)
-            except Exception as exc:
-                crop_failures += 1
-                face.processing_error = "crop_failed"
-                self._log_stage(photo, "crop", "crop_failed", exc)
-                try: self.repository.save_face(face)
-                except Exception: persistence_failures += 1
         if candidates and not faces:
             raise FaceImageProcessingError(
                 "persistence_failed", "Detected faces could not be saved for this image.")
+        timings["detection_persistence_ms"] = (time.perf_counter()-started)*1000
+        if faces:
+            self._stage(photo, "creating face thumbnails", image_started, len(faces), detection_stats)
+            started = time.perf_counter()
+            try:
+                create_many = getattr(self.crop_cache, "create_many", None)
+                if create_many is not None:
+                    create_many(path, faces)
+                else:
+                    for face in faces: self.crop_cache.create(path, face)
+                for face in faces: self.repository.save_face(face)
+            except Exception as exc:
+                crop_failures += len(faces)
+                self._log_stage(photo, "crop", "crop_failed", exc)
+                for face in faces:
+                    face.processing_error = "crop_failed"
+                    try: self.repository.save_face(face)
+                    except Exception: persistence_failures += 1
+            timings["crop_ms"] = (time.perf_counter()-started)*1000
         if faces:
             model_key = (f"{self.embedder.provider_id}|{self.embedder.model_id}|"
                          f"{self.embedder.model_revision}|dim={self.embedder.embedding_dimension}")
-            missing = [face for face in faces if face.crop_cache_path and
-                       self.repository.get_embedding(face.id, model_key) is None]
+            cached_embedding_ids = self.repository.embedding_face_ids(model_key, (face.id for face in faces))
+            missing = [face for face in faces if face.crop_cache_path and face.id not in cached_embedding_ids]
             embedding_failures = 0
+            self._stage(photo, "embedding faces", image_started, len(faces), detection_stats)
+            started = time.perf_counter()
             for face in missing:
+                if self._skip.is_set():
+                    embedding_failures += 1
+                    face.processing_error = "embedding_skipped"
+                    continue
                 try:
                     embeddings = self.embedder.embed(path, (face,), self._cancel)
                     for embedding in embeddings: self.repository.save_embedding(embedding)
@@ -223,11 +261,17 @@ class FaceProcessingWorker(QObject):
                     self._log_stage(photo, "embed", "embedding_failed", exc)
                     try: self.repository.save_face(face)
                     except Exception: persistence_failures += 1
+            timings["embedding_ms"] = (time.perf_counter()-started)*1000
+        self._stage(photo, "saving processing result", image_started, len(faces), detection_stats)
+        started = time.perf_counter()
         try:
             self.repository.save_processing_result(image_id, fingerprint, detector_key, "success", len(faces))
         except Exception as exc:
             persistence_failures += 1
             self._log_stage(photo, "persist", "persistence_failed", exc)
+        timings["result_persistence_ms"] = (time.perf_counter()-started)*1000
+        timings["total_ms"] = (time.perf_counter()-image_started)*1000
+        self._log_timings(photo, timings, detection_stats, len(faces))
         return PhotoProcessingOutcome(len(faces), False, crop_failures,
                                       embedding_failures if faces else 0, persistence_failures)
 
@@ -245,6 +289,24 @@ class FaceProcessingWorker(QObject):
         with Path(log_path).open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(record, ensure_ascii=True) + "\n")
 
+    def _log_timings(self, photo, timings, detection_stats, accepted_count):
+        client = getattr(self.detector, "runtime_client", None)
+        log_path = getattr(client, "log_path", None)
+        if log_path is None: return
+        path = Path(getattr(photo, "path", ""))
+        record = {"time": datetime.now(timezone.utc).isoformat(), "operation": "image_summary",
+                  "image_suffix": path.suffix.casefold(), "image_size": path.stat().st_size if path.is_file() else 0,
+                  "raw_detections": detection_stats.get("raw", accepted_count),
+                  "accepted_detections": accepted_count,
+                  "rejected_detections": detection_stats.get("rejected", 0), **timings}
+        with Path(log_path).open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(record, ensure_ascii=True) + "\n")
+
+    def _stage(self, photo, stage, image_started, faces=0, detection_stats=None):
+        self.stage_changed.emit({"stage": stage, "current": str(getattr(photo, "filename", "")),
+                                 "elapsed_seconds": time.perf_counter()-image_started,
+                                 "faces": int(faces), "detection_stats": detection_stats or {}})
+
     def _close_runtime(self):
         clients = {getattr(self.detector, "runtime_client", None), getattr(self.embedder, "runtime_client", None)}
         for client in clients:
@@ -257,6 +319,7 @@ class FaceProcessingWorker(QObject):
         return (float(client.startup_ms), sum(values)/len(values), statistics.median(values), max(values))
 
     def _rebuild_clusters(self):
+        self.stage_changed.emit({"stage": "building face groups", "current": "", "elapsed_seconds": 0, "faces": 0})
         model_key = (f"{self.embedder.provider_id}|{self.embedder.model_id}|"
                      f"{self.embedder.model_revision}|dim={self.embedder.embedding_dimension}")
         clusters = self.clusterer.cluster(self.repository.embeddings_for_model(model_key), self.repository.list_clusters())

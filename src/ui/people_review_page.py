@@ -1,8 +1,9 @@
 """Product-owner controlled People Review workspace."""
 
 from __future__ import annotations
+import time
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QTimer, Signal
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QListWidget, QMessageBox,
                                QPushButton, QVBoxLayout, QWidget)
 
@@ -25,6 +26,7 @@ class PeopleReviewPage(QWidget):
     pause_requested = Signal()
     resume_requested = Signal()
     cancel_requested = Signal()
+    skip_requested = Signal()
     runtime_settings_requested = Signal()
 
     def __init__(self, repository: SQLiteFaceRepository | None = None, parent=None):
@@ -32,6 +34,8 @@ class PeopleReviewPage(QWidget):
         self.repository = repository or SQLiteFaceRepository()
         self._photos = []
         self._failure_warning_shown = False
+        self._stage_detail = None
+        self._stage_started = 0.0
         layout = QVBoxLayout(self)
         self.header = WorkspaceHeader("People Review")
         self.header.help_clicked.connect(lambda: self.help_requested.emit(self.WORKSPACE_ID))
@@ -45,6 +49,8 @@ class PeopleReviewPage(QWidget):
         layout.addWidget(self.info_panel)
         layout.addWidget(QLabel("Face processing happens locally on this computer. Photos are never uploaded, and no identity is claimed without your confirmation."))
         self.progress_label = QLabel("Choose Scan eligible photos for faces to begin."); layout.addWidget(self.progress_label)
+        self._stage_timer = QTimer(self); self._stage_timer.setInterval(1000)
+        self._stage_timer.timeout.connect(self._refresh_stage_text)
         self.open_runtime_settings_button = QPushButton("Open Face Runtime Settings")
         self.open_runtime_settings_button.clicked.connect(self.runtime_settings_requested.emit)
         layout.addWidget(self.open_runtime_settings_button)
@@ -53,9 +59,11 @@ class PeopleReviewPage(QWidget):
         self.pause_button = QPushButton("Pause")
         self.resume_button = QPushButton("Resume")
         self.cancel_button = QPushButton("Cancel")
+        self.skip_button = QPushButton("Skip current photo")
         self.rebuild_button = QPushButton("Rebuild clusters")
         for button, signal in ((self.scan_button, self._scan), (self.pause_button, self.pause_requested.emit),
-                               (self.resume_button, self.resume_requested.emit), (self.cancel_button, self.cancel_requested.emit),
+                               (self.resume_button, self.resume_requested.emit), (self.skip_button, self.skip_requested.emit),
+                               (self.cancel_button, self.cancel_requested.emit),
                                (self.rebuild_button, self.refresh)):
             button.clicked.connect(signal); controls.addWidget(button)
         layout.addLayout(controls)
@@ -91,6 +99,23 @@ class PeopleReviewPage(QWidget):
         self.pause_button.setEnabled(state == "running")
         self.resume_button.setEnabled(paused)
         self.cancel_button.setEnabled(active)
+        self.skip_button.setEnabled(active)
+
+    def show_scan_stage(self, detail) -> None:
+        self._stage_detail = dict(detail)
+        self._stage_started = time.monotonic() - float(detail.get("elapsed_seconds", 0))
+        self._stage_timer.start()
+        self._refresh_stage_text()
+
+    def _refresh_stage_text(self) -> None:
+        if not self._stage_detail: return
+        detail = self._stage_detail
+        elapsed = time.monotonic() - self._stage_started
+        slow = " This photo is taking longer than expected." if elapsed >= 30 else ""
+        self.progress_label.setText(
+            f"Current stage: {detail.get('stage', 'working')} | Current photo: {detail.get('current', '')} | "
+            f"Elapsed: {elapsed:.1f}s | Faces in current photo: {int(detail.get('faces', 0))}.{slow}"
+        )
 
     def set_runtime_ready(self, ready: bool) -> None:
         self._runtime_ready = bool(ready)
@@ -124,6 +149,7 @@ class PeopleReviewPage(QWidget):
                 self.cancel_requested.emit()
 
     def show_scan_completed(self, progress) -> None:
+        self._stage_timer.stop(); self._stage_detail = None
         self.refresh(); self.set_scan_state("idle")
         outcome = "cancelled safely" if progress.cancelled else "complete"
         reasons = ", ".join(f"{code}: {count}" for code, count in progress.failure_reasons) or "none"
